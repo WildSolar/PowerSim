@@ -32,6 +32,11 @@ export function dayOfWeek(dateMs: number): number {
 }
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+export function formatWeekday(simTimeMs: number): string {
+  return WEEKDAY_NAMES[dayOfWeek(toDateMs(simTimeMs))];
+}
 
 export function formatDate(simTimeMs: number): string {
   const d = new Date(toDateMs(simTimeMs));

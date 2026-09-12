@@ -1,7 +1,7 @@
 import { simClock } from "../sim/engine";
 import { ghiWm2 } from "../sim/pv";
 import { useSimTime, useSimSpeed } from "../sim/store";
-import { formatDate, formatTime } from "../sim/calendar";
+import { formatDate, formatTime, formatWeekday } from "../sim/calendar";
 import { weatherAt } from "../sim/weather";
 import { dayNightStatus } from "./dayNightDisplay";
 import { CONDITION_ICON, CONDITION_LABEL } from "./weatherDisplay";
@@ -31,7 +31,7 @@ export function TimeControl() {
     <div className="time-control">
       <h3 className="panel-title">Info</h3>
       <div className="clock-readout">
-        {formatDate(simTimeMs)} · {formatTime(simTimeMs)}
+        {formatWeekday(simTimeMs)}, {formatDate(simTimeMs)} · {formatTime(simTimeMs)}
       </div>
       <div className="info-row">
         <span>{dayNight.icon}</span>
