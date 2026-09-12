@@ -11,6 +11,7 @@ import {
   HISTORY_REFRESH_MS,
 } from "../sim/history";
 import { pvPowerForBuildingW } from "../sim/pv";
+import { snowDepthCm } from "../sim/snow";
 import { useSimTime, useTariff } from "../sim/store";
 import { HistoryChart } from "./HistoryChart";
 import { useHistorySeries } from "./useHistorySeries";
@@ -33,7 +34,8 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
 
   const buildingPlants = plants.filter((p) => p.egid === building.egid && p.technology === "Photovoltaic");
   const hasSolar = buildingPlants.length > 0;
-  const solarGenerationW = hasSolar ? -pvPowerForBuildingW(building.egid, plants, simTimeMs) : 0;
+  const snowCoverCm = hasSolar ? snowDepthCm(simTimeMs) : 0;
+  const solarGenerationW = hasSolar ? -pvPowerForBuildingW(building.egid, plants, simTimeMs, snowCoverCm) : 0;
   const solarCapacityKw = buildingPlants.reduce((sum, p) => sum + (p.capacityKw ?? 0), 0);
 
   const history = useHistorySeries(
@@ -89,6 +91,7 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
             <span className="device-name">
               ☀️ Generation
               <span className="ev-badge responsive">{solarCapacityKw.toFixed(1)} kWp installed</span>
+              {snowCoverCm > 0 && <span className="ev-badge">❄️ {snowCoverCm.toFixed(1)} cm snow</span>}
             </span>
             <span className={`device-watts${solarGenerationW === 0 ? " off" : ""}`}>{formatWatts(solarGenerationW)}</span>
           </div>

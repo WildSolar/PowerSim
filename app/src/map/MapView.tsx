@@ -11,6 +11,7 @@ import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
 import { buildingHeightM } from "../sim/buildingGeometry";
 import { buildingPowerW } from "../sim/buildingPower";
 import { simClock } from "../sim/engine";
+import { snowDepthCm } from "../sim/snow";
 import {
   buildingCategoryBucket,
   buildingHeatingBucket,
@@ -276,11 +277,12 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode }: 
       if (!polySource || !pointSource || !polyData || !pointData) return;
 
       const simTimeMs = simClock.getSimTimeMs();
+      const snowCoverCm = snowDepthCm(simTimeMs);
       let minW = 0;
       let maxW = 0;
       for (const feature of [...polyData.features, ...pointData.features]) {
         const building = buildingsByEgid.get(feature.properties.egid);
-        const power = building ? buildingPowerW(building, simTimeMs, dataset.powerPlants) : 0;
+        const power = building ? buildingPowerW(building, simTimeMs, dataset.powerPlants, snowCoverCm) : 0;
         feature.properties.powerW = power;
         if (power > maxW) maxW = power;
         if (power < minW) minW = power;

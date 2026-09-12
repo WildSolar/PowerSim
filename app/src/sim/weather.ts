@@ -69,9 +69,19 @@ export function weatherAt(simTimeMs: number): Weather {
   const dateMs = toDateMs(simTimeMs);
   const base = seasonalTempC(dateMs) + diurnalTempC(dateMs) + tempAnomalyC(dateMs);
 
+  // Averaging two independent noise channels (the original 0.7/0.3 blend) pulls the
+  // combined signal toward the middle — two roughly-independent values rarely land
+  // near the same extreme at once — which made genuinely clear or genuinely overcast
+  // stretches statistically rare (verified: ~4% overcast, 0% precipitation across a
+  // simulated year). Leaning almost entirely on one channel keeps its full spread;
+  // the second just adds minor day-to-day texture. A contrast stretch widens that
+  // back toward the extremes, and a small upward bias matches a temperate central-
+  // European climate (more grey than blue-sky on average) rather than a 50/50 split.
   const cloudSystemNoise = valueNoise("cloud-system", dateMs, WEATHER_SYSTEM_PERIOD_MS);
   const cloudDailyNoise = valueNoise("cloud-daily", dateMs, DAILY_WOBBLE_PERIOD_MS * 0.6);
-  const cloudiness = Math.min(1, Math.max(0, (cloudSystemNoise * 0.7 + cloudDailyNoise * 0.3 + 1) / 2));
+  const rawCloudiness = (cloudSystemNoise * 0.85 + cloudDailyNoise * 0.15 + 1) / 2;
+  const stretched = 0.5 + (rawCloudiness - 0.5) * 1.4 + 0.08;
+  const cloudiness = Math.min(1, Math.max(0, stretched));
 
   const tempC = base - cloudiness * 2; // overcast days run a little cooler
 

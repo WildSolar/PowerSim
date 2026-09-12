@@ -24,6 +24,7 @@ import { buildingEvTraits, evPowerWFromTraits, type EvTraits } from "./ev";
 import { heatPumpPowerWWithWeather } from "./heatPump";
 import { pvPowerW } from "./pv";
 import { hashSeed } from "./rng";
+import { snowDepthCm } from "./snow";
 import type { Tariff } from "./tariff";
 import { dailyMeanTempC, weatherAt } from "./weather";
 
@@ -103,8 +104,12 @@ function heatPumpSeries(buildings: Building[], times: number[]): number[] {
   });
 }
 
+/** Snow cover changes on a day+ timescale, so one value for the whole (24h) chart
+ * window is a fine approximation — computing it fresh per sample would mean redoing
+ * nearly the same 30-day lookback 96 times over for almost no accuracy gain. */
 function pvSeries(plants: PowerPlant[], times: number[]): number[] {
-  return times.map((t) => plants.reduce((sum, plant) => sum + pvPowerW(plant, t), 0));
+  const snowCoverCm = snowDepthCm(times[times.length - 1]);
+  return times.map((t) => plants.reduce((sum, plant) => sum + pvPowerW(plant, t, snowCoverCm), 0));
 }
 
 /** Just the PV contribution for one building's own roof — for a dedicated "solar
