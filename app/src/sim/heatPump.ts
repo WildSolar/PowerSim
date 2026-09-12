@@ -19,6 +19,7 @@
 
 import type { Building } from "../data/types";
 import { buildingEnvelopeAreaM2 } from "./buildingGeometry";
+import { impliesHeatPump } from "./heatPumpSources";
 import { dailyMeanTempC, weatherAt } from "./weather";
 
 const HEATING_THRESHOLD_C = 12; // day's characteristic temp above this -> heating off for the day
@@ -31,7 +32,10 @@ function copAt(outsideTempC: number): number {
 }
 
 export function hasHeatPump(building: Building): boolean {
-  return building.heatingGenerator === "Wärmepumpe für ein Gebäude" || building.heatingGenerator === "Wärmepumpe für mehrere Gebäude";
+  if (building.heatingGenerator === "Wärmepumpe für ein Gebäude" || building.heatingGenerator === "Wärmepumpe für mehrere Gebäude") {
+    return true;
+  }
+  return impliesHeatPump(building.heatingEnergySource);
 }
 
 /** Takes weather already evaluated by the caller — worth it when scanning many

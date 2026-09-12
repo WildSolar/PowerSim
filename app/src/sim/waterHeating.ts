@@ -5,19 +5,22 @@
  * behavior (showers, dishes), not heat loss. So instead of heatPump.ts's
  * envelope-area/deltaT model, each dwelling gets its own independently duty-cycling
  * heating element (mirroring devices.ts's fridge/lighting pattern), gated at the
- * building level by whether GWR records an electric hot water system at all.
- * Modeling a shared boiler as N independently-cycling per-dwelling loads is a
- * simplification, but it reproduces what matters: a diurnal shape (morning/evening
- * shower peaks) and a total that scales with how many dwellings the building serves.
+ * building level by whether GWR records a system that draws grid electricity at all
+ * — either directly ("Elektrizität": a resistive tank) or via a heat pump (any of
+ * the ground/water/air reservoir sources — see heatPumpSources.ts). Modeling a
+ * shared boiler as N independently-cycling per-dwelling loads is a simplification,
+ * but it reproduces what matters: a diurnal shape (morning/evening shower peaks)
+ * and a total that scales with how many dwellings the building serves.
  */
 
 import type { Building, Dwelling } from "../data/types";
+import { impliesHeatPump } from "./heatPumpSources";
 import { bucketRandom, hashSeed, mulberry32 } from "./rng";
 
 const ELECTRIC_SOURCE = "Elektrizität";
 
 export function hasElectricWaterHeating(building: Building): boolean {
-  return building.hotWaterEnergySource === ELECTRIC_SOURCE;
+  return building.hotWaterEnergySource === ELECTRIC_SOURCE || impliesHeatPump(building.hotWaterEnergySource);
 }
 
 export interface WaterHeaterProfile {
