@@ -14,8 +14,8 @@
  * (also depending on temperature/cloudiness) is a natural next consumer.
  */
 
-import { hashSeed, mulberry32 } from "./rng";
 import { toDateMs, dayOfYear } from "./calendar";
+import { valueNoise } from "./valueNoise";
 
 const DAY_MS = 24 * 60 * 60_000;
 const HOUR_MS = 3_600_000;
@@ -29,25 +29,6 @@ const DIURNAL_PEAK_HOUR = 15;
 const WEATHER_SYSTEM_PERIOD_MS = 5 * DAY_MS; // a passing high/low pressure system
 const DAILY_WOBBLE_PERIOD_MS = 1.3 * DAY_MS;
 const PRECIP_ROLL_PERIOD_MS = 6 * HOUR_MS;
-
-function smoothstep(t: number): number {
-  return t * t * (3 - 2 * t);
-}
-
-/** A deterministic anchor value in [-1, 1] for the given noise channel and integer index. */
-function noiseAnchor(channel: string, index: number): number {
-  return mulberry32(hashSeed("weather-noise", channel, String(index)))() * 2 - 1;
-}
-
-/** Smoothly-interpolated noise in [-1, 1] — floor+subtract (not `%`) so it's well-defined for negative t too. */
-function valueNoise(channel: string, tMs: number, periodMs: number): number {
-  const idxFloat = tMs / periodMs;
-  const idx = Math.floor(idxFloat);
-  const frac = smoothstep(idxFloat - idx);
-  const a = noiseAnchor(channel, idx);
-  const b = noiseAnchor(channel, idx + 1);
-  return a + (b - a) * frac;
-}
 
 function seasonalTempC(dateMs: number): number {
   const phase = (2 * Math.PI * (dayOfYear(dateMs) - SEASONAL_PEAK_DAY_OF_YEAR)) / 365.25;

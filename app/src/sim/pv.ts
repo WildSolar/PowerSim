@@ -4,24 +4,35 @@
  * buildings have solar, and how big, is already known from real data.
  *
  * Model: standard solar-geometry approximations (declination, hour angle -> solar
- * elevation) give a clear-sky irradiance proportional to sin(elevation), attenuated
- * by weather.ts's cloudiness. A plant's output scales its nameplate (STC) capacity
- * by the ratio of current irradiance to the ~1000 W/m2 STC reference — ignoring
- * panel temperature derating, inverter losses, tilt/orientation, and shading, all of
- * which are real but second-order next to "is it day, is it summer, is it cloudy."
- * Pure function of (plant, simTime) like everything else here, so it composes with
+ * elevation) give a clear-sky irradiance proportional to sin(elevation). weather.ts's
+ * cloudiness sets the *smooth, day-scale* attenuation (a persistently overcast week
+ * transmits less on average than a clear one) — but real cloud cover isn't a dimmer
+ * switch, it's individual clouds passing in front of the sun, so a second, much
+ * faster noise channel ("passing clouds", ~10min timescale) makes irradiance actually
+ * flicker on a cloudy day, scaled by how much cloud there is to flicker (negligible
+ * on a clear day, since there's nothing passing in front of the sun to begin with).
+ * This one signal is shared by every plant in the municipality — it's entirely
+ * reasonable for panels a few km apart to see the same sky at the same moment, and
+ * it means the flicker only needs computing once per instant, not once per plant.
+ * Everything ignores panel temperature derating, inverter losses, tilt/orientation,
+ * and shading — real but second-order next to "is it day, is it summer, is a cloud
+ * over the sun right now." Pure function of (plant, simTime), so it composes with
  * history sampling for free.
  */
 
 import type { PowerPlant } from "../data/types";
 import { toDateMs, dayOfYear } from "./calendar";
+import { valueNoise } from "./valueNoise";
 import { weatherAt } from "./weather";
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
+const MINUTE_MS = 60_000;
 const SCHLIEREN_LATITUDE_DEG = 47.4;
 const PEAK_IRRADIANCE_WM2 = 1000; // STC reference
-const CLOUD_ATTENUATION = 0.8; // fraction of clear-sky irradiance lost at full overcast
+const CLOUD_ATTENUATION = 0.8; // fraction of clear-sky irradiance lost at full overcast, on average
+const PASSING_CLOUD_PERIOD_MS = 11 * MINUTE_MS;
+const PASSING_CLOUD_STRENGTH = 0.5; // how hard passing clouds can swing transmittance, scaled by cloudiness
 
 function solarDeclinationDeg(doy: number): number {
   return 23.45 * Math.sin((2 * Math.PI * (284 + doy)) / 365);
@@ -37,14 +48,22 @@ function solarElevationDeg(dateMs: number): number {
   return (Math.asin(Math.min(1, Math.max(-1, sinElevation))) * 180) / Math.PI;
 }
 
-/** Irradiance in W/m2 at the given simulated time, weather (cloudiness) included. */
+/** Irradiance in W/m2 at the given simulated time, weather (cloudiness, plus a fast
+ * "passing clouds" flicker) included. */
 export function irradianceWm2(simTimeMs: number): number {
   const dateMs = toDateMs(simTimeMs);
   const elevationDeg = solarElevationDeg(dateMs);
   if (elevationDeg <= 0) return 0;
   const clearSky = PEAK_IRRADIANCE_WM2 * Math.sin((elevationDeg * Math.PI) / 180);
+
   const cloudiness = weatherAt(simTimeMs).cloudiness;
-  return clearSky * (1 - cloudiness * CLOUD_ATTENUATION);
+  const smoothTransmittance = 1 - cloudiness * CLOUD_ATTENUATION;
+  // Flicker amplitude scales with cloudiness: ~0 on a clear day (nothing to pass in
+  // front of the sun), up to +/-PASSING_CLOUD_STRENGTH once fully overcast.
+  const flicker = valueNoise("pv-passing-cloud", dateMs, PASSING_CLOUD_PERIOD_MS) * cloudiness * PASSING_CLOUD_STRENGTH;
+  const transmittance = Math.min(1, Math.max(0, smoothTransmittance + flicker));
+
+  return clearSky * transmittance;
 }
 
 /** Generation in W — negative-signed, i.e. a credit against consumption, since this
