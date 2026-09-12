@@ -10,9 +10,8 @@
  * needs no special-casing for negative simTime (a history window looking back past
  * t=0) the way devices.ts's fridge originally did.
  *
- * Not yet consumed by anything — this is groundwork for heat pump load and PV
- * generation, which both depend on temperature/cloudiness. For now it only drives
- * the live weather indicator.
+ * Drives the live weather indicator and heat pump load (heatPump.ts); PV generation
+ * (also depending on temperature/cloudiness) is a natural next consumer.
  */
 
 import { hashSeed, mulberry32 } from "./rng";
@@ -66,6 +65,23 @@ function diurnalTempC(dateMs: number): number {
   return DIURNAL_AMPLITUDE_C * Math.cos((2 * Math.PI * (hourOfDay - DIURNAL_PEAK_HOUR)) / 24);
 }
 
+function tempAnomalyC(dateMs: number): number {
+  const systemNoise = valueNoise("temp-system", dateMs, WEATHER_SYSTEM_PERIOD_MS);
+  const dailyNoise = valueNoise("temp-daily", dateMs, DAILY_WOBBLE_PERIOD_MS);
+  return systemNoise * 5 + dailyNoise * 2;
+}
+
+/** The day's characteristic temperature — seasonal baseline plus the slower-moving
+ * "weather system" anomaly, deliberately excluding the diurnal day/night wobble
+ * (which averages out over a full day). Used to decide whether a day is cold enough
+ * to need heating at all, as distinct from how hard a heat pump runs at any one
+ * instant within that day (which does use the full instantaneous temperature,
+ * diurnal swing included — see heatPump.ts). */
+export function dailyMeanTempC(simTimeMs: number): number {
+  const dateMs = toDateMs(simTimeMs);
+  return seasonalTempC(dateMs) + tempAnomalyC(dateMs);
+}
+
 export type WeatherCondition = "clear" | "partly-cloudy" | "cloudy" | "overcast" | "rain" | "snow";
 
 export interface Weather {
@@ -76,17 +92,13 @@ export interface Weather {
 
 export function weatherAt(simTimeMs: number): Weather {
   const dateMs = toDateMs(simTimeMs);
-  const base = seasonalTempC(dateMs) + diurnalTempC(dateMs);
-
-  const systemNoise = valueNoise("temp-system", dateMs, WEATHER_SYSTEM_PERIOD_MS);
-  const dailyNoise = valueNoise("temp-daily", dateMs, DAILY_WOBBLE_PERIOD_MS);
-  const tempAnomaly = systemNoise * 5 + dailyNoise * 2;
+  const base = seasonalTempC(dateMs) + diurnalTempC(dateMs) + tempAnomalyC(dateMs);
 
   const cloudSystemNoise = valueNoise("cloud-system", dateMs, WEATHER_SYSTEM_PERIOD_MS);
   const cloudDailyNoise = valueNoise("cloud-daily", dateMs, DAILY_WOBBLE_PERIOD_MS * 0.6);
   const cloudiness = Math.min(1, Math.max(0, (cloudSystemNoise * 0.7 + cloudDailyNoise * 0.3 + 1) / 2));
 
-  const tempC = base + tempAnomaly - cloudiness * 2; // overcast days run a little cooler
+  const tempC = base - cloudiness * 2; // overcast days run a little cooler
 
   let condition: WeatherCondition;
   if (cloudiness < 0.3) {

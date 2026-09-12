@@ -1,12 +1,12 @@
 /**
  * Historical time series, sampled by re-evaluating the same pure device functions
  * at earlier points in simulated time — there's no recorded/logged history to
- * maintain, because fridge/lighting/EV power was never anything but a function of
- * (seed, simTime[, tariff]) in the first place (see devices.ts, ev.ts). A dwelling's
- * device *profiles* and EV traits (derived once from its seed) are cached across
- * calls since they don't depend on simTime — only their evaluation at a given t does
- * — which keeps municipality-wide sampling (~11k dwellings) cheap to repeat on every
- * chart refresh.
+ * maintain, because fridge/lighting/EV/heat-pump power was never anything but a
+ * function of (seed, simTime[, tariff/weather]) in the first place (see devices.ts,
+ * ev.ts, heatPump.ts). A dwelling's device *profiles* and EV traits (derived once
+ * from its seed) are cached across calls since they don't depend on simTime — only
+ * their evaluation at a given t does — which keeps municipality-wide sampling
+ * (~11k dwellings, ~2.5k buildings) cheap to repeat on every chart refresh.
  */
 
 import type { Building, Dwelling } from "../data/types";
@@ -19,8 +19,10 @@ import {
   type LightingProfile,
 } from "./devices";
 import { buildingEvTraits, evPowerWFromTraits, type EvTraits } from "./ev";
+import { heatPumpPowerWWithWeather } from "./heatPump";
 import { hashSeed } from "./rng";
 import type { Tariff } from "./tariff";
+import { dailyMeanTempC, weatherAt } from "./weather";
 
 interface DwellingProfiles {
   egid: string;
@@ -84,9 +86,25 @@ function sumAcrossDwellings(profileSets: DwellingProfiles[], times: number[], ta
   });
 }
 
+/** Weather is the same for every building at a given instant — evaluated once per
+ * timestep here rather than once per building per timestep. */
+function heatPumpSeries(buildings: Building[], times: number[]): number[] {
+  return times.map((t) => {
+    const dailyMeanC = dailyMeanTempC(t);
+    const outsideTempC = weatherAt(t).tempC;
+    let total = 0;
+    for (const building of buildings) {
+      total += heatPumpPowerWWithWeather(building, dailyMeanC, outsideTempC);
+    }
+    return total;
+  });
+}
+
 export function sampleBuildingSeries(building: Building, times: number[], tariff: Tariff): number[] {
   const profileSets = building.dwellings.map((d) => getDwellingProfiles(building, d));
-  return sumAcrossDwellings(profileSets, times, tariff);
+  const dwellingTotals = sumAcrossDwellings(profileSets, times, tariff);
+  const heatPumpTotals = heatPumpSeries([building], times);
+  return dwellingTotals.map((v, i) => v + heatPumpTotals[i]);
 }
 
 export function sampleMunicipalitySeries(buildings: Building[], times: number[], tariff: Tariff): number[] {
@@ -96,5 +114,7 @@ export function sampleMunicipalitySeries(buildings: Building[], times: number[],
       profileSets.push(getDwellingProfiles(building, dwelling));
     }
   }
-  return sumAcrossDwellings(profileSets, times, tariff);
+  const dwellingTotals = sumAcrossDwellings(profileSets, times, tariff);
+  const heatPumpTotals = heatPumpSeries(buildings, times);
+  return dwellingTotals.map((v, i) => v + heatPumpTotals[i]);
 }

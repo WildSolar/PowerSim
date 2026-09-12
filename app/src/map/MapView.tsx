@@ -8,6 +8,7 @@ import {
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Building, MunicipalityDataset } from "../data/types";
+import { buildingHeightM } from "../sim/buildingGeometry";
 import { buildingPowerW } from "../sim/buildingPower";
 import { simClock } from "../sim/engine";
 import {
@@ -30,8 +31,6 @@ const POINT_LAYER_ID = "buildings-points-circle";
 
 const DEFAULT_COLOR = "#9db4c9";
 const SELECTED_COLOR = "#f97316";
-const FLOOR_HEIGHT_M = 3;
-const DEFAULT_HEIGHT_M = 6; // ~2 floors, used when floorCount is unknown
 const POWER_TICK_MS = 1500;
 
 type BuildingProperties = { egid: string; category: string; heating: string; powerW: number; heightM?: number };
@@ -50,10 +49,6 @@ function closedRing(ring: [number, number][]): [number, number][] {
   const last = ring[ring.length - 1];
   if (first[0] === last[0] && first[1] === last[1]) return ring;
   return [...ring, first];
-}
-
-function buildingHeightM(building: Building): number {
-  return building.floorCount && building.floorCount > 0 ? building.floorCount * FLOOR_HEIGHT_M : DEFAULT_HEIGHT_M;
 }
 
 function buildingsToGeoJSON(buildings: Building[]): { polygons: BuildingFeatureCollection; points: BuildingFeatureCollection } {

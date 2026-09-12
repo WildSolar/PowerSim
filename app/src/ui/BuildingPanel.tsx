@@ -1,5 +1,7 @@
 import type { Building } from "../data/types";
+import { buildingEnvelopeAreaM2 } from "../sim/buildingGeometry";
 import { simClock } from "../sim/engine";
+import { hasHeatPump, heatPumpPowerW } from "../sim/heatPump";
 import {
   historyTimeSteps,
   sampleBuildingSeries,
@@ -7,9 +9,10 @@ import {
   HISTORY_SAMPLE_COUNT,
   HISTORY_REFRESH_MS,
 } from "../sim/history";
-import { useTariff } from "../sim/store";
+import { useSimTime, useTariff } from "../sim/store";
 import { HistoryChart } from "./HistoryChart";
 import { useHistorySeries } from "./useHistorySeries";
+import { formatWatts } from "./format";
 import "./panels.css";
 
 export interface BuildingPanelProps {
@@ -19,7 +22,12 @@ export interface BuildingPanelProps {
 }
 
 export function BuildingPanel({ building, onSelectDwelling, onClose }: BuildingPanelProps) {
+  const simTimeMs = useSimTime();
   const tariff = useTariff();
+  const hasHp = hasHeatPump(building);
+  const heatPumpW = hasHp ? heatPumpPowerW(building, simTimeMs) : 0;
+  const envelopeAreaM2 = hasHp ? buildingEnvelopeAreaM2(building) : null;
+
   const history = useHistorySeries(
     () => {
       const times = historyTimeSteps(simClock.getSimTimeMs(), HISTORY_WINDOW_MS, HISTORY_SAMPLE_COUNT);
@@ -48,6 +56,20 @@ export function BuildingPanel({ building, onSelectDwelling, onClose }: BuildingP
           {building.heatingEnergySource ? ` (${building.heatingEnergySource})` : ""}
         </dd>
       </dl>
+
+      {hasHp && (
+        <>
+          <h2 style={{ fontSize: 14, marginTop: 14 }}>Heat pump</h2>
+          <div className="device-row">
+            <span className="device-name">
+              🌡️ Space heating
+              {envelopeAreaM2 && <span className="ev-badge">{Math.round(envelopeAreaM2)} m² envelope</span>}
+            </span>
+            <span className={`device-watts${heatPumpW === 0 ? " off" : ""}`}>{formatWatts(heatPumpW)}</span>
+          </div>
+        </>
+      )}
+
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Dwellings ({building.dwellings.length})</h2>
       <ul>
         {building.dwellings.map((dwelling) => (
