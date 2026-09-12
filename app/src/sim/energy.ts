@@ -33,6 +33,23 @@ export interface CategoryEnergyKWh {
   solar: number; // generation, positive-signed
 }
 
+/** Placeholder for a period whose real value hasn't finished computing yet — see
+ * historyLong.ts's cache, which renders bars at zero until a background chunked
+ * computation fills them in rather than blocking on the whole tier at once. */
+export const ZERO_CATEGORY_ENERGY_KWH: CategoryEnergyKWh = {
+  fridge: 0,
+  lighting: 0,
+  cooking: 0,
+  laundry: 0,
+  plugLoad: 0,
+  ev: 0,
+  heatPump: 0,
+  ac: 0,
+  waterHeating: 0,
+  commercial: 0,
+  solar: 0,
+};
+
 export function categoryEnergyFromSeries(times: number[], series: CategorySeries): CategoryEnergyKWh {
   return {
     fridge: energyKWh(times, series.fridgeW),

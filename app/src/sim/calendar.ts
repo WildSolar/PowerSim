@@ -16,6 +16,13 @@ export function toDateMs(simTimeMs: number): number {
   return EPOCH_MS + simTimeMs;
 }
 
+/** Inverse of toDateMs — for code that finds a boundary in real calendar terms
+ * (a week or month start) and needs it back in simTimeMs to feed the sampling
+ * functions, which all operate on simTimeMs (see historyLong.ts). */
+export function toSimTimeMs(dateMs: number): number {
+  return dateMs - EPOCH_MS;
+}
+
 /** Fractional day-of-year (0-indexed from 1 Jan) for an absolute epoch-ms date —
  * shared by weather.ts (seasonal temperature) and pv.ts (solar geometry). */
 export function dayOfYear(dateMs: number): number {
@@ -31,8 +38,8 @@ export function dayOfWeek(dateMs: number): number {
   return new Date(dateMs).getUTCDay();
 }
 
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+export const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function formatWeekday(simTimeMs: number): string {
   return WEEKDAY_NAMES[dayOfWeek(toDateMs(simTimeMs))];
