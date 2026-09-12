@@ -7,7 +7,7 @@ import {
   type MapMouseEvent,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { Building, MunicipalityDataset } from "../data/types";
+import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
 import { buildingHeightM } from "../sim/buildingGeometry";
 import { buildingPowerW } from "../sim/buildingPower";
 import { simClock } from "../sim/engine";
@@ -18,6 +18,7 @@ import {
   HEATING_LEGEND,
   legendMatchExpression,
   powerColorExpression,
+  solarColorExpression,
   type ColorMode,
   type MapExpr,
 } from "./colorModes";
@@ -33,7 +34,14 @@ const DEFAULT_COLOR = "#9db4c9";
 const SELECTED_COLOR = "#f97316";
 const POWER_TICK_MS = 1500;
 
-type BuildingProperties = { egid: string; category: string; heating: string; powerW: number; heightM?: number };
+type BuildingProperties = {
+  egid: string;
+  category: string;
+  heating: string;
+  powerW: number;
+  solarCapacityKw: number;
+  heightM?: number;
+};
 type BuildingFeature = {
   type: "Feature";
   properties: BuildingProperties;
@@ -51,7 +59,21 @@ function closedRing(ring: [number, number][]): [number, number][] {
   return [...ring, first];
 }
 
-function buildingsToGeoJSON(buildings: Building[]): { polygons: BuildingFeatureCollection; points: BuildingFeatureCollection } {
+function solarCapacityByEgid(plants: PowerPlant[]): Map<string, number> {
+  const byEgid = new Map<string, number>();
+  for (const plant of plants) {
+    if (plant.technology !== "Photovoltaic" || !plant.egid || !plant.capacityKw) continue;
+    byEgid.set(plant.egid, (byEgid.get(plant.egid) ?? 0) + plant.capacityKw);
+  }
+  return byEgid;
+}
+
+function buildingsToGeoJSON(
+  buildings: Building[],
+  plants: PowerPlant[],
+): { polygons: BuildingFeatureCollection; points: BuildingFeatureCollection } {
+  const solarByEgid = solarCapacityByEgid(plants);
+
   const polygonFeatures = buildings
     .filter((b) => b.footprint && b.footprint.length >= 3)
     .map((b) => ({
@@ -61,6 +83,7 @@ function buildingsToGeoJSON(buildings: Building[]): { polygons: BuildingFeatureC
         category: buildingCategoryBucket(b),
         heating: buildingHeatingBucket(b),
         powerW: 0,
+        solarCapacityKw: solarByEgid.get(b.egid) ?? 0,
         heightM: buildingHeightM(b),
       },
       geometry: {
@@ -78,6 +101,7 @@ function buildingsToGeoJSON(buildings: Building[]): { polygons: BuildingFeatureC
         category: buildingCategoryBucket(b),
         heating: buildingHeatingBucket(b),
         powerW: 0,
+        solarCapacityKw: solarByEgid.get(b.egid) ?? 0,
       },
       geometry: { type: "Point" as const, coordinates: [b.lon, b.lat] as [number, number] },
     }));
@@ -101,15 +125,23 @@ function hideBasemapBuildingLayers(map: MlMap): void {
   }
 }
 
-function colorExpression(mode: ColorMode, selectedEgid: string | null, powerMaxW: number): MapExpr {
+interface ColorScales {
+  powerMinW: number;
+  powerMaxW: number;
+  maxSolarCapacityKw: number;
+}
+
+function colorExpression(mode: ColorMode, selectedEgid: string | null, scales: ColorScales): MapExpr {
   const base =
     mode === "category"
       ? legendMatchExpression("category", CATEGORY_LEGEND)
       : mode === "heating"
         ? legendMatchExpression("heating", HEATING_LEGEND)
         : mode === "power"
-          ? powerColorExpression(powerMaxW)
-          : DEFAULT_COLOR;
+          ? powerColorExpression(scales.powerMinW, scales.powerMaxW)
+          : mode === "solar"
+            ? solarColorExpression(scales.maxSolarCapacityKw)
+            : DEFAULT_COLOR;
   return ["case", ["==", ["get", "egid"], selectedEgid ?? "__none__"], SELECTED_COLOR, base];
 }
 
@@ -137,7 +169,9 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode }: 
   selectedEgidRef.current = selectedEgid;
   const polygonsRef = useRef<BuildingFeatureCollection | null>(null);
   const pointsRef = useRef<BuildingFeatureCollection | null>(null);
+  const lastPowerMinWRef = useRef(0);
   const lastPowerMaxWRef = useRef(0);
+  const maxSolarCapacityKwRef = useRef(0);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -157,9 +191,14 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode }: 
     mapRef.current = map;
     map.addControl(new NavigationControl({ visualizePitch: true }), "top-right");
 
-    const geojson = buildingsToGeoJSON(buildings);
+    const geojson = buildingsToGeoJSON(buildings, dataset.powerPlants);
     polygonsRef.current = geojson.polygons;
     pointsRef.current = geojson.points;
+    maxSolarCapacityKwRef.current = Math.max(
+      0,
+      ...geojson.polygons.features.map((f) => f.properties.solarCapacityKw),
+      ...geojson.points.features.map((f) => f.properties.solarCapacityKw),
+    );
 
     // "style.load" fires once the style is parsed and sources are registered — the
     // right point to add our own source/layers. The "load" event additionally waits
@@ -174,7 +213,9 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode }: 
         type: "fill-extrusion",
         source: POLY_SOURCE_ID,
         paint: {
-          "fill-extrusion-color": ml(colorExpression("none", selectedEgidRef.current, 0)),
+          "fill-extrusion-color": ml(
+            colorExpression("none", selectedEgidRef.current, { powerMinW: 0, powerMaxW: 0, maxSolarCapacityKw: 0 }),
+          ),
           "fill-extrusion-height": ["get", "heightM"],
           "fill-extrusion-base": 0,
           "fill-extrusion-opacity": 0.9,
@@ -188,7 +229,9 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode }: 
         source: POINT_SOURCE_ID,
         paint: {
           "circle-radius": 5,
-          "circle-color": ml(colorExpression("none", selectedEgidRef.current, 0)),
+          "circle-color": ml(
+            colorExpression("none", selectedEgidRef.current, { powerMinW: 0, powerMaxW: 0, maxSolarCapacityKw: 0 }),
+          ),
           "circle-stroke-color": "#5b7185",
           "circle-stroke-width": 1,
         },
@@ -233,18 +276,27 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode }: 
       if (!polySource || !pointSource || !polyData || !pointData) return;
 
       const simTimeMs = simClock.getSimTimeMs();
+      let minW = 0;
       let maxW = 0;
       for (const feature of [...polyData.features, ...pointData.features]) {
         const building = buildingsByEgid.get(feature.properties.egid);
         const power = building ? buildingPowerW(building, simTimeMs, dataset.powerPlants) : 0;
         feature.properties.powerW = power;
         if (power > maxW) maxW = power;
+        if (power < minW) minW = power;
       }
+      lastPowerMinWRef.current = minW;
       lastPowerMaxWRef.current = maxW;
 
       polySource.setData(polyData);
       pointSource.setData(pointData);
-      const expr = ml(colorExpression("power", selectedEgidRef.current, maxW));
+      const expr = ml(
+        colorExpression("power", selectedEgidRef.current, {
+          powerMinW: minW,
+          powerMaxW: maxW,
+          maxSolarCapacityKw: maxSolarCapacityKwRef.current,
+        }),
+      );
       map.setPaintProperty(POLY_LAYER_ID, "fill-extrusion-color", expr);
       map.setPaintProperty(POINT_LAYER_ID, "circle-color", expr);
     };
@@ -260,7 +312,13 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode }: 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.getLayer(POLY_LAYER_ID)) return;
-    const expr = ml(colorExpression(colorMode, selectedEgid, lastPowerMaxWRef.current));
+    const expr = ml(
+      colorExpression(colorMode, selectedEgid, {
+        powerMinW: lastPowerMinWRef.current,
+        powerMaxW: lastPowerMaxWRef.current,
+        maxSolarCapacityKw: maxSolarCapacityKwRef.current,
+      }),
+    );
     map.setPaintProperty(POLY_LAYER_ID, "fill-extrusion-color", expr);
     map.setPaintProperty(POINT_LAYER_ID, "circle-color", expr);
   }, [colorMode, selectedEgid]);

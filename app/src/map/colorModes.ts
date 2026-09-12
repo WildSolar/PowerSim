@@ -1,6 +1,6 @@
 import type { Building } from "../data/types";
 
-export type ColorMode = "none" | "category" | "heating" | "power";
+export type ColorMode = "none" | "category" | "heating" | "power" | "solar";
 
 export interface LegendEntry {
   bucket: string;
@@ -76,26 +76,91 @@ export function legendMatchExpression(property: string, legend: LegendEntry[]): 
   return expr;
 }
 
-// Sequential blue ramp (skill default), 5 stops from near-zero to max.
+// Sequential blue ramp (skill default), 5 stops from near-zero to max — importing
+// (net consuming) side of the power-draw scale.
 export const POWER_RAMP = ["#cde2fb", "#86b6ef", "#3987e5", "#1c5cab", "#0d366b"];
+// A matching sequential red ramp for the exporting (net negative, PV-heavy) side —
+// same light->dark construction as POWER_RAMP, hand-built to the same lightness
+// steps since the skill's reference only tabulates the blue ramp. Paired with blue
+// as the skill's documented diverging pair (blue<->red); the label, not the hue
+// alone, carries "this is good" vs "this is bad" — red here just means "exporting".
+export const EXPORT_RAMP = ["#fbdcda", "#f2a29d", "#e34948", "#b93430", "#7a201d"];
+const DIVERGING_NEUTRAL_COLOR = "#f0efec";
 
-/** MapLibre `interpolate` expression for live power draw, scaled 0..maxW. */
-export function powerColorExpression(maxW: number): MapExpr {
+/** MapLibre `interpolate` expression for live net power draw, scaled minW..maxW.
+ * Purely sequential (0..maxW) when nothing is currently exporting (minW >= 0, e.g.
+ * at night) — no point allocating half the color range to an empty domain. Once
+ * something exports (minW < 0, PV outrunning demand), switches to a diverging
+ * scale so an exporting building reads as visibly different from an idle one
+ * instead of both clipping to the same "near zero" color. */
+export function powerColorExpression(minW: number, maxW: number): MapExpr {
   const safeMax = Math.max(maxW, 1);
+  if (minW >= 0) {
+    return [
+      "interpolate",
+      ["linear"],
+      ["get", "powerW"],
+      0,
+      POWER_RAMP[0],
+      safeMax * 0.25,
+      POWER_RAMP[1],
+      safeMax * 0.5,
+      POWER_RAMP[2],
+      safeMax * 0.75,
+      POWER_RAMP[3],
+      safeMax,
+      POWER_RAMP[4],
+    ];
+  }
+  const safeMin = Math.min(minW, -1);
   return [
     "interpolate",
     ["linear"],
     ["get", "powerW"],
+    safeMin,
+    EXPORT_RAMP[4],
+    safeMin * 0.5,
+    EXPORT_RAMP[2],
     0,
-    POWER_RAMP[0],
-    safeMax * 0.25,
-    POWER_RAMP[1],
+    DIVERGING_NEUTRAL_COLOR,
     safeMax * 0.5,
     POWER_RAMP[2],
-    safeMax * 0.75,
-    POWER_RAMP[3],
     safeMax,
     POWER_RAMP[4],
+  ];
+}
+
+// Sequential yellow ramp for installed solar capacity — matches the sun/solar color
+// already used for the PV line in HistoryChart, and stays distinct from the blue
+// used for power draw so the two modes are never confused.
+export const SOLAR_RAMP = ["#fdf0cc", "#f7d374", "#eda100", "#b87c00", "#7a5200"];
+const NO_SOLAR_COLOR = "#b6b4ac";
+
+/** MapLibre `interpolate` expression for installed solar capacity (kWp), scaled
+ * 0..maxCapacityKw. Buildings with no solar (property value 0) fall through to a
+ * flat neutral grey via the leading `step`, rather than the palest yellow — "no
+ * panels" shouldn't look like "a tiny panel". */
+export function solarColorExpression(maxCapacityKw: number): MapExpr {
+  const safeMax = Math.max(maxCapacityKw, 1);
+  return [
+    "case",
+    ["==", ["get", "solarCapacityKw"], 0],
+    NO_SOLAR_COLOR,
+    [
+      "interpolate",
+      ["linear"],
+      ["get", "solarCapacityKw"],
+      0,
+      SOLAR_RAMP[0],
+      safeMax * 0.25,
+      SOLAR_RAMP[1],
+      safeMax * 0.5,
+      SOLAR_RAMP[2],
+      safeMax * 0.75,
+      SOLAR_RAMP[3],
+      safeMax,
+      SOLAR_RAMP[4],
+    ],
   ];
 }
 

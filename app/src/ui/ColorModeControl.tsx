@@ -1,4 +1,4 @@
-import { CATEGORY_LEGEND, HEATING_LEGEND, POWER_RAMP, type ColorMode } from "../map/colorModes";
+import { CATEGORY_LEGEND, HEATING_LEGEND, POWER_RAMP, EXPORT_RAMP, SOLAR_RAMP, type ColorMode } from "../map/colorModes";
 import "./colorModeControl.css";
 
 const MODES: { key: ColorMode; label: string }[] = [
@@ -6,7 +6,11 @@ const MODES: { key: ColorMode; label: string }[] = [
   { key: "category", label: "Building type" },
   { key: "heating", label: "Heating" },
   { key: "power", label: "Power draw" },
+  { key: "solar", label: "Solar" },
 ];
+
+const DIVERGING_POWER_GRADIENT = [...[...EXPORT_RAMP].reverse(), ...POWER_RAMP].join(",");
+const SOLAR_GRADIENT = SOLAR_RAMP.join(",");
 
 export interface ColorModeControlProps {
   mode: ColorMode;
@@ -37,10 +41,23 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
       )}
       {mode === "power" && (
         <div className="legend power-legend">
-          <div className="power-gradient" style={{ background: `linear-gradient(to right, ${POWER_RAMP.join(",")})` }} />
+          <div className="power-gradient" style={{ background: `linear-gradient(to right, ${DIVERGING_POWER_GRADIENT})` }} />
           <div className="power-gradient-labels">
-            <span>0 W</span>
-            <span>highest live draw</span>
+            <span>exporting</span>
+            <span>importing</span>
+          </div>
+        </div>
+      )}
+      {mode === "solar" && (
+        <div className="legend power-legend">
+          <div className="power-gradient" style={{ background: `linear-gradient(to right, ${SOLAR_GRADIENT})` }} />
+          <div className="power-gradient-labels">
+            <span>0 kWp</span>
+            <span>largest installation</span>
+          </div>
+          <div className="legend-row" style={{ marginTop: 6 }}>
+            <span className="swatch" style={{ background: "#b6b4ac" }} />
+            <span>No solar</span>
           </div>
         </div>
       )}
