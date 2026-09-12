@@ -5,6 +5,7 @@ import { DwellingPanel } from "./ui/DwellingPanel";
 import { MunicipalityPanel } from "./ui/MunicipalityPanel";
 import { ColorModeControl } from "./ui/ColorModeControl";
 import { TimeControl } from "./ui/TimeControl";
+import { TariffControl } from "./ui/TariffControl";
 import { loadDataset } from "./data/loadDataset";
 import type { MunicipalityDataset } from "./data/types";
 import type { ColorMode } from "./map/colorModes";
@@ -60,6 +61,7 @@ export default function App() {
       />
       <TimeControl />
       <ColorModeControl mode={colorMode} onChange={setColorMode} />
+      <TariffControl />
       <button
         className="municipality-toggle"
         onClick={() => {

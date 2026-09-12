@@ -7,6 +7,7 @@ import {
   HISTORY_SAMPLE_COUNT,
   HISTORY_REFRESH_MS,
 } from "../sim/history";
+import { useTariff } from "../sim/store";
 import { HistoryChart } from "./HistoryChart";
 import { useHistorySeries } from "./useHistorySeries";
 import "./panels.css";
@@ -18,13 +19,14 @@ export interface BuildingPanelProps {
 }
 
 export function BuildingPanel({ building, onSelectDwelling, onClose }: BuildingPanelProps) {
+  const tariff = useTariff();
   const history = useHistorySeries(
     () => {
       const times = historyTimeSteps(simClock.getSimTimeMs(), HISTORY_WINDOW_MS, HISTORY_SAMPLE_COUNT);
-      return { times, totalW: sampleBuildingSeries(building, times) };
+      return { times, totalW: sampleBuildingSeries(building, times, tariff) };
     },
     HISTORY_REFRESH_MS,
-    building.egid,
+    `${building.egid}:${tariff.offPeakPriceRpKWh}:${tariff.peakPriceRpKWh}`,
   );
 
   return (

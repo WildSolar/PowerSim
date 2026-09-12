@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { formatWatts } from "./format";
 import "./historyChart.css";
 
 export interface ChartSeries {
@@ -16,10 +17,6 @@ export interface HistoryChartProps {
 const WIDTH = 280;
 const HEIGHT = 120;
 const PAD = { left: 36, right: 8, top: 10, bottom: 16 };
-
-function formatWatts(w: number): string {
-  return `${Math.round(w)} W`;
-}
 
 function formatOffset(deltaMs: number): string {
   if (deltaMs >= 0) return "now";
@@ -90,7 +87,7 @@ export function HistoryChart({ times, series }: HistoryChartProps) {
             <g key={f}>
               <line x1={PAD.left} x2={WIDTH - PAD.right} y1={y} y2={y} className="grid-line" />
               <text x={PAD.left - 4} y={y + 3} textAnchor="end" className="axis-label">
-                {Math.round(maxValue * f)}
+                {formatWatts(maxValue * f)}
               </text>
             </g>
           );

@@ -7,6 +7,8 @@
 
 import { useSyncExternalStore } from "react";
 import { simClock } from "./engine";
+import { tariffStore } from "./tariffStore";
+import type { Tariff } from "./tariff";
 
 export function useSimTime(): number {
   return useSyncExternalStore(
@@ -19,5 +21,12 @@ export function useSimSpeed(): number {
   return useSyncExternalStore(
     (callback) => simClock.subscribe(callback),
     () => simClock.getSpeed(),
+  );
+}
+
+export function useTariff(): Tariff {
+  return useSyncExternalStore(
+    (callback) => tariffStore.subscribe(callback),
+    () => tariffStore.get(),
   );
 }
