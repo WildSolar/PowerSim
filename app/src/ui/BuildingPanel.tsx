@@ -17,6 +17,7 @@ import { snowDepthCm } from "../sim/snow";
 import { useSimTime, useTariff } from "../sim/store";
 import { hasElectricWaterHeating, waterHeatingPowerW } from "../sim/waterHeating";
 import { EnergyBreakdown } from "./EnergyBreakdown";
+import { energySourceLabel } from "./energySourceLabel";
 import { HistoryChart } from "./HistoryChart";
 import { useHistorySeries } from "./useHistorySeries";
 import { formatWatts } from "./format";
@@ -81,67 +82,53 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
         </dd>
       </dl>
 
-      {(hasHp || hasAirCon) && (
-        <>
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Climate control</h2>
-          {hasHp && (
-            <div className="device-row">
-              <span className="device-name">
-                🌡️ Space heating
-                {envelopeAreaM2 && <span className="ev-badge">{Math.round(envelopeAreaM2)} m² envelope</span>}
-              </span>
-              <span className={`device-watts${heatPumpW === 0 ? " off" : ""}`}>{formatWatts(heatPumpW)}</span>
-            </div>
-          )}
-          {hasAirCon && (
-            <div className="device-row">
-              <span className="device-name">
-                ❄️ Air conditioning
-                {envelopeAreaM2 && <span className="ev-badge">{Math.round(envelopeAreaM2)} m² envelope</span>}
-              </span>
-              <span className={`device-watts${acW === 0 ? " off" : ""}`}>{formatWatts(acW)}</span>
-            </div>
-          )}
-        </>
-      )}
+      <h2 style={{ fontSize: 14, marginTop: 14 }}>Climate control</h2>
+      <div className={`device-row${hasHp ? "" : " inactive"}`}>
+        <span className="device-name">
+          🌡️ Space heating
+          {envelopeAreaM2 && hasHp && <span className="ev-badge">{Math.round(envelopeAreaM2)} m² envelope</span>}
+        </span>
+        {hasHp ? (
+          <span className={`device-watts${heatPumpW === 0 ? " off" : ""}`}>{formatWatts(heatPumpW)}</span>
+        ) : (
+          <span className="device-status">{energySourceLabel(building.heatingEnergySource)}</span>
+        )}
+      </div>
+      <div className={`device-row${hasAirCon ? "" : " inactive"}`}>
+        <span className="device-name">
+          ❄️ Air conditioning
+          {envelopeAreaM2 && hasAirCon && <span className="ev-badge">{Math.round(envelopeAreaM2)} m² envelope</span>}
+        </span>
+        {hasAirCon ? (
+          <span className={`device-watts${acW === 0 ? " off" : ""}`}>{formatWatts(acW)}</span>
+        ) : (
+          <span className="device-status">Not installed</span>
+        )}
+      </div>
 
-      {hasElectricWater && (
-        <>
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Hot water</h2>
-          <div className="device-row">
-            <span className="device-name">🚿 Water heating</span>
-            <span className={`device-watts${waterHeatingW === 0 ? " off" : ""}`}>{formatWatts(waterHeatingW)}</span>
-          </div>
-        </>
-      )}
+      <h2 style={{ fontSize: 14, marginTop: 14 }}>Hot water</h2>
+      <div className={`device-row${hasElectricWater ? "" : " inactive"}`}>
+        <span className="device-name">🚿 Water heating</span>
+        {hasElectricWater ? (
+          <span className={`device-watts${waterHeatingW === 0 ? " off" : ""}`}>{formatWatts(waterHeatingW)}</span>
+        ) : (
+          <span className="device-status">{energySourceLabel(building.hotWaterEnergySource)}</span>
+        )}
+      </div>
 
-      {hasSolar && (
-        <>
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Solar</h2>
-          <div className="device-row">
-            <span className="device-name">
-              ☀️ Generation
-              <span className="ev-badge responsive">{solarCapacityKw.toFixed(1)} kWp installed</span>
-              {snowCoverCm > 0 && <span className="ev-badge">❄️ {snowCoverCm.toFixed(1)} cm snow</span>}
-            </span>
-            <span className={`device-watts${solarGenerationW === 0 ? " off" : ""}`}>{formatWatts(solarGenerationW)}</span>
-          </div>
-        </>
-      )}
-
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Dwellings ({building.dwellings.length})</h2>
-      <ul>
-        {building.dwellings.map((dwelling) => (
-          <li key={dwelling.ewid}>
-            <button onClick={() => onSelectDwelling(dwelling.ewid)}>
-              Dwelling {dwelling.ewid}
-              {dwelling.roomCount ? ` — ${dwelling.roomCount} rooms` : ""}
-              {dwelling.areaM2 ? `, ${dwelling.areaM2} m²` : ""}
-            </button>
-          </li>
-        ))}
-        {building.dwellings.length === 0 && <li style={{ color: "#888", fontSize: 13 }}>No dwellings on record.</li>}
-      </ul>
+      <h2 style={{ fontSize: 14, marginTop: 14 }}>Solar</h2>
+      <div className={`device-row${hasSolar ? "" : " inactive"}`}>
+        <span className="device-name">
+          ☀️ Generation
+          {hasSolar && <span className="ev-badge responsive">{solarCapacityKw.toFixed(1)} kWp installed</span>}
+          {snowCoverCm > 0 && <span className="ev-badge">❄️ {snowCoverCm.toFixed(1)} cm snow</span>}
+        </span>
+        {hasSolar ? (
+          <span className={`device-watts${solarGenerationW === 0 ? " off" : ""}`}>{formatWatts(solarGenerationW)}</span>
+        ) : (
+          <span className="device-status">Not installed</span>
+        )}
+      </div>
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Daily energy — last 24h</h2>
       <EnergyBreakdown energy={history.energy} />
@@ -161,6 +148,20 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
           />
         </>
       )}
+
+      <h2 style={{ fontSize: 14, marginTop: 14 }}>Dwellings ({building.dwellings.length})</h2>
+      <ul>
+        {building.dwellings.map((dwelling) => (
+          <li key={dwelling.ewid}>
+            <button onClick={() => onSelectDwelling(dwelling.ewid)}>
+              Dwelling {dwelling.ewid}
+              {dwelling.roomCount ? ` — ${dwelling.roomCount} rooms` : ""}
+              {dwelling.areaM2 ? `, ${dwelling.areaM2} m²` : ""}
+            </button>
+          </li>
+        ))}
+        {building.dwellings.length === 0 && <li style={{ color: "#888", fontSize: 13 }}>No dwellings on record.</li>}
+      </ul>
     </div>
   );
 }

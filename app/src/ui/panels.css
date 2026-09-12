@@ -102,6 +102,21 @@
   color: #9ca3af;
 }
 
+.device-row.inactive {
+  background: #fbfbfa;
+  border-style: dashed;
+}
+
+.device-row.inactive .device-name {
+  color: #9ca3af;
+}
+
+.device-row .device-status {
+  font-size: 12px;
+  font-style: italic;
+  color: #9ca3af;
+}
+
 .total-row {
   display: flex;
   justify-content: space-between;
