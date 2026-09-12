@@ -1,6 +1,16 @@
 import type { Building, Dwelling } from "../data/types";
 import { dwellingDevicePowerW } from "../sim/devices";
+import {
+  historyTimeSteps,
+  sampleDwellingSeries,
+  HISTORY_WINDOW_MS,
+  HISTORY_SAMPLE_COUNT,
+  HISTORY_REFRESH_MS,
+} from "../sim/history";
 import { useSimTime } from "../sim/store";
+import { simClock } from "../sim/engine";
+import { HistoryChart } from "./HistoryChart";
+import { useHistorySeries } from "./useHistorySeries";
 import "./panels.css";
 
 export interface DwellingPanelProps {
@@ -18,6 +28,15 @@ export function DwellingPanel({ building, dwelling, onBack, onClose }: DwellingP
   const simTimeMs = useSimTime();
   const { fridgeW, lightingW } = dwellingDevicePowerW(building.egid, dwelling, simTimeMs);
   const totalW = fridgeW + lightingW;
+
+  const history = useHistorySeries(
+    () => {
+      const times = historyTimeSteps(simClock.getSimTimeMs(), HISTORY_WINDOW_MS, HISTORY_SAMPLE_COUNT);
+      return { times, ...sampleDwellingSeries(building.egid, dwelling, times) };
+    },
+    HISTORY_REFRESH_MS,
+    `${building.egid}:${dwelling.ewid}`,
+  );
 
   return (
     <div className="panel">
@@ -48,6 +67,15 @@ export function DwellingPanel({ building, dwelling, onBack, onClose }: DwellingP
         <span>Total</span>
         <span>{formatWatts(totalW)}</span>
       </div>
+
+      <h2 style={{ fontSize: 14, marginTop: 14 }}>Power — last 24h</h2>
+      <HistoryChart
+        times={history.times}
+        series={[
+          { key: "fridge", label: "Fridge", color: "#2a78d6", values: history.fridgeW },
+          { key: "lighting", label: "Lighting", color: "#eb6834", values: history.lightingW },
+        ]}
+      />
     </div>
   );
 }

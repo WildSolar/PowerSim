@@ -27,8 +27,13 @@ export function makeFridgeProfile(seed: number): FridgeProfile {
 }
 
 export function fridgePowerW(profile: FridgeProfile, simTimeMs: number): number {
-  const t = (simTimeMs + profile.phaseOffsetMs) % profile.cyclePeriodMs;
-  return t < profile.cyclePeriodMs * profile.onFraction ? profile.wattageOn : 0;
+  // JS `%` keeps the dividend's sign, so a raw modulo goes negative for simTimeMs < 0
+  // (true whenever a history window looks back past t=0) — every fridge would then
+  // read as permanently "on" (t < a positive threshold is trivially always true for
+  // negative t). Double-mod folds it back into [0, cyclePeriodMs) regardless of sign.
+  const period = profile.cyclePeriodMs;
+  const t = (((simTimeMs + profile.phaseOffsetMs) % period) + period) % period;
+  return t < period * profile.onFraction ? profile.wattageOn : 0;
 }
 
 export interface LightingProfile {

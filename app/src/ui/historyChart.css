@@ -1,0 +1,105 @@
+.history-chart {
+  position: relative;
+  margin-top: 6px;
+}
+
+.history-chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.history-chart-legend {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: #52514e;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.grid-line {
+  stroke: #e1e0d9;
+  stroke-width: 1;
+}
+
+.axis-label {
+  font-size: 8px;
+  fill: #898781;
+}
+
+.series-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.end-dot {
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.end-label {
+  font-size: 9px;
+  font-weight: 600;
+  fill: #0b0b0b;
+}
+
+.crosshair {
+  stroke: #c3c2b7;
+  stroke-width: 1;
+}
+
+.hover-dot {
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.chart-tooltip {
+  position: absolute;
+  transform: translate(-50%, -110%);
+  background: #0b0b0bee;
+  color: #fff;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.tooltip-time {
+  color: #c3c2b7;
+  margin-bottom: 3px;
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tooltip-label {
+  color: #c3c2b7;
+}
+
+.tooltip-value {
+  margin-left: auto;
+  padding-left: 8px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
