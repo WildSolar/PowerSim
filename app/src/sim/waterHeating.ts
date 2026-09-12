@@ -34,11 +34,14 @@ export function makeWaterHeaterProfile(seed: number): WaterHeaterProfile {
 
 /** Probability the heating element is running, given hour-of-day (0-24): a sharp
  * morning shower peak, a broader evening peak (showers + dishes), and a low but
- * nonzero baseline overnight (thermostat topping the tank back up). */
+ * nonzero baseline overnight (thermostat topping the tank back up). Amplitudes are
+ * tuned so a dwelling's integrated on-time comes out to ~1-1.5h/day at this profile's
+ * wattage — roughly 2.5-4 kWh/day, matching a real modern electric water heater
+ * (verified via energy.ts's daily totals once those existed to check against). */
 function baseProbability(hourOfDay: number): number {
-  const morning = Math.exp(-((hourOfDay - 7) ** 2) / (2 * 1.2 ** 2));
-  const evening = Math.exp(-((hourOfDay - 19) ** 2) / (2 * 2.5 ** 2));
-  return 0.05 + 0.35 * Math.max(morning, evening);
+  const morning = Math.exp(-((hourOfDay - 7) ** 2) / (2 * 1.2 ** 2)) * 0.08;
+  const evening = Math.exp(-((hourOfDay - 19) ** 2) / (2 * 1.8 ** 2)) * 0.1;
+  return 0.02 + Math.max(morning, evening);
 }
 
 export function waterHeaterPowerW(profile: WaterHeaterProfile, simTimeMs: number): number {

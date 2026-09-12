@@ -74,16 +74,19 @@ export interface CookingProfile {
 
 export function makeCookingProfile(seed: number): CookingProfile {
   const rng = mulberry32(seed);
-  const wattageOn = 1200 + rng() * 1000; // 1200-2200 W while a stove/oven/kettle is in use
+  const wattageOn = 800 + rng() * 800; // 800-1600 W while a stove/oven/kettle is in use
   return { seed, wattageOn, bucketMs: 5 * 60_000 };
 }
 
 /** Probability something's cooking, given hour-of-day: three meal bursts, dinner
- * widest/most likely, breakfast narrowest and least. */
+ * widest/most likely, breakfast narrowest and least. Amplitudes are tuned so a
+ * dwelling's integrated on-time comes out to roughly 1-1.5h/day at this profile's
+ * wattage — ~1-2 kWh/day, matching real household cooking energy (verified via
+ * energy.ts's daily totals once those existed to check against). */
 function cookingProbability(hourOfDay: number): number {
-  const breakfast = Math.exp(-((hourOfDay - 7.5) ** 2) / (2 * 0.7 ** 2)) * 0.25;
-  const lunch = Math.exp(-((hourOfDay - 12.5) ** 2) / (2 * 1 ** 2)) * 0.35;
-  const dinner = Math.exp(-((hourOfDay - 18.5) ** 2) / (2 * 1.2 ** 2)) * 0.5;
+  const breakfast = Math.exp(-((hourOfDay - 7.5) ** 2) / (2 * 0.7 ** 2)) * 0.12;
+  const lunch = Math.exp(-((hourOfDay - 12.5) ** 2) / (2 * 1 ** 2)) * 0.18;
+  const dinner = Math.exp(-((hourOfDay - 18.5) ** 2) / (2 * 1.2 ** 2)) * 0.28;
   return Math.max(breakfast, lunch, dinner);
 }
 

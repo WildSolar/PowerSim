@@ -11,10 +11,13 @@ import {
 } from "../sim/history";
 import { useSimTime, useTariff } from "../sim/store";
 import { simClock } from "../sim/engine";
+import { DEVICE_CATEGORIES } from "./deviceCategories";
 import { HistoryChart } from "./HistoryChart";
 import { useHistorySeries } from "./useHistorySeries";
 import { formatWatts } from "./format";
 import "./panels.css";
+
+const colorOf = (key: (typeof DEVICE_CATEGORIES)[number]["key"]) => DEVICE_CATEGORIES.find((c) => c.key === key)!.color;
 
 export interface DwellingPanelProps {
   building: Building;
@@ -119,9 +122,9 @@ export function DwellingPanel({ building, dwelling, onBack, onClose }: DwellingP
       <HistoryChart
         times={history.times}
         series={[
-          { key: "fridge", label: "Fridge", color: "#2a78d6", values: history.fridgeW },
-          { key: "lighting", label: "Lighting", color: "#eb6834", values: history.lightingW },
-          { key: "plugLoad", label: "Other plug loads", color: "#8a5fd6", values: history.plugLoadW },
+          { key: "fridge", label: "Fridge", color: colorOf("fridge"), values: history.fridgeW },
+          { key: "lighting", label: "Lighting", color: colorOf("lighting"), values: history.lightingW },
+          { key: "plugLoad", label: "Other plug loads", color: colorOf("plugLoad"), values: history.plugLoadW },
         ]}
       />
 
@@ -129,15 +132,15 @@ export function DwellingPanel({ building, dwelling, onBack, onClose }: DwellingP
       <HistoryChart
         times={history.times}
         series={[
-          { key: "cooking", label: "Cooking", color: "#d64545", values: history.cookingW },
-          { key: "laundry", label: "Washer/dryer", color: "#2aa8a0", values: history.laundryW },
+          { key: "cooking", label: "Cooking", color: colorOf("cooking"), values: history.cookingW },
+          { key: "laundry", label: "Washer/dryer", color: colorOf("laundry"), values: history.laundryW },
         ]}
       />
 
       {evTraits.hasEV && (
         <>
           <h2 style={{ fontSize: 14, marginTop: 14 }}>EV charging — last 24h</h2>
-          <HistoryChart times={history.times} series={[{ key: "ev", label: "EV", color: "#1baf7a", values: history.evW }]} />
+          <HistoryChart times={history.times} series={[{ key: "ev", label: "EV", color: colorOf("ev"), values: history.evW }]} />
         </>
       )}
     </div>

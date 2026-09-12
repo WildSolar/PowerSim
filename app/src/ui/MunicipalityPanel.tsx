@@ -1,14 +1,16 @@
 import type { MunicipalityDataset } from "../data/types";
 import { simClock } from "../sim/engine";
+import { categoryEnergyFromSeries } from "../sim/energy";
 import {
   historyTimeSteps,
-  sampleMunicipalitySeries,
-  sampleMunicipalityPvSeries,
+  netTotalFromCategorySeries,
+  sampleMunicipalityCategorySeries,
   HISTORY_WINDOW_MS,
   HISTORY_SAMPLE_COUNT,
   HISTORY_REFRESH_MS,
 } from "../sim/history";
 import { useTariff } from "../sim/store";
+import { EnergyBreakdown } from "./EnergyBreakdown";
 import { HistoryChart } from "./HistoryChart";
 import { useHistorySeries } from "./useHistorySeries";
 import "./panels.css";
@@ -25,10 +27,12 @@ export function MunicipalityPanel({ dataset, onClose }: MunicipalityPanelProps) 
   const history = useHistorySeries(
     () => {
       const times = historyTimeSteps(simClock.getSimTimeMs(), HISTORY_WINDOW_MS, HISTORY_SAMPLE_COUNT);
+      const categorySeries = sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, dataset.powerPlants);
       return {
         times,
-        totalW: sampleMunicipalitySeries(dataset.buildings, times, tariff, dataset.powerPlants),
-        pvW: sampleMunicipalityPvSeries(solarPlants, times).map((w) => -w),
+        totalW: netTotalFromCategorySeries(categorySeries),
+        pvW: categorySeries.solarW,
+        energy: categoryEnergyFromSeries(times, categorySeries),
       };
     },
     HISTORY_REFRESH_MS,
@@ -51,6 +55,9 @@ export function MunicipalityPanel({ dataset, onClose }: MunicipalityPanelProps) 
           {solarPlants.length} ({solarPlants.reduce((sum, p) => sum + (p.capacityKw ?? 0), 0).toFixed(0)} kWp total)
         </dd>
       </dl>
+
+      <h2 style={{ fontSize: 14, marginTop: 14 }}>Daily energy — last 24h</h2>
+      <EnergyBreakdown energy={history.energy} />
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Net power — last 24h</h2>
       <HistoryChart

@@ -99,36 +99,71 @@ export function sampleDwellingSeries(building: Building, dwelling: Dwelling, tim
   };
 }
 
-function sumAcrossDwellings(profileSets: DwellingProfiles[], times: number[], tariff: Tariff): number[] {
-  return times.map((t) => {
-    let total = 0;
-    for (const p of profileSets) {
-      total +=
-        fridgePowerW(p.fridge, t) +
-        lightingPowerW(p.lighting, t) +
-        cookingPowerW(p.cooking, t) +
-        laundryPowerW(p.egid, p.dwelling, t) +
-        plugLoadPowerW(p.plugLoad, t) +
-        evPowerWFromTraits(p.egid, p.dwelling, p.ev, t, tariff);
-    }
-    return total;
-  });
+interface DwellingCategoryTotals {
+  fridgeW: number[];
+  lightingW: number[];
+  cookingW: number[];
+  laundryW: number[];
+  plugLoadW: number[];
+  evW: number[];
 }
 
-/** Heat pump + AC together, since both are gated by the same daily/instantaneous
- * temperature reading — weather is the same for every building at a given instant,
- * so it's evaluated once per timestep here rather than once per building (or once
- * per device) per timestep. */
-function climateControlSeries(buildings: Building[], times: number[]): number[] {
-  return times.map((t) => {
+/** Every dwelling device, broken out by category rather than pre-summed — the
+ * per-category split is what both the net-total series (sum every field) and the
+ * daily-energy breakdown (integrate each field separately, see energy.ts) are built
+ * from, so there's one place that walks (dwelling x timestep) rather than two. */
+function dwellingCategoryTotals(profileSets: DwellingProfiles[], times: number[], tariff: Tariff): DwellingCategoryTotals {
+  const fridgeW: number[] = [];
+  const lightingW: number[] = [];
+  const cookingW: number[] = [];
+  const laundryW: number[] = [];
+  const plugLoadW: number[] = [];
+  const evW: number[] = [];
+  for (const t of times) {
+    let fridge = 0;
+    let lighting = 0;
+    let cooking = 0;
+    let laundry = 0;
+    let plugLoad = 0;
+    let ev = 0;
+    for (const p of profileSets) {
+      fridge += fridgePowerW(p.fridge, t);
+      lighting += lightingPowerW(p.lighting, t);
+      cooking += cookingPowerW(p.cooking, t);
+      laundry += laundryPowerW(p.egid, p.dwelling, t);
+      plugLoad += plugLoadPowerW(p.plugLoad, t);
+      ev += evPowerWFromTraits(p.egid, p.dwelling, p.ev, t, tariff);
+    }
+    fridgeW.push(fridge);
+    lightingW.push(lighting);
+    cookingW.push(cooking);
+    laundryW.push(laundry);
+    plugLoadW.push(plugLoad);
+    evW.push(ev);
+  }
+  return { fridgeW, lightingW, cookingW, laundryW, plugLoadW, evW };
+}
+
+/** Heat pump and AC split apart but still evaluated together, since both are gated
+ * by the same daily/instantaneous temperature reading — weather is the same for
+ * every building at a given instant, so it's evaluated once per timestep here
+ * rather than once per building (or once per device) per timestep. */
+function climateControlCategorySeries(buildings: Building[], times: number[]): { heatPumpW: number[]; acW: number[] } {
+  const heatPumpW: number[] = [];
+  const acW: number[] = [];
+  for (const t of times) {
     const dailyMeanC = dailyMeanTempC(t);
     const outsideTempC = weatherAt(t).tempC;
-    let total = 0;
+    let heatPump = 0;
+    let ac = 0;
     for (const building of buildings) {
-      total += heatPumpPowerWWithWeather(building, dailyMeanC, outsideTempC) + acPowerWWithWeather(building, dailyMeanC, outsideTempC);
+      heatPump += heatPumpPowerWWithWeather(building, dailyMeanC, outsideTempC);
+      ac += acPowerWWithWeather(building, dailyMeanC, outsideTempC);
     }
-    return total;
-  });
+    heatPumpW.push(heatPump);
+    acW.push(ac);
+  }
+  return { heatPumpW, acW };
 }
 
 /** Electric water heating together for every building in one pass — unlike climate
@@ -160,28 +195,80 @@ export function sampleMunicipalityPvSeries(plants: PowerPlant[], times: number[]
   return pvSeries(plants, times);
 }
 
-export function sampleBuildingSeries(building: Building, times: number[], tariff: Tariff, plants: PowerPlant[]): number[] {
-  const profileSets = building.dwellings.map((d) => getDwellingProfiles(building, d));
-  const dwellingTotals = sumAcrossDwellings(profileSets, times, tariff);
-  const climateTotals = climateControlSeries([building], times);
-  const waterHeatingTotals = waterHeatingSeries([building], times);
-  const pvTotals = pvSeries(
-    plants.filter((p) => p.egid === building.egid),
-    times,
-  );
-  return dwellingTotals.map((v, i) => v + climateTotals[i] + waterHeatingTotals[i] + pvTotals[i]);
+/** Every consumption/generation category, kept apart rather than pre-summed —
+ * consumed both by the net-total series below (sum every field, solar subtracted)
+ * and by energy.ts's daily-energy breakdown (integrate each field on its own).
+ * `solarW` is generation, positive-signed (unlike pvSeries' raw negative-as-credit
+ * convention) since the breakdown displays it as its own bar, not folded into a sum. */
+export interface CategorySeries {
+  fridgeW: number[];
+  lightingW: number[];
+  cookingW: number[];
+  laundryW: number[];
+  plugLoadW: number[];
+  evW: number[];
+  heatPumpW: number[];
+  acW: number[];
+  waterHeatingW: number[];
+  solarW: number[];
 }
 
-export function sampleMunicipalitySeries(buildings: Building[], times: number[], tariff: Tariff, plants: PowerPlant[]): number[] {
+export function sampleBuildingCategorySeries(building: Building, times: number[], tariff: Tariff, plants: PowerPlant[]): CategorySeries {
+  const profileSets = building.dwellings.map((d) => getDwellingProfiles(building, d));
+  const dwellingTotals = dwellingCategoryTotals(profileSets, times, tariff);
+  const { heatPumpW, acW } = climateControlCategorySeries([building], times);
+  const waterHeatingW = waterHeatingSeries([building], times);
+  const solarW = pvSeries(
+    plants.filter((p) => p.egid === building.egid),
+    times,
+  ).map((w) => -w);
+  return { ...dwellingTotals, heatPumpW, acW, waterHeatingW, solarW };
+}
+
+export function sampleMunicipalityCategorySeries(
+  buildings: Building[],
+  times: number[],
+  tariff: Tariff,
+  plants: PowerPlant[],
+): CategorySeries {
   const profileSets: DwellingProfiles[] = [];
   for (const building of buildings) {
     for (const dwelling of building.dwellings) {
       profileSets.push(getDwellingProfiles(building, dwelling));
     }
   }
-  const dwellingTotals = sumAcrossDwellings(profileSets, times, tariff);
-  const climateTotals = climateControlSeries(buildings, times);
-  const waterHeatingTotals = waterHeatingSeries(buildings, times);
-  const pvTotals = pvSeries(plants, times);
-  return dwellingTotals.map((v, i) => v + climateTotals[i] + waterHeatingTotals[i] + pvTotals[i]);
+  const dwellingTotals = dwellingCategoryTotals(profileSets, times, tariff);
+  const { heatPumpW, acW } = climateControlCategorySeries(buildings, times);
+  const waterHeatingW = waterHeatingSeries(buildings, times);
+  const solarW = pvSeries(plants, times).map((w) => -w);
+  return { ...dwellingTotals, heatPumpW, acW, waterHeatingW, solarW };
+}
+
+/** Net power draw from a category breakdown: every consumption category summed,
+ * less solar generation (a credit). */
+export function netTotalFromCategorySeries(series: CategorySeries): number[] {
+  const len = series.fridgeW.length;
+  const total = new Array<number>(len).fill(0);
+  for (let i = 0; i < len; i++) {
+    total[i] =
+      series.fridgeW[i] +
+      series.lightingW[i] +
+      series.cookingW[i] +
+      series.laundryW[i] +
+      series.plugLoadW[i] +
+      series.evW[i] +
+      series.heatPumpW[i] +
+      series.acW[i] +
+      series.waterHeatingW[i] -
+      series.solarW[i];
+  }
+  return total;
+}
+
+export function sampleBuildingSeries(building: Building, times: number[], tariff: Tariff, plants: PowerPlant[]): number[] {
+  return netTotalFromCategorySeries(sampleBuildingCategorySeries(building, times, tariff, plants));
+}
+
+export function sampleMunicipalitySeries(buildings: Building[], times: number[], tariff: Tariff, plants: PowerPlant[]): number[] {
+  return netTotalFromCategorySeries(sampleMunicipalityCategorySeries(buildings, times, tariff, plants));
 }

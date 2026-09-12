@@ -2,11 +2,12 @@ import type { Building, PowerPlant } from "../data/types";
 import { hasAC, acPowerW } from "../sim/ac";
 import { buildingEnvelopeAreaM2 } from "../sim/buildingGeometry";
 import { simClock } from "../sim/engine";
+import { categoryEnergyFromSeries } from "../sim/energy";
 import { hasHeatPump, heatPumpPowerW } from "../sim/heatPump";
 import {
   historyTimeSteps,
-  sampleBuildingSeries,
-  sampleBuildingPvSeries,
+  netTotalFromCategorySeries,
+  sampleBuildingCategorySeries,
   HISTORY_WINDOW_MS,
   HISTORY_SAMPLE_COUNT,
   HISTORY_REFRESH_MS,
@@ -15,6 +16,7 @@ import { pvPowerForBuildingW } from "../sim/pv";
 import { snowDepthCm } from "../sim/snow";
 import { useSimTime, useTariff } from "../sim/store";
 import { hasElectricWaterHeating, waterHeatingPowerW } from "../sim/waterHeating";
+import { EnergyBreakdown } from "./EnergyBreakdown";
 import { HistoryChart } from "./HistoryChart";
 import { useHistorySeries } from "./useHistorySeries";
 import { formatWatts } from "./format";
@@ -47,10 +49,12 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
   const history = useHistorySeries(
     () => {
       const times = historyTimeSteps(simClock.getSimTimeMs(), HISTORY_WINDOW_MS, HISTORY_SAMPLE_COUNT);
+      const categorySeries = sampleBuildingCategorySeries(building, times, tariff, plants);
       return {
         times,
-        totalW: sampleBuildingSeries(building, times, tariff, plants),
-        pvW: sampleBuildingPvSeries(building, times, plants).map((w) => -w),
+        totalW: netTotalFromCategorySeries(categorySeries),
+        pvW: categorySeries.solarW,
+        energy: categoryEnergyFromSeries(times, categorySeries),
       };
     },
     HISTORY_REFRESH_MS,
@@ -138,6 +142,9 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
         ))}
         {building.dwellings.length === 0 && <li style={{ color: "#888", fontSize: 13 }}>No dwellings on record.</li>}
       </ul>
+
+      <h2 style={{ fontSize: 14, marginTop: 14 }}>Daily energy — last 24h</h2>
+      <EnergyBreakdown energy={history.energy} />
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Net power — last 24h</h2>
       <HistoryChart
