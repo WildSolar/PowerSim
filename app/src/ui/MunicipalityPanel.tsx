@@ -6,7 +6,7 @@ import {
   netTotalFromCategorySeries,
   sampleMunicipalityCategorySeries,
   HISTORY_WINDOW_MS,
-  HISTORY_SAMPLE_COUNT,
+  MUNICIPALITY_HISTORY_SAMPLE_COUNT,
   HISTORY_REFRESH_MS,
 } from "../sim/history";
 import { useTariff } from "../sim/store";
@@ -26,7 +26,7 @@ export function MunicipalityPanel({ dataset, onClose }: MunicipalityPanelProps) 
 
   const history = useHistorySeries(
     () => {
-      const times = historyTimeSteps(simClock.getSimTimeMs(), HISTORY_WINDOW_MS, HISTORY_SAMPLE_COUNT);
+      const times = historyTimeSteps(simClock.getSimTimeMs(), HISTORY_WINDOW_MS, MUNICIPALITY_HISTORY_SAMPLE_COUNT);
       const categorySeries = sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, dataset.powerPlants);
       return {
         times,

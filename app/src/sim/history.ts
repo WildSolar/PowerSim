@@ -34,7 +34,7 @@ import { pvPowerW } from "./pv";
 import { hashSeed } from "./rng";
 import { snowDepthCm } from "./snow";
 import type { Tariff } from "./tariff";
-import { waterHeatingPowerW } from "./waterHeating";
+import { dwellingWaterHeaterProfile, hasElectricWaterHeating, waterHeaterPowerW, type WaterHeaterProfile } from "./waterHeating";
 import { dailyMeanTempC, weatherAt } from "./weather";
 
 interface DwellingProfiles {
@@ -44,12 +44,21 @@ interface DwellingProfiles {
   lighting: LightingProfile;
   cooking: CookingProfile;
   plugLoad: PlugLoadProfile;
+  waterHeater: WaterHeaterProfile;
   ev: EvTraits;
 }
 
 export const HISTORY_WINDOW_MS = 24 * 60 * 60_000;
 export const HISTORY_SAMPLE_COUNT = 96;
 export const HISTORY_REFRESH_MS = 3000;
+
+/** Coarser than HISTORY_SAMPLE_COUNT, for the municipality-wide chart only: that
+ * one sums ~11k dwellings per sample rather than a handful, so it's by far the
+ * most expensive history query in the app (measured ~1s per refresh at 96 samples
+ * on a mid-range machine) — and the aggregate curve is already smooth at that
+ * scale (thousands of independent duty cycles average out), so halving the sample
+ * count buys back real time without a visible change in the chart's shape. */
+export const MUNICIPALITY_HISTORY_SAMPLE_COUNT = 48;
 
 const profileCache = new Map<string, DwellingProfiles>();
 
@@ -64,6 +73,7 @@ function getDwellingProfiles(building: Building, dwelling: Dwelling): DwellingPr
       lighting: makeLightingProfile(hashSeed(building.egid, dwelling.ewid, "lighting")),
       cooking: makeCookingProfile(hashSeed(building.egid, dwelling.ewid, "cooking")),
       plugLoad: makePlugLoadProfile(building.egid, dwelling),
+      waterHeater: dwellingWaterHeaterProfile(building.egid, dwelling),
       ev: buildingEvTraits(building, dwelling),
     };
     profileCache.set(key, profiles);
@@ -166,11 +176,29 @@ function climateControlCategorySeries(buildings: Building[], times: number[]): {
   return { heatPumpW, acW };
 }
 
-/** Electric water heating together for every building in one pass — unlike climate
- * control it isn't weather-gated, so there's no shared per-timestep value to hoist,
- * but batching still avoids re-filtering `buildings` once per series consumer. */
-function waterHeatingSeries(buildings: Building[], times: number[]): number[] {
-  return times.map((t) => buildings.reduce((sum, b) => sum + waterHeatingPowerW(b, t), 0));
+/** Electric water heating for every dwelling in an electrically-water-heated
+ * building, summed per timestep. Takes the already-built (and cached, see
+ * getDwellingProfiles) profile list rather than raw buildings — waterHeating.ts's
+ * own building-level helper rebuilds each dwelling's profile from scratch on every
+ * call, which is fine for a single live reading but was silently making this
+ * 96-times-over history sampling redo the same seeded-RNG setup on every sample
+ * instead of once. */
+function waterHeatingCategorySeries(waterHeatedProfileSets: DwellingProfiles[], times: number[]): number[] {
+  return times.map((t) => waterHeatedProfileSets.reduce((sum, p) => sum + waterHeaterPowerW(p.waterHeater, t), 0));
+}
+
+/** Every dwelling in buildings with an electric water heater, profiles already
+ * resolved through the cache — the subset `waterHeatingCategorySeries` above sums
+ * over. */
+function waterHeatedDwellingProfiles(buildings: Building[]): DwellingProfiles[] {
+  const profiles: DwellingProfiles[] = [];
+  for (const building of buildings) {
+    if (!hasElectricWaterHeating(building)) continue;
+    for (const dwelling of building.dwellings) {
+      profiles.push(getDwellingProfiles(building, dwelling));
+    }
+  }
+  return profiles;
 }
 
 /** Snow cover changes on a day+ timescale, so one value for the whole (24h) chart
@@ -217,7 +245,7 @@ export function sampleBuildingCategorySeries(building: Building, times: number[]
   const profileSets = building.dwellings.map((d) => getDwellingProfiles(building, d));
   const dwellingTotals = dwellingCategoryTotals(profileSets, times, tariff);
   const { heatPumpW, acW } = climateControlCategorySeries([building], times);
-  const waterHeatingW = waterHeatingSeries([building], times);
+  const waterHeatingW = waterHeatingCategorySeries(waterHeatedDwellingProfiles([building]), times);
   const solarW = pvSeries(
     plants.filter((p) => p.egid === building.egid),
     times,
@@ -239,7 +267,7 @@ export function sampleMunicipalityCategorySeries(
   }
   const dwellingTotals = dwellingCategoryTotals(profileSets, times, tariff);
   const { heatPumpW, acW } = climateControlCategorySeries(buildings, times);
-  const waterHeatingW = waterHeatingSeries(buildings, times);
+  const waterHeatingW = waterHeatingCategorySeries(waterHeatedDwellingProfiles(buildings), times);
   const solarW = pvSeries(plants, times).map((w) => -w);
   return { ...dwellingTotals, heatPumpW, acW, waterHeatingW, solarW };
 }
