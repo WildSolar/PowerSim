@@ -1,0 +1,40 @@
+.time-control {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  background: #ffffffee;
+  backdrop-filter: blur(6px);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-family: system-ui, sans-serif;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+}
+
+.time-control .clock-readout {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: #1a1a1a;
+  margin-bottom: 6px;
+}
+
+.time-control .speed-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.time-control .speed-buttons button {
+  border: 1px solid #ddd;
+  background: #f8f8f8;
+  border-radius: 6px;
+  padding: 4px 7px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  min-width: 28px;
+}
+
+.time-control .speed-buttons button.active {
+  background: #2a78d6;
+  border-color: #2a78d6;
+  color: #fff;
+}

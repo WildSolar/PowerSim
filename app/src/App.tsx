@@ -3,37 +3,11 @@ import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
 import { DwellingPanel } from "./ui/DwellingPanel";
 import { ColorModeControl } from "./ui/ColorModeControl";
+import { TimeControl } from "./ui/TimeControl";
 import { loadDataset } from "./data/loadDataset";
 import type { MunicipalityDataset } from "./data/types";
 import type { ColorMode } from "./map/colorModes";
 import { simClock } from "./sim/engine";
-import { useSimTime } from "./sim/store";
-
-function ClockReadout() {
-  const simTimeMs = useSimTime();
-  const dayMs = 24 * 60 * 60_000;
-  const day = Math.floor(simTimeMs / dayMs) + 1;
-  const hours = Math.floor((simTimeMs % dayMs) / 3_600_000);
-  const minutes = Math.floor((simTimeMs % 3_600_000) / 60_000);
-  return (
-    <div
-      style={{
-        position: "absolute",
-        top: 16,
-        left: 16,
-        background: "#ffffffee",
-        borderRadius: 8,
-        padding: "6px 12px",
-        fontFamily: "system-ui, sans-serif",
-        fontSize: 13,
-        fontVariantNumeric: "tabular-nums",
-        boxShadow: "0 2px 10px rgba(0,0,0,0.15)",
-      }}
-    >
-      Day {day}, {String(hours).padStart(2, "0")}:{String(minutes).padStart(2, "0")}
-    </div>
-  );
-}
 
 export default function App() {
   const [dataset, setDataset] = useState<MunicipalityDataset | null>(null);
@@ -80,7 +54,7 @@ export default function App() {
         }}
         colorMode={colorMode}
       />
-      <ClockReadout />
+      <TimeControl />
       <ColorModeControl mode={colorMode} onChange={setColorMode} />
       {selectedDwelling && selectedBuilding ? (
         <DwellingPanel

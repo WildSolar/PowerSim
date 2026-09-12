@@ -14,3 +14,10 @@ export function useSimTime(): number {
     () => simClock.getSimTimeMs(),
   );
 }
+
+export function useSimSpeed(): number {
+  return useSyncExternalStore(
+    (callback) => simClock.subscribe(callback),
+    () => simClock.getSpeed(),
+  );
+}
