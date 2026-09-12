@@ -9,10 +9,6 @@ import json
 import math
 from pathlib import Path
 
-import pandas as pd
-from shapely.geometry import Point, Polygon
-from shapely.strtree import STRtree
-
 from . import coords
 from .schema import Building, Dwelling, MunicipalityDataset, PowerPlant
 from .sources import footprints as footprints_source
@@ -21,7 +17,6 @@ from .sources import gwr, powerplants, statent
 BFS_NUMBER = 247
 MUNICIPALITY_NAME = "Schlieren"
 OUTPUT_PATH = Path(__file__).resolve().parents[3] / "app" / "public" / "data" / "schlieren.json"
-FOOTPRINT_MATCH_MAX_DISTANCE_M = 30
 
 
 def _clean_int(value) -> int | None:
@@ -41,35 +36,6 @@ def _clean_str(value) -> str | None:
         return None
     text = str(value).strip()
     return text or None
-
-
-def _valid_polygons(footprint_rings: list[list[tuple[float, float]]]) -> list[Polygon]:
-    polygons = []
-    for ring in footprint_rings:
-        if len(ring) < 4:
-            continue
-        polygon = Polygon(ring)
-        if polygon.is_valid and not polygon.is_empty:
-            polygons.append(polygon)
-    return polygons
-
-
-def _match_footprints(
-    buildings_df: pd.DataFrame, footprint_rings: list[list[tuple[float, float]]]
-) -> dict[int, list[tuple[float, float]]]:
-    polygons = _valid_polygons(footprint_rings)
-    if not polygons:
-        return {}
-    tree = STRtree(polygons)
-
-    matches: dict[int, list[tuple[float, float]]] = {}
-    for _, row in buildings_df.iterrows():
-        egid = int(row[gwr.EGID_COL])
-        point = Point(row["E-Gebaeudekoordinate"], row["N-Gebaeudekoordinate"])
-        polygon = polygons[tree.nearest(point)]
-        if point.distance(polygon) <= FOOTPRINT_MATCH_MAX_DISTANCE_M:
-            matches[egid] = list(polygon.exterior.coords)
-    return matches
 
 
 def _camel_case(key: str) -> str:
@@ -105,11 +71,9 @@ def build() -> MunicipalityDataset:
     max_n = buildings_df["N-Gebaeudekoordinate"].max()
 
     print(f"Fetching building footprints over bbox ({min_e:.0f},{min_n:.0f})-({max_e:.0f},{max_n:.0f})...")
-    footprint_rings = footprints_source.fetch_building_footprints(min_e, min_n, max_e, max_n)
-    print(f"  {len(footprint_rings)} candidate footprints")
-
-    footprint_by_egid = _match_footprints(buildings_df, footprint_rings)
-    print(f"  matched {len(footprint_by_egid)} / {len(buildings_df)} buildings to a footprint")
+    footprint_by_egid = footprints_source.fetch_building_footprints(min_e, min_n, max_e, max_n)
+    matched_count = sum(1 for egid in egids if egid in footprint_by_egid)
+    print(f"  matched {matched_count} / {len(buildings_df)} Schlieren buildings to a footprint")
 
     dwellings_by_egid: dict[int, list[Dwelling]] = {}
     for _, row in dwellings_df.iterrows():
