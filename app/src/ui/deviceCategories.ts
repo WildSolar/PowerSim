@@ -28,6 +28,7 @@ export const DEVICE_CATEGORIES: DeviceCategoryInfo[] = [
   { key: "laundry", label: "Washer/dryer", icon: "🧺", color: "#a56b2c" },
   { key: "ac", label: "Air conditioning", icon: "❄️", color: "#e87ba4" },
   { key: "heatPump", label: "Space heating", icon: "🌡️", color: "#008300" },
+  { key: "commercial", label: "Commercial/business use", icon: "🏢", color: "#2f9e8f" },
   { key: "solar", label: "Solar generation", icon: "☀️", color: "#eda100" },
   { key: "waterHeating", label: "Water heating", icon: "🚿", color: "#0f8fc0" },
 ];

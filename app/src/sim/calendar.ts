@@ -24,6 +24,13 @@ export function dayOfYear(dateMs: number): number {
   return (dateMs - startOfYear) / DAY_MS;
 }
 
+/** Day of week for an absolute epoch-ms date, 0 (Sunday) - 6 (Saturday), UTC —
+ * for anything that needs a weekday/weekend distinction (commercial.ts's business
+ * schedules so far). */
+export function dayOfWeek(dateMs: number): number {
+  return new Date(dateMs).getUTCDay();
+}
+
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export function formatDate(simTimeMs: number): string {

@@ -1,6 +1,7 @@
 import type { Building, PowerPlant } from "../data/types";
 import { hasAC, acPowerW } from "../sim/ac";
 import { buildingEnvelopeAreaM2 } from "../sim/buildingGeometry";
+import { commercialCategory, commercialPowerW, totalFloorAreaM2 } from "../sim/commercial";
 import { simClock } from "../sim/engine";
 import { categoryEnergyFromSeries } from "../sim/energy";
 import { hasHeatPump, heatPumpPowerW } from "../sim/heatPump";
@@ -16,6 +17,7 @@ import { pvPowerForBuildingW } from "../sim/pv";
 import { snowDepthCm } from "../sim/snow";
 import { useSimTime, useTariff } from "../sim/store";
 import { hasElectricWaterHeating, waterHeatingPowerW } from "../sim/waterHeating";
+import { COMMERCIAL_CATEGORY_ICON, COMMERCIAL_CATEGORY_LABEL } from "./commercialDisplay";
 import { EnergyBreakdown } from "./EnergyBreakdown";
 import { energySourceLabel } from "./energySourceLabel";
 import { HistoryChart } from "./HistoryChart";
@@ -40,6 +42,9 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
   const envelopeAreaM2 = hasHp || hasAirCon ? buildingEnvelopeAreaM2(building) : null;
   const hasElectricWater = hasElectricWaterHeating(building);
   const waterHeatingW = hasElectricWater ? waterHeatingPowerW(building, simTimeMs) : 0;
+  const commCategory = commercialCategory(building);
+  const commFloorAreaM2 = commCategory ? totalFloorAreaM2(building) : null;
+  const commercialW = commCategory ? commercialPowerW(building, simTimeMs) : 0;
 
   const buildingPlants = plants.filter((p) => p.egid === building.egid && p.technology === "Photovoltaic");
   const hasSolar = buildingPlants.length > 0;
@@ -71,6 +76,8 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
       <dl>
         <dt>Category</dt>
         <dd>{building.category ?? "Unknown"}</dd>
+        <dt>Use</dt>
+        <dd>{building.buildingClass ?? "Unknown"}</dd>
         <dt>Built</dt>
         <dd>{building.constructionYear ?? "Unknown"}</dd>
         <dt>Floors</dt>
@@ -115,6 +122,19 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
           <span className="device-status">{energySourceLabel(building.hotWaterEnergySource)}</span>
         )}
       </div>
+
+      {commCategory && (
+        <>
+          <h2 style={{ fontSize: 14, marginTop: 14 }}>Commercial</h2>
+          <div className="device-row">
+            <span className="device-name">
+              {COMMERCIAL_CATEGORY_ICON[commCategory]} {COMMERCIAL_CATEGORY_LABEL[commCategory]}
+              {commFloorAreaM2 && <span className="ev-badge">{Math.round(commFloorAreaM2)} m² floor area</span>}
+            </span>
+            <span className={`device-watts${commercialW === 0 ? " off" : ""}`}>{formatWatts(commercialW)}</span>
+          </div>
+        </>
+      )}
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Solar</h2>
       <div className={`device-row${hasSolar ? "" : " inactive"}`}>

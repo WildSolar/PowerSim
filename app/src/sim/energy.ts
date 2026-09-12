@@ -29,6 +29,7 @@ export interface CategoryEnergyKWh {
   heatPump: number;
   ac: number;
   waterHeating: number;
+  commercial: number;
   solar: number; // generation, positive-signed
 }
 
@@ -43,6 +44,7 @@ export function categoryEnergyFromSeries(times: number[], series: CategorySeries
     heatPump: energyKWh(times, series.heatPumpW),
     ac: energyKWh(times, series.acW),
     waterHeating: energyKWh(times, series.waterHeatingW),
+    commercial: energyKWh(times, series.commercialW),
     solar: energyKWh(times, series.solarW),
   };
 }

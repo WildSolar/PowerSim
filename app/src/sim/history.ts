@@ -28,6 +28,7 @@ import {
   type PlugLoadProfile,
 } from "./devices";
 import { acPowerWWithWeather } from "./ac";
+import { commercialPowerWFromProfile, makeCommercialProfile, type CommercialProfile } from "./commercial";
 import { buildingEvTraits, evPowerWFromTraits, type EvTraits } from "./ev";
 import { heatPumpPowerWWithWeather } from "./heatPump";
 import { pvPowerW } from "./pv";
@@ -201,6 +202,29 @@ function waterHeatedDwellingProfiles(buildings: Building[]): DwellingProfiles[] 
   return profiles;
 }
 
+const commercialProfileCache = new Map<string, CommercialProfile | null>();
+
+function getCommercialProfile(building: Building): CommercialProfile | null {
+  let profile = commercialProfileCache.get(building.egid);
+  if (profile === undefined) {
+    profile = makeCommercialProfile(building);
+    commercialProfileCache.set(building.egid, profile);
+  }
+  return profile;
+}
+
+/** Non-residential/commercial load for every recognized-category building, profiles
+ * resolved through the cache above rather than rebuilt (the per-building random
+ * intensity multiplier) on every one of the 96 samples. */
+function commercialCategorySeries(buildings: Building[], times: number[]): number[] {
+  const profiles: CommercialProfile[] = [];
+  for (const building of buildings) {
+    const profile = getCommercialProfile(building);
+    if (profile) profiles.push(profile);
+  }
+  return times.map((t) => profiles.reduce((sum, p) => sum + commercialPowerWFromProfile(p, t), 0));
+}
+
 /** Snow cover changes on a day+ timescale, so one value for the whole (24h) chart
  * window is a fine approximation — computing it fresh per sample would mean redoing
  * nearly the same 30-day lookback 96 times over for almost no accuracy gain. */
@@ -238,6 +262,7 @@ export interface CategorySeries {
   heatPumpW: number[];
   acW: number[];
   waterHeatingW: number[];
+  commercialW: number[];
   solarW: number[];
 }
 
@@ -246,11 +271,12 @@ export function sampleBuildingCategorySeries(building: Building, times: number[]
   const dwellingTotals = dwellingCategoryTotals(profileSets, times, tariff);
   const { heatPumpW, acW } = climateControlCategorySeries([building], times);
   const waterHeatingW = waterHeatingCategorySeries(waterHeatedDwellingProfiles([building]), times);
+  const commercialW = commercialCategorySeries([building], times);
   const solarW = pvSeries(
     plants.filter((p) => p.egid === building.egid),
     times,
   ).map((w) => -w);
-  return { ...dwellingTotals, heatPumpW, acW, waterHeatingW, solarW };
+  return { ...dwellingTotals, heatPumpW, acW, waterHeatingW, commercialW, solarW };
 }
 
 export function sampleMunicipalityCategorySeries(
@@ -268,8 +294,9 @@ export function sampleMunicipalityCategorySeries(
   const dwellingTotals = dwellingCategoryTotals(profileSets, times, tariff);
   const { heatPumpW, acW } = climateControlCategorySeries(buildings, times);
   const waterHeatingW = waterHeatingCategorySeries(waterHeatedDwellingProfiles(buildings), times);
+  const commercialW = commercialCategorySeries(buildings, times);
   const solarW = pvSeries(plants, times).map((w) => -w);
-  return { ...dwellingTotals, heatPumpW, acW, waterHeatingW, solarW };
+  return { ...dwellingTotals, heatPumpW, acW, waterHeatingW, commercialW, solarW };
 }
 
 /** Net power draw from a category breakdown: every consumption category summed,
@@ -287,7 +314,8 @@ export function netTotalFromCategorySeries(series: CategorySeries): number[] {
       series.evW[i] +
       series.heatPumpW[i] +
       series.acW[i] +
-      series.waterHeatingW[i] -
+      series.waterHeatingW[i] +
+      series.commercialW[i] -
       series.solarW[i];
   }
   return total;

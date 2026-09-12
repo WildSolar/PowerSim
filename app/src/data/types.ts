@@ -16,8 +16,10 @@ export interface Building {
   footprint: [number, number][] | null;
   constructionYear: number | null;
   category: string | null;
+  buildingClass: string | null;
   floorCount: number | null;
   energyReferenceAreaM2: number | null;
+  footprintAreaM2: number | null;
   heatingGenerator: string | null;
   heatingEnergySource: string | null;
   hotWaterGenerator: string | null;

@@ -23,9 +23,11 @@ class Building:
     lat: float
     footprint: list[tuple[float, float]] | None  # WGS84 (lon, lat) polygon ring, or None
     construction_year: int | None
-    category: str | None
+    category: str | None  # GKAT — coarse residential/non-residential category
+    building_class: str | None  # GKLAS — finer EU-standard building-use class (office, retail, school, ...)
     floor_count: int | None
     energy_reference_area_m2: float | None
+    footprint_area_m2: float | None  # Gebaeudeflaeche — footprint area, much better data coverage than energy_reference_area_m2
     heating_generator: str | None  # GWAERZH1 code
     heating_energy_source: str | None  # GENH1 code
     hot_water_generator: str | None
