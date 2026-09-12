@@ -22,6 +22,7 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
 
   return (
     <div className="color-mode-control">
+      <h3 className="panel-title">Layers</h3>
       <div className="mode-buttons">
         {MODES.map((m) => (
           <button key={m.key} className={m.key === mode ? "active" : ""} onClick={() => onChange(m.key)}>

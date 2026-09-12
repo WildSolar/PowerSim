@@ -1,7 +1,4 @@
 .time-control {
-  position: absolute;
-  top: 16px;
-  left: 16px;
   background: #ffffffee;
   backdrop-filter: blur(6px);
   border-radius: 10px;
@@ -10,24 +7,34 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
 }
 
+.time-control .panel-title {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #898781;
+}
+
 .time-control .clock-readout {
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   color: #1a1a1a;
   white-space: nowrap;
+  margin-bottom: 6px;
 }
 
-.time-control .weather-readout {
+.time-control .info-row {
   display: flex;
   align-items: center;
   gap: 5px;
   font-size: 12px;
   color: #52514e;
-  margin: 4px 0 6px;
+  margin-bottom: 4px;
   white-space: nowrap;
 }
 
-.time-control .weather-temp {
+.time-control .info-value {
   margin-left: auto;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -37,6 +44,7 @@
 .time-control .speed-buttons {
   display: flex;
   gap: 4px;
+  margin-top: 6px;
 }
 
 .time-control .speed-buttons button {

@@ -43,7 +43,7 @@ function solarDeclinationDeg(doy: number): number {
   return 23.45 * Math.sin((2 * Math.PI * (284 + doy)) / 365);
 }
 
-function solarElevationDeg(dateMs: number): number {
+export function solarElevationDeg(dateMs: number): number {
   const doy = dayOfYear(dateMs);
   const hourOfDay = (dateMs % DAY_MS) / HOUR_MS; // dateMs is always a large positive real epoch ms
   const latRad = (SCHLIEREN_LATITUDE_DEG * Math.PI) / 180;
@@ -53,10 +53,13 @@ function solarElevationDeg(dateMs: number): number {
   return (Math.asin(Math.min(1, Math.max(-1, sinElevation))) * 180) / Math.PI;
 }
 
-/** Irradiance in W/m2 at the given simulated time: weather (cloudiness + passing-cloud
- * flicker) and snow cover included. `snowCoverCm` can be precomputed by the caller —
- * see module docs — and defaults to computing it fresh for a single ad-hoc call. */
-export function irradianceWm2(simTimeMs: number, snowCoverCm?: number): number {
+/** Global horizontal irradiance in W/m2 at the given simulated time: clear-sky solar
+ * geometry attenuated by weather (cloudiness + passing-cloud flicker). This is a
+ * sky/meteorological quantity — unlike irradianceWm2 below, it deliberately excludes
+ * snow sitting on a panel, which blocks light reaching that specific panel rather
+ * than changing how much reaches the ground at all. Used for the live "insolation"
+ * readout as well as being the input every PV plant's own generation derives from. */
+export function ghiWm2(simTimeMs: number): number {
   const dateMs = toDateMs(simTimeMs);
   const elevationDeg = solarElevationDeg(dateMs);
   if (elevationDeg <= 0) return 0;
@@ -69,10 +72,39 @@ export function irradianceWm2(simTimeMs: number, snowCoverCm?: number): number {
   const flicker = valueNoise("pv-passing-cloud", dateMs, PASSING_CLOUD_PERIOD_MS) * cloudiness * PASSING_CLOUD_STRENGTH;
   const weatherTransmittance = Math.min(1, Math.max(0, smoothTransmittance + flicker));
 
-  const snow = snowCoverCm ?? snowDepthCm(simTimeMs);
-  const snowFactor = snowPvBlockingFactor(snow);
+  return clearSky * weatherTransmittance;
+}
 
-  return clearSky * weatherTransmittance * snowFactor;
+/** Irradiance actually reaching a panel, in W/m2 — ghiWm2 further blocked by any
+ * snow sitting on the panel itself. `snowCoverCm` can be precomputed by the caller —
+ * see module docs — and defaults to computing it fresh for a single ad-hoc call. */
+export function irradianceWm2(simTimeMs: number, snowCoverCm?: number): number {
+  const ghi = ghiWm2(simTimeMs);
+  if (ghi <= 0) return 0;
+  const snow = snowCoverCm ?? snowDepthCm(simTimeMs);
+  return ghi * snowPvBlockingFactor(snow);
+}
+
+function clamp01(x: number): number {
+  return Math.min(1, Math.max(0, x));
+}
+
+/** Fraction of full daylight, 0 (night) to 1 (day) — smoothstep over a +-6deg
+ * elevation band around the horizon (roughly a 45-60min transition at Schlieren's
+ * latitude) rather than flipping the instant the sun crosses it, so a "day/night"
+ * indicator built on this can fade through sunrise/sunset instead of snapping. */
+export function dayFraction(simTimeMs: number): number {
+  const elevationDeg = solarElevationDeg(toDateMs(simTimeMs));
+  const t = clamp01((elevationDeg + 6) / 12);
+  return t * t * (3 - 2 * t);
+}
+
+/** Whether the sun is climbing (morning side of its arc) rather than sinking
+ * (evening side) — the trend, not just the current elevation, is what tells a
+ * transitional dayFraction apart as "sunrise" vs. "sunset". */
+export function isSunRising(simTimeMs: number): boolean {
+  const dateMs = toDateMs(simTimeMs);
+  return solarElevationDeg(dateMs + 2 * MINUTE_MS) > solarElevationDeg(dateMs - 2 * MINUTE_MS);
 }
 
 /** Generation in W — negative-signed, i.e. a credit against consumption, since this

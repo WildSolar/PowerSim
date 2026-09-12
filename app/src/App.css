@@ -1,3 +1,13 @@
+.top-left-stack {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 240px;
+}
+
 .municipality-toggle {
   position: absolute;
   bottom: 16px;

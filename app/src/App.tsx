@@ -59,8 +59,10 @@ export default function App() {
         }}
         colorMode={colorMode}
       />
-      <TimeControl />
-      <ColorModeControl mode={colorMode} onChange={setColorMode} />
+      <div className="top-left-stack">
+        <TimeControl />
+        <ColorModeControl mode={colorMode} onChange={setColorMode} />
+      </div>
       <TariffControl />
       <button
         className="municipality-toggle"
