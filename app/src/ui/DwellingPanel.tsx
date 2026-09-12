@@ -1,12 +1,5 @@
-import { useMemo } from "react";
 import type { Building, Dwelling } from "../data/types";
-import { hashSeed } from "../sim/rng";
-import {
-  makeFridgeProfile,
-  fridgePowerW,
-  makeLightingProfile,
-  lightingPowerW,
-} from "../sim/devices";
+import { dwellingDevicePowerW } from "../sim/devices";
 import { useSimTime } from "../sim/store";
 import "./panels.css";
 
@@ -23,18 +16,7 @@ function formatWatts(w: number): string {
 
 export function DwellingPanel({ building, dwelling, onBack, onClose }: DwellingPanelProps) {
   const simTimeMs = useSimTime();
-
-  const fridgeProfile = useMemo(
-    () => makeFridgeProfile(hashSeed(building.egid, dwelling.ewid, "fridge")),
-    [building.egid, dwelling.ewid],
-  );
-  const lightingProfile = useMemo(
-    () => makeLightingProfile(hashSeed(building.egid, dwelling.ewid, "lighting")),
-    [building.egid, dwelling.ewid],
-  );
-
-  const fridgeW = fridgePowerW(fridgeProfile, simTimeMs);
-  const lightingW = lightingPowerW(lightingProfile, simTimeMs);
+  const { fridgeW, lightingW } = dwellingDevicePowerW(building.egid, dwelling, simTimeMs);
   const totalW = fridgeW + lightingW;
 
   return (

@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
 import { DwellingPanel } from "./ui/DwellingPanel";
+import { ColorModeControl } from "./ui/ColorModeControl";
 import { loadDataset } from "./data/loadDataset";
 import type { MunicipalityDataset } from "./data/types";
+import type { ColorMode } from "./map/colorModes";
 import { simClock } from "./sim/engine";
 import { useSimTime } from "./sim/store";
 
@@ -38,6 +40,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [selectedEgid, setSelectedEgid] = useState<string | null>(null);
   const [selectedEwid, setSelectedEwid] = useState<string | null>(null);
+  const [colorMode, setColorMode] = useState<ColorMode>("none");
 
   useEffect(() => {
     simClock.start();
@@ -75,8 +78,10 @@ export default function App() {
           setSelectedEgid(egid);
           setSelectedEwid(null);
         }}
+        colorMode={colorMode}
       />
       <ClockReadout />
+      <ColorModeControl mode={colorMode} onChange={setColorMode} />
       {selectedDwelling && selectedBuilding ? (
         <DwellingPanel
           building={selectedBuilding}

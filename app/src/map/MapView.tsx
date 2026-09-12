@@ -1,7 +1,25 @@
 import { useEffect, useRef } from "react";
-import { Map as MlMap, NavigationControl, type MapGeoJSONFeature, type MapMouseEvent } from "maplibre-gl";
+import {
+  Map as MlMap,
+  NavigationControl,
+  type GeoJSONSource,
+  type MapGeoJSONFeature,
+  type MapMouseEvent,
+} from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Building, MunicipalityDataset } from "../data/types";
+import { buildingPowerW } from "../sim/buildingPower";
+import { simClock } from "../sim/engine";
+import {
+  buildingCategoryBucket,
+  buildingHeatingBucket,
+  CATEGORY_LEGEND,
+  HEATING_LEGEND,
+  legendMatchExpression,
+  powerColorExpression,
+  type ColorMode,
+  type MapExpr,
+} from "./colorModes";
 
 const BASEMAP_STYLE_URL = "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.basemap.vt/style.json";
 
@@ -14,6 +32,17 @@ const DEFAULT_COLOR = "#9db4c9";
 const SELECTED_COLOR = "#f97316";
 const FLOOR_HEIGHT_M = 3;
 const DEFAULT_HEIGHT_M = 6; // ~2 floors, used when floorCount is unknown
+const POWER_TICK_MS = 1500;
+
+type BuildingProperties = { egid: string; category: string; heating: string; powerW: number; heightM?: number };
+type BuildingFeature = {
+  type: "Feature";
+  properties: BuildingProperties;
+  geometry:
+    | { type: "Polygon"; coordinates: [number, number][][] }
+    | { type: "Point"; coordinates: [number, number] };
+};
+type BuildingFeatureCollection = { type: "FeatureCollection"; features: BuildingFeature[] };
 
 function closedRing(ring: [number, number][]): [number, number][] {
   if (ring.length === 0) return ring;
@@ -27,12 +56,18 @@ function buildingHeightM(building: Building): number {
   return building.floorCount && building.floorCount > 0 ? building.floorCount * FLOOR_HEIGHT_M : DEFAULT_HEIGHT_M;
 }
 
-function buildingsToGeoJSON(buildings: Building[]) {
+function buildingsToGeoJSON(buildings: Building[]): { polygons: BuildingFeatureCollection; points: BuildingFeatureCollection } {
   const polygonFeatures = buildings
     .filter((b) => b.footprint && b.footprint.length >= 3)
     .map((b) => ({
       type: "Feature" as const,
-      properties: { egid: b.egid, heightM: buildingHeightM(b) },
+      properties: {
+        egid: b.egid,
+        category: buildingCategoryBucket(b),
+        heating: buildingHeatingBucket(b),
+        powerW: 0,
+        heightM: buildingHeightM(b),
+      },
       geometry: {
         type: "Polygon" as const,
         coordinates: [closedRing(b.footprint as [number, number][])],
@@ -43,13 +78,18 @@ function buildingsToGeoJSON(buildings: Building[]) {
     .filter((b) => !b.footprint || b.footprint.length < 3)
     .map((b) => ({
       type: "Feature" as const,
-      properties: { egid: b.egid },
-      geometry: { type: "Point" as const, coordinates: [b.lon, b.lat] },
+      properties: {
+        egid: b.egid,
+        category: buildingCategoryBucket(b),
+        heating: buildingHeatingBucket(b),
+        powerW: 0,
+      },
+      geometry: { type: "Point" as const, coordinates: [b.lon, b.lat] as [number, number] },
     }));
 
   return {
-    polygons: { type: "FeatureCollection" as const, features: polygonFeatures },
-    points: { type: "FeatureCollection" as const, features: pointFeatures },
+    polygons: { type: "FeatureCollection", features: polygonFeatures },
+    points: { type: "FeatureCollection", features: pointFeatures },
   };
 }
 
@@ -66,17 +106,43 @@ function hideBasemapBuildingLayers(map: MlMap): void {
   }
 }
 
+function colorExpression(mode: ColorMode, selectedEgid: string | null, powerMaxW: number): MapExpr {
+  const base =
+    mode === "category"
+      ? legendMatchExpression("category", CATEGORY_LEGEND)
+      : mode === "heating"
+        ? legendMatchExpression("heating", HEATING_LEGEND)
+        : mode === "power"
+          ? powerColorExpression(powerMaxW)
+          : DEFAULT_COLOR;
+  return ["case", ["==", ["get", "egid"], selectedEgid ?? "__none__"], SELECTED_COLOR, base];
+}
+
+/** maplibre-gl's own expression-spec types are a deep literal-tuple union that a
+ * runtime-built JSON-DSL array can't structurally satisfy — cast at this one
+ * boundary rather than fighting it, since the expressions themselves are already
+ * verified against the real style. */
+function ml(expr: MapExpr): any {
+  return expr;
+}
+
 export interface MapViewProps {
   dataset: MunicipalityDataset;
   selectedEgid: string | null;
   onSelectBuilding: (egid: string) => void;
+  colorMode: ColorMode;
 }
 
-export function MapView({ dataset, selectedEgid, onSelectBuilding }: MapViewProps) {
+export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
   const onSelectBuildingRef = useRef(onSelectBuilding);
   onSelectBuildingRef.current = onSelectBuilding;
+  const selectedEgidRef = useRef(selectedEgid);
+  selectedEgidRef.current = selectedEgid;
+  const polygonsRef = useRef<BuildingFeatureCollection | null>(null);
+  const pointsRef = useRef<BuildingFeatureCollection | null>(null);
+  const lastPowerMaxWRef = useRef(0);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -97,6 +163,8 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding }: MapViewProp
     map.addControl(new NavigationControl({ visualizePitch: true }), "top-right");
 
     const geojson = buildingsToGeoJSON(buildings);
+    polygonsRef.current = geojson.polygons;
+    pointsRef.current = geojson.points;
 
     // "style.load" fires once the style is parsed and sources are registered — the
     // right point to add our own source/layers. The "load" event additionally waits
@@ -111,7 +179,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding }: MapViewProp
         type: "fill-extrusion",
         source: POLY_SOURCE_ID,
         paint: {
-          "fill-extrusion-color": ["case", ["==", ["get", "egid"], "__none__"], SELECTED_COLOR, DEFAULT_COLOR],
+          "fill-extrusion-color": ml(colorExpression("none", selectedEgidRef.current, 0)),
           "fill-extrusion-height": ["get", "heightM"],
           "fill-extrusion-base": 0,
           "fill-extrusion-opacity": 0.9,
@@ -125,7 +193,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding }: MapViewProp
         source: POINT_SOURCE_ID,
         paint: {
           "circle-radius": 5,
-          "circle-color": DEFAULT_COLOR,
+          "circle-color": ml(colorExpression("none", selectedEgidRef.current, 0)),
           "circle-stroke-color": "#5b7185",
           "circle-stroke-width": 1,
         },
@@ -152,16 +220,55 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding }: MapViewProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset]);
 
+  // Live power-draw mode: periodically recompute every building's current device
+  // draw and push it into the source data + a fresh color scale. Devices are pure
+  // functions of (seed, simTime), so this is a cheap recomputation, not a simulation
+  // that needs to run continuously in the background.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || colorMode !== "power") return;
+
+    const buildingsByEgid = new Map(dataset.buildings.map((b) => [b.egid, b]));
+
+    const tick = () => {
+      const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
+      const pointSource = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
+      const polyData = polygonsRef.current;
+      const pointData = pointsRef.current;
+      if (!polySource || !pointSource || !polyData || !pointData) return;
+
+      const simTimeMs = simClock.getSimTimeMs();
+      let maxW = 0;
+      for (const feature of [...polyData.features, ...pointData.features]) {
+        const building = buildingsByEgid.get(feature.properties.egid);
+        const power = building ? buildingPowerW(building, simTimeMs) : 0;
+        feature.properties.powerW = power;
+        if (power > maxW) maxW = power;
+      }
+      lastPowerMaxWRef.current = maxW;
+
+      polySource.setData(polyData);
+      pointSource.setData(pointData);
+      const expr = ml(colorExpression("power", selectedEgidRef.current, maxW));
+      map.setPaintProperty(POLY_LAYER_ID, "fill-extrusion-color", expr);
+      map.setPaintProperty(POINT_LAYER_ID, "circle-color", expr);
+    };
+
+    tick();
+    const interval = setInterval(tick, POWER_TICK_MS);
+    return () => clearInterval(interval);
+  }, [colorMode, dataset]);
+
+  // Selection and non-power color modes update immediately; power mode is kept in
+  // sync by the ticking effect above but still gets an immediate repaint here using
+  // the last known scale, so clicking a building doesn't wait for the next tick.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.getLayer(POLY_LAYER_ID)) return;
-    map.setPaintProperty(POLY_LAYER_ID, "fill-extrusion-color", [
-      "case",
-      ["==", ["get", "egid"], selectedEgid ?? "__none__"],
-      SELECTED_COLOR,
-      DEFAULT_COLOR,
-    ]);
-  }, [selectedEgid]);
+    const expr = ml(colorExpression(colorMode, selectedEgid, lastPowerMaxWRef.current));
+    map.setPaintProperty(POLY_LAYER_ID, "fill-extrusion-color", expr);
+    map.setPaintProperty(POINT_LAYER_ID, "circle-color", expr);
+  }, [colorMode, selectedEgid]);
 
   return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
 }

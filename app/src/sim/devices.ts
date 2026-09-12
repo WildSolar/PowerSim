@@ -7,7 +7,8 @@
  * with on-demand per-entity detail.
  */
 
-import { mulberry32, bucketRandom } from "./rng";
+import { mulberry32, bucketRandom, hashSeed } from "./rng";
+import type { Dwelling } from "../data/types";
 
 export interface FridgeProfile {
   wattageOn: number;
@@ -57,4 +58,20 @@ export function lightingPowerW(profile: LightingProfile, simTimeMs: number): num
   const bucket = Math.floor(simTimeMs / profile.bucketMs);
   const draw = bucketRandom(profile.seed, bucket);
   return draw < prob ? profile.fixtureWattage : 0;
+}
+
+/** A dwelling's fridge + lighting draw at a point in simulated time — the single
+ * place that derives per-device seeds from (building EGID, dwelling EWID), so the
+ * live inspection panel and the map's aggregate power layer never drift apart. */
+export function dwellingDevicePowerW(
+  egid: string,
+  dwelling: Dwelling,
+  simTimeMs: number,
+): { fridgeW: number; lightingW: number } {
+  const fridgeProfile = makeFridgeProfile(hashSeed(egid, dwelling.ewid, "fridge"));
+  const lightingProfile = makeLightingProfile(hashSeed(egid, dwelling.ewid, "lighting"));
+  return {
+    fridgeW: fridgePowerW(fridgeProfile, simTimeMs),
+    lightingW: lightingPowerW(lightingProfile, simTimeMs),
+  };
 }
