@@ -1,4 +1,5 @@
 import type { Building, PowerPlant } from "../data/types";
+import { hasAC, acPowerW } from "../sim/ac";
 import { buildingEnvelopeAreaM2 } from "../sim/buildingGeometry";
 import { simClock } from "../sim/engine";
 import { hasHeatPump, heatPumpPowerW } from "../sim/heatPump";
@@ -30,7 +31,9 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
   const tariff = useTariff();
   const hasHp = hasHeatPump(building);
   const heatPumpW = hasHp ? heatPumpPowerW(building, simTimeMs) : 0;
-  const envelopeAreaM2 = hasHp ? buildingEnvelopeAreaM2(building) : null;
+  const hasAirCon = hasAC(building);
+  const acW = hasAirCon ? acPowerW(building, simTimeMs) : 0;
+  const envelopeAreaM2 = hasHp || hasAirCon ? buildingEnvelopeAreaM2(building) : null;
 
   const buildingPlants = plants.filter((p) => p.egid === building.egid && p.technology === "Photovoltaic");
   const hasSolar = buildingPlants.length > 0;
@@ -71,16 +74,27 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
         </dd>
       </dl>
 
-      {hasHp && (
+      {(hasHp || hasAirCon) && (
         <>
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Heat pump</h2>
-          <div className="device-row">
-            <span className="device-name">
-              🌡️ Space heating
-              {envelopeAreaM2 && <span className="ev-badge">{Math.round(envelopeAreaM2)} m² envelope</span>}
-            </span>
-            <span className={`device-watts${heatPumpW === 0 ? " off" : ""}`}>{formatWatts(heatPumpW)}</span>
-          </div>
+          <h2 style={{ fontSize: 14, marginTop: 14 }}>Climate control</h2>
+          {hasHp && (
+            <div className="device-row">
+              <span className="device-name">
+                🌡️ Space heating
+                {envelopeAreaM2 && <span className="ev-badge">{Math.round(envelopeAreaM2)} m² envelope</span>}
+              </span>
+              <span className={`device-watts${heatPumpW === 0 ? " off" : ""}`}>{formatWatts(heatPumpW)}</span>
+            </div>
+          )}
+          {hasAirCon && (
+            <div className="device-row">
+              <span className="device-name">
+                ❄️ Air conditioning
+                {envelopeAreaM2 && <span className="ev-badge">{Math.round(envelopeAreaM2)} m² envelope</span>}
+              </span>
+              <span className={`device-watts${acW === 0 ? " off" : ""}`}>{formatWatts(acW)}</span>
+            </div>
+          )}
         </>
       )}
 

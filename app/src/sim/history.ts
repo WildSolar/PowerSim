@@ -1,9 +1,9 @@
 /**
  * Historical time series, sampled by re-evaluating the same pure device functions
  * at earlier points in simulated time — there's no recorded/logged history to
- * maintain, because fridge/lighting/EV/heat-pump/PV power was never anything but a
- * function of (seed, simTime[, tariff/weather]) in the first place (see devices.ts,
- * ev.ts, heatPump.ts, pv.ts). PV generation is negative-signed, so it nets directly
+ * maintain, because fridge/lighting/EV/heat-pump/AC/PV power was never anything but
+ * a function of (seed, simTime[, tariff/weather]) in the first place (see devices.ts,
+ * ev.ts, heatPump.ts, ac.ts, pv.ts). PV generation is negative-signed, so it nets directly
  * against consumption in every sum below rather than needing separate handling. A
  * dwelling's device *profiles* and EV traits (derived once
  * from its seed) are cached across calls since they don't depend on simTime — only
@@ -20,6 +20,7 @@ import {
   type FridgeProfile,
   type LightingProfile,
 } from "./devices";
+import { acPowerWWithWeather } from "./ac";
 import { buildingEvTraits, evPowerWFromTraits, type EvTraits } from "./ev";
 import { heatPumpPowerWWithWeather } from "./heatPump";
 import { pvPowerW } from "./pv";
@@ -90,15 +91,17 @@ function sumAcrossDwellings(profileSets: DwellingProfiles[], times: number[], ta
   });
 }
 
-/** Weather is the same for every building at a given instant — evaluated once per
- * timestep here rather than once per building per timestep. */
-function heatPumpSeries(buildings: Building[], times: number[]): number[] {
+/** Heat pump + AC together, since both are gated by the same daily/instantaneous
+ * temperature reading — weather is the same for every building at a given instant,
+ * so it's evaluated once per timestep here rather than once per building (or once
+ * per device) per timestep. */
+function climateControlSeries(buildings: Building[], times: number[]): number[] {
   return times.map((t) => {
     const dailyMeanC = dailyMeanTempC(t);
     const outsideTempC = weatherAt(t).tempC;
     let total = 0;
     for (const building of buildings) {
-      total += heatPumpPowerWWithWeather(building, dailyMeanC, outsideTempC);
+      total += heatPumpPowerWWithWeather(building, dailyMeanC, outsideTempC) + acPowerWWithWeather(building, dailyMeanC, outsideTempC);
     }
     return total;
   });
@@ -129,12 +132,12 @@ export function sampleMunicipalityPvSeries(plants: PowerPlant[], times: number[]
 export function sampleBuildingSeries(building: Building, times: number[], tariff: Tariff, plants: PowerPlant[]): number[] {
   const profileSets = building.dwellings.map((d) => getDwellingProfiles(building, d));
   const dwellingTotals = sumAcrossDwellings(profileSets, times, tariff);
-  const heatPumpTotals = heatPumpSeries([building], times);
+  const climateTotals = climateControlSeries([building], times);
   const pvTotals = pvSeries(
     plants.filter((p) => p.egid === building.egid),
     times,
   );
-  return dwellingTotals.map((v, i) => v + heatPumpTotals[i] + pvTotals[i]);
+  return dwellingTotals.map((v, i) => v + climateTotals[i] + pvTotals[i]);
 }
 
 export function sampleMunicipalitySeries(buildings: Building[], times: number[], tariff: Tariff, plants: PowerPlant[]): number[] {
@@ -145,7 +148,7 @@ export function sampleMunicipalitySeries(buildings: Building[], times: number[],
     }
   }
   const dwellingTotals = sumAcrossDwellings(profileSets, times, tariff);
-  const heatPumpTotals = heatPumpSeries(buildings, times);
+  const climateTotals = climateControlSeries(buildings, times);
   const pvTotals = pvSeries(plants, times);
-  return dwellingTotals.map((v, i) => v + heatPumpTotals[i] + pvTotals[i]);
+  return dwellingTotals.map((v, i) => v + climateTotals[i] + pvTotals[i]);
 }
