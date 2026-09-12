@@ -1,5 +1,8 @@
 import { simClock } from "../sim/engine";
 import { useSimTime, useSimSpeed } from "../sim/store";
+import { formatDate, formatTime } from "../sim/calendar";
+import { weatherAt } from "../sim/weather";
+import { CONDITION_ICON, CONDITION_LABEL } from "./weatherDisplay";
 import "./timeControl.css";
 
 const SPEEDS: { label: string; value: number }[] = [
@@ -13,16 +16,17 @@ const SPEEDS: { label: string; value: number }[] = [
 export function TimeControl() {
   const simTimeMs = useSimTime();
   const speed = useSimSpeed();
-
-  const dayMs = 24 * 60 * 60_000;
-  const day = Math.floor(simTimeMs / dayMs) + 1;
-  const hours = Math.floor((simTimeMs % dayMs) / 3_600_000);
-  const minutes = Math.floor((simTimeMs % 3_600_000) / 60_000);
+  const weather = weatherAt(simTimeMs);
 
   return (
     <div className="time-control">
       <div className="clock-readout">
-        Day {day}, {String(hours).padStart(2, "0")}:{String(minutes).padStart(2, "0")}
+        {formatDate(simTimeMs)} · {formatTime(simTimeMs)}
+      </div>
+      <div className="weather-readout">
+        <span>{CONDITION_ICON[weather.condition]}</span>
+        <span>{CONDITION_LABEL[weather.condition]}</span>
+        <span className="weather-temp">{Math.round(weather.tempC)}°C</span>
       </div>
       <div className="speed-buttons">
         {SPEEDS.map((s) => (
