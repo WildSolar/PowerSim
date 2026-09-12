@@ -16,6 +16,7 @@ import {
 import { pvPowerForBuildingW } from "../sim/pv";
 import { snowDepthCm } from "../sim/snow";
 import { useSimTime, useTariff } from "../sim/store";
+import { tariffKey } from "../sim/tariff";
 import { hasElectricWaterHeating, waterHeatingPowerW } from "../sim/waterHeating";
 import { COMMERCIAL_CATEGORY_ICON, COMMERCIAL_CATEGORY_LABEL } from "./commercialDisplay";
 import { EnergyBreakdown } from "./EnergyBreakdown";
@@ -65,7 +66,7 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
       };
     },
     HISTORY_REFRESH_MS,
-    `${building.egid}:${tariff.offPeakPriceRpKWh}:${tariff.peakPriceRpKWh}`,
+    `${building.egid}:${tariffKey(tariff)}`,
   );
 
   return (
@@ -170,7 +171,11 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
         </>
       )}
 
-      <HistoricalEnergySection entityId={building.egid} buildings={[building]} plants={buildingPlants} />
+      <HistoricalEnergySection
+        entityId={building.egid}
+        sampler={(times) => sampleBuildingCategorySeries(building, times, tariff, plants)}
+        tariffKey={tariffKey(tariff)}
+      />
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Dwellings ({building.dwellings.length})</h2>
       <ul>

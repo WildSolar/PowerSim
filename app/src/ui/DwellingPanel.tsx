@@ -1,9 +1,10 @@
 import type { Building, Dwelling } from "../data/types";
 import { dwellingDevicePowerW } from "../sim/devices";
 import { buildingEvTraits, evDailySession, evPowerWFromTraits } from "../sim/ev";
-import { isOffPeakHour } from "../sim/tariff";
+import { isOffPeakHour, tariffKey } from "../sim/tariff";
 import {
   historyTimeSteps,
+  sampleDwellingCategorySeries,
   sampleDwellingSeries,
   HISTORY_WINDOW_MS,
   HISTORY_SAMPLE_COUNT,
@@ -12,6 +13,7 @@ import {
 import { useSimTime, useTariff } from "../sim/store";
 import { simClock } from "../sim/engine";
 import { DEVICE_CATEGORIES } from "./deviceCategories";
+import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { HistoryChart } from "./HistoryChart";
 import { useHistorySeries } from "./useHistorySeries";
 import { formatWatts } from "./format";
@@ -55,7 +57,7 @@ export function DwellingPanel({ building, dwelling, onBack, onClose }: DwellingP
       return { times, ...sampleDwellingSeries(building, dwelling, times, tariff) };
     },
     HISTORY_REFRESH_MS,
-    `${building.egid}:${dwelling.ewid}:${tariff.offPeakPriceRpKWh}:${tariff.peakPriceRpKWh}`,
+    `${building.egid}:${dwelling.ewid}:${tariffKey(tariff)}`,
   );
 
   return (
@@ -143,6 +145,12 @@ export function DwellingPanel({ building, dwelling, onBack, onClose }: DwellingP
           <HistoryChart times={history.times} series={[{ key: "ev", label: "EV", color: colorOf("ev"), values: history.evW }]} />
         </>
       )}
+
+      <HistoricalEnergySection
+        entityId={`${building.egid}:${dwelling.ewid}`}
+        sampler={(times) => sampleDwellingCategorySeries(building, dwelling, times, tariff)}
+        tariffKey={tariffKey(tariff)}
+      />
     </div>
   );
 }

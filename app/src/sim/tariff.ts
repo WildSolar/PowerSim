@@ -22,3 +22,11 @@ export const DEFAULT_TARIFF: Tariff = {
 export function isOffPeakHour(tariff: Tariff, hourOfDay: number): boolean {
   return hourOfDay >= tariff.offPeakStartHour || hourOfDay < tariff.offPeakEndHour;
 }
+
+/** A cache/effect key for "the tariff prices that affect EV-charging timing" —
+ * only the two prices matter for that (the off-peak window is fixed), so this
+ * deliberately ignores offPeakStartHour/offPeakEndHour rather than invalidating
+ * a cache over a value that never actually changes. */
+export function tariffKey(tariff: Tariff): string {
+  return `${tariff.offPeakPriceRpKWh}:${tariff.peakPriceRpKWh}`;
+}

@@ -10,6 +10,7 @@ import {
   HISTORY_REFRESH_MS,
 } from "../sim/history";
 import { useTariff } from "../sim/store";
+import { tariffKey } from "../sim/tariff";
 import { EnergyBreakdown } from "./EnergyBreakdown";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { HistoryChart } from "./HistoryChart";
@@ -37,7 +38,7 @@ export function MunicipalityPanel({ dataset, onClose }: MunicipalityPanelProps) 
       };
     },
     HISTORY_REFRESH_MS,
-    `${dataset.name}:${tariff.offPeakPriceRpKWh}:${tariff.peakPriceRpKWh}`,
+    `${dataset.name}:${tariffKey(tariff)}`,
   );
 
   return (
@@ -69,7 +70,11 @@ export function MunicipalityPanel({ dataset, onClose }: MunicipalityPanelProps) 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Solar generation — last 24h</h2>
       <HistoryChart times={history.times} series={[{ key: "pv", label: "Solar", color: "#eda100", values: history.pvW }]} />
 
-      <HistoricalEnergySection entityId="municipality" buildings={dataset.buildings} plants={dataset.powerPlants} />
+      <HistoricalEnergySection
+        entityId="municipality"
+        sampler={(times) => sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, dataset.powerPlants)}
+        tariffKey={tariffKey(tariff)}
+      />
     </div>
   );
 }

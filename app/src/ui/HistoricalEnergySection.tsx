@@ -1,7 +1,5 @@
 import { useState } from "react";
-import type { Building, PowerPlant } from "../data/types";
-import type { PeriodTier } from "../sim/historyLong";
-import { useTariff } from "../sim/store";
+import type { PeriodSampler, PeriodTier } from "../sim/historyLong";
 import { DEVICE_CATEGORIES, type DeviceCategoryKey } from "./deviceCategories";
 import { formatKWh } from "./format";
 import { PeriodBarChart, type BarSeries } from "./PeriodBarChart";
@@ -19,24 +17,25 @@ const CONSUMPTION_CATEGORIES = DEVICE_CATEGORIES.filter((c) => c.key !== "solar"
 type CategorySelection = "total" | "stacked" | DeviceCategoryKey;
 
 export interface HistoricalEnergySectionProps {
-  /** Unique per view — the municipality's name, or a building's EGID — so this
-   * view's cached bars never collide with another view's (see historyLong.ts). */
+  /** Unique per view — the municipality's name, a building's EGID, or a
+   * dwelling's `egid:ewid` — so this view's cached bars never collide with
+   * another view's (see historyLong.ts). */
   entityId: string;
-  /** The municipality's full building list, or a single-element array for one
-   * building's own panel — sampleMunicipalityCategorySeries is generic over both. */
-  buildings: Building[];
-  plants: PowerPlant[];
+  /** Produces this view's CategorySeries for a set of timestamps — the caller
+   * binds whichever of history.ts's sample*CategorySeries functions fits what's
+   * being shown (municipality/building/dwelling) via a closure. */
+  sampler: PeriodSampler;
+  tariffKey: string;
 }
 
-/** Day/week/month bar-chart history — shared by MunicipalityPanel and
- * BuildingPanel, the only difference between the two being what `buildings`
- * they pass in. */
-export function HistoricalEnergySection({ entityId, buildings, plants }: HistoricalEnergySectionProps) {
-  const tariff = useTariff();
+/** Day/week/month bar-chart history — shared by MunicipalityPanel,
+ * BuildingPanel, and DwellingPanel, the only difference between them being
+ * which sampler (and entityId) they pass in. */
+export function HistoricalEnergySection({ entityId, sampler, tariffKey }: HistoricalEnergySectionProps) {
   const [tier, setTier] = useState<PeriodTier>("day");
   const [categorySelection, setCategorySelection] = useState<CategorySelection>("total");
 
-  const { bars, loading } = useLongHistory(entityId, tier, buildings, plants, tariff);
+  const { bars, loading } = useLongHistory(entityId, tier, sampler, tariffKey);
   const barLabels = bars.map((b) => b.label);
   const barSeries: BarSeries[] =
     categorySelection === "stacked"

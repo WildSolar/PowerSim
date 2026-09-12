@@ -279,6 +279,24 @@ export function sampleBuildingCategorySeries(building: Building, times: number[]
   return { ...dwellingTotals, heatPumpW, acW, waterHeatingW, commercialW, solarW };
 }
 
+/** A single dwelling's own category series — just the six per-dwelling devices;
+ * heat pump/AC/water heating/commercial/solar are building-wide systems shared
+ * across every dwelling in the building, not something one dwelling on its own
+ * can be said to "have", so those five always read zero here rather than
+ * attributing a shared system to whichever dwelling happens to be selected. */
+export function sampleDwellingCategorySeries(building: Building, dwelling: Dwelling, times: number[], tariff: Tariff): CategorySeries {
+  const dwellingTotals = dwellingCategoryTotals([getDwellingProfiles(building, dwelling)], times, tariff);
+  const zeros = times.map(() => 0);
+  return {
+    ...dwellingTotals,
+    heatPumpW: zeros,
+    acW: zeros,
+    waterHeatingW: zeros,
+    commercialW: zeros,
+    solarW: zeros,
+  };
+}
+
 export function sampleMunicipalityCategorySeries(
   buildings: Building[],
   times: number[],
