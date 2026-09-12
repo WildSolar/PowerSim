@@ -28,6 +28,8 @@ class Building:
     energy_reference_area_m2: float | None
     heating_generator: str | None  # GWAERZH1 code
     heating_energy_source: str | None  # GENH1 code
+    hot_water_generator: str | None
+    hot_water_energy_source: str | None
     dwellings: list[Dwelling] = field(default_factory=list)
 
 

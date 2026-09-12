@@ -13,12 +13,19 @@
 
 import type { Building, Dwelling, PowerPlant } from "../data/types";
 import {
+  cookingPowerW,
   fridgePowerW,
+  laundryPowerW,
   lightingPowerW,
+  makeCookingProfile,
   makeFridgeProfile,
   makeLightingProfile,
+  makePlugLoadProfile,
+  plugLoadPowerW,
+  type CookingProfile,
   type FridgeProfile,
   type LightingProfile,
+  type PlugLoadProfile,
 } from "./devices";
 import { acPowerWWithWeather } from "./ac";
 import { buildingEvTraits, evPowerWFromTraits, type EvTraits } from "./ev";
@@ -27,6 +34,7 @@ import { pvPowerW } from "./pv";
 import { hashSeed } from "./rng";
 import { snowDepthCm } from "./snow";
 import type { Tariff } from "./tariff";
+import { waterHeatingPowerW } from "./waterHeating";
 import { dailyMeanTempC, weatherAt } from "./weather";
 
 interface DwellingProfiles {
@@ -34,6 +42,8 @@ interface DwellingProfiles {
   dwelling: Dwelling;
   fridge: FridgeProfile;
   lighting: LightingProfile;
+  cooking: CookingProfile;
+  plugLoad: PlugLoadProfile;
   ev: EvTraits;
 }
 
@@ -52,6 +62,8 @@ function getDwellingProfiles(building: Building, dwelling: Dwelling): DwellingPr
       dwelling,
       fridge: makeFridgeProfile(hashSeed(building.egid, dwelling.ewid, "fridge")),
       lighting: makeLightingProfile(hashSeed(building.egid, dwelling.ewid, "lighting")),
+      cooking: makeCookingProfile(hashSeed(building.egid, dwelling.ewid, "cooking")),
+      plugLoad: makePlugLoadProfile(building.egid, dwelling),
       ev: buildingEvTraits(building, dwelling),
     };
     profileCache.set(key, profiles);
@@ -69,6 +81,9 @@ export function historyTimeSteps(nowMs: number, windowMs: number, sampleCount: n
 export interface DwellingSeries {
   fridgeW: number[];
   lightingW: number[];
+  cookingW: number[];
+  laundryW: number[];
+  plugLoadW: number[];
   evW: number[];
 }
 
@@ -77,6 +92,9 @@ export function sampleDwellingSeries(building: Building, dwelling: Dwelling, tim
   return {
     fridgeW: times.map((t) => fridgePowerW(p.fridge, t)),
     lightingW: times.map((t) => lightingPowerW(p.lighting, t)),
+    cookingW: times.map((t) => cookingPowerW(p.cooking, t)),
+    laundryW: times.map((t) => laundryPowerW(p.egid, p.dwelling, t)),
+    plugLoadW: times.map((t) => plugLoadPowerW(p.plugLoad, t)),
     evW: times.map((t) => evPowerWFromTraits(p.egid, p.dwelling, p.ev, t, tariff)),
   };
 }
@@ -85,7 +103,13 @@ function sumAcrossDwellings(profileSets: DwellingProfiles[], times: number[], ta
   return times.map((t) => {
     let total = 0;
     for (const p of profileSets) {
-      total += fridgePowerW(p.fridge, t) + lightingPowerW(p.lighting, t) + evPowerWFromTraits(p.egid, p.dwelling, p.ev, t, tariff);
+      total +=
+        fridgePowerW(p.fridge, t) +
+        lightingPowerW(p.lighting, t) +
+        cookingPowerW(p.cooking, t) +
+        laundryPowerW(p.egid, p.dwelling, t) +
+        plugLoadPowerW(p.plugLoad, t) +
+        evPowerWFromTraits(p.egid, p.dwelling, p.ev, t, tariff);
     }
     return total;
   });
@@ -105,6 +129,13 @@ function climateControlSeries(buildings: Building[], times: number[]): number[] 
     }
     return total;
   });
+}
+
+/** Electric water heating together for every building in one pass — unlike climate
+ * control it isn't weather-gated, so there's no shared per-timestep value to hoist,
+ * but batching still avoids re-filtering `buildings` once per series consumer. */
+function waterHeatingSeries(buildings: Building[], times: number[]): number[] {
+  return times.map((t) => buildings.reduce((sum, b) => sum + waterHeatingPowerW(b, t), 0));
 }
 
 /** Snow cover changes on a day+ timescale, so one value for the whole (24h) chart
@@ -133,11 +164,12 @@ export function sampleBuildingSeries(building: Building, times: number[], tariff
   const profileSets = building.dwellings.map((d) => getDwellingProfiles(building, d));
   const dwellingTotals = sumAcrossDwellings(profileSets, times, tariff);
   const climateTotals = climateControlSeries([building], times);
+  const waterHeatingTotals = waterHeatingSeries([building], times);
   const pvTotals = pvSeries(
     plants.filter((p) => p.egid === building.egid),
     times,
   );
-  return dwellingTotals.map((v, i) => v + climateTotals[i] + pvTotals[i]);
+  return dwellingTotals.map((v, i) => v + climateTotals[i] + waterHeatingTotals[i] + pvTotals[i]);
 }
 
 export function sampleMunicipalitySeries(buildings: Building[], times: number[], tariff: Tariff, plants: PowerPlant[]): number[] {
@@ -149,6 +181,7 @@ export function sampleMunicipalitySeries(buildings: Building[], times: number[],
   }
   const dwellingTotals = sumAcrossDwellings(profileSets, times, tariff);
   const climateTotals = climateControlSeries(buildings, times);
+  const waterHeatingTotals = waterHeatingSeries(buildings, times);
   const pvTotals = pvSeries(plants, times);
-  return dwellingTotals.map((v, i) => v + climateTotals[i] + pvTotals[i]);
+  return dwellingTotals.map((v, i) => v + climateTotals[i] + waterHeatingTotals[i] + pvTotals[i]);
 }

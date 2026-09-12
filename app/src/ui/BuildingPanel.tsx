@@ -14,6 +14,7 @@ import {
 import { pvPowerForBuildingW } from "../sim/pv";
 import { snowDepthCm } from "../sim/snow";
 import { useSimTime, useTariff } from "../sim/store";
+import { hasElectricWaterHeating, waterHeatingPowerW } from "../sim/waterHeating";
 import { HistoryChart } from "./HistoryChart";
 import { useHistorySeries } from "./useHistorySeries";
 import { formatWatts } from "./format";
@@ -34,6 +35,8 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
   const hasAirCon = hasAC(building);
   const acW = hasAirCon ? acPowerW(building, simTimeMs) : 0;
   const envelopeAreaM2 = hasHp || hasAirCon ? buildingEnvelopeAreaM2(building) : null;
+  const hasElectricWater = hasElectricWaterHeating(building);
+  const waterHeatingW = hasElectricWater ? waterHeatingPowerW(building, simTimeMs) : 0;
 
   const buildingPlants = plants.filter((p) => p.egid === building.egid && p.technology === "Photovoltaic");
   const hasSolar = buildingPlants.length > 0;
@@ -95,6 +98,16 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
               <span className={`device-watts${acW === 0 ? " off" : ""}`}>{formatWatts(acW)}</span>
             </div>
           )}
+        </>
+      )}
+
+      {hasElectricWater && (
+        <>
+          <h2 style={{ fontSize: 14, marginTop: 14 }}>Hot water</h2>
+          <div className="device-row">
+            <span className="device-name">🚿 Water heating</span>
+            <span className={`device-watts${waterHeatingW === 0 ? " off" : ""}`}>{formatWatts(waterHeatingW)}</span>
+          </div>
         </>
       )}
 

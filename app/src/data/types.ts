@@ -20,6 +20,8 @@ export interface Building {
   energyReferenceAreaM2: number | null;
   heatingGenerator: string | null;
   heatingEnergySource: string | null;
+  hotWaterGenerator: string | null;
+  hotWaterEnergySource: string | null;
   dwellings: Dwelling[];
 }
 

@@ -105,6 +105,8 @@ def build() -> MunicipalityDataset:
                 energy_reference_area_m2=_clean_float(row.get("Energiebezugsflaeche")),
                 heating_generator=_clean_str(row.get("Waermeerzeuger_Heizung_primaer_Bezeichnung")),
                 heating_energy_source=_clean_str(row.get("Energie-/Waermequelle_Heizung_primaer_Bezeichnung")),
+                hot_water_generator=_clean_str(row.get("Waermeerzeuger_Warmwasser_primaer_Bezeichnung")),
+                hot_water_energy_source=_clean_str(row.get("Energie-/Waermequelle_Warmwasser_primaer_Bezeichnung")),
                 dwellings=dwellings_by_egid.get(egid, []),
             )
         )

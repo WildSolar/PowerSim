@@ -35,10 +35,10 @@ function formatHourOfDay(ms: number): string {
 export function DwellingPanel({ building, dwelling, onBack, onClose }: DwellingPanelProps) {
   const simTimeMs = useSimTime();
   const tariff = useTariff();
-  const { fridgeW, lightingW } = dwellingDevicePowerW(building.egid, dwelling, simTimeMs);
+  const { fridgeW, lightingW, cookingW, laundryW, plugLoadW } = dwellingDevicePowerW(building.egid, dwelling, simTimeMs);
   const evTraits = buildingEvTraits(building, dwelling);
   const evW = evPowerWFromTraits(building.egid, dwelling, evTraits, simTimeMs, tariff);
-  const totalW = fridgeW + lightingW + evW;
+  const totalW = fridgeW + lightingW + cookingW + laundryW + plugLoadW + evW;
 
   const todaySession = evTraits.hasEV
     ? evDailySession(building.egid, dwelling, Math.floor(simTimeMs / DAY_MS), evTraits.responsive, tariff)
@@ -80,6 +80,18 @@ export function DwellingPanel({ building, dwelling, onBack, onClose }: DwellingP
         <span className="device-name">💡 Lighting</span>
         <span className={`device-watts${lightingW === 0 ? " off" : ""}`}>{formatWatts(lightingW)}</span>
       </div>
+      <div className="device-row">
+        <span className="device-name">🔌 Other plug loads</span>
+        <span className={`device-watts${plugLoadW === 0 ? " off" : ""}`}>{formatWatts(plugLoadW)}</span>
+      </div>
+      <div className="device-row">
+        <span className="device-name">🍳 Cooking</span>
+        <span className={`device-watts${cookingW === 0 ? " off" : ""}`}>{formatWatts(cookingW)}</span>
+      </div>
+      <div className="device-row">
+        <span className="device-name">🧺 Washer/dryer</span>
+        <span className={`device-watts${laundryW === 0 ? " off" : ""}`}>{formatWatts(laundryW)}</span>
+      </div>
       {evTraits.hasEV && (
         <div className="device-row">
           <span className="device-name">
@@ -109,6 +121,16 @@ export function DwellingPanel({ building, dwelling, onBack, onClose }: DwellingP
         series={[
           { key: "fridge", label: "Fridge", color: "#2a78d6", values: history.fridgeW },
           { key: "lighting", label: "Lighting", color: "#eb6834", values: history.lightingW },
+          { key: "plugLoad", label: "Other plug loads", color: "#8a5fd6", values: history.plugLoadW },
+        ]}
+      />
+
+      <h2 style={{ fontSize: 14, marginTop: 14 }}>Appliances — last 24h</h2>
+      <HistoryChart
+        times={history.times}
+        series={[
+          { key: "cooking", label: "Cooking", color: "#d64545", values: history.cookingW },
+          { key: "laundry", label: "Washer/dryer", color: "#2aa8a0", values: history.laundryW },
         ]}
       />
 
