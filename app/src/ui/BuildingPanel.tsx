@@ -20,6 +20,7 @@ import { hasElectricWaterHeating, waterHeatingPowerW } from "../sim/waterHeating
 import { COMMERCIAL_CATEGORY_ICON, COMMERCIAL_CATEGORY_LABEL } from "./commercialDisplay";
 import { EnergyBreakdown } from "./EnergyBreakdown";
 import { energySourceLabel } from "./energySourceLabel";
+import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { HistoryChart } from "./HistoryChart";
 import { useHistorySeries } from "./useHistorySeries";
 import { formatWatts } from "./format";
@@ -168,6 +169,8 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
           />
         </>
       )}
+
+      <HistoricalEnergySection entityId={building.egid} buildings={[building]} plants={buildingPlants} />
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Dwellings ({building.dwellings.length})</h2>
       <ul>

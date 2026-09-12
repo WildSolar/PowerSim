@@ -1,11 +1,12 @@
 /**
- * Longer-range municipality energy history — day/week/month bars, each a full
- * trapezoidal integration over its own period (reusing sampleMunicipalityCategorySeries
- * + energy.ts, the same machinery the existing 24h charts use), not a derived or
- * approximated rollup. Municipality-only for now — a single building's dwelling
- * count is cheap enough that this module's per-period cost would be overkill, and
- * sampleMunicipalityCategorySeries already generalizes to a building-sized
- * buildings[] array if that changes later.
+ * Longer-range energy history for the municipality OR a single building — day/
+ * week/month bars, each a full trapezoidal integration over its own period
+ * (reusing sampleMunicipalityCategorySeries + energy.ts, the same machinery the
+ * existing 24h charts use), not a derived or approximated rollup.
+ * sampleMunicipalityCategorySeries is already generic over any buildings[] array
+ * (its name predates this module), so a single building just passes a one-element
+ * array — every caller is identified by `entityId` (the municipality's name, or a
+ * building's EGID) so the cache below can't mix the two up.
  *
  * Only *fully completed* periods are ever shown (today isn't part of the "last 7
  * days," this month isn't part of the "last 12 months") — deliberately, so every
@@ -15,15 +16,17 @@
  * ever needs to be recomputed once it exists, only newly-completed ones need to be
  * added as simulated time moves forward.
  *
- * Even at a modest per-bar sample count, a whole tier's worth of bars costs real
- * time (each sample re-evaluates the whole municipality — measured ~12-13ms/sample
- * on a mid-range machine, so a 12-13 bar tier at 24 samples/bar is ~3.5-4s) — too
- * long to block the main thread in one synchronous call, so computing an uncached
- * tier is chunked one period at a time with a yield back to the event loop between
- * each, rather than all at once.
+ * Even at a modest per-bar sample count, a whole municipality-wide tier's worth of
+ * bars costs real time (each sample re-evaluates every dwelling — measured
+ * ~12-13ms/sample on a mid-range machine, so a 12-13 bar tier at 24 samples/bar is
+ * ~3.5-4s) — too long to block the main thread in one synchronous call, so
+ * computing an uncached tier is chunked one period at a time with a yield back to
+ * the event loop between each, rather than all at once. A single building's
+ * handful of dwellings makes the same computation effectively instant, but reuses
+ * the identical chunked path rather than a special-cased fast one.
  */
 
-import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
+import type { Building, PowerPlant } from "../data/types";
 import { dayOfWeek, MONTH_NAMES, toDateMs, toSimTimeMs, WEEKDAY_NAMES } from "./calendar";
 import { categoryEnergyFromSeries, type CategoryEnergyKWh } from "./energy";
 import { sampleMunicipalityCategorySeries } from "./history";
@@ -108,12 +111,12 @@ export function periodsForTier(tier: PeriodTier, nowSimTimeMs: number): Period[]
 
 const periodCache = new Map<string, CategoryEnergyKWh>();
 
-function cacheKey(tier: PeriodTier, period: Period, tariffKey: string): string {
-  return `${tier}:${period.startMs}:${tariffKey}`;
+function cacheKey(entityId: string, tier: PeriodTier, period: Period, tariffKey: string): string {
+  return `${entityId}:${tier}:${period.startMs}:${tariffKey}`;
 }
 
-export function getCachedPeriodEnergy(tier: PeriodTier, period: Period, tariffKey: string): CategoryEnergyKWh | undefined {
-  return periodCache.get(cacheKey(tier, period, tariffKey));
+export function getCachedPeriodEnergy(entityId: string, tier: PeriodTier, period: Period, tariffKey: string): CategoryEnergyKWh | undefined {
+  return periodCache.get(cacheKey(entityId, tier, period, tariffKey));
 }
 
 function samplePeriodEnergy(buildings: Building[], plants: PowerPlant[], tariff: Tariff, period: Period): CategoryEnergyKWh {
@@ -127,20 +130,23 @@ function samplePeriodEnergy(buildings: Building[], plants: PowerPlant[], tariff:
  * with a yield to the event loop between each — see module docs for why this
  * can't just be a plain loop. `onPeriodDone` fires after each period lands in the
  * cache, so a caller can re-render progressively instead of waiting for the whole
- * tier. */
+ * tier. `buildings` is the municipality's full list for the municipality view, or
+ * a single-element array for one building's. */
 export async function ensurePeriodsCached(
+  entityId: string,
   tier: PeriodTier,
   periods: Period[],
-  dataset: MunicipalityDataset,
+  buildings: Building[],
+  plants: PowerPlant[],
   tariff: Tariff,
   tariffKey: string,
   onPeriodDone?: () => void,
 ): Promise<void> {
-  const missing = periods.filter((p) => getCachedPeriodEnergy(tier, p, tariffKey) === undefined);
+  const missing = periods.filter((p) => getCachedPeriodEnergy(entityId, tier, p, tariffKey) === undefined);
   for (let i = 0; i < missing.length; i++) {
     const period = missing[i];
-    const energy = samplePeriodEnergy(dataset.buildings, dataset.powerPlants, tariff, period);
-    periodCache.set(cacheKey(tier, period, tariffKey), energy);
+    const energy = samplePeriodEnergy(buildings, plants, tariff, period);
+    periodCache.set(cacheKey(entityId, tier, period, tariffKey), energy);
     onPeriodDone?.();
     if (i < missing.length - 1) await new Promise((resolve) => setTimeout(resolve, 0));
   }
