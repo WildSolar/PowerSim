@@ -1,15 +1,17 @@
 /**
  * Historical time series, sampled by re-evaluating the same pure device functions
  * at earlier points in simulated time — there's no recorded/logged history to
- * maintain, because fridge/lighting/EV/heat-pump power was never anything but a
+ * maintain, because fridge/lighting/EV/heat-pump/PV power was never anything but a
  * function of (seed, simTime[, tariff/weather]) in the first place (see devices.ts,
- * ev.ts, heatPump.ts). A dwelling's device *profiles* and EV traits (derived once
+ * ev.ts, heatPump.ts, pv.ts). PV generation is negative-signed, so it nets directly
+ * against consumption in every sum below rather than needing separate handling. A
+ * dwelling's device *profiles* and EV traits (derived once
  * from its seed) are cached across calls since they don't depend on simTime — only
  * their evaluation at a given t does — which keeps municipality-wide sampling
  * (~11k dwellings, ~2.5k buildings) cheap to repeat on every chart refresh.
  */
 
-import type { Building, Dwelling } from "../data/types";
+import type { Building, Dwelling, PowerPlant } from "../data/types";
 import {
   fridgePowerW,
   lightingPowerW,
@@ -20,6 +22,7 @@ import {
 } from "./devices";
 import { buildingEvTraits, evPowerWFromTraits, type EvTraits } from "./ev";
 import { heatPumpPowerWWithWeather } from "./heatPump";
+import { pvPowerW } from "./pv";
 import { hashSeed } from "./rng";
 import type { Tariff } from "./tariff";
 import { dailyMeanTempC, weatherAt } from "./weather";
@@ -100,14 +103,36 @@ function heatPumpSeries(buildings: Building[], times: number[]): number[] {
   });
 }
 
-export function sampleBuildingSeries(building: Building, times: number[], tariff: Tariff): number[] {
+function pvSeries(plants: PowerPlant[], times: number[]): number[] {
+  return times.map((t) => plants.reduce((sum, plant) => sum + pvPowerW(plant, t), 0));
+}
+
+/** Just the PV contribution for one building's own roof — for a dedicated "solar
+ * generation" chart, distinct from the net total (which folds PV in as a credit). */
+export function sampleBuildingPvSeries(building: Building, times: number[], plants: PowerPlant[]): number[] {
+  return pvSeries(
+    plants.filter((p) => p.egid === building.egid),
+    times,
+  );
+}
+
+/** Every plant in the municipality, summed — for a dedicated "solar generation" chart. */
+export function sampleMunicipalityPvSeries(plants: PowerPlant[], times: number[]): number[] {
+  return pvSeries(plants, times);
+}
+
+export function sampleBuildingSeries(building: Building, times: number[], tariff: Tariff, plants: PowerPlant[]): number[] {
   const profileSets = building.dwellings.map((d) => getDwellingProfiles(building, d));
   const dwellingTotals = sumAcrossDwellings(profileSets, times, tariff);
   const heatPumpTotals = heatPumpSeries([building], times);
-  return dwellingTotals.map((v, i) => v + heatPumpTotals[i]);
+  const pvTotals = pvSeries(
+    plants.filter((p) => p.egid === building.egid),
+    times,
+  );
+  return dwellingTotals.map((v, i) => v + heatPumpTotals[i] + pvTotals[i]);
 }
 
-export function sampleMunicipalitySeries(buildings: Building[], times: number[], tariff: Tariff): number[] {
+export function sampleMunicipalitySeries(buildings: Building[], times: number[], tariff: Tariff, plants: PowerPlant[]): number[] {
   const profileSets: DwellingProfiles[] = [];
   for (const building of buildings) {
     for (const dwelling of building.dwellings) {
@@ -116,5 +141,6 @@ export function sampleMunicipalitySeries(buildings: Building[], times: number[],
   }
   const dwellingTotals = sumAcrossDwellings(profileSets, times, tariff);
   const heatPumpTotals = heatPumpSeries(buildings, times);
-  return dwellingTotals.map((v, i) => v + heatPumpTotals[i]);
+  const pvTotals = pvSeries(plants, times);
+  return dwellingTotals.map((v, i) => v + heatPumpTotals[i] + pvTotals[i]);
 }

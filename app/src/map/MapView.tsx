@@ -236,7 +236,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode }: 
       let maxW = 0;
       for (const feature of [...polyData.features, ...pointData.features]) {
         const building = buildingsByEgid.get(feature.properties.egid);
-        const power = building ? buildingPowerW(building, simTimeMs) : 0;
+        const power = building ? buildingPowerW(building, simTimeMs, dataset.powerPlants) : 0;
         feature.properties.powerW = power;
         if (power > maxW) maxW = power;
       }

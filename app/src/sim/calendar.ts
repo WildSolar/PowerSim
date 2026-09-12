@@ -16,6 +16,14 @@ export function toDateMs(simTimeMs: number): number {
   return EPOCH_MS + simTimeMs;
 }
 
+/** Fractional day-of-year (0-indexed from 1 Jan) for an absolute epoch-ms date —
+ * shared by weather.ts (seasonal temperature) and pv.ts (solar geometry). */
+export function dayOfYear(dateMs: number): number {
+  const d = new Date(dateMs);
+  const startOfYear = Date.UTC(d.getUTCFullYear(), 0, 1);
+  return (dateMs - startOfYear) / DAY_MS;
+}
+
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export function formatDate(simTimeMs: number): string {

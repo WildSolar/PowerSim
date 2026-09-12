@@ -15,7 +15,7 @@
  */
 
 import { hashSeed, mulberry32 } from "./rng";
-import { toDateMs } from "./calendar";
+import { toDateMs, dayOfYear } from "./calendar";
 
 const DAY_MS = 24 * 60 * 60_000;
 const HOUR_MS = 3_600_000;
@@ -47,12 +47,6 @@ function valueNoise(channel: string, tMs: number, periodMs: number): number {
   const a = noiseAnchor(channel, idx);
   const b = noiseAnchor(channel, idx + 1);
   return a + (b - a) * frac;
-}
-
-function dayOfYear(dateMs: number): number {
-  const d = new Date(dateMs);
-  const startOfYear = Date.UTC(d.getUTCFullYear(), 0, 1);
-  return (dateMs - startOfYear) / DAY_MS;
 }
 
 function seasonalTempC(dateMs: number): number {

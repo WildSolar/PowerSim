@@ -3,6 +3,7 @@ import { simClock } from "../sim/engine";
 import {
   historyTimeSteps,
   sampleMunicipalitySeries,
+  sampleMunicipalityPvSeries,
   HISTORY_WINDOW_MS,
   HISTORY_SAMPLE_COUNT,
   HISTORY_REFRESH_MS,
@@ -19,10 +20,16 @@ export interface MunicipalityPanelProps {
 
 export function MunicipalityPanel({ dataset, onClose }: MunicipalityPanelProps) {
   const tariff = useTariff();
+  const solarPlants = dataset.powerPlants.filter((p) => p.technology === "Photovoltaic");
+
   const history = useHistorySeries(
     () => {
       const times = historyTimeSteps(simClock.getSimTimeMs(), HISTORY_WINDOW_MS, HISTORY_SAMPLE_COUNT);
-      return { times, totalW: sampleMunicipalitySeries(dataset.buildings, times, tariff) };
+      return {
+        times,
+        totalW: sampleMunicipalitySeries(dataset.buildings, times, tariff, dataset.powerPlants),
+        pvW: sampleMunicipalityPvSeries(solarPlants, times).map((w) => -w),
+      };
     },
     HISTORY_REFRESH_MS,
     `${dataset.name}:${tariff.offPeakPriceRpKWh}:${tariff.peakPriceRpKWh}`,
@@ -39,15 +46,20 @@ export function MunicipalityPanel({ dataset, onClose }: MunicipalityPanelProps) 
         <dd>{dataset.buildings.length}</dd>
         <dt>Dwellings</dt>
         <dd>{dataset.buildings.reduce((sum, b) => sum + b.dwellings.length, 0)}</dd>
-        <dt>Power plants</dt>
-        <dd>{dataset.powerPlants.length}</dd>
+        <dt>Solar installations</dt>
+        <dd>
+          {solarPlants.length} ({solarPlants.reduce((sum, p) => sum + (p.capacityKw ?? 0), 0).toFixed(0)} kWp total)
+        </dd>
       </dl>
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Power — last 24h</h2>
+      <h2 style={{ fontSize: 14, marginTop: 14 }}>Net power — last 24h</h2>
       <HistoryChart
         times={history.times}
-        series={[{ key: "total", label: "Total", color: "#2a78d6", values: history.totalW }]}
+        series={[{ key: "total", label: "Net", color: "#2a78d6", values: history.totalW }]}
       />
+
+      <h2 style={{ fontSize: 14, marginTop: 14 }}>Solar generation — last 24h</h2>
+      <HistoryChart times={history.times} series={[{ key: "pv", label: "Solar", color: "#eda100", values: history.pvW }]} />
     </div>
   );
 }

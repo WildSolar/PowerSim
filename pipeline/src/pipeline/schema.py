@@ -39,6 +39,7 @@ class PowerPlant:
     capacity_kw: float | None
     technology: str | None
     commissioning_date: str | None
+    egid: str | None  # links to Building.egid where the registry records one (most rooftop solar does)
 
 
 @dataclass

@@ -30,6 +30,7 @@ export interface PowerPlant {
   capacityKw: number | null;
   technology: string | null;
   commissioningDate: string | null;
+  egid: string | null;
 }
 
 export interface MunicipalityDataset {

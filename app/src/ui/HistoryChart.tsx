@@ -36,20 +36,28 @@ function niceMax(value: number): number {
   return step * magnitude;
 }
 
+/** Mirrors niceMax for the negative side — 0 when there's no negative data, so
+ * existing consumption-only charts (which never go below 0) are unaffected. */
+function niceMin(value: number): number {
+  return value >= 0 ? 0 : -niceMax(-value);
+}
+
 export function HistoryChart({ times, series }: HistoryChartProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [hover, setHover] = useState<{ index: number; px: number; py: number } | null>(null);
 
   if (times.length < 2 || series.length === 0) return null;
 
-  const maxValue = niceMax(Math.max(1, ...series.flatMap((s) => s.values)));
+  const allValues = series.flatMap((s) => s.values);
+  const maxValue = niceMax(Math.max(1, ...allValues));
+  const minValue = niceMin(Math.min(0, ...allValues));
   const t0 = times[0];
   const t1 = times[times.length - 1];
   const plotW = WIDTH - PAD.left - PAD.right;
   const plotH = HEIGHT - PAD.top - PAD.bottom;
 
   const xScale = (t: number) => PAD.left + ((t - t0) / (t1 - t0)) * plotW;
-  const yScale = (v: number) => HEIGHT - PAD.bottom - (v / maxValue) * plotH;
+  const yScale = (v: number) => HEIGHT - PAD.bottom - ((v - minValue) / (maxValue - minValue)) * plotH;
 
   const pathFor = (values: number[]) =>
     values.map((v, i) => `${i === 0 ? "M" : "L"} ${xScale(times[i]).toFixed(1)} ${yScale(v).toFixed(1)}`).join(" ");
@@ -65,7 +73,8 @@ export function HistoryChart({ times, series }: HistoryChartProps) {
     setHover({ index, px, py: e.clientY - rect.top });
   };
 
-  const gridFractions = [0, 0.5, 1];
+  const gridValues = [minValue, (minValue + maxValue) / 2, maxValue];
+  const hasNegative = minValue < 0;
   const lastIndex = times.length - 1;
 
   return (
@@ -81,17 +90,20 @@ export function HistoryChart({ times, series }: HistoryChartProps) {
         </div>
       )}
       <svg ref={svgRef} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="history-chart-svg">
-        {gridFractions.map((f) => {
-          const y = HEIGHT - PAD.bottom - f * plotH;
+        {gridValues.map((v) => {
+          const y = yScale(v);
           return (
-            <g key={f}>
+            <g key={v}>
               <line x1={PAD.left} x2={WIDTH - PAD.right} y1={y} y2={y} className="grid-line" />
               <text x={PAD.left - 4} y={y + 3} textAnchor="end" className="axis-label">
-                {formatWatts(maxValue * f)}
+                {formatWatts(v)}
               </text>
             </g>
           );
         })}
+        {hasNegative && (
+          <line x1={PAD.left} x2={WIDTH - PAD.right} y1={yScale(0)} y2={yScale(0)} className="zero-line" />
+        )}
 
         {series.map((s) => (
           <path key={s.key} d={pathFor(s.values)} stroke={s.color} className="series-line" />

@@ -36,6 +36,11 @@
   stroke-width: 1;
 }
 
+.zero-line {
+  stroke: #c3c2b7;
+  stroke-width: 1;
+}
+
 .axis-label {
   font-size: 8px;
   fill: #898781;

@@ -1,14 +1,16 @@
-import type { Building } from "../data/types";
+import type { Building, PowerPlant } from "../data/types";
 import { buildingEnvelopeAreaM2 } from "../sim/buildingGeometry";
 import { simClock } from "../sim/engine";
 import { hasHeatPump, heatPumpPowerW } from "../sim/heatPump";
 import {
   historyTimeSteps,
   sampleBuildingSeries,
+  sampleBuildingPvSeries,
   HISTORY_WINDOW_MS,
   HISTORY_SAMPLE_COUNT,
   HISTORY_REFRESH_MS,
 } from "../sim/history";
+import { pvPowerForBuildingW } from "../sim/pv";
 import { useSimTime, useTariff } from "../sim/store";
 import { HistoryChart } from "./HistoryChart";
 import { useHistorySeries } from "./useHistorySeries";
@@ -17,21 +19,31 @@ import "./panels.css";
 
 export interface BuildingPanelProps {
   building: Building;
+  plants: PowerPlant[];
   onSelectDwelling: (ewid: string) => void;
   onClose: () => void;
 }
 
-export function BuildingPanel({ building, onSelectDwelling, onClose }: BuildingPanelProps) {
+export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: BuildingPanelProps) {
   const simTimeMs = useSimTime();
   const tariff = useTariff();
   const hasHp = hasHeatPump(building);
   const heatPumpW = hasHp ? heatPumpPowerW(building, simTimeMs) : 0;
   const envelopeAreaM2 = hasHp ? buildingEnvelopeAreaM2(building) : null;
 
+  const buildingPlants = plants.filter((p) => p.egid === building.egid && p.technology === "Photovoltaic");
+  const hasSolar = buildingPlants.length > 0;
+  const solarGenerationW = hasSolar ? -pvPowerForBuildingW(building.egid, plants, simTimeMs) : 0;
+  const solarCapacityKw = buildingPlants.reduce((sum, p) => sum + (p.capacityKw ?? 0), 0);
+
   const history = useHistorySeries(
     () => {
       const times = historyTimeSteps(simClock.getSimTimeMs(), HISTORY_WINDOW_MS, HISTORY_SAMPLE_COUNT);
-      return { times, totalW: sampleBuildingSeries(building, times, tariff) };
+      return {
+        times,
+        totalW: sampleBuildingSeries(building, times, tariff, plants),
+        pvW: sampleBuildingPvSeries(building, times, plants).map((w) => -w),
+      };
     },
     HISTORY_REFRESH_MS,
     `${building.egid}:${tariff.offPeakPriceRpKWh}:${tariff.peakPriceRpKWh}`,
@@ -70,6 +82,19 @@ export function BuildingPanel({ building, onSelectDwelling, onClose }: BuildingP
         </>
       )}
 
+      {hasSolar && (
+        <>
+          <h2 style={{ fontSize: 14, marginTop: 14 }}>Solar</h2>
+          <div className="device-row">
+            <span className="device-name">
+              ☀️ Generation
+              <span className="ev-badge responsive">{solarCapacityKw.toFixed(1)} kWp installed</span>
+            </span>
+            <span className={`device-watts${solarGenerationW === 0 ? " off" : ""}`}>{formatWatts(solarGenerationW)}</span>
+          </div>
+        </>
+      )}
+
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Dwellings ({building.dwellings.length})</h2>
       <ul>
         {building.dwellings.map((dwelling) => (
@@ -84,11 +109,21 @@ export function BuildingPanel({ building, onSelectDwelling, onClose }: BuildingP
         {building.dwellings.length === 0 && <li style={{ color: "#888", fontSize: 13 }}>No dwellings on record.</li>}
       </ul>
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Power — last 24h</h2>
+      <h2 style={{ fontSize: 14, marginTop: 14 }}>Net power — last 24h</h2>
       <HistoryChart
         times={history.times}
-        series={[{ key: "total", label: "Total", color: "#2a78d6", values: history.totalW }]}
+        series={[{ key: "total", label: "Net", color: "#2a78d6", values: history.totalW }]}
       />
+
+      {hasSolar && (
+        <>
+          <h2 style={{ fontSize: 14, marginTop: 14 }}>Solar generation — last 24h</h2>
+          <HistoryChart
+            times={history.times}
+            series={[{ key: "pv", label: "Solar", color: "#eda100", values: history.pvW }]}
+          />
+        </>
+      )}
     </div>
   );
 }

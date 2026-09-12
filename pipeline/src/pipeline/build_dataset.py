@@ -112,6 +112,7 @@ def build() -> MunicipalityDataset:
     plants: list[PowerPlant] = []
     for _, row in plants_df.iterrows():
         lon, lat = coords.lv95_to_lonlat(row["_x"], row["_y"])
+        plant_egid = _clean_int(row.get("EGID"))
         plants.append(
             PowerPlant(
                 plant_id=str(row["xtf_id"]),
@@ -120,6 +121,7 @@ def build() -> MunicipalityDataset:
                 capacity_kw=_clean_float(row.get("TotalPower")),
                 technology=_clean_str(row.get("TechnologyLabel")),
                 commissioning_date=_clean_str(row.get("BeginningOfOperation")),
+                egid=str(plant_egid) if plant_egid is not None else None,
             )
         )
 

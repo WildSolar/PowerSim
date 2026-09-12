@@ -87,6 +87,7 @@ export default function App() {
       ) : selectedBuilding ? (
         <BuildingPanel
           building={selectedBuilding}
+          plants={dataset.powerPlants}
           onSelectDwelling={setSelectedEwid}
           onClose={() => setSelectedEgid(null)}
         />
