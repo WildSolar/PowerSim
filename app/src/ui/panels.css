@@ -1,0 +1,112 @@
+.panel {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 320px;
+  max-height: calc(100% - 32px);
+  overflow-y: auto;
+  background: #ffffffee;
+  backdrop-filter: blur(6px);
+  border-radius: 10px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  padding: 16px;
+  font-family: system-ui, sans-serif;
+  color: #1a1a1a;
+}
+
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.panel .panel-close {
+  float: right;
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  color: #666;
+}
+
+.panel dl {
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.panel dt {
+  color: #666;
+  margin-top: 6px;
+}
+
+.panel dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+.panel ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.panel li button {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #f8f8f8;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.panel li button:hover {
+  background: #eef2ff;
+  border-color: #93c5fd;
+}
+
+.panel .back-link {
+  background: none;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 0 8px;
+}
+
+.device-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: #f8f8f8;
+  border: 1px solid #eee;
+}
+
+.device-row .device-name {
+  font-size: 13px;
+}
+
+.device-row .device-watts {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.device-row .device-watts.off {
+  color: #9ca3af;
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #ddd;
+}

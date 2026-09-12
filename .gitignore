@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+pipeline/data/raw/
+*.egg-info/
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Node
+node_modules/
+app/dist/
+
+# Editor/OS
+.vscode/
+.DS_Store
+Thumbs.db
