@@ -19,6 +19,16 @@ DWELLINGS_URL = "https://daten.statistik.zh.ch/ogd/daten/ressourcen/KTZH_0000202
 EGID_COL = "Eidgenoessischer_Gebaeudeidentifikator"
 EWID_COL = "Eidgenoessischer_Wohnungsidentifikator"
 
+# GWR's federal GSTAT codelist for Gebaeudestatus_Code — 1004 is the only status
+# meaning the building is actually standing today. The others (1001 projected,
+# 1002 approved, 1003 under construction, 1007 demolished) are real GWR rows for
+# buildings that don't physically exist right now, either not yet or not anymore —
+# in Schlieren's own extract, 204 demolished + 30 planned/approved/under-construction
+# out of 2456 rows. Left unfiltered, a demolished building keeps its old coordinate
+# (often now inside whatever replaced it) with no current footprint to match, so it
+# rendered as a stray point marker sitting inside another building's volume.
+EXISTING_BUILDING_STATUS_CODE = 1004
+
 
 def _download_csv(url: str) -> pd.DataFrame:
     response = requests.get(url, timeout=120)
@@ -27,9 +37,11 @@ def _download_csv(url: str) -> pd.DataFrame:
 
 
 def fetch_buildings(bfs_number: int) -> pd.DataFrame:
-    """Buildings in the given municipality, one row per EGID."""
+    """Currently-existing buildings in the given municipality, one row per EGID —
+    excludes demolished/planned/approved/under-construction GWR records."""
     df = _download_csv(BUILDINGS_URL)
-    return df[df["BFS_NR"] == bfs_number].copy()
+    municipality = df[df["BFS_NR"] == bfs_number]
+    return municipality[municipality["Gebaeudestatus_Code"] == EXISTING_BUILDING_STATUS_CODE].copy()
 
 
 def fetch_dwellings(egids: set[int]) -> pd.DataFrame:

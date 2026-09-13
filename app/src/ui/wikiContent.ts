@@ -72,6 +72,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
       p(
         "A building's \"Use\" field (EU-standard building class) is what determines whether it gets residential devices, a commercial category, or both — a building can be both (e.g. shops on the ground floor of an apartment block).",
       ),
+      note(
+        "Only buildings GWR records as currently standing are included — demolished, planned, approved, and under-construction records are filtered out, so every building on the map is really there today.",
+      ),
     ],
   },
   {
