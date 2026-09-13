@@ -15,6 +15,7 @@ import requests
 
 BUILDINGS_URL = "https://daten.statistik.zh.ch/ogd/daten/ressourcen/KTZH_00002022_00004064.csv"
 DWELLINGS_URL = "https://daten.statistik.zh.ch/ogd/daten/ressourcen/KTZH_00002022_00004065.csv"
+ADDRESSES_URL = "https://daten.statistik.zh.ch/ogd/daten/ressourcen/KTZH_00002022_00004066.csv"
 
 EGID_COL = "Eidgenoessischer_Gebaeudeidentifikator"
 EWID_COL = "Eidgenoessischer_Wohnungsidentifikator"
@@ -48,3 +49,28 @@ def fetch_dwellings(egids: set[int]) -> pd.DataFrame:
     """Dwellings whose building EGID is in the given set."""
     df = _download_csv(DWELLINGS_URL)
     return df[df[EGID_COL].isin(egids)].copy()
+
+
+def fetch_addresses(egids: set[int]) -> dict[int, str]:
+    """One street-and-house-number address per EGID in the given set, built from
+    GWR's building-entrance records (a building can have more than one entrance,
+    e.g. a corner building addressed from two streets). Prefers the entrance
+    flagged as the official address (`Offizielle_Adresse_Bezeichnung` == "Ja");
+    among ties (or if none is flagged) picks the lowest entrance ID so the choice
+    is deterministic rather than depending on row order. Buildings with no house
+    number recorded (rare — 2 out of ~2500 in Schlieren) are simply omitted, not
+    guessed at."""
+    df = _download_csv(ADDRESSES_URL)
+    df = df[df[EGID_COL].isin(egids)].copy()
+    df["_is_official"] = df["Offizielle_Adresse_Bezeichnung"] == "Ja"
+    df = df.sort_values(["_is_official", "Eidgenoessischer_Eingangsidentifikator"], ascending=[False, True])
+    df = df.drop_duplicates(subset=EGID_COL, keep="first")
+
+    addresses: dict[int, str] = {}
+    for _, row in df.iterrows():
+        street = row["Strassenbezeichnung"]
+        house_number = row["Eingangsnummer_Gebaeude"]
+        if pd.isna(street) or pd.isna(house_number):
+            continue
+        addresses[int(row[EGID_COL])] = f"{street} {house_number}"
+    return addresses

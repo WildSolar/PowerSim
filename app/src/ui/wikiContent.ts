@@ -67,7 +67,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Buildings & data",
     blocks: [
       p(
-        "Every building's location, footprint, construction year, floor count, heating system, and (where applicable) building-use class come from the real GWR register — nothing about a specific building's identity or attributes is invented.",
+        "Every building's location, footprint, address, construction year, floor count, heating system, and (where applicable) building-use class come from the real GWR register — nothing about a specific building's identity or attributes is invented. A building's panel is titled with its real street address (from GWR's building-entrance records) rather than its internal federal building ID, falling back to that ID only on the rare building with no address on record.",
       ),
       p(
         "A building's \"Use\" field (EU-standard building class) is what determines whether it gets residential devices, a commercial category, or both — a building can be both (e.g. shops on the ground floor of an apartment block).",

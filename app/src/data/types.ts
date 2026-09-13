@@ -14,6 +14,7 @@ export interface Building {
   lon: number;
   lat: number;
   footprint: [number, number][] | null;
+  address: string | null;
   constructionYear: number | null;
   category: string | null;
   buildingClass: string | null;

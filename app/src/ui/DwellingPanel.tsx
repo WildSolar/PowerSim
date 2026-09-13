@@ -70,7 +70,7 @@ export function DwellingPanel({ building, dwelling, plants, onBack, onClose }: D
         ×
       </button>
       <button className="back-link" onClick={onBack}>
-        ← Building {building.egid}
+        ← {building.address ?? `Building ${building.egid}`}
       </button>
       <h2>Dwelling {dwelling.ewid}</h2>
       <dl>

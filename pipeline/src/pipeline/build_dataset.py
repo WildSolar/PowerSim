@@ -61,6 +61,10 @@ def build() -> MunicipalityDataset:
     dwellings_df = gwr.fetch_dwellings(egids)
     print(f"  {len(dwellings_df)} dwellings")
 
+    print("Fetching GWR addresses...")
+    address_by_egid = gwr.fetch_addresses(egids)
+    print(f"  {len(address_by_egid)} / {len(buildings_df)} buildings matched an address")
+
     print("Fetching power plant registry...")
     plants_df = powerplants.fetch_power_plants(MUNICIPALITY_NAME)
     print(f"  {len(plants_df)} plants")
@@ -108,6 +112,7 @@ def build() -> MunicipalityDataset:
                 lon=lon,
                 lat=lat,
                 footprint=footprint_wgs84,
+                address=address_by_egid.get(egid),
                 construction_year=_clean_int(row.get("Baujahr_des_Gebaeudes")),
                 category=_clean_str(row.get("Gebaeudekategorie_Bezeichnung")),
                 building_class=_clean_str(row.get("Gebaeudeklasse_Bezeichnung")),

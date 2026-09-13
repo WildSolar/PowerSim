@@ -78,7 +78,7 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
       <button className="panel-close" onClick={onClose} aria-label="Close">
         ×
       </button>
-      <h2>Building {building.egid}</h2>
+      <h2>{building.address ?? `Building ${building.egid}`}</h2>
       <dl>
         <dt>Category</dt>
         <dd>{building.category ?? "Unknown"}</dd>

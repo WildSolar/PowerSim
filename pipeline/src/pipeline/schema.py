@@ -22,6 +22,7 @@ class Building:
     lon: float
     lat: float
     footprint: list[tuple[float, float]] | None  # WGS84 (lon, lat) polygon ring, or None
+    address: str | None  # street + house number from GWR's building-entrance records
     construction_year: int | None
     category: str | None  # GKAT — coarse residential/non-residential category
     building_class: str | None  # GKLAS — finer EU-standard building-use class (office, retail, school, ...)
