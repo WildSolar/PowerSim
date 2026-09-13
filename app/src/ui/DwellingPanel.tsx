@@ -1,6 +1,6 @@
 import type { Building, Dwelling, PowerPlant } from "../data/types";
 import { dwellingDevicePowerW } from "../sim/devices";
-import { buildingEvTraits, evDailySession, evPowerWFromTraits } from "../sim/ev";
+import { mobilityChargingPowerW, mobilityRenewalLog, mobilitySlotSummaries, evSessionForSlot, slotChargingPowerW } from "../sim/mobility";
 import { isOffPeakHour, tariffKey } from "../sim/tariff";
 import {
   historyTimeSteps,
@@ -16,6 +16,7 @@ import { BillSection } from "./BillSection";
 import { DEVICE_CATEGORIES } from "./deviceCategories";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { HistoryChart } from "./HistoryChart";
+import { RenewalLogSection } from "./RenewalLogSection";
 import { useDwellingBillSummary } from "./useBillSummary";
 import { useHistorySeries } from "./useHistorySeries";
 import { formatWatts } from "./format";
@@ -45,15 +46,13 @@ export function DwellingPanel({ building, dwelling, plants, onBack, onClose }: D
   const tariff = useTariff();
   const billSummary = useDwellingBillSummary(building, dwelling, plants, tariff);
   const { fridgeW, lightingW, cookingW, laundryW, plugLoadW } = dwellingDevicePowerW(building.egid, dwelling, simTimeMs);
-  const evTraits = buildingEvTraits(building, dwelling);
-  const evW = evPowerWFromTraits(building.egid, dwelling, evTraits, simTimeMs, tariff);
+  const evW = mobilityChargingPowerW(building.egid, dwelling, simTimeMs, tariff);
   const totalW = fridgeW + lightingW + cookingW + laundryW + plugLoadW + evW;
 
-  const todaySession = evTraits.hasEV
-    ? evDailySession(building.egid, dwelling, Math.floor(simTimeMs / DAY_MS), evTraits.responsive, tariff)
-    : null;
-  const sessionStartsOffPeak =
-    todaySession && isOffPeakHour(tariff, ((((todaySession.startMs % DAY_MS) + DAY_MS) % DAY_MS) / 3_600_000));
+  const mobilitySlots = mobilitySlotSummaries(building.egid, dwelling, simTimeMs);
+  const mobilityLog = mobilityRenewalLog(building.egid, dwelling, simTimeMs);
+  const dayIndex = Math.floor(simTimeMs / DAY_MS);
+  const hasCarEV = mobilitySlots.some((s) => s.vehicleType === "carEV");
 
   const history = useHistorySeries(
     () => {
@@ -101,28 +100,45 @@ export function DwellingPanel({ building, dwelling, plants, onBack, onClose }: D
         <span className="device-name">🧺 Washer/dryer</span>
         <span className={`device-watts${laundryW === 0 ? " off" : ""}`}>{formatWatts(laundryW)}</span>
       </div>
-      {evTraits.hasEV && (
-        <div className="device-row">
-          <span className="device-name">
-            🚗 EV charging
-            <span className={`ev-badge${evTraits.responsive ? " responsive" : ""}`}>
-              {evTraits.responsive ? "responsive" : "not responsive"}
-            </span>
-          </span>
-          <span className={`device-watts${evW === 0 ? " off" : ""}`}>{formatWatts(evW)}</span>
-        </div>
-      )}
       <div className="total-row">
         <span>Total</span>
         <span>{formatWatts(totalW)}</span>
       </div>
 
-      {todaySession && (
-        <div className="ev-session-note">
-          Tonight: {formatHourOfDay(todaySession.startMs)}–{formatHourOfDay(todaySession.endMs)}
-          {sessionStartsOffPeak ? " (off-peak)" : " (peak)"}
-        </div>
-      )}
+      <h2 style={{ fontSize: 14, marginTop: 14 }}>Mobility</h2>
+      {mobilitySlots.map((slot) => {
+        const isCarEV = slot.vehicleType === "carEV";
+        const slotW = slotChargingPowerW(building.egid, dwelling, slot.slotIndex, slot.mode, slot.vehicleType, simTimeMs, tariff);
+        const session = isCarEV ? evSessionForSlot(building.egid, dwelling, slot.slotIndex, dayIndex, tariff) : null;
+        const sessionStartsOffPeak =
+          session && isOffPeakHour(tariff, ((((session.startMs % DAY_MS) + DAY_MS) % DAY_MS) / 3_600_000));
+        return (
+          <div key={slot.slotIndex}>
+            <div className="device-row">
+              <span className="device-name">
+                {slot.modeIcon} {slot.modeLabel}
+                {slot.vehicleLabel && (
+                  <span className="ev-badge">
+                    {slot.vehicleIcon} {slot.vehicleLabel}
+                  </span>
+                )}
+              </span>
+              {isCarEV ? (
+                <span className={`device-watts${slotW === 0 ? " off" : ""}`}>{formatWatts(slotW)}</span>
+              ) : (
+                <span className="device-status">No charging</span>
+              )}
+            </div>
+            {session && (
+              <div className="ev-session-note">
+                Tonight: {formatHourOfDay(session.startMs)}–{formatHourOfDay(session.endMs)}
+                {sessionStartsOffPeak ? " (off-peak)" : " (peak)"}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <RenewalLogSection title="Mobility history" entries={mobilityLog} />
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Bill</h2>
       <BillSection summary={billSummary} />
@@ -146,7 +162,7 @@ export function DwellingPanel({ building, dwelling, plants, onBack, onClose }: D
         ]}
       />
 
-      {evTraits.hasEV && (
+      {hasCarEV && (
         <>
           <h2 style={{ fontSize: 14, marginTop: 14 }}>EV charging — last 24h</h2>
           <HistoryChart times={history.times} series={[{ key: "ev", label: "EV", color: colorOf("ev"), values: history.evW }]} />

@@ -2,8 +2,8 @@ import type { Building, PowerPlant } from "../data/types";
 import { acPowerW } from "./ac";
 import { commercialPowerW } from "./commercial";
 import { dwellingDevicePowerW } from "./devices";
-import { buildingEvTraits, evPowerWFromTraits } from "./ev";
 import { heatPumpPowerW } from "./heatPump";
+import { mobilityChargingPowerW } from "./mobility";
 import { pvPowerForBuildingW } from "./pv";
 import { snowDepthCm } from "./snow";
 import { tariffStore } from "./tariffStore";
@@ -26,7 +26,7 @@ export function buildingPowerW(building: Building, simTimeMs: number, plants: Po
   const tariff = tariffStore.get();
   for (const dwelling of building.dwellings) {
     const { fridgeW, lightingW, cookingW, laundryW, plugLoadW } = dwellingDevicePowerW(building.egid, dwelling, simTimeMs);
-    const evW = evPowerWFromTraits(building.egid, dwelling, buildingEvTraits(building, dwelling), simTimeMs, tariff);
+    const evW = mobilityChargingPowerW(building.egid, dwelling, simTimeMs, tariff);
     total += fridgeW + lightingW + cookingW + laundryW + plugLoadW + evW;
   }
   return total;

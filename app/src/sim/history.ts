@@ -29,8 +29,8 @@ import {
 } from "./devices";
 import { acPowerWWithWeather } from "./ac";
 import { commercialPowerWFromProfile, makeCommercialProfile, type CommercialProfile } from "./commercial";
-import { buildingEvTraits, evPowerWFromTraits, type EvTraits } from "./ev";
 import { heatPumpPowerWWithWeather } from "./heatPump";
+import { mobilityChargingPowerW } from "./mobility";
 import { pvPowerW } from "./pv";
 import { hashSeed } from "./rng";
 import { snowDepthCm } from "./snow";
@@ -46,7 +46,6 @@ interface DwellingProfiles {
   cooking: CookingProfile;
   plugLoad: PlugLoadProfile;
   waterHeater: WaterHeaterProfile;
-  ev: EvTraits;
 }
 
 export const HISTORY_WINDOW_MS = 24 * 60 * 60_000;
@@ -75,7 +74,6 @@ function getDwellingProfiles(building: Building, dwelling: Dwelling): DwellingPr
       cooking: makeCookingProfile(hashSeed(building.egid, dwelling.ewid, "cooking")),
       plugLoad: makePlugLoadProfile(building.egid, dwelling),
       waterHeater: dwellingWaterHeaterProfile(building.egid, dwelling),
-      ev: buildingEvTraits(building, dwelling),
     };
     profileCache.set(key, profiles);
   }
@@ -106,7 +104,7 @@ export function sampleDwellingSeries(building: Building, dwelling: Dwelling, tim
     cookingW: times.map((t) => cookingPowerW(p.cooking, t)),
     laundryW: times.map((t) => laundryPowerW(p.egid, p.dwelling, t)),
     plugLoadW: times.map((t) => plugLoadPowerW(p.plugLoad, t)),
-    evW: times.map((t) => evPowerWFromTraits(p.egid, p.dwelling, p.ev, t, tariff)),
+    evW: times.map((t) => mobilityChargingPowerW(p.egid, p.dwelling, t, tariff)),
   };
 }
 
@@ -143,7 +141,7 @@ function dwellingCategoryTotals(profileSets: DwellingProfiles[], times: number[]
       cooking += cookingPowerW(p.cooking, t);
       laundry += laundryPowerW(p.egid, p.dwelling, t);
       plugLoad += plugLoadPowerW(p.plugLoad, t);
-      ev += evPowerWFromTraits(p.egid, p.dwelling, p.ev, t, tariff);
+      ev += mobilityChargingPowerW(p.egid, p.dwelling, t, tariff);
     }
     fridgeW.push(fridge);
     lightingW.push(lighting);

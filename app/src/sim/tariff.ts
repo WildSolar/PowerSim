@@ -23,6 +23,7 @@ export interface Tariff {
   oilPriceRpPerLiter: number; // per liter of heating oil burned
   gasPriceRpKWh: number; // per kWh of gas burned (not thermal delivered — see billing.ts)
   districtHeatingPriceRpKWh: number; // per kWh of heat delivered
+  petrolPriceRpPerLiter: number; // per liter of petrol/diesel burned by an ICE car — see mobility.ts
 }
 
 export const DEFAULT_TARIFF: Tariff = {
@@ -39,6 +40,7 @@ export const DEFAULT_TARIFF: Tariff = {
   oilPriceRpPerLiter: 100,
   gasPriceRpKWh: 10,
   districtHeatingPriceRpKWh: 12,
+  petrolPriceRpPerLiter: 180, // ~CHF 1.80/L — ballpark 2025 Swiss pump price, blended petrol/diesel
 };
 
 export function isOffPeakHour(tariff: Tariff, hourOfDay: number): boolean {

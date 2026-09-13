@@ -108,17 +108,31 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
-    id: "ev",
+    id: "mobility",
     icon: "🚗",
-    title: "Electric vehicle charging",
+    title: "Mobility: cars, bikes & getting around",
     blocks: [
       p(
-        "EV ownership isn't in the real data (Switzerland doesn't publish it at building level), so it's a seeded random draw per dwelling, biased toward smaller buildings (houses more than apartment blocks) — roughly what you'd expect from parking availability.",
+        "Every dwelling has one or two independent \"mobility slots\" (biased toward two for larger dwellings — a stand-in for a second person in the household with their own way of getting around, not literally a second car). Each slot independently holds a mode — car, bicycle, or public transit/walking/other — and, for car or bike, a vehicle type on top of that: electric or not.",
       ),
       p(
-        "About 30% of EV-owning households are \"responsive\": they'll delay charging to start once off-peak pricing begins, as long as they can still finish by morning. The rest just plug in when they get home and charge immediately, regardless of price.",
+        "A slot's mode changes through stock renewal too, but differently from heating: roughly every 5-10 years (randomly timed, like a heating system's service life), a \"life event\" — a new job, a child, a move — prompts the household to reconsider, and the slot is reassigned to a new mode drawn at random with probabilities matching Schlieren's current mix, so the mix as a whole stays put even as individual households change. That current mix comes from Kanton Zürich's 2021 Mikrozensus travel survey (BFS/ARE) — the best available real proxy, since no per-municipality modal-split data exists.",
       ),
-      p("Each charging session needs 6-16 kWh (a day's typical driving) at a 7.4 kW home wallbox rate."),
+      p(
+        "Separately, a car or bike wears out on its own schedule (about 14 years for a car, 8-10 for a bike) and gets replaced like-for-like — a car for a car, a bike for a bike — but which vehicle type replaces it is a genuine financial decision, using the exact same four-factor process as a heating renewal (see \"Stock renewal\"): purchase price, running cost (electricity vs. petrol/diesel, both player-adjustable in Control → Prices), a household's own indifference band, and a hidden bias. A car's starting electric/non-electric mix comes from Schlieren's real registered vehicle fleet (BFS's per-municipality vehicle register) rather than a guess.",
+      ),
+      p(
+        "Every mode change and vehicle renewal is logged in plain language on the dwelling's own panel, the same way a heating renewal is on a building's.",
+      ),
+      p(
+        "Responsive EV charging works exactly as before: about 30% of EV-owning slots delay charging until off-peak pricing begins, as long as they can still finish by morning; the rest just plug in and charge immediately. Each session needs 6-16 kWh (a day's typical driving) at a 7.4 kW home wallbox rate.",
+      ),
+      note(
+        "An e-bike's charging draw is real but tiny next to a car's, so it isn't separately modeled — a bike slot never adds to a dwelling's power reading, whichever kind it is.",
+      ),
+      note(
+        "Within a bike slot's own renewal decision, a standard bike currently wins the four-factor comparison almost every time — purchase price dominates, and a bike's electricity cost is too small either way to offset a standard bike's much lower price. A known simplification, since precise e-bike cost data wasn't as readily available as the car and heating figures this is otherwise built on.",
+      ),
     ],
   },
   {
@@ -171,7 +185,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
       note(
         "A renewal decision uses whatever tariff and prices are set at the moment it happens, then never changes again — moving a price slider later doesn't rewrite a past decision, only shapes whichever renewal comes next.",
       ),
-      note("Only heating renews this way for now — EV ownership and solar are still static, with the same mechanic planned for both next."),
+      note(
+        "Heating and mobility (see \"Mobility\") both renew this way now — mobility's mode tier (car/bike/other) uses a simpler weighted-random choice instead of the four-factor one, since a life event changes what a household needs, not what's cheapest; its nested vehicle-type tier (EV vs. ICE, e-bike vs. standard) uses the identical four-factor process heating does. Solar is still static, with the same mechanic planned for it next.",
+      ),
     ],
   },
   {
@@ -209,13 +225,13 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Electricity tariff & prices",
     blocks: [
       p(
-        "The \"⚙️ ‹municipality› Control\" button (bottom-left) opens the Control panel's Prices tab: a simple two-rate time-of-use electricity price — a cheaper off-peak rate overnight (21:00-06:00) and a more expensive peak rate during the day — plus four flat prices below it. It's the main lever you can pull directly right now.",
+        "The \"⚙️ ‹municipality› Control\" button (bottom-left) opens the Control panel's Prices tab: a simple two-rate time-of-use electricity price — a cheaper off-peak rate overnight (21:00-06:00) and a more expensive peak rate during the day — plus five flat prices below it. It's the main lever you can pull directly right now.",
       ),
       p(
         "Only EV charging currently responds to the electricity tariff (see above) — a responsive household will wait for off-peak pricing to begin if that still gets the car charged in time.",
       ),
       p(
-        "The four flat prices: what exported solar generation earns (feed-in), and what oil, gas, and district heating cost — oil per liter (how it's actually sold), the other two per kWh. All four feed directly into the Bill sections described next.",
+        "The five flat prices: what exported solar generation earns (feed-in), and what oil, gas, district heating, and petrol cost — oil and petrol per liter (how they're actually sold), the other two per kWh. The first four feed directly into the Bill sections described next; petrol (and every electricity price above) instead feeds mobility's vehicle-type renewal decision (see \"Mobility\") — moving it shifts how attractive an EV looks the next time a car in the municipality wears out, the same way changing oil or gas price shifts heating's own renewal decisions.",
       ),
     ],
   },
@@ -237,7 +253,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "A dwelling's bill is its own devices (electricity only) plus its floor-area share of the building's shared systems — heat pump/AC electricity, solar credit, and heating-fuel cost — split the way a real Swiss ancillary-costs statement (Nebenkostenabrechnung) allocates shared building costs to tenants. A commercial tenant's own energy use is never split to residential dwellings; it's billed to the building itself.",
       ),
       note(
-        "EV charging cost is already billed to the dwelling that owns the car — EV ownership has always been assigned per dwelling, not per building, even before bills existed. A proper choice between EV/ICE-vehicle/public-transport/bicycle costs is a planned follow-up, not implemented yet.",
+        "EV charging cost is billed to the dwelling exactly like any other device — mobility's mode and vehicle-type choice (see \"Mobility\") is fully modeled now, but only the electricity side shows up on a bill: a petrol/diesel car's fuel cost, and any cost of public transit or a bike, aren't billed anywhere yet, the same boundary heating draws around wood and other unpriced fuels.",
       ),
       note("Wood and other unpriced heating sources still get no fuel-cost line — same reasoning as the unmodeled commercial building classes: no price input, no guess."),
     ],

@@ -93,6 +93,18 @@ export function TariffControl() {
         />
         <span className="tariff-unit">Rp/kWh</span>
       </div>
+      <div className="tariff-row">
+        <span className="tariff-label">Petrol price</span>
+        <input
+          type="number"
+          min={0}
+          max={400}
+          step={1}
+          value={tariff.petrolPriceRpPerLiter}
+          onChange={(e) => tariffStore.set({ petrolPriceRpPerLiter: Number(e.target.value) })}
+        />
+        <span className="tariff-unit">Rp/L</span>
+      </div>
     </div>
   );
 }
