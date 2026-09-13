@@ -144,6 +144,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Space heating starts from real data: a building has a heat pump if GWR's heating generator or energy source says so (including ground/water/air-source systems even when the generator field is inconsistent) — though what's actually installed can change over time now, see \"Stock renewal\" below. Its power scales with the building's own envelope area (roof + walls) and how far the outdoor temperature sits below a comfort setpoint, divided by a temperature-dependent efficiency (colder outside = less efficient, and a ground/water-source pump's efficiency barely moves with outside temperature at all — its reservoir stays close to a stable ~10°C year-round).",
       ),
       p(
+        "How much heat a building loses per degree isn't one number for the whole municipality: it comes from a real construction-era curve (GWR's construction year again — pre-1920 masonry loses heat several times faster than a 2020s new-build), nudged down a little for internal heat gains where a building has more occupants or a recognized commercial use (people, appliances, and equipment all give off warmth for free), and finished with a small seeded per-building variation standing in for everything age alone doesn't explain — a particular building's workmanship, an unlisted renovation, general draftiness.",
+      ),
+      p(
         "Air conditioning has no real ownership data in Switzerland yet, so it's a seeded random draw biased toward newer and larger buildings — reflecting today's low but rising adoption. Its model mirrors the heat pump's (envelope area × comfort-setpoint gap), with a flat efficiency and a capacity cap standing in for real regulatory limits.",
       ),
       p(
