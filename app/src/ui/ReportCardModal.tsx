@@ -1,12 +1,15 @@
 import type { MunicipalityDataset } from "../data/types";
+import { EMISSIONS_SOURCE_COLOR } from "../sim/emissions";
 import { HEATING_SYSTEM_CATALOG, HEATING_SYSTEM_ORDER, WATER_HEATING_KIND_COLOR } from "../sim/heatingSystems";
 import { sampleMunicipalityCategorySeries } from "../sim/history";
 import { spaceHeatingKWhFor } from "../sim/yearReport";
 import { useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
 import { CONSUMPTION_CATEGORIES } from "./deviceCategories";
+import { formatCO2 } from "./format";
 import { PieChart, type PieSlice } from "./PieChart";
 import { usePeriodPieEnergy } from "./usePeriodPieEnergy";
+import { useYearEmissions, BASELINE_YEAR, NET_ZERO_TARGET_YEAR } from "./useYearEmissions";
 import { useYearHeatingReport } from "./useYearHeatingReport";
 import "./modal.css";
 import "./panels.css";
@@ -68,6 +71,27 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
     : [];
   const totalRenewals = heatingReport ? heatingReport.renewals.reduce((sum, r) => sum + r.count, 0) : 0;
 
+  const { data: emissions, loading: emissionsLoading } = useYearEmissions(dataset, year);
+  const emissionSlices: PieSlice[] = emissions
+    ? [
+        { key: "electricity", label: "Electricity", icon: "⚡", color: EMISSIONS_SOURCE_COLOR.electricity, valueKWh: emissions.current.electricityKgCO2 },
+        { key: "mobility", label: "Mobility (petrol/diesel)", icon: "🚗", color: EMISSIONS_SOURCE_COLOR.mobility, valueKWh: emissions.current.mobilityKgCO2 },
+        {
+          key: "districtHeating",
+          label: "District heating",
+          icon: "🏭",
+          color: EMISSIONS_SOURCE_COLOR.districtHeating,
+          valueKWh: emissions.current.districtHeatingKgCO2,
+        },
+        { key: "gas", label: "Gas heating", icon: "🔥", color: EMISSIONS_SOURCE_COLOR.gas, valueKWh: emissions.current.gasKgCO2 },
+        { key: "oil", label: "Oil heating", icon: "🛢️", color: EMISSIONS_SOURCE_COLOR.oil, valueKWh: emissions.current.oilKgCO2 },
+      ]
+    : [];
+  const vsBaselinePct =
+    emissions && emissions.baseline.totalKgCO2 > 0
+      ? ((emissions.current.totalKgCO2 - emissions.baseline.totalKgCO2) / emissions.baseline.totalKgCO2) * 100
+      : 0;
+
   return (
     <div className="modal-backdrop">
       <div className="modal-shell report-card-shell">
@@ -80,6 +104,30 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
             {dataset.name}, {year}: {dataset.buildings.length} buildings, {dataset.buildings.reduce((sum, b) => sum + b.dwellings.length, 0)}{" "}
             dwellings.
           </p>
+
+          <h2 style={{ fontSize: 14, marginTop: 14 }}>Emissions</h2>
+          {emissionsLoading || !emissions ? (
+            <div className="loading-note">Computing…</div>
+          ) : (
+            <>
+              <PieChart title={`${year} total`} slices={emissionSlices} formatValue={formatCO2} />
+              <p style={{ fontSize: 12, margin: "8px 0 0" }}>
+                {year === BASELINE_YEAR ? (
+                  <>This is the baseline year — every future report compares back to this one.</>
+                ) : (
+                  <>
+                    {formatCO2(emissions.current.totalKgCO2)} this year, {vsBaselinePct <= 0 ? "down" : "up"} {Math.abs(vsBaselinePct).toFixed(1)}%
+                    from the {BASELINE_YEAR} baseline ({formatCO2(emissions.baseline.totalKgCO2)}).
+                  </>
+                )}{" "}
+                Target: net zero by {NET_ZERO_TARGET_YEAR} — {Math.max(0, NET_ZERO_TARGET_YEAR - year)} years left.
+              </p>
+              <p style={{ fontSize: 12, color: "#888", margin: "4px 0 0" }}>
+                Operational emissions only — what's actually burned or drawn from the grid, net of solar exported. Manufacturing a heat pump, an
+                EV's battery, or a solar panel isn't counted.
+              </p>
+            </>
+          )}
 
           <h2 style={{ fontSize: 14, marginTop: 14 }}>Energy by category</h2>
           {overallLoading || !overallEnergy ? (

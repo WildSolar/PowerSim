@@ -17,17 +17,22 @@
  * synchronously.
  */
 
-import type { Building } from "../data/types";
+import type { Building, PowerPlant } from "../data/types";
 import { toSimTimeMs } from "./calendar";
-import { energyKWh } from "./energy";
+import { categoryEnergyFromSeries, energyKWh } from "./energy";
 import { currentHeatingSystemId, heatingRenewalsInRange } from "./heatingRenewal";
 import type { HeatingSystemId } from "./heatingSystems";
-import { historyTimeSteps } from "./history";
+import { historyTimeSteps, sampleMunicipalityCategorySeries } from "./history";
+import { ANNUAL_CAR_KM, ICE_CAR_L_PER_100KM } from "./mobilitySystems";
+import { currentMobilityMode, currentVehicleType, mobilitySlotCount } from "./mobility";
 import { spaceHeatingThermalDemandW } from "./spaceHeating";
+import type { Tariff } from "./tariff";
+import { tariffStore } from "./tariffStore";
 import { dwellingWaterHeaterProfile, waterHeaterPowerW, waterHeatingKind, type WaterHeaterProfile } from "./waterHeating";
 import { dailyMeanTempC, weatherAt } from "./weather";
 
 const SAMPLES_PER_MONTH = 24; // matches historyLong.ts's own per-period density
+const COARSE_SAMPLES_PER_MONTH = 8; // for quantities that don't need weather-grade resolution — see the two functions below
 
 export interface HeatingTechnologyEnergyKWh {
   airHeatPumpSpaceKWh: number;
@@ -197,4 +202,84 @@ export function computeHeatingRenewalTally(buildings: Building[], year: number):
     }
   }
   return [...counts.values()].sort((a, b) => b.count - a.count);
+}
+
+/** Net municipality-wide electricity consumption for the given calendar year
+ * — every device category minus solar generation (the same "net" formula
+ * ReportCardModal's own overview pie uses, just for an arbitrary past year
+ * rather than "the last 12 months as of right now"), for emissions.ts's
+ * grid-electricity figure. `tariff` only affects *when within a day* EV
+ * charging happens, never the total kWh, so reading whatever's current is
+ * fine even when computing a past year. Chunked the same way as the
+ * technology breakdown, at a coarser sample density — aggregate electricity
+ * demand is smooth at municipality scale (thousands of independent duty
+ * cycles), so it doesn't need weather-grade resolution to integrate
+ * accurately. */
+export async function computeNetElectricityKWh(
+  buildings: Building[],
+  plants: PowerPlant[],
+  year: number,
+  isCancelled: () => boolean,
+): Promise<number> {
+  const tariff: Tariff = tariffStore.get();
+  let netKWh = 0;
+  for (let month = 0; month < 12; month++) {
+    if (isCancelled()) return netKWh;
+    const monthStartMs = toSimTimeMs(Date.UTC(year, month, 1));
+    const monthEndMs = toSimTimeMs(Date.UTC(year, month + 1, 1));
+    const times = historyTimeSteps(monthEndMs, monthEndMs - monthStartMs, COARSE_SAMPLES_PER_MONTH);
+    const series = sampleMunicipalityCategorySeries(buildings, times, tariff, plants);
+    const energy = categoryEnergyFromSeries(times, series);
+    netKWh +=
+      energy.fridge +
+      energy.lighting +
+      energy.cooking +
+      energy.laundry +
+      energy.plugLoad +
+      energy.ev +
+      energy.heatPump +
+      energy.ac +
+      energy.waterHeating +
+      energy.commercial -
+      energy.solar;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  return netKWh;
+}
+
+/** Liters of petrol/diesel burned by every currently-ICE car slot in the
+ * municipality over the given calendar year — mobility's own fuel
+ * consumption is a flat per-km rate (unlike heating's weather-driven
+ * demand), so this only needs to know *how many ICE car-slot-years* existed,
+ * not a fine-grained power curve: each sample just checks which slots are
+ * car+ICE right then, and the fraction of samples a slot appears in
+ * approximates the fraction of the year it held that state. Coarser
+ * sampling than the technology breakdown for the same reason — renewal
+ * events are rare (years apart per slot), so the underlying quantity barely
+ * moves within a month. */
+export async function computeMobilityFuelLiters(buildings: Building[], year: number, isCancelled: () => boolean): Promise<number> {
+  let iceCarSlotSamples = 0;
+  let totalSamples = 0;
+  for (let month = 0; month < 12; month++) {
+    if (isCancelled()) break;
+    const monthStartMs = toSimTimeMs(Date.UTC(year, month, 1));
+    const monthEndMs = toSimTimeMs(Date.UTC(year, month + 1, 1));
+    const times = historyTimeSteps(monthEndMs, monthEndMs - monthStartMs, COARSE_SAMPLES_PER_MONTH);
+    for (const t of times) {
+      totalSamples++;
+      for (const building of buildings) {
+        for (const dwelling of building.dwellings) {
+          const slotCount = mobilitySlotCount(building.egid, dwelling);
+          for (let slot = 0; slot < slotCount; slot++) {
+            const mode = currentMobilityMode(building.egid, dwelling.ewid, slot, t);
+            if (mode !== "car") continue;
+            if (currentVehicleType(building.egid, dwelling.ewid, slot, mode, t) === "carICE") iceCarSlotSamples++;
+          }
+        }
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  const avgIceCarCount = totalSamples > 0 ? iceCarSlotSamples / totalSamples : 0;
+  return avgIceCarCount * (ANNUAL_CAR_KM / 100) * ICE_CAR_L_PER_100KM;
 }

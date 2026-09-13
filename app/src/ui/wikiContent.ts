@@ -293,6 +293,25 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "emissions",
+    icon: "🌍",
+    title: "Emissions & net zero",
+    blocks: [
+      p(
+        "The municipality's headline goal is net zero by 2050: every completed calendar year totals up operational CO₂ emissions from four sources — grid electricity, gas heating, oil heating, district heating, and petrol/diesel cars — and compares it against the very first year simulated, which is fixed forever as the baseline.",
+      ),
+      p(
+        "Grid electricity is priced on a net basis — total consumption minus solar exported — at that year's grid carbon intensity, sourced from a real Swiss industry projection (VSE) of how much cleaner the national grid gets over time as it decarbonizes. A given year's intensity is treated as constant: no single municipality's choices move the national grid, so this figure only depends on the calendar year, never on anything you do.",
+      ),
+      p(
+        "Gas, oil, and district heating are priced by how much of each fuel was actually burned for space heating (see \"Stock renewal\"), using standard Swiss combustion emission factors (BAFU). Mobility's contribution is petrol/diesel burned by ICE cars (see \"Mobility\") — public transit, walking, and bikes (electric or not) aren't counted, the same way they aren't billed a fuel cost.",
+      ),
+      note(
+        "This is operational emissions only — what's actually burned or drawn from the grid. Manufacturing footprints (a heat pump, an EV's battery, a solar panel) aren't in scope, and neither are emissions embodied in a building itself. A future update may add these separately rather than blend them into one number.",
+      ),
+    ],
+  },
+  {
     id: "year-in-review",
     icon: "🎉",
     title: "Year in Review",
@@ -301,7 +320,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "The instant the clock crosses into a new calendar year, it automatically pauses and a \"Year in Review\" report card opens — a snapshot of the municipality's just-completed year, on top of whatever building or dwelling panel you happen to have open.",
       ),
       p(
-        "Alongside a municipality-wide energy breakdown for the year, it has two sections specific to heating: \"Heating energy by technology\" — how much heat was actually delivered by each system (air/ground heat pump, gas, oil, district heating) for space heating, and by heat pump vs. direct electric for hot water — and \"Heating renewals this year\", a tally of every stock-renewal replacement that happened during the year (e.g. \"14× Oil boiler → Ground heat pump\"), \"like-for-like\" flagged when a building was replaced with the same kind of system it already had.",
+        "The report leads with the year's emissions (see \"Emissions & net zero\") — a donut chart split by source, and how it compares to the baseline year. Below that comes a municipality-wide energy breakdown, then two sections specific to heating: \"Heating energy by technology\" — how much heat was actually delivered by each system (air/ground heat pump, gas, oil, district heating) for space heating, and by heat pump vs. direct electric for hot water — and \"Heating renewals this year\", a tally of every stock-renewal replacement that happened during the year (e.g. \"14× Oil boiler → Ground heat pump\"), \"like-for-like\" flagged when a building was replaced with the same kind of system it already had.",
       ),
       note(
         "The heating-by-technology totals cover every fuel a building might use, not just electricity, so they're deliberately not directly comparable to the \"Energy by category\" pie above them, which only covers what draws grid power.",

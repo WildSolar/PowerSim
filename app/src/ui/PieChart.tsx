@@ -16,6 +16,11 @@ export interface PieChartProps {
   /** Slices below this are folded out entirely rather than drawn as a sliver —
    * matches EnergyBreakdown's own near-zero cutoff. */
   minKWh?: number;
+  /** Formats a slice's value (still just a plain number in `valueKWh` —
+   * despite the field's name, callers with a non-energy quantity, e.g.
+   * emissions in kg CO2, pass their own formatter here rather than the
+   * field being renamed everywhere just for them). Defaults to formatKWh. */
+  formatValue?: (v: number) => string;
 }
 
 const SIZE = 150;
@@ -47,7 +52,7 @@ function donutSlicePath(startAngle: number, endAngle: number): string {
  * (see HistoryChart/PeriodBarChart for magnitude-over-time instead). The
  * center reads the total; the legend (always present, never color-only) reads
  * every slice's share, with a hover link between legend row and slice. */
-export function PieChart({ title, slices, minKWh = 0.01 }: PieChartProps) {
+export function PieChart({ title, slices, minKWh = 0.01, formatValue = formatKWh }: PieChartProps) {
   const [hoverKey, setHoverKey] = useState<string | null>(null);
   const rows = slices.filter((s) => s.valueKWh >= minKWh);
   const total = rows.reduce((sum, s) => sum + s.valueKWh, 0);
@@ -78,12 +83,12 @@ export function PieChart({ title, slices, minKWh = 0.01 }: PieChartProps) {
                 onPointerLeave={() => setHoverKey(null)}
               >
                 <title>
-                  {a.label}: {formatKWh(a.valueKWh)} ({(a.fraction * 100).toFixed(1)}%)
+                  {a.label}: {formatValue(a.valueKWh)} ({(a.fraction * 100).toFixed(1)}%)
                 </title>
               </path>
             ))}
             <text x={CENTER} y={CENTER - 4} textAnchor="middle" className="pie-chart-total-value">
-              {formatKWh(total)}
+              {formatValue(total)}
             </text>
             <text x={CENTER} y={CENTER + 12} textAnchor="middle" className="pie-chart-total-label">
               total

@@ -21,3 +21,10 @@ export function formatCHF(rp: number): string {
   const decimals = Math.abs(chf) >= 1_000 ? 0 : 2;
   return `CHF ${chf.toLocaleString("de-CH", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
 }
+
+export function formatCO2(kg: number): string {
+  const abs = Math.abs(kg);
+  if (abs >= 1_000_000) return `${(kg / 1_000_000).toFixed(2)} kt CO₂`;
+  if (abs >= 1_000) return `${(kg / 1_000).toFixed(1)} t CO₂`;
+  return `${kg.toFixed(0)} kg CO₂`;
+}
