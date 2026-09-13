@@ -1,6 +1,7 @@
+import { useState } from "react";
 import type { MunicipalityDataset } from "../data/types";
 import { simClock } from "../sim/engine";
-import { categoryEnergyFromSeries } from "../sim/energy";
+import { categoryEnergyFromSeries, type CategoryEnergyKWh } from "../sim/energy";
 import {
   historyTimeSteps,
   netTotalFromCategorySeries,
@@ -11,22 +12,40 @@ import {
 } from "../sim/history";
 import { useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
-import { EnergyBreakdown } from "./EnergyBreakdown";
+import { CONSUMPTION_CATEGORIES } from "./deviceCategories";
 import { HistoryChart } from "./HistoryChart";
+import { PieChart, type PieSlice } from "./PieChart";
 import { useHistorySeries } from "./useHistorySeries";
+import { usePeriodPieEnergy, type PieGranularity } from "./usePeriodPieEnergy";
 import "./panels.css";
+import "./pieChart.css";
 
 export interface CityStatsTabProps {
   dataset: MunicipalityDataset;
 }
 
-/** The municipality-wide summary — building/dwelling/solar counts, the Daily
- * energy breakdown, and the live Net power / Solar generation charts. Shares
- * `.panel-typography` (panels.css) for its h2/dl look, since it's rendered
- * inside ControlPanel's `.modal-content` rather than a `.panel` card. */
+const GRANULARITIES: { label: string; value: PieGranularity }[] = [
+  { label: "Day", value: "day" },
+  { label: "Week", value: "week" },
+  { label: "Month", value: "month" },
+  { label: "Year", value: "year" },
+];
+
+const RESIDENTIAL_CATEGORIES = CONSUMPTION_CATEGORIES.filter((c) => c.key !== "commercial");
+
+function toSlices(energy: CategoryEnergyKWh, categories: typeof CONSUMPTION_CATEGORIES): PieSlice[] {
+  return categories.map((c) => ({ key: c.key, label: c.label, icon: c.icon, color: c.color, valueKWh: energy[c.key] }));
+}
+
+/** The municipality-wide summary — building/dwelling/solar counts, an Energy
+ * breakdown pie pair (day/week/month/year, switchable), and the live Net power
+ * / Solar generation charts. Shares `.panel-typography` (panels.css) for its
+ * h2/dl look, since it's rendered inside ControlPanel's `.modal-content` rather
+ * than a `.panel` card. */
 export function CityStatsTab({ dataset }: CityStatsTabProps) {
   const tariff = useTariff();
   const solarPlants = dataset.powerPlants.filter((p) => p.technology === "Photovoltaic");
+  const [granularity, setGranularity] = useState<PieGranularity>("day");
 
   const history = useHistorySeries(
     () => {
@@ -43,6 +62,14 @@ export function CityStatsTab({ dataset }: CityStatsTabProps) {
     `${dataset.name}:${tariffKey(tariff)}`,
   );
 
+  const { energy: periodEnergy, loading } = usePeriodPieEnergy(
+    dataset.name,
+    granularity,
+    (times) => sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, dataset.powerPlants),
+    tariffKey(tariff),
+  );
+  const pieEnergy = granularity === "day" ? history.energy : periodEnergy;
+
   return (
     <div className="panel-typography">
       <dl>
@@ -56,8 +83,22 @@ export function CityStatsTab({ dataset }: CityStatsTabProps) {
         </dd>
       </dl>
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Daily energy — last 24h</h2>
-      <EnergyBreakdown energy={history.energy} />
+      <h2 style={{ fontSize: 14, marginTop: 14 }}>Energy breakdown</h2>
+      <div className="tier-buttons">
+        {GRANULARITIES.map((g) => (
+          <button key={g.value} className={g.value === granularity ? "active" : ""} onClick={() => setGranularity(g.value)}>
+            {g.label}
+          </button>
+        ))}
+      </div>
+      {loading || !pieEnergy ? (
+        <div className="loading-note">Computing…</div>
+      ) : (
+        <div className="pie-chart-row">
+          <PieChart title="All categories" slices={toSlices(pieEnergy, CONSUMPTION_CATEGORIES)} />
+          <PieChart title="Excluding commercial/business" slices={toSlices(pieEnergy, RESIDENTIAL_CATEGORIES)} />
+        </div>
+      )}
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Net power — last 24h</h2>
       <HistoryChart

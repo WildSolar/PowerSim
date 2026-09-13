@@ -32,3 +32,8 @@ export const DEVICE_CATEGORIES: DeviceCategoryInfo[] = [
   { key: "solar", label: "Solar generation", icon: "☀️", color: "#eda100" },
   { key: "waterHeating", label: "Water heating", icon: "🚿", color: "#0f8fc0" },
 ];
+
+/** Every category except solar generation, which is a credit rather than a
+ * consumption device — the set a "components of total consumption" view (a
+ * stacked chart, a pie) should sum over. */
+export const CONSUMPTION_CATEGORIES: DeviceCategoryInfo[] = DEVICE_CATEGORIES.filter((c) => c.key !== "solar");

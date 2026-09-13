@@ -237,7 +237,10 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Statistics & history",
     blocks: [
       p(
-        "Building and dwelling panels, plus the Control panel's City stats tab (for the whole municipality), each have a \"Daily energy\" breakdown: total kWh over the last 24h, split by category as a labeled bar list, plus a live \"Net power\" line chart.",
+        "Building and dwelling panels each have a \"Daily energy\" breakdown: total kWh over the last 24h, split by category as a labeled bar list, plus a live \"Net power\" line chart.",
+      ),
+      p(
+        "The Control panel's City stats tab shows the same idea municipality-wide as a pair of donut charts instead — one of every category, one with commercial/business use excluded (it's usually the biggest slice by far, so the second chart is where the residential categories' own relative sizes actually show up). Switch the period with Day/Week/Month/Year: Day is a live rolling last-24h reading like the building/dwelling panels; Week and Month show the most recently completed calendar week/month; Year sums the last 12 completed months.",
       ),
       p(
         "Further down (or, for the municipality, the Control panel's separate History tab) is \"Historical energy\": beyond the last 24 hours, switch between Day (last 7 days), Week (last 13 weeks), or Month (last 12 months), and pick Total, a stacked breakdown of every category, or any single category (e.g. just EV charging) from the dropdown.",

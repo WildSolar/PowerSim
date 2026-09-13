@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { PeriodSampler, PeriodTier } from "../sim/historyLong";
-import { DEVICE_CATEGORIES, type DeviceCategoryKey } from "./deviceCategories";
+import { CONSUMPTION_CATEGORIES, DEVICE_CATEGORIES, type DeviceCategoryKey } from "./deviceCategories";
 import { formatKWh } from "./format";
 import { PeriodBarChart, type BarSeries } from "./PeriodBarChart";
 import { useLongHistory } from "./useLongHistory";
@@ -11,8 +11,6 @@ const TIERS: { label: string; value: PeriodTier }[] = [
   { label: "Week", value: "week" },
   { label: "Month", value: "month" },
 ];
-
-const CONSUMPTION_CATEGORIES = DEVICE_CATEGORIES.filter((c) => c.key !== "solar");
 
 type CategorySelection = "total" | "stacked" | DeviceCategoryKey;
 
