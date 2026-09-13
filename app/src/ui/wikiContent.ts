@@ -180,13 +180,13 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Electricity tariff & prices",
     blocks: [
       p(
-        "The Tariff control (bottom-right) sets a simple two-rate time-of-use electricity price: a cheaper off-peak rate overnight (21:00-06:00) and a more expensive peak rate during the day. It's the main lever you can pull directly right now.",
+        "The \"⚙️ ‹municipality› Control\" button (bottom-left) opens the Control panel's Prices tab: a simple two-rate time-of-use electricity price — a cheaper off-peak rate overnight (21:00-06:00) and a more expensive peak rate during the day — plus four flat prices below it. It's the main lever you can pull directly right now.",
       ),
       p(
-        "Only EV charging currently responds to it (see above) — a responsive household will wait for off-peak pricing to begin if that still gets the car charged in time.",
+        "Only EV charging currently responds to the electricity tariff (see above) — a responsive household will wait for off-peak pricing to begin if that still gets the car charged in time.",
       ),
       p(
-        "Below the electricity prices are three more you can set: what exported solar generation earns (feed-in), and what gas and district heating cost per kWh — all three feed directly into the Bill sections described next.",
+        "The four flat prices: what exported solar generation earns (feed-in), and what oil, gas, and district heating cost — oil per liter (how it's actually sold), the other two per kWh. All four feed directly into the Bill sections described next.",
       ),
     ],
   },
@@ -202,15 +202,15 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Electricity is priced correctly for time-of-use — each moment of consumption is billed at whichever of off-peak/peak applied right then, not an average rate — so a responsive EV owner's bill actually reflects the money they save by waiting for off-peak pricing. Exported solar is credited separately at the feed-in rate, which is normally lower than what you pay to consume.",
       ),
       p(
-        "A heat pump's cost shows up as electricity. A building whose real heating source is gas or district heat instead gets its own priced line: the same underlying heat-loss demand a heat pump would meet, converted to gas or district-heat usage (a gas boiler assumed 90% efficient; district heat priced as delivered) and billed at whichever price you've set.",
+        "A heat pump's cost shows up as electricity. A building whose real heating source is oil, gas, or district heat instead gets its own priced line, labeled with how much fuel it actually used (liters for oil, kWh for gas/district heat): the same underlying heat-loss demand a heat pump would meet, converted to that fuel (a boiler assumed 85% efficient for oil, 90% for gas; district heat priced as delivered) and billed at whichever price you've set.",
       ),
       p(
-        "A dwelling's bill is its own devices (electricity only) plus its floor-area share of the building's shared systems — heat pump/AC electricity, solar credit, and gas/district-heat cost — split the way a real Swiss ancillary-costs statement (Nebenkostenabrechnung) allocates shared building costs to tenants. A commercial tenant's own energy use is never split to residential dwellings; it's billed to the building itself.",
+        "A dwelling's bill is its own devices (electricity only) plus its floor-area share of the building's shared systems — heat pump/AC electricity, solar credit, and heating-fuel cost — split the way a real Swiss ancillary-costs statement (Nebenkostenabrechnung) allocates shared building costs to tenants. A commercial tenant's own energy use is never split to residential dwellings; it's billed to the building itself.",
       ),
       note(
         "EV charging cost is already billed to the dwelling that owns the car — EV ownership has always been assigned per dwelling, not per building, even before bills existed. A proper choice between EV/ICE-vehicle/public-transport/bicycle costs is a planned follow-up, not implemented yet.",
       ),
-      note("Oil, wood, and other unpriced heating sources get no fuel-cost line — same reasoning as the unmodeled commercial building classes: no price input, no guess."),
+      note("Wood and other unpriced heating sources still get no fuel-cost line — same reasoning as the unmodeled commercial building classes: no price input, no guess."),
     ],
   },
   {
@@ -234,10 +234,10 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Statistics & history",
     blocks: [
       p(
-        "Every panel (municipality, building, dwelling) has a \"Daily energy\" breakdown: total kWh over the last 24h, split by category as a labeled bar list, plus a live \"Net power\" line chart.",
+        "Building and dwelling panels, plus the Control panel's City stats tab (for the whole municipality), each have a \"Daily energy\" breakdown: total kWh over the last 24h, split by category as a labeled bar list, plus a live \"Net power\" line chart.",
       ),
       p(
-        "Further down, \"Historical energy\" goes beyond the last 24 hours: switch between Day (last 7 days), Week (last 13 weeks), or Month (last 12 months), and pick Total, a stacked breakdown of every category, or any single category (e.g. just EV charging) from the dropdown.",
+        "Further down (or, for the municipality, the Control panel's separate History tab) is \"Historical energy\": beyond the last 24 hours, switch between Day (last 7 days), Week (last 13 weeks), or Month (last 12 months), and pick Total, a stacked breakdown of every category, or any single category (e.g. just EV charging) from the dropdown.",
       ),
       note(
         "Historical bars only ever show fully completed periods — today isn't part of \"last 7 days\" — so every bar is a fixed number computed once and cached, not something that wobbles as time passes.",

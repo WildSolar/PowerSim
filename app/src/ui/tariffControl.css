@@ -1,17 +1,8 @@
 .tariff-control {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
-  z-index: 15;
-  background: #ffffffee;
-  backdrop-filter: blur(6px);
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
-  padding: 10px 12px;
   font-family: system-ui, sans-serif;
   font-size: 13px;
   color: #1a1a1a;
-  width: 220px;
+  max-width: 280px;
 }
 
 .tariff-title {

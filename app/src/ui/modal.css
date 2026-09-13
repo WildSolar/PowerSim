@@ -1,4 +1,11 @@
-.wiki-backdrop {
+/**
+ * Shared shell for full-takeover modals (Wiki, Control) — backdrop, sized card,
+ * a sidebar of tab/section buttons, and a scrolling content pane with prose
+ * styling. Content-specific components (charts, device rows, etc.) bring their
+ * own styling on top of `.modal-content`.
+ */
+
+.modal-backdrop {
   position: absolute;
   inset: 0;
   background: rgba(11, 11, 11, 0.45);
@@ -8,7 +15,7 @@
   z-index: 20;
 }
 
-.wiki-modal {
+.modal-shell {
   position: relative;
   width: min(720px, 92vw);
   height: min(560px, 86vh);
@@ -21,7 +28,7 @@
   overflow: hidden;
 }
 
-.wiki-close {
+.modal-close {
   position: absolute;
   top: 10px;
   right: 12px;
@@ -34,7 +41,7 @@
   z-index: 1;
 }
 
-.wiki-nav {
+.modal-nav {
   width: 220px;
   flex-shrink: 0;
   background: #f8f8f6;
@@ -43,7 +50,7 @@
   overflow-y: auto;
 }
 
-.wiki-nav h2 {
+.modal-nav h2 {
   margin: 0 0 8px;
   padding: 0 16px;
   font-size: 12px;
@@ -53,13 +60,13 @@
   color: #898781;
 }
 
-.wiki-nav ul {
+.modal-nav ul {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.wiki-nav button {
+.modal-nav button {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -73,38 +80,38 @@
   cursor: pointer;
 }
 
-.wiki-nav button:hover {
+.modal-nav button:hover {
   background: #eef2ff;
 }
 
-.wiki-nav button.active {
+.modal-nav button.active {
   background: #2a78d6;
   color: #fff;
 }
 
-.wiki-nav-icon {
+.modal-nav-icon {
   flex-shrink: 0;
 }
 
-.wiki-content {
+.modal-content {
   flex: 1;
   padding: 20px 28px;
   overflow-y: auto;
 }
 
-.wiki-content h2 {
+.modal-content h2 {
   margin: 0 0 14px;
   font-size: 18px;
 }
 
-.wiki-content p {
+.modal-content p {
   font-size: 13px;
   line-height: 1.6;
   color: #2a2a28;
   margin: 0 0 12px;
 }
 
-.wiki-list {
+.modal-list {
   margin: 0 0 12px;
   padding-left: 20px;
   font-size: 13px;
@@ -112,11 +119,11 @@
   color: #2a2a28;
 }
 
-.wiki-list li {
+.modal-list li {
   margin-bottom: 4px;
 }
 
-.wiki-note {
+.modal-note {
   font-size: 12px;
   line-height: 1.5;
   color: #52514e;

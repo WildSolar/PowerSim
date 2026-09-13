@@ -12,17 +12,19 @@ import {
 import { useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
 import { EnergyBreakdown } from "./EnergyBreakdown";
-import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { HistoryChart } from "./HistoryChart";
 import { useHistorySeries } from "./useHistorySeries";
 import "./panels.css";
 
-export interface MunicipalityPanelProps {
+export interface CityStatsTabProps {
   dataset: MunicipalityDataset;
-  onClose: () => void;
 }
 
-export function MunicipalityPanel({ dataset, onClose }: MunicipalityPanelProps) {
+/** The municipality-wide summary — building/dwelling/solar counts, the Daily
+ * energy breakdown, and the live Net power / Solar generation charts. Shares
+ * `.panel-typography` (panels.css) for its h2/dl look, since it's rendered
+ * inside ControlPanel's `.modal-content` rather than a `.panel` card. */
+export function CityStatsTab({ dataset }: CityStatsTabProps) {
   const tariff = useTariff();
   const solarPlants = dataset.powerPlants.filter((p) => p.technology === "Photovoltaic");
 
@@ -42,11 +44,7 @@ export function MunicipalityPanel({ dataset, onClose }: MunicipalityPanelProps) 
   );
 
   return (
-    <div className="panel">
-      <button className="panel-close" onClick={onClose} aria-label="Close">
-        ×
-      </button>
-      <h2>{dataset.name}</h2>
+    <div className="panel-typography">
       <dl>
         <dt>Buildings</dt>
         <dd>{dataset.buildings.length}</dd>
@@ -69,12 +67,6 @@ export function MunicipalityPanel({ dataset, onClose }: MunicipalityPanelProps) 
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Solar generation — last 24h</h2>
       <HistoryChart times={history.times} series={[{ key: "pv", label: "Solar", color: "#eda100", values: history.pvW }]} />
-
-      <HistoricalEnergySection
-        entityId="municipality"
-        sampler={(times) => sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, dataset.powerPlants)}
-        tariffKey={tariffKey(tariff)}
-      />
     </div>
   );
 }

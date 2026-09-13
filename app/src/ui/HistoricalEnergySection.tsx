@@ -28,9 +28,9 @@ export interface HistoricalEnergySectionProps {
   tariffKey: string;
 }
 
-/** Day/week/month bar-chart history — shared by MunicipalityPanel,
- * BuildingPanel, and DwellingPanel, the only difference between them being
- * which sampler (and entityId) they pass in. */
+/** Day/week/month bar-chart history — shared by ControlPanel's History tab
+ * (municipality-wide), BuildingPanel, and DwellingPanel, the only difference
+ * between them being which sampler (and entityId) they pass in. */
 export function HistoricalEnergySection({ entityId, sampler, tariffKey }: HistoricalEnergySectionProps) {
   const [tier, setTier] = useState<PeriodTier>("day");
   const [categorySelection, setCategorySelection] = useState<CategorySelection>("total");

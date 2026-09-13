@@ -48,6 +48,7 @@ function tariffEffectKey(tariff: Tariff): string {
     tariff.offPeakPriceRpKWh,
     tariff.peakPriceRpKWh,
     tariff.feedInPriceRpKWh,
+    tariff.oilPriceRpPerLiter,
     tariff.gasPriceRpKWh,
     tariff.districtHeatingPriceRpKWh,
   ].join(":");

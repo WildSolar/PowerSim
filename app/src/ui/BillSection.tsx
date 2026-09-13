@@ -12,7 +12,16 @@ const TIERS: { label: string; value: keyof BillSummary; hint: string }[] = [
 
 const HEATING_FUEL_LABEL: Record<Exclude<HeatingFuel, null>, string> = {
   gas: "🔥 Gas heating",
+  oil: "🛢️ Oil heating",
   districtHeating: "🏭 District heating",
+};
+
+/** The unit each fuel's quantity is actually priced/sold in — liters for oil,
+ * kWh for gas and district heat (see billing.ts). */
+const HEATING_FUEL_UNIT: Record<Exclude<HeatingFuel, null>, string> = {
+  gas: "kWh",
+  oil: "L",
+  districtHeating: "kWh",
 };
 
 export interface BillSectionProps {
@@ -46,7 +55,12 @@ export function BillSection({ summary }: BillSectionProps) {
       )}
       {bill.heatingFuel && (
         <div className="device-row">
-          <span className="device-name">{HEATING_FUEL_LABEL[bill.heatingFuel]}</span>
+          <span className="device-name">
+            {HEATING_FUEL_LABEL[bill.heatingFuel]}
+            <span className="ev-badge">
+              {bill.heatingFuelQuantity.toFixed(1)} {HEATING_FUEL_UNIT[bill.heatingFuel]}
+            </span>
+          </span>
           <span className="device-watts">{formatCHF(bill.heatingFuelRp)}</span>
         </div>
       )}

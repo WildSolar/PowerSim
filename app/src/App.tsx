@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
+import { ControlPanel } from "./ui/ControlPanel";
 import { DwellingPanel } from "./ui/DwellingPanel";
-import { MunicipalityPanel } from "./ui/MunicipalityPanel";
 import { ColorModeControl } from "./ui/ColorModeControl";
 import { TimeControl } from "./ui/TimeControl";
-import { TariffControl } from "./ui/TariffControl";
 import { WikiPanel } from "./ui/WikiPanel";
 import { loadDataset } from "./data/loadDataset";
 import type { MunicipalityDataset } from "./data/types";
@@ -19,7 +18,7 @@ export default function App() {
   const [selectedEgid, setSelectedEgid] = useState<string | null>(null);
   const [selectedEwid, setSelectedEwid] = useState<string | null>(null);
   const [colorMode, setColorMode] = useState<ColorMode>("none");
-  const [showMunicipality, setShowMunicipality] = useState(false);
+  const [showControl, setShowControl] = useState(false);
   const [showWiki, setShowWiki] = useState(false);
 
   useEffect(() => {
@@ -57,7 +56,6 @@ export default function App() {
         onSelectBuilding={(egid) => {
           setSelectedEgid(egid);
           setSelectedEwid(null);
-          setShowMunicipality(false);
         }}
         colorMode={colorMode}
       />
@@ -65,26 +63,17 @@ export default function App() {
         <TimeControl />
         <ColorModeControl mode={colorMode} onChange={setColorMode} />
       </div>
-      <TariffControl />
       <div className="bottom-left-stack">
-        <button
-          className="municipality-toggle"
-          onClick={() => {
-            setShowMunicipality(true);
-            setSelectedEgid(null);
-            setSelectedEwid(null);
-          }}
-        >
-          {dataset.name} overview
+        <button className="pill-button" onClick={() => setShowControl(true)}>
+          ⚙️ {dataset.name} Control
         </button>
-        <button className="municipality-toggle" onClick={() => setShowWiki(true)}>
+        <button className="pill-button" onClick={() => setShowWiki(true)}>
           📖 Wiki
         </button>
       </div>
+      {showControl && <ControlPanel dataset={dataset} onClose={() => setShowControl(false)} />}
       {showWiki && <WikiPanel onClose={() => setShowWiki(false)} />}
-      {showMunicipality ? (
-        <MunicipalityPanel dataset={dataset} onClose={() => setShowMunicipality(false)} />
-      ) : selectedDwelling && selectedBuilding ? (
+      {selectedDwelling && selectedBuilding ? (
         <DwellingPanel
           building={selectedBuilding}
           dwelling={selectedDwelling}

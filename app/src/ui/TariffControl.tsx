@@ -58,6 +58,18 @@ export function TariffControl() {
         <span className="tariff-unit">Rp/kWh</span>
       </div>
       <div className="tariff-row">
+        <span className="tariff-label">Oil price</span>
+        <input
+          type="number"
+          min={0}
+          max={300}
+          step={1}
+          value={tariff.oilPriceRpPerLiter}
+          onChange={(e) => tariffStore.set({ oilPriceRpPerLiter: Number(e.target.value) })}
+        />
+        <span className="tariff-unit">Rp/L</span>
+      </div>
+      <div className="tariff-row">
         <span className="tariff-label">Gas price</span>
         <input
           type="number"

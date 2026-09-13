@@ -16,7 +16,7 @@
   gap: 8px;
 }
 
-.municipality-toggle {
+.pill-button {
   background: #ffffffee;
   backdrop-filter: blur(6px);
   border: 1px solid #ddd;
@@ -28,6 +28,6 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
 }
 
-.municipality-toggle:hover {
+.pill-button:hover {
   background: #f0f4fa;
 }

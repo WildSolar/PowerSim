@@ -1,9 +1,9 @@
 /**
  * Converts already-simulated energy into money — the tariff's time-of-use
- * electricity prices, plus three flat (non-time-of-use) prices: what exported
- * solar earns (feed-in), and what non-electric space heating costs for the
- * buildings whose real heating source is gas or district heat rather than a
- * heat pump.
+ * electricity prices, plus flat (non-time-of-use) prices: what exported solar
+ * earns (feed-in), and what non-electric space heating costs for the buildings
+ * whose real heating source is oil, gas, or district heat rather than a heat
+ * pump.
  *
  * Electricity is priced per sample interval at whichever of off-peak/peak
  * applies at that interval's midpoint, not "total kWh times a blended average
@@ -12,12 +12,14 @@
  *
  * Non-electric heating reuses heatPump.ts's own thermal-demand calculation —
  * the building's envelope-driven heat loss, before any COP/efficiency — for
- * buildings whose real heating source is gas or district heat: the same
+ * buildings whose real heating source is oil, gas, or district heat: the same
  * physical demand, met by a different priced energy carrier instead of a heat
- * pump's electricity. Oil, wood, and other/unspecified sources get no bill
- * line here — there's no price input for them, and a guess would be worse than
- * admitting we don't model it (same reasoning as commercial.ts's unmodeled
- * building classes).
+ * pump's electricity. Oil is priced (and its quantity shown) per liter, the
+ * unit it's actually sold in in Switzerland, rather than forcing it through
+ * the same Rp/kWh shape as the other two. Wood and other/unspecified sources
+ * still get no bill line — there's no price input for them, and a guess would
+ * be worse than admitting we don't model it (same reasoning as commercial.ts's
+ * unmodeled building classes).
  *
  * Building-level shared systems (heat pump/AC electricity, solar credit,
  * heating fuel) have no natural per-dwelling split in the simulation itself —
@@ -40,29 +42,61 @@ const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 
 const GAS_BOILER_EFFICIENCY = 0.9; // typical modern gas boiler
+const OIL_BOILER_EFFICIENCY = 0.85; // typical oil boiler — somewhat less efficient than gas
 const DISTRICT_HEATING_EFFICIENCY = 1.0; // price is already per kWh of heat delivered
+const OIL_ENERGY_KWH_PER_LITER = 10; // "Heizöl extra leicht" — standard rule-of-thumb energy density
 
-export type HeatingFuel = "gas" | "districtHeating" | null;
+export type HeatingFuel = "gas" | "oil" | "districtHeating" | null;
 
 /** null for a heat-pump building (billed as electricity instead) or any source
- * with no price input (oil, wood, "andere", unspecified). */
+ * with no price input (wood, "andere", unspecified). */
 export function heatingFuelType(building: Building): HeatingFuel {
   if (hasHeatPump(building)) return null;
   if (building.heatingEnergySource === "Gas") return "gas";
+  if (building.heatingEnergySource === "Heizöl") return "oil";
   if (building.heatingEnergySource?.startsWith("Fernwärme")) return "districtHeating";
   return null;
 }
 
+function fuelEfficiency(fuel: "gas" | "oil" | "districtHeating"): number {
+  if (fuel === "gas") return GAS_BOILER_EFFICIENCY;
+  if (fuel === "oil") return OIL_BOILER_EFFICIENCY;
+  return DISTRICT_HEATING_EFFICIENCY;
+}
+
+/** The fuel actually burned/delivered, in kW — thermal demand divided by the
+ * fuel's conversion efficiency. Still "kWh of gas" or "kWh of oil" at this
+ * point, not liters — the liter conversion only matters for oil, and only at
+ * the point of pricing/display (below), to keep this series usable directly
+ * with energy.ts's plain kWh integration regardless of fuel. */
 function heatingFuelPowerW(building: Building, fuel: HeatingFuel, dailyMeanC: number, outsideTempC: number): number {
   if (!fuel) return 0;
   const thermalW = spaceHeatingThermalDemandW(building, dailyMeanC, outsideTempC);
-  const efficiency = fuel === "gas" ? GAS_BOILER_EFFICIENCY : DISTRICT_HEATING_EFFICIENCY;
-  return thermalW / efficiency;
+  return thermalW / fuelEfficiency(fuel);
 }
 
 function heatingFuelSeriesW(building: Building, fuel: HeatingFuel, times: number[]): number[] {
   if (!fuel) return times.map(() => 0);
   return times.map((t) => heatingFuelPowerW(building, fuel, dailyMeanTempC(t), weatherAt(t).tempC));
+}
+
+/** Cost and physical quantity consumed (liters for oil, kWh for gas/district
+ * heat — whichever unit the corresponding tariff price is actually in) over a
+ * period. */
+function heatingFuelCostAndQuantity(
+  building: Building,
+  fuel: HeatingFuel,
+  times: number[],
+  tariff: Tariff,
+): { costRp: number; quantity: number } {
+  if (!fuel) return { costRp: 0, quantity: 0 };
+  const fuelKWh = energyKWh(times, heatingFuelSeriesW(building, fuel, times));
+  if (fuel === "oil") {
+    const liters = fuelKWh / OIL_ENERGY_KWH_PER_LITER;
+    return { costRp: liters * tariff.oilPriceRpPerLiter, quantity: liters };
+  }
+  const priceRpKWh = fuel === "gas" ? tariff.gasPriceRpKWh : tariff.districtHeatingPriceRpKWh;
+  return { costRp: fuelKWh * priceRpKWh, quantity: fuelKWh };
 }
 
 function hourOfDayAt(simTimeMs: number): number {
@@ -97,10 +131,18 @@ export interface BillBreakdown {
   solarCreditRp: number; // positive — a credit, subtracted in netRp
   heatingFuel: HeatingFuel;
   heatingFuelRp: number;
+  heatingFuelQuantity: number; // liters (oil) or kWh (gas/district heat) — 0 if heatingFuel is null
   netRp: number;
 }
 
-const ZERO_BILL: BillBreakdown = { electricityRp: 0, solarCreditRp: 0, heatingFuel: null, heatingFuelRp: 0, netRp: 0 };
+const ZERO_BILL: BillBreakdown = {
+  electricityRp: 0,
+  solarCreditRp: 0,
+  heatingFuel: null,
+  heatingFuelRp: 0,
+  heatingFuelQuantity: 0,
+  netRp: 0,
+};
 
 function consumptionSeriesW(series: CategorySeries): number[] {
   return series.fridgeW.map(
@@ -126,7 +168,14 @@ function consumptionSeriesW(series: CategorySeries): number[] {
 export function ownBillFromSeries(series: CategorySeries, times: number[], tariff: Tariff): BillBreakdown {
   const electricityRp = electricityCostRp(times, consumptionSeriesW(series), tariff);
   const solarCreditRp = flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh);
-  return { electricityRp, solarCreditRp, heatingFuel: null, heatingFuelRp: 0, netRp: electricityRp - solarCreditRp };
+  return {
+    electricityRp,
+    solarCreditRp,
+    heatingFuel: null,
+    heatingFuelRp: 0,
+    heatingFuelQuantity: 0,
+    netRp: electricityRp - solarCreditRp,
+  };
 }
 
 /** A whole building's bill — every category it has (including every dwelling's
@@ -136,12 +185,8 @@ export function ownBillFromSeries(series: CategorySeries, times: number[], tarif
 export function buildingBillRp(building: Building, series: CategorySeries, times: number[], tariff: Tariff): BillBreakdown {
   const own = ownBillFromSeries(series, times, tariff);
   const fuel = heatingFuelType(building);
-  const heatingFuelRp = fuel ? flatCostRp(times, heatingFuelSeriesW(building, fuel, times), fuelPrice(fuel, tariff)) : 0;
-  return { ...own, heatingFuel: fuel, heatingFuelRp, netRp: own.netRp + heatingFuelRp };
-}
-
-function fuelPrice(fuel: "gas" | "districtHeating", tariff: Tariff): number {
-  return fuel === "gas" ? tariff.gasPriceRpKWh : tariff.districtHeatingPriceRpKWh;
+  const { costRp: heatingFuelRp, quantity: heatingFuelQuantity } = heatingFuelCostAndQuantity(building, fuel, times, tariff);
+  return { ...own, heatingFuel: fuel, heatingFuelRp, heatingFuelQuantity, netRp: own.netRp + heatingFuelRp };
 }
 
 /** The portion of the building's *shared* systems (heat pump/AC electricity,
@@ -152,8 +197,15 @@ function sharedBuildingBillRp(building: Building, buildingSeries: CategorySeries
   const electricityRp = electricityCostRp(times, sharedElectricW, tariff);
   const solarCreditRp = flatCostRp(times, buildingSeries.solarW, tariff.feedInPriceRpKWh);
   const fuel = heatingFuelType(building);
-  const heatingFuelRp = fuel ? flatCostRp(times, heatingFuelSeriesW(building, fuel, times), fuelPrice(fuel, tariff)) : 0;
-  return { electricityRp, solarCreditRp, heatingFuel: fuel, heatingFuelRp, netRp: electricityRp - solarCreditRp + heatingFuelRp };
+  const { costRp: heatingFuelRp, quantity: heatingFuelQuantity } = heatingFuelCostAndQuantity(building, fuel, times, tariff);
+  return {
+    electricityRp,
+    solarCreditRp,
+    heatingFuel: fuel,
+    heatingFuelRp,
+    heatingFuelQuantity,
+    netRp: electricityRp - solarCreditRp + heatingFuelRp,
+  };
 }
 
 export function addBills(a: BillBreakdown, b: BillBreakdown): BillBreakdown {
@@ -162,6 +214,7 @@ export function addBills(a: BillBreakdown, b: BillBreakdown): BillBreakdown {
     solarCreditRp: a.solarCreditRp + b.solarCreditRp,
     heatingFuel: a.heatingFuel ?? b.heatingFuel,
     heatingFuelRp: a.heatingFuelRp + b.heatingFuelRp,
+    heatingFuelQuantity: a.heatingFuelQuantity + b.heatingFuelQuantity,
     netRp: a.netRp + b.netRp,
   };
 }
@@ -172,6 +225,7 @@ function scaleBill(bill: BillBreakdown, fraction: number): BillBreakdown {
     solarCreditRp: bill.solarCreditRp * fraction,
     heatingFuel: bill.heatingFuel,
     heatingFuelRp: bill.heatingFuelRp * fraction,
+    heatingFuelQuantity: bill.heatingFuelQuantity * fraction,
     netRp: bill.netRp * fraction,
   };
 }
