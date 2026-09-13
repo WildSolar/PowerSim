@@ -177,14 +177,40 @@ export const WIKI_SECTIONS: WikiSection[] = [
   {
     id: "tariff",
     icon: "💰",
-    title: "Electricity tariff",
+    title: "Electricity tariff & prices",
     blocks: [
       p(
-        "The Tariff control (bottom-right) sets a simple two-rate time-of-use price: a cheaper off-peak rate overnight (21:00-06:00) and a more expensive peak rate during the day. It's the one lever you can pull directly right now.",
+        "The Tariff control (bottom-right) sets a simple two-rate time-of-use electricity price: a cheaper off-peak rate overnight (21:00-06:00) and a more expensive peak rate during the day. It's the main lever you can pull directly right now.",
       ),
       p(
         "Only EV charging currently responds to it (see above) — a responsive household will wait for off-peak pricing to begin if that still gets the car charged in time.",
       ),
+      p(
+        "Below the electricity prices are three more you can set: what exported solar generation earns (feed-in), and what gas and district heating cost per kWh — all three feed directly into the Bill sections described next.",
+      ),
+    ],
+  },
+  {
+    id: "finances",
+    icon: "🧾",
+    title: "Your bill",
+    blocks: [
+      p(
+        "Every building and dwelling panel has a Bill section: Day (last 24h), Month (last fully completed calendar month), or Year (the last 12 completed months added together) — like a real bill, these only ever cover finished periods, not \"this month so far.\"",
+      ),
+      p(
+        "Electricity is priced correctly for time-of-use — each moment of consumption is billed at whichever of off-peak/peak applied right then, not an average rate — so a responsive EV owner's bill actually reflects the money they save by waiting for off-peak pricing. Exported solar is credited separately at the feed-in rate, which is normally lower than what you pay to consume.",
+      ),
+      p(
+        "A heat pump's cost shows up as electricity. A building whose real heating source is gas or district heat instead gets its own priced line: the same underlying heat-loss demand a heat pump would meet, converted to gas or district-heat usage (a gas boiler assumed 90% efficient; district heat priced as delivered) and billed at whichever price you've set.",
+      ),
+      p(
+        "A dwelling's bill is its own devices (electricity only) plus its floor-area share of the building's shared systems — heat pump/AC electricity, solar credit, and gas/district-heat cost — split the way a real Swiss ancillary-costs statement (Nebenkostenabrechnung) allocates shared building costs to tenants. A commercial tenant's own energy use is never split to residential dwellings; it's billed to the building itself.",
+      ),
+      note(
+        "EV charging cost is already billed to the dwelling that owns the car — EV ownership has always been assigned per dwelling, not per building, even before bills existed. A proper choice between EV/ICE-vehicle/public-transport/bicycle costs is a planned follow-up, not implemented yet.",
+      ),
+      note("Oil, wood, and other unpriced heating sources get no fuel-cost line — same reasoning as the unmodeled commercial building classes: no price input, no guess."),
     ],
   },
   {

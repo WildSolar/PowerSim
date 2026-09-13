@@ -1,4 +1,4 @@
-import type { Building, Dwelling } from "../data/types";
+import type { Building, Dwelling, PowerPlant } from "../data/types";
 import { dwellingDevicePowerW } from "../sim/devices";
 import { buildingEvTraits, evDailySession, evPowerWFromTraits } from "../sim/ev";
 import { isOffPeakHour, tariffKey } from "../sim/tariff";
@@ -12,9 +12,11 @@ import {
 } from "../sim/history";
 import { useSimTime, useTariff } from "../sim/store";
 import { simClock } from "../sim/engine";
+import { BillSection } from "./BillSection";
 import { DEVICE_CATEGORIES } from "./deviceCategories";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { HistoryChart } from "./HistoryChart";
+import { useDwellingBillSummary } from "./useBillSummary";
 import { useHistorySeries } from "./useHistorySeries";
 import { formatWatts } from "./format";
 import "./panels.css";
@@ -24,6 +26,7 @@ const colorOf = (key: (typeof DEVICE_CATEGORIES)[number]["key"]) => DEVICE_CATEG
 export interface DwellingPanelProps {
   building: Building;
   dwelling: Dwelling;
+  plants: PowerPlant[];
   onBack: () => void;
   onClose: () => void;
 }
@@ -37,9 +40,10 @@ function formatHourOfDay(ms: number): string {
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
-export function DwellingPanel({ building, dwelling, onBack, onClose }: DwellingPanelProps) {
+export function DwellingPanel({ building, dwelling, plants, onBack, onClose }: DwellingPanelProps) {
   const simTimeMs = useSimTime();
   const tariff = useTariff();
+  const billSummary = useDwellingBillSummary(building, dwelling, plants, tariff);
   const { fridgeW, lightingW, cookingW, laundryW, plugLoadW } = dwellingDevicePowerW(building.egid, dwelling, simTimeMs);
   const evTraits = buildingEvTraits(building, dwelling);
   const evW = evPowerWFromTraits(building.egid, dwelling, evTraits, simTimeMs, tariff);
@@ -119,6 +123,9 @@ export function DwellingPanel({ building, dwelling, onBack, onClose }: DwellingP
           {sessionStartsOffPeak ? " (off-peak)" : " (peak)"}
         </div>
       )}
+
+      <h2 style={{ fontSize: 14, marginTop: 14 }}>Bill</h2>
+      <BillSection summary={billSummary} />
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Power — last 24h</h2>
       <HistoryChart

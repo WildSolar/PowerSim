@@ -18,11 +18,13 @@ import { snowDepthCm } from "../sim/snow";
 import { useSimTime, useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
 import { hasElectricWaterHeating, waterHeatingPowerW } from "../sim/waterHeating";
+import { BillSection } from "./BillSection";
 import { COMMERCIAL_CATEGORY_ICON, COMMERCIAL_CATEGORY_LABEL } from "./commercialDisplay";
 import { EnergyBreakdown } from "./EnergyBreakdown";
 import { energySourceLabel } from "./energySourceLabel";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { HistoryChart } from "./HistoryChart";
+import { useBuildingBillSummary } from "./useBillSummary";
 import { useHistorySeries } from "./useHistorySeries";
 import { formatWatts } from "./format";
 import "./panels.css";
@@ -68,6 +70,8 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
     HISTORY_REFRESH_MS,
     `${building.egid}:${tariffKey(tariff)}`,
   );
+
+  const billSummary = useBuildingBillSummary(building, plants, tariff);
 
   return (
     <div className="panel">
@@ -154,6 +158,9 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Daily energy — last 24h</h2>
       <EnergyBreakdown energy={history.energy} />
+
+      <h2 style={{ fontSize: 14, marginTop: 14 }}>Bill</h2>
+      <BillSection summary={billSummary} />
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Net power — last 24h</h2>
       <HistoryChart

@@ -52,3 +52,9 @@
   font-size: 10px;
   color: #898781;
 }
+
+.tariff-divider {
+  height: 1px;
+  background: #eee;
+  margin: 8px 0;
+}

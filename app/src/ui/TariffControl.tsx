@@ -42,6 +42,45 @@ export function TariffControl() {
         />
         <span className="tariff-unit">Rp/kWh</span>
       </div>
+
+      <div className="tariff-divider" />
+
+      <div className="tariff-row">
+        <span className="tariff-label">Solar feed-in</span>
+        <input
+          type="number"
+          min={0}
+          max={40}
+          step={1}
+          value={tariff.feedInPriceRpKWh}
+          onChange={(e) => tariffStore.set({ feedInPriceRpKWh: Number(e.target.value) })}
+        />
+        <span className="tariff-unit">Rp/kWh</span>
+      </div>
+      <div className="tariff-row">
+        <span className="tariff-label">Gas price</span>
+        <input
+          type="number"
+          min={0}
+          max={40}
+          step={1}
+          value={tariff.gasPriceRpKWh}
+          onChange={(e) => tariffStore.set({ gasPriceRpKWh: Number(e.target.value) })}
+        />
+        <span className="tariff-unit">Rp/kWh</span>
+      </div>
+      <div className="tariff-row">
+        <span className="tariff-label">District heating</span>
+        <input
+          type="number"
+          min={0}
+          max={40}
+          step={1}
+          value={tariff.districtHeatingPriceRpKWh}
+          onChange={(e) => tariffStore.set({ districtHeatingPriceRpKWh: Number(e.target.value) })}
+        />
+        <span className="tariff-unit">Rp/kWh</span>
+      </div>
     </div>
   );
 }
