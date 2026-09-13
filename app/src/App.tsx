@@ -4,12 +4,16 @@ import { BuildingPanel } from "./ui/BuildingPanel";
 import { ControlPanel } from "./ui/ControlPanel";
 import { DwellingPanel } from "./ui/DwellingPanel";
 import { ColorModeControl } from "./ui/ColorModeControl";
+import { ReportCardModal } from "./ui/ReportCardModal";
 import { TimeControl } from "./ui/TimeControl";
 import { WikiPanel } from "./ui/WikiPanel";
 import { loadDataset } from "./data/loadDataset";
 import type { MunicipalityDataset } from "./data/types";
 import type { ColorMode } from "./map/colorModes";
 import { simClock } from "./sim/engine";
+import { reportCardStore } from "./sim/reportCardStore";
+import { useReportCardYear } from "./sim/store";
+import { startYearEndWatcher } from "./sim/yearEndWatcher";
 import "./App.css";
 
 export default function App() {
@@ -20,10 +24,15 @@ export default function App() {
   const [colorMode, setColorMode] = useState<ColorMode>("none");
   const [showControl, setShowControl] = useState(false);
   const [showWiki, setShowWiki] = useState(false);
+  const reportCardYear = useReportCardYear();
 
   useEffect(() => {
     simClock.start();
-    return () => simClock.stop();
+    const stopWatcher = startYearEndWatcher();
+    return () => {
+      simClock.stop();
+      stopWatcher();
+    };
   }, []);
 
   useEffect(() => {
@@ -73,6 +82,9 @@ export default function App() {
       </div>
       {showControl && <ControlPanel dataset={dataset} onClose={() => setShowControl(false)} />}
       {showWiki && <WikiPanel onClose={() => setShowWiki(false)} />}
+      {reportCardYear !== null && (
+        <ReportCardModal dataset={dataset} year={reportCardYear} onClose={() => reportCardStore.dismiss()} />
+      )}
       {selectedDwelling && selectedBuilding ? (
         <DwellingPanel
           building={selectedBuilding}

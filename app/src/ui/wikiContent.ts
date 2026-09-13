@@ -53,6 +53,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
       p(
         "The game clock starts at today's real date and runs forward. Use the speed buttons in the Info panel to pause, run at real-time, or fast-forward — up to a simulated day passing in about a second. Every device's power draw is a pure function of the exact simulated moment, so jumping speeds never breaks anything: nothing is \"remembered\" between ticks.",
       ),
+      note(
+        "The clock automatically pauses the instant it crosses into a new calendar year and opens that year's \"Year in Review\" report — see below — so a long fast-forward never blows straight past it.",
+      ),
       p(
         "The Info panel shows the current date, weekday, and a day/night indicator that fades smoothly through Sunrise and Sunset over roughly an hour, based on the sun's actual elevation at Schlieren's latitude — not a fixed clock time, so it shifts with the seasons like the real sun does.",
       ),
@@ -267,6 +270,25 @@ export const WIKI_SECTIONS: WikiSection[] = [
       ),
       note(
         "Historical bars only ever show fully completed periods — today isn't part of \"last 7 days\" — so every bar is a fixed number computed once and cached, not something that wobbles as time passes.",
+      ),
+    ],
+  },
+  {
+    id: "year-in-review",
+    icon: "🎉",
+    title: "Year in Review",
+    blocks: [
+      p(
+        "The instant the clock crosses into a new calendar year, it automatically pauses and a \"Year in Review\" report card opens — a snapshot of the municipality's just-completed year, on top of whatever building or dwelling panel you happen to have open.",
+      ),
+      p(
+        "Alongside a municipality-wide energy breakdown for the year, it has two sections specific to heating: \"Heating energy by technology\" — how much heat was actually delivered by each system (air/ground heat pump, gas, oil, district heating) for space heating, and by heat pump vs. direct electric for hot water — and \"Heating renewals this year\", a tally of every stock-renewal replacement that happened during the year (e.g. \"14× Oil boiler → Ground heat pump\"), \"like-for-like\" flagged when a building was replaced with the same kind of system it already had.",
+      ),
+      note(
+        "The heating-by-technology totals cover every fuel a building might use, not just electricity, so they're deliberately not directly comparable to the \"Energy by category\" pie above them, which only covers what draws grid power.",
+      ),
+      note(
+        "Closing the report doesn't resume the clock — it stays paused exactly where the year turned over until you pick a speed again, the same as if you'd paused it yourself.",
       ),
     ],
   },

@@ -219,3 +219,20 @@ export function heatingRenewalLog(building: Building, simTimeMs: number): Heatin
   if (!chain) return [];
   return chain.filter((e) => e.reasonKind !== "initial").map((e) => ({ installedAtMs: e.installedAtMs, note: renewalNote(e) }));
 }
+
+export interface HeatingRenewalRecord {
+  installedAtMs: number;
+  previousSystem: HeatingSystemId;
+  system: HeatingSystemId;
+}
+
+/** Structured (not narrative) renewals in `[fromMs, toMs)` — yearReport.ts
+ * uses this to tally how many buildings switched from which system to which
+ * over a calendar year, reusing the same cached chain heatingRenewalLog does. */
+export function heatingRenewalsInRange(building: Building, fromMs: number, toMs: number): HeatingRenewalRecord[] {
+  const chain = chainFor(building, toMs);
+  if (!chain) return [];
+  return chain
+    .filter((e) => e.reasonKind !== "initial" && e.installedAtMs >= fromMs && e.installedAtMs < toMs)
+    .map((e) => ({ installedAtMs: e.installedAtMs, previousSystem: e.previousSystem as HeatingSystemId, system: e.system }));
+}

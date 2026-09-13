@@ -24,22 +24,34 @@ import { bucketRandom, hashSeed, mulberry32 } from "./rng";
 
 const ELECTRIC_SOURCE = "Elektrizität";
 
-/** True initially exactly when GWR's own hot-water field says so. Once a
- * building's space heating has actually been renewed (not just observed at
- * game start) to an air or ground heat pump, hot water is assumed to have
- * switched to that same unit too — virtually every real heat-pump install
- * serves both, and running a separate old electric tank alongside a brand-new
- * heat pump would be unusual. A renewal to a fossil or district system never
- * changes this either way: there's no reason swapping a boiler would
- * disconnect an existing electric tank, and non-electric water heating isn't
- * priced or modeled at all — same boundary billing.ts already draws for space
- * heating (wood/unspecified sources get no bill line rather than a guess). */
-export function hasElectricWaterHeating(building: Building, simTimeMs: number): boolean {
+export type WaterHeatingKind = "heatPump" | "direct" | null;
+
+/** Which kind of electric water heating (if any) this building currently has —
+ * "heatPump" for a heat-pump-driven system, "direct" for a plain resistive
+ * tank, null for anything not electric at all (unmodeled: gas/oil/district/
+ * wood/unspecified). True initially exactly when GWR's own hot-water field
+ * says so. Once a building's space heating has actually been renewed (not
+ * just observed at game start) to an air or ground heat pump, hot water is
+ * assumed to have switched to that same unit too — virtually every real
+ * heat-pump install serves both, and running a separate old electric tank
+ * alongside a brand-new heat pump would be unusual. A renewal to a fossil or
+ * district system never changes this either way: there's no reason swapping
+ * a boiler would disconnect an existing electric tank, and non-electric water
+ * heating isn't priced or modeled at all — same boundary billing.ts already
+ * draws for space heating (wood/unspecified sources get no bill line rather
+ * than a guess). */
+export function waterHeatingKind(building: Building, simTimeMs: number): WaterHeatingKind {
   if (heatingHasBeenRenewed(building, simTimeMs)) {
     const heatingId = currentHeatingSystemId(building, simTimeMs);
-    if (heatingId === "airHeatPump" || heatingId === "groundHeatPump") return true;
+    if (heatingId === "airHeatPump" || heatingId === "groundHeatPump") return "heatPump";
   }
-  return building.hotWaterEnergySource === ELECTRIC_SOURCE || impliesHeatPump(building.hotWaterEnergySource);
+  if (building.hotWaterEnergySource === ELECTRIC_SOURCE) return "direct";
+  if (impliesHeatPump(building.hotWaterEnergySource)) return "heatPump";
+  return null;
+}
+
+export function hasElectricWaterHeating(building: Building, simTimeMs: number): boolean {
+  return waterHeatingKind(building, simTimeMs) !== null;
 }
 
 export interface WaterHeaterProfile {

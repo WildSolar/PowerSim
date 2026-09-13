@@ -61,6 +61,16 @@ export class SimClock {
     this.listeners.forEach((listener) => listener());
   }
 
+  /** Snaps to an exact instant and pauses there in one step — used by
+   * yearEndWatcher.ts so a fast-forwarding player lands exactly on a calendar
+   * year boundary (never overshoots into the new year) rather than merely
+   * noticing after the fact. */
+  pauseAt(simTimeMs: number): void {
+    this.simTimeMs = Math.min(simTimeMs, MAX_SIM_TIME_MS);
+    this.multiplier = 0;
+    this.listeners.forEach((listener) => listener());
+  }
+
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);

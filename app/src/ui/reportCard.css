@@ -1,0 +1,40 @@
+.report-card-shell {
+  width: min(760px, 94vw);
+  height: min(640px, 90vh);
+}
+
+.report-card-shell .modal-content {
+  overflow-y: auto;
+}
+
+.renewal-tally {
+  margin-top: 4px;
+}
+
+.renewal-tally-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  background: #f8f8f8;
+  border: 1px solid #eee;
+  font-size: 12px;
+}
+
+.renewal-tally-count {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #2a78d6;
+  min-width: 28px;
+}
+
+.renewal-tally-label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}

@@ -23,6 +23,10 @@ export interface HeatingSystemSpec {
   /** Signed "renewable-ness" used only to nudge the hidden bias trait — never
    * shown to the player. */
   greenness: number;
+  /** Validated (dataviz skill's validate_palette.js, all 5 together, light
+   * mode) — used by ui/ReportCardModal.tsx's space-heating-by-technology pie.
+   * Re-validate the same way before changing any of these. */
+  color: string;
 }
 
 export const HEATING_SYSTEM_ORDER: HeatingSystemId[] = ["airHeatPump", "groundHeatPump", "districtHeating", "gasBoiler", "oilBoiler"];
@@ -36,6 +40,7 @@ export const HEATING_SYSTEM_CATALOG: Record<HeatingSystemId, HeatingSystemSpec> 
     baseInstallCostRp: 30_000_00,
     subsidyRp: 7_000_00,
     greenness: 1,
+    color: "#1baf7a",
   },
   groundHeatPump: {
     id: "groundHeatPump",
@@ -45,6 +50,7 @@ export const HEATING_SYSTEM_CATALOG: Record<HeatingSystemId, HeatingSystemSpec> 
     baseInstallCostRp: 38_000_00,
     subsidyRp: 9_000_00,
     greenness: 1,
+    color: "#0f8fc0",
   },
   districtHeating: {
     id: "districtHeating",
@@ -54,6 +60,7 @@ export const HEATING_SYSTEM_CATALOG: Record<HeatingSystemId, HeatingSystemSpec> 
     baseInstallCostRp: 14_000_00,
     subsidyRp: 0,
     greenness: 0.4,
+    color: "#4a3aa7",
   },
   gasBoiler: {
     id: "gasBoiler",
@@ -63,6 +70,7 @@ export const HEATING_SYSTEM_CATALOG: Record<HeatingSystemId, HeatingSystemSpec> 
     baseInstallCostRp: 16_000_00,
     subsidyRp: 0,
     greenness: -1,
+    color: "#eb6834",
   },
   oilBoiler: {
     id: "oilBoiler",
@@ -72,7 +80,17 @@ export const HEATING_SYSTEM_CATALOG: Record<HeatingSystemId, HeatingSystemSpec> 
     baseInstallCostRp: 17_000_00,
     subsidyRp: 0,
     greenness: -1.3,
+    color: "#b23a2e",
   },
+};
+
+/** Validated (validate_palette.js, light mode) — ui/ReportCardModal.tsx's
+ * water-heating-by-kind pie. Deliberately reuses airHeatPump's green (both
+ * read as "heat pump"-driven) and a blue distinct from every space-heating
+ * color for "direct electric" (a plain resistive tank). */
+export const WATER_HEATING_KIND_COLOR: Record<"heatPump" | "direct", string> = {
+  heatPump: "#1baf7a",
+  direct: "#2a78d6",
 };
 
 export const GAS_BOILER_EFFICIENCY = 0.9; // typical modern gas boiler
