@@ -49,7 +49,7 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
   const hasAirCon = hasAC(building);
   const acW = hasAirCon ? acPowerW(building, simTimeMs) : 0;
   const envelopeAreaM2 = hasHp || hasAirCon ? buildingEnvelopeAreaM2(building) : null;
-  const hasElectricWater = hasElectricWaterHeating(building);
+  const hasElectricWater = hasElectricWaterHeating(building, simTimeMs);
   const waterHeatingW = hasElectricWater ? waterHeatingPowerW(building, simTimeMs) : 0;
   const commCategory = commercialCategory(building);
   const commFloorAreaM2 = commCategory ? totalFloorAreaM2(building) : null;

@@ -15,6 +15,7 @@ import { snowDepthCm } from "../sim/snow";
 import {
   buildingCategoryBucket,
   buildingHeatingBucket,
+  buildingHeatingBucketAt,
   CATEGORY_LEGEND,
   HEATING_LEGEND,
   legendMatchExpression,
@@ -34,6 +35,7 @@ const POINT_LAYER_ID = "buildings-points-circle";
 const DEFAULT_COLOR = "#9db4c9";
 const SELECTED_COLOR = "#f97316";
 const POWER_TICK_MS = 1500;
+const HEATING_TICK_MS = 5000; // renewals are years apart in simulated time — no need for power's snappy cadence
 
 type BuildingProperties = {
   egid: string;
@@ -305,6 +307,39 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode }: 
 
     tick();
     const interval = setInterval(tick, POWER_TICK_MS);
+    return () => clearInterval(interval);
+  }, [colorMode, dataset]);
+
+  // Live heating mode: like the power-draw tick above, but far less frequent —
+  // stock renewal (heatingRenewal.ts) only ever changes a building's heating
+  // system years apart in simulated time, so there's nothing to gain from
+  // checking every 1.5s. Without this, the "Heating" layer would freeze at
+  // whatever GWR recorded at load time and never show a renewal.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || colorMode !== "heating") return;
+
+    const buildingsByEgid = new Map(dataset.buildings.map((b) => [b.egid, b]));
+
+    const tick = () => {
+      const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
+      const pointSource = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
+      const polyData = polygonsRef.current;
+      const pointData = pointsRef.current;
+      if (!polySource || !pointSource || !polyData || !pointData) return;
+
+      const simTimeMs = simClock.getSimTimeMs();
+      for (const feature of [...polyData.features, ...pointData.features]) {
+        const building = buildingsByEgid.get(feature.properties.egid);
+        if (building) feature.properties.heating = buildingHeatingBucketAt(building, simTimeMs);
+      }
+
+      polySource.setData(polyData);
+      pointSource.setData(pointData);
+    };
+
+    tick();
+    const interval = setInterval(tick, HEATING_TICK_MS);
     return () => clearInterval(interval);
   }, [colorMode, dataset]);
 

@@ -177,29 +177,26 @@ function climateControlCategorySeries(buildings: Building[], times: number[]): {
   return { heatPumpW, acW };
 }
 
-/** Electric water heating for every dwelling in an electrically-water-heated
- * building, summed per timestep. Takes the already-built (and cached, see
- * getDwellingProfiles) profile list rather than raw buildings — waterHeating.ts's
- * own building-level helper rebuilds each dwelling's profile from scratch on every
- * call, which is fine for a single live reading but was silently making this
- * 96-times-over history sampling redo the same seeded-RNG setup on every sample
- * instead of once. */
-function waterHeatingCategorySeries(waterHeatedProfileSets: DwellingProfiles[], times: number[]): number[] {
-  return times.map((t) => waterHeatedProfileSets.reduce((sum, p) => sum + waterHeaterPowerW(p.waterHeater, t), 0));
-}
-
-/** Every dwelling in buildings with an electric water heater, profiles already
- * resolved through the cache — the subset `waterHeatingCategorySeries` above sums
- * over. */
-function waterHeatedDwellingProfiles(buildings: Building[]): DwellingProfiles[] {
-  const profiles: DwellingProfiles[] = [];
-  for (const building of buildings) {
-    if (!hasElectricWaterHeating(building)) continue;
-    for (const dwelling of building.dwellings) {
-      profiles.push(getDwellingProfiles(building, dwelling));
+/** Electric water heating for every dwelling in a currently-electrically-water-
+ * heated building, summed per timestep. Checked fresh at every timestep rather
+ * than once up front — since a stock-renewal heat-pump install can switch a
+ * building's hot water from unmodeled (no line at all) to electric partway
+ * through a sampling window, the same reason climateControlCategorySeries
+ * already re-checks heat pump ownership per timestep instead of once. Dwelling
+ * profiles still come from the shared cache (getDwellingProfiles), so this
+ * doesn't redo the seeded-RNG setup per sample, only the (cheap, cached)
+ * ownership check. */
+function waterHeatingCategorySeries(buildings: Building[], times: number[]): number[] {
+  return times.map((t) => {
+    let sum = 0;
+    for (const building of buildings) {
+      if (!hasElectricWaterHeating(building, t)) continue;
+      for (const dwelling of building.dwellings) {
+        sum += waterHeaterPowerW(getDwellingProfiles(building, dwelling).waterHeater, t);
+      }
     }
-  }
-  return profiles;
+    return sum;
+  });
 }
 
 const commercialProfileCache = new Map<string, CommercialProfile | null>();
@@ -270,7 +267,7 @@ export function sampleBuildingCategorySeries(building: Building, times: number[]
   const profileSets = building.dwellings.map((d) => getDwellingProfiles(building, d));
   const dwellingTotals = dwellingCategoryTotals(profileSets, times, tariff);
   const { heatPumpW, acW } = climateControlCategorySeries([building], times);
-  const waterHeatingW = waterHeatingCategorySeries(waterHeatedDwellingProfiles([building]), times);
+  const waterHeatingW = waterHeatingCategorySeries([building], times);
   const commercialW = commercialCategorySeries([building], times);
   const solarW = pvSeries(
     plants.filter((p) => p.egid === building.egid),
@@ -311,7 +308,7 @@ export function sampleMunicipalityCategorySeries(
   }
   const dwellingTotals = dwellingCategoryTotals(profileSets, times, tariff);
   const { heatPumpW, acW } = climateControlCategorySeries(buildings, times);
-  const waterHeatingW = waterHeatingCategorySeries(waterHeatedDwellingProfiles(buildings), times);
+  const waterHeatingW = waterHeatingCategorySeries(buildings, times);
   const commercialW = commercialCategorySeries(buildings, times);
   const solarW = pvSeries(plants, times).map((w) => -w);
   return { ...dwellingTotals, heatPumpW, acW, waterHeatingW, commercialW, solarW };

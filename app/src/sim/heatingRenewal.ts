@@ -173,6 +173,15 @@ export function currentHeatingSystemId(building: Building, simTimeMs: number): H
   return chain ? systemAt(chain, simTimeMs) : null;
 }
 
+/** Whether this building's space heating has actually been replaced by
+ * `simTimeMs`, as opposed to still being whatever GWR originally recorded —
+ * waterHeating.ts uses this to decide whether a heat-pump renewal should be
+ * treated as having brought hot water production along with it. */
+export function heatingHasBeenRenewed(building: Building, simTimeMs: number): boolean {
+  const chain = chainFor(building, simTimeMs);
+  return !!chain && chain.length > 1;
+}
+
 export interface HeatingRenewalLogEntry {
   installedAtMs: number;
   note: string;

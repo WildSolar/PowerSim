@@ -124,7 +124,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Water heating",
     blocks: [
       p(
-        "Whether a building's hot water is electric comes straight from GWR's recorded hot-water energy source — including buildings that use a heat pump for hot water (ground, groundwater, or air-source), not just a plain electric tank.",
+        "Whether a building's hot water is electric starts from GWR's recorded hot-water energy source — including buildings that use a heat pump for hot water (ground, groundwater, or air-source), not just a plain electric tank. A space-heating renewal (see \"Stock renewal\") that installs a heat pump is assumed to bring hot water production along with it from that point on, even if the building's hot water wasn't electric before — the way a real heat-pump install almost always does.",
       ),
       p(
         "Where it applies, each dwelling has its own morning and evening shower-shaped demand curve, sized to land around 2.5-4 kWh/day per dwelling — in line with a real modern electric water heater.",
@@ -245,7 +245,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Default — a flat neutral color, just the geometry.",
         "Building type — colored by GWR's coarse residential/non-residential category.",
-        "Heating — colored by primary heating system.",
+        "Heating — colored by primary heating system, live: a stock-renewal replacement (see \"Stock renewal\") recolors the building within a few seconds, not just at the moment you happen to look at its panel.",
         "Power draw — colored by live net power right now, on a diverging scale from exporting (solar surplus) to importing; recalculates every 1.5 real seconds.",
         "Solar — colored by installed solar capacity, from none to the municipality's largest installation.",
       ]),

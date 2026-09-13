@@ -1,4 +1,5 @@
 import type { Building } from "../data/types";
+import { currentHeatingSystemId } from "../sim/heatingRenewal";
 
 export type ColorMode = "none" | "category" | "heating" | "power" | "solar";
 
@@ -169,5 +170,19 @@ export function buildingCategoryBucket(building: Building): string {
 }
 
 export function buildingHeatingBucket(building: Building): string {
+  return heatingBucket(building.heatingEnergySource);
+}
+
+/** Same legend, but reflecting whatever stock renewal (heatingRenewal.ts) has
+ * actually installed by `simTimeMs` rather than only GWR's original snapshot —
+ * used by the "Heating" map layer's periodic repaint (see MapView.tsx) so a
+ * renewal actually shows up on the map, not just in a building's own panel.
+ * Falls back to the static bucket above for a source we don't model/renew at
+ * all (wood, unspecified, ...), which never changes anyway. */
+export function buildingHeatingBucketAt(building: Building, simTimeMs: number): string {
+  const id = currentHeatingSystemId(building, simTimeMs);
+  if (id === "airHeatPump" || id === "groundHeatPump") return "heatPump";
+  if (id === "gasBoiler" || id === "oilBoiler") return "fossil";
+  if (id === "districtHeating") return "districtHeat";
   return heatingBucket(building.heatingEnergySource);
 }

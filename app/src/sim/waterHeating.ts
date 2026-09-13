@@ -1,25 +1,44 @@
 /**
- * Electric water heating — ownership is real GWR data (hotWaterEnergySource), like
- * heat pump space heating, but unlike space heating the load doesn't depend on the
- * building envelope or outdoor temperature: hot water demand is driven by occupant
- * behavior (showers, dishes), not heat loss. So instead of heatPump.ts's
- * envelope-area/deltaT model, each dwelling gets its own independently duty-cycling
- * heating element (mirroring devices.ts's fridge/lighting pattern), gated at the
- * building level by whether GWR records a system that draws grid electricity at all
- * — either directly ("Elektrizität": a resistive tank) or via a heat pump (any of
- * the ground/water/air reservoir sources — see heatPumpSources.ts). Modeling a
- * shared boiler as N independently-cycling per-dwelling loads is a simplification,
- * but it reproduces what matters: a diurnal shape (morning/evening shower peaks)
- * and a total that scales with how many dwellings the building serves.
+ * Electric water heating — ownership starts from real GWR data
+ * (hotWaterEnergySource), like heat pump space heating, but unlike space
+ * heating the load doesn't depend on the building envelope or outdoor
+ * temperature: hot water demand is driven by occupant behavior (showers,
+ * dishes), not heat loss. So instead of heatPump.ts's envelope-area/deltaT
+ * model, each dwelling gets its own independently duty-cycling heating element
+ * (mirroring devices.ts's fridge/lighting pattern), gated at the building
+ * level by whether it currently draws grid electricity for hot water at all —
+ * either directly ("Elektrizität": a resistive tank), via a heat pump (any of
+ * the ground/water/air reservoir sources — see heatPumpSources.ts), or because
+ * a stock-renewal heat-pump install is assumed to have brought hot water
+ * production along with it (see hasElectricWaterHeating below). Modeling a
+ * shared boiler as N independently-cycling per-dwelling loads is a
+ * simplification, but it reproduces what matters: a diurnal shape (morning/
+ * evening shower peaks) and a total that scales with how many dwellings the
+ * building serves.
  */
 
 import type { Building, Dwelling } from "../data/types";
+import { currentHeatingSystemId, heatingHasBeenRenewed } from "./heatingRenewal";
 import { impliesHeatPump } from "./heatPumpSources";
 import { bucketRandom, hashSeed, mulberry32 } from "./rng";
 
 const ELECTRIC_SOURCE = "Elektrizität";
 
-export function hasElectricWaterHeating(building: Building): boolean {
+/** True initially exactly when GWR's own hot-water field says so. Once a
+ * building's space heating has actually been renewed (not just observed at
+ * game start) to an air or ground heat pump, hot water is assumed to have
+ * switched to that same unit too — virtually every real heat-pump install
+ * serves both, and running a separate old electric tank alongside a brand-new
+ * heat pump would be unusual. A renewal to a fossil or district system never
+ * changes this either way: there's no reason swapping a boiler would
+ * disconnect an existing electric tank, and non-electric water heating isn't
+ * priced or modeled at all — same boundary billing.ts already draws for space
+ * heating (wood/unspecified sources get no bill line rather than a guess). */
+export function hasElectricWaterHeating(building: Building, simTimeMs: number): boolean {
+  if (heatingHasBeenRenewed(building, simTimeMs)) {
+    const heatingId = currentHeatingSystemId(building, simTimeMs);
+    if (heatingId === "airHeatPump" || heatingId === "groundHeatPump") return true;
+  }
   return building.hotWaterEnergySource === ELECTRIC_SOURCE || impliesHeatPump(building.hotWaterEnergySource);
 }
 
@@ -60,9 +79,9 @@ export function dwellingWaterHeaterProfile(egid: string, dwelling: Dwelling): Wa
   return makeWaterHeaterProfile(hashSeed(egid, dwelling.ewid, "water-heater"));
 }
 
-/** Building-level total — zero unless GWR records an electric hot water system. */
+/** Building-level total — zero unless it currently has an electric hot water system. */
 export function waterHeatingPowerW(building: Building, simTimeMs: number): number {
-  if (!hasElectricWaterHeating(building)) return 0;
+  if (!hasElectricWaterHeating(building, simTimeMs)) return 0;
   let total = 0;
   for (const dwelling of building.dwellings) {
     total += waterHeaterPowerW(dwellingWaterHeaterProfile(building.egid, dwelling), simTimeMs);
