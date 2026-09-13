@@ -75,6 +75,15 @@ def build() -> MunicipalityDataset:
     matched_count = sum(1 for egid in egids if egid in footprint_by_egid)
     print(f"  matched {matched_count} / {len(buildings_df)} Schlieren buildings to a footprint")
 
+    # Buildings with no cadastral footprint match render as a bare point marker,
+    # which reads badly on the map (often sitting inside a neighboring building's
+    # volume). Manual spot-checking found these are overwhelmingly transit-stop
+    # shelters and other inconsequential structures, so we drop them for a clean
+    # map rather than keep a point-marker fallback.
+    dropped_count = len(buildings_df) - matched_count
+    buildings_df = buildings_df[buildings_df[gwr.EGID_COL].astype(int).isin(footprint_by_egid)].copy()
+    print(f"  dropped {dropped_count} building(s) with no footprint match")
+
     dwellings_by_egid: dict[int, list[Dwelling]] = {}
     for _, row in dwellings_df.iterrows():
         egid = int(row[gwr.EGID_COL])
