@@ -5,6 +5,8 @@ import { commercialCategory, commercialPowerW, totalFloorAreaM2 } from "../sim/c
 import { simClock } from "../sim/engine";
 import { categoryEnergyFromSeries } from "../sim/energy";
 import { hasHeatPump, heatPumpPowerW } from "../sim/heatPump";
+import { currentHeatingSystemId, heatingRenewalLog } from "../sim/heatingRenewal";
+import { HEATING_SYSTEM_CATALOG } from "../sim/heatingSystems";
 import {
   historyTimeSteps,
   netTotalFromCategorySeries,
@@ -24,6 +26,7 @@ import { EnergyBreakdown } from "./EnergyBreakdown";
 import { energySourceLabel } from "./energySourceLabel";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { HistoryChart } from "./HistoryChart";
+import { RenewalLogSection } from "./RenewalLogSection";
 import { useBuildingBillSummary } from "./useBillSummary";
 import { useHistorySeries } from "./useHistorySeries";
 import { formatWatts } from "./format";
@@ -39,8 +42,10 @@ export interface BuildingPanelProps {
 export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: BuildingPanelProps) {
   const simTimeMs = useSimTime();
   const tariff = useTariff();
-  const hasHp = hasHeatPump(building);
+  const hasHp = hasHeatPump(building, simTimeMs);
   const heatPumpW = hasHp ? heatPumpPowerW(building, simTimeMs) : 0;
+  const heatingSystemId = currentHeatingSystemId(building, simTimeMs);
+  const heatingLog = heatingRenewalLog(building, simTimeMs);
   const hasAirCon = hasAC(building);
   const acW = hasAirCon ? acPowerW(building, simTimeMs) : 0;
   const envelopeAreaM2 = hasHp || hasAirCon ? buildingEnvelopeAreaM2(building) : null;
@@ -90,8 +95,14 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
         <dd>{building.floorCount ?? "Unknown"}</dd>
         <dt>Heating</dt>
         <dd>
-          {building.heatingGenerator ?? "Unknown"}
-          {building.heatingEnergySource ? ` (${building.heatingEnergySource})` : ""}
+          {heatingSystemId ? (
+            `${HEATING_SYSTEM_CATALOG[heatingSystemId].icon} ${HEATING_SYSTEM_CATALOG[heatingSystemId].label}`
+          ) : (
+            <>
+              {building.heatingGenerator ?? "Unknown"}
+              {building.heatingEnergySource ? ` (${building.heatingEnergySource})` : ""}
+            </>
+          )}
         </dd>
       </dl>
 
@@ -104,7 +115,9 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
         {hasHp ? (
           <span className={`device-watts${heatPumpW === 0 ? " off" : ""}`}>{formatWatts(heatPumpW)}</span>
         ) : (
-          <span className="device-status">{energySourceLabel(building.heatingEnergySource)}</span>
+          <span className="device-status">
+            {heatingSystemId ? HEATING_SYSTEM_CATALOG[heatingSystemId].label : energySourceLabel(building.heatingEnergySource)}
+          </span>
         )}
       </div>
       <div className={`device-row${hasAirCon ? "" : " inactive"}`}>
@@ -118,6 +131,7 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
           <span className="device-status">Not installed</span>
         )}
       </div>
+      <RenewalLogSection title="Heating history" entries={heatingLog} />
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Hot water</h2>
       <div className={`device-row${hasElectricWater ? "" : " inactive"}`}>

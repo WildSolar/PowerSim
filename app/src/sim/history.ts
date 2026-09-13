@@ -168,7 +168,7 @@ function climateControlCategorySeries(buildings: Building[], times: number[]): {
     let heatPump = 0;
     let ac = 0;
     for (const building of buildings) {
-      heatPump += heatPumpPowerWWithWeather(building, dailyMeanC, outsideTempC);
+      heatPump += heatPumpPowerWWithWeather(building, dailyMeanC, outsideTempC, t);
       ac += acPowerWWithWeather(building, dailyMeanC, outsideTempC);
     }
     heatPumpW.push(heatPump);

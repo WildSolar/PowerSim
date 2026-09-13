@@ -34,34 +34,26 @@ import type { Building, Dwelling } from "../data/types";
 import { toDateMs } from "./calendar";
 import { energyKWh } from "./energy";
 import type { CategorySeries } from "./history";
-import { spaceHeatingThermalDemandW, hasHeatPump } from "./heatPump";
+import { currentHeatingSystemId } from "./heatingRenewal";
+import { fuelEfficiency, OIL_ENERGY_KWH_PER_LITER } from "./heatingSystems";
+import { spaceHeatingThermalDemandW } from "./spaceHeating";
 import { isOffPeakHour, type Tariff } from "./tariff";
 import { dailyMeanTempC, weatherAt } from "./weather";
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 
-const GAS_BOILER_EFFICIENCY = 0.9; // typical modern gas boiler
-const OIL_BOILER_EFFICIENCY = 0.85; // typical oil boiler — somewhat less efficient than gas
-const DISTRICT_HEATING_EFFICIENCY = 1.0; // price is already per kWh of heat delivered
-const OIL_ENERGY_KWH_PER_LITER = 10; // "Heizöl extra leicht" — standard rule-of-thumb energy density
-
-export type HeatingFuel = "gas" | "oil" | "districtHeating" | null;
+export type HeatingFuel = "gasBoiler" | "oilBoiler" | "districtHeating" | null;
 
 /** null for a heat-pump building (billed as electricity instead) or any source
- * with no price input (wood, "andere", unspecified). */
-export function heatingFuelType(building: Building): HeatingFuel {
-  if (hasHeatPump(building)) return null;
-  if (building.heatingEnergySource === "Gas") return "gas";
-  if (building.heatingEnergySource === "Heizöl") return "oil";
-  if (building.heatingEnergySource?.startsWith("Fernwärme")) return "districtHeating";
-  return null;
-}
-
-function fuelEfficiency(fuel: "gas" | "oil" | "districtHeating"): number {
-  if (fuel === "gas") return GAS_BOILER_EFFICIENCY;
-  if (fuel === "oil") return OIL_BOILER_EFFICIENCY;
-  return DISTRICT_HEATING_EFFICIENCY;
+ * with no price input (wood, "andere", unspecified). Resolved as of the *end*
+ * of `times` — a renewal mid-period would ideally split the bill in two, but
+ * renewals are years apart and bill periods are day/month/year, so "whichever
+ * applies by the end of the period" is a rare, small, and honest simplification
+ * rather than real inaccuracy. */
+export function heatingFuelType(building: Building, atSimTimeMs: number): HeatingFuel {
+  const id = currentHeatingSystemId(building, atSimTimeMs);
+  return id === "gasBoiler" || id === "oilBoiler" || id === "districtHeating" ? id : null;
 }
 
 /** The fuel actually burned/delivered, in kW — thermal demand divided by the
@@ -91,11 +83,11 @@ function heatingFuelCostAndQuantity(
 ): { costRp: number; quantity: number } {
   if (!fuel) return { costRp: 0, quantity: 0 };
   const fuelKWh = energyKWh(times, heatingFuelSeriesW(building, fuel, times));
-  if (fuel === "oil") {
+  if (fuel === "oilBoiler") {
     const liters = fuelKWh / OIL_ENERGY_KWH_PER_LITER;
     return { costRp: liters * tariff.oilPriceRpPerLiter, quantity: liters };
   }
-  const priceRpKWh = fuel === "gas" ? tariff.gasPriceRpKWh : tariff.districtHeatingPriceRpKWh;
+  const priceRpKWh = fuel === "gasBoiler" ? tariff.gasPriceRpKWh : tariff.districtHeatingPriceRpKWh;
   return { costRp: fuelKWh * priceRpKWh, quantity: fuelKWh };
 }
 
@@ -184,7 +176,7 @@ export function ownBillFromSeries(series: CategorySeries, times: number[], tarif
  * allocation to tenants. */
 export function buildingBillRp(building: Building, series: CategorySeries, times: number[], tariff: Tariff): BillBreakdown {
   const own = ownBillFromSeries(series, times, tariff);
-  const fuel = heatingFuelType(building);
+  const fuel = heatingFuelType(building, times[times.length - 1]);
   const { costRp: heatingFuelRp, quantity: heatingFuelQuantity } = heatingFuelCostAndQuantity(building, fuel, times, tariff);
   return { ...own, heatingFuel: fuel, heatingFuelRp, heatingFuelQuantity, netRp: own.netRp + heatingFuelRp };
 }
@@ -196,7 +188,7 @@ function sharedBuildingBillRp(building: Building, buildingSeries: CategorySeries
   const sharedElectricW = buildingSeries.heatPumpW.map((_, i) => buildingSeries.heatPumpW[i] + buildingSeries.acW[i]);
   const electricityRp = electricityCostRp(times, sharedElectricW, tariff);
   const solarCreditRp = flatCostRp(times, buildingSeries.solarW, tariff.feedInPriceRpKWh);
-  const fuel = heatingFuelType(building);
+  const fuel = heatingFuelType(building, times[times.length - 1]);
   const { costRp: heatingFuelRp, quantity: heatingFuelQuantity } = heatingFuelCostAndQuantity(building, fuel, times, tariff);
   return {
     electricityRp,

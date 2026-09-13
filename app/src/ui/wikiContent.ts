@@ -138,7 +138,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Space heating & air conditioning",
     blocks: [
       p(
-        "Space heating is real data again: a building has a heat pump if GWR's heating generator or energy source says so (including ground/water/air-source systems even when the generator field is inconsistent). Its power scales with the building's own envelope area (roof + walls) and how far the outdoor temperature sits below a comfort setpoint, divided by a temperature-dependent efficiency (colder outside = less efficient).",
+        "Space heating starts from real data: a building has a heat pump if GWR's heating generator or energy source says so (including ground/water/air-source systems even when the generator field is inconsistent) — though what's actually installed can change over time now, see \"Stock renewal\" below. Its power scales with the building's own envelope area (roof + walls) and how far the outdoor temperature sits below a comfort setpoint, divided by a temperature-dependent efficiency (colder outside = less efficient, and a ground/water-source pump's efficiency barely moves with outside temperature at all — its reservoir stays close to a stable ~10°C year-round).",
       ),
       p(
         "Air conditioning has no real ownership data in Switzerland yet, so it's a seeded random draw biased toward newer and larger buildings — reflecting today's low but rising adoption. Its model mirrors the heat pump's (envelope area × comfort-setpoint gap), with a flat efficiency and a capacity cap standing in for real regulatory limits.",
@@ -146,6 +146,26 @@ export const WIKI_SECTIONS: WikiSection[] = [
       p(
         "Both are gated by the day's characteristic (mean) temperature, not the instantaneous reading — so heating doesn't click on for one cold hour in an otherwise mild week, or cooling for one warm afternoon.",
       ),
+    ],
+  },
+  {
+    id: "stock-renewal",
+    icon: "🔄",
+    title: "Stock renewal: when infrastructure gets replaced",
+    blocks: [
+      p(
+        "Every heating system has a service lifetime, and — like real equipment — it doesn't fail on a fixed schedule: each building's current system has a randomly-drawn lifetime centered on a realistic average for its type (roughly 18-22 years), so some buildings renew within the first few years and others not for decades.",
+      ),
+      p(
+        "When a system reaches the end of its life, the replacement is decided by the same four things a real building owner would weigh: what's actually available (a building not already on district heating can't just connect to a network that doesn't reach it — a stand-in until real network data exists), which option is cheapest over its own lifetime at today's prices (install cost minus any subsidy, plus running cost), how carefully that comparison is even worth doing (a single house won't chase a marginally cheaper option the way a large apartment block's management might), and a hidden owner-level leaning that nudges a close call toward or away from renewable options.",
+      ),
+      p(
+        "Every renewal shows up as a \"Heating history\" entry on the building's panel, in plain language — what reached the end of its life, what replaced it, and why (including when the obvious choice wasn't available). Only renewals that have actually happened in the game's timeline appear; nothing about the future is revealed in advance.",
+      ),
+      note(
+        "A renewal decision uses whatever tariff and prices are set at the moment it happens, then never changes again — moving a price slider later doesn't rewrite a past decision, only shapes whichever renewal comes next.",
+      ),
+      note("Only heating renews this way for now — EV ownership and solar are still static, with the same mechanic planned for both next."),
     ],
   },
   {
