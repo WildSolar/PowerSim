@@ -1,0 +1,129 @@
+.wiki-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(11, 11, 11, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.wiki-modal {
+  position: relative;
+  width: min(720px, 92vw);
+  height: min(560px, 86vh);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.3);
+  font-family: system-ui, sans-serif;
+  color: #1a1a1a;
+  display: flex;
+  overflow: hidden;
+}
+
+.wiki-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: none;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  color: #666;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.wiki-nav {
+  width: 220px;
+  flex-shrink: 0;
+  background: #f8f8f6;
+  border-right: 1px solid #eee;
+  padding: 16px 0;
+  overflow-y: auto;
+}
+
+.wiki-nav h2 {
+  margin: 0 0 8px;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #898781;
+}
+
+.wiki-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wiki-nav button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 9px 16px;
+  font-size: 13px;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.wiki-nav button:hover {
+  background: #eef2ff;
+}
+
+.wiki-nav button.active {
+  background: #2a78d6;
+  color: #fff;
+}
+
+.wiki-nav-icon {
+  flex-shrink: 0;
+}
+
+.wiki-content {
+  flex: 1;
+  padding: 20px 28px;
+  overflow-y: auto;
+}
+
+.wiki-content h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+}
+
+.wiki-content p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #2a2a28;
+  margin: 0 0 12px;
+}
+
+.wiki-list {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #2a2a28;
+}
+
+.wiki-list li {
+  margin-bottom: 4px;
+}
+
+.wiki-note {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #52514e;
+  background: #f8f8f8;
+  border: 1px solid #eee;
+  border-left: 3px solid #2a78d6;
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin: 0 0 12px;
+}

@@ -6,6 +6,7 @@ import { MunicipalityPanel } from "./ui/MunicipalityPanel";
 import { ColorModeControl } from "./ui/ColorModeControl";
 import { TimeControl } from "./ui/TimeControl";
 import { TariffControl } from "./ui/TariffControl";
+import { WikiPanel } from "./ui/WikiPanel";
 import { loadDataset } from "./data/loadDataset";
 import type { MunicipalityDataset } from "./data/types";
 import type { ColorMode } from "./map/colorModes";
@@ -19,6 +20,7 @@ export default function App() {
   const [selectedEwid, setSelectedEwid] = useState<string | null>(null);
   const [colorMode, setColorMode] = useState<ColorMode>("none");
   const [showMunicipality, setShowMunicipality] = useState(false);
+  const [showWiki, setShowWiki] = useState(false);
 
   useEffect(() => {
     simClock.start();
@@ -64,16 +66,22 @@ export default function App() {
         <ColorModeControl mode={colorMode} onChange={setColorMode} />
       </div>
       <TariffControl />
-      <button
-        className="municipality-toggle"
-        onClick={() => {
-          setShowMunicipality(true);
-          setSelectedEgid(null);
-          setSelectedEwid(null);
-        }}
-      >
-        {dataset.name} overview
-      </button>
+      <div className="bottom-left-stack">
+        <button
+          className="municipality-toggle"
+          onClick={() => {
+            setShowMunicipality(true);
+            setSelectedEgid(null);
+            setSelectedEwid(null);
+          }}
+        >
+          {dataset.name} overview
+        </button>
+        <button className="municipality-toggle" onClick={() => setShowWiki(true)}>
+          📖 Wiki
+        </button>
+      </div>
+      {showWiki && <WikiPanel onClose={() => setShowWiki(false)} />}
       {showMunicipality ? (
         <MunicipalityPanel dataset={dataset} onClose={() => setShowMunicipality(false)} />
       ) : selectedDwelling && selectedBuilding ? (
