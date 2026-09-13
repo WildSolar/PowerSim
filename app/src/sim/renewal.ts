@@ -123,7 +123,8 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
     chainCache.set(params.entityKey, chain);
   }
 
-  for (let guard = 0; guard < MAX_EVENTS_PER_CALL; guard++) {
+  let guard = 0;
+  for (; guard < MAX_EVENTS_PER_CALL; guard++) {
     const last = chain[chain.length - 1] as RenewalEvent<T>;
     const eventIndex = chain.length;
     const meanYears = params.lifetimeMeanYearsFor(last.system);
@@ -136,6 +137,14 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
     const candidates = params.candidatesAt(nextInstalledAtMs, last.system);
     const { chosen, reasonKind, bestOverallId } = chooseNext(candidates, last.system, params.uncertaintyFraction, params.biasStrengthRp);
     chain.push({ installedAtMs: nextInstalledAtMs, system: chosen, previousSystem: last.system, reasonKind, bestOverallId });
+  }
+  // Exhausting the guard (rather than breaking out of it) means the chain still
+  // hasn't reached `uptoMs` — under engine.ts's MAX_SIM_TIME_MS clock ceiling
+  // this shouldn't be reachable for a realistic entity, so it's worth knowing
+  // about rather than silently handing back a chain that understates how many
+  // renewals have actually happened by `uptoMs`.
+  if (guard === MAX_EVENTS_PER_CALL) {
+    console.warn(`renewal.ts: ${params.entityKey} hit the ${MAX_EVENTS_PER_CALL}-event generation cap before reaching uptoMs=${uptoMs}`);
   }
 
   return chain as RenewalEvent<T>[];

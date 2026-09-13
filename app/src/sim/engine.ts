@@ -8,6 +8,19 @@
 
 const DEFAULT_MULTIPLIER = 720; // 1 real second = 12 simulated minutes (~2 real minutes per simulated day)
 
+// A generous but hard ceiling on simulated time, well inside JS's own Date
+// range (+-~273,790 years from the epoch) rather than right up against it —
+// every calendar-dependent calculation in the app (weather, heating demand,
+// stock-renewal timing, the dates shown in a renewal's history log) ultimately
+// traces back to `new Date(EPOCH_MS + simTimeMs)`, and silently produces NaN
+// once that overflows, with no error anywhere near the actual cause. At max
+// speed (x86400) this is centuries of continuous real-time play to reach, but
+// a backgrounded tab can accumulate a huge single `realDeltaMs` on its next
+// frame once foregrounded again, so it's reachable well within an ordinary
+// session — clamping here, the one place simTimeMs is ever incremented, is a
+// single choke point rather than guarding every consumer individually.
+const MAX_SIM_TIME_MS = 10_000 * 365.25 * 24 * 60 * 60_000; // 10,000 simulated years
+
 export class SimClock {
   private simTimeMs = 0;
   private lastFrameTime: number | null = null;
@@ -20,7 +33,7 @@ export class SimClock {
     const loop = (now: number) => {
       if (this.lastFrameTime !== null) {
         const realDeltaMs = now - this.lastFrameTime;
-        this.simTimeMs += realDeltaMs * this.multiplier;
+        this.simTimeMs = Math.min(this.simTimeMs + realDeltaMs * this.multiplier, MAX_SIM_TIME_MS);
         this.listeners.forEach((listener) => listener());
       }
       this.lastFrameTime = now;
