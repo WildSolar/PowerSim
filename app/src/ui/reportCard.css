@@ -38,3 +38,17 @@
   gap: 4px;
   flex-wrap: wrap;
 }
+
+.finance-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.finance-value.positive {
+  color: #1baf7a;
+}
+
+.finance-value.negative {
+  color: #b23a2e;
+}

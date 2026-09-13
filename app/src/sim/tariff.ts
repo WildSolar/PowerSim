@@ -12,6 +12,11 @@
  * rather than per kWh like the other two. Grouped into the same object/store
  * as the electricity prices since they're all "prices the player sets," not
  * because they're mechanically related.
+ *
+ * The last two are different again — not a price a consumer ever sees, but
+ * the DSO's own cost side: what it pays upstream for wholesale electricity,
+ * and what it costs to maintain the local grid. See finances.ts for where
+ * they turn into the municipal money ledger.
  */
 
 export interface Tariff {
@@ -24,6 +29,8 @@ export interface Tariff {
   gasPriceRpKWh: number; // per kWh of gas burned (not thermal delivered — see billing.ts)
   districtHeatingPriceRpKWh: number; // per kWh of heat delivered
   petrolPriceRpPerLiter: number; // per liter of petrol/diesel burned by an ICE car — see mobility.ts
+  wholesalePriceRpKWh: number; // what the DSO pays upstream per net kWh purchased — see finances.ts
+  gridMaintenanceRpKWh: number; // the DSO's own wires/upkeep cost per kWh delivered — see finances.ts
 }
 
 export const DEFAULT_TARIFF: Tariff = {
@@ -41,6 +48,14 @@ export const DEFAULT_TARIFF: Tariff = {
   gasPriceRpKWh: 10,
   districtHeatingPriceRpKWh: 12,
   petrolPriceRpPerLiter: 180, // ~CHF 1.80/L — ballpark 2025 Swiss pump price, blended petrol/diesel
+  // Both comfortably below the retail tariff above (18-32 Rp/kWh) — the
+  // margin-above-cost shape a real utility's rates are built from. Ballpark
+  // figures rather than sourced to one specific real number the way the
+  // emissions factors are: recent Swiss/European day-ahead wholesale power
+  // has sat roughly in this range, and a small Swiss DSO's own grid-usage
+  // fee is a similar order of magnitude.
+  wholesalePriceRpKWh: 9,
+  gridMaintenanceRpKWh: 6,
 };
 
 export function isOffPeakHour(tariff: Tariff, hourOfDay: number): boolean {

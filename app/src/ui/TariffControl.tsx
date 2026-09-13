@@ -105,6 +105,33 @@ export function TariffControl() {
         />
         <span className="tariff-unit">Rp/L</span>
       </div>
+
+      <div className="tariff-divider" />
+      <div className="tariff-title">Municipal utility costs</div>
+      <div className="tariff-row">
+        <span className="tariff-label">Wholesale price</span>
+        <input
+          type="number"
+          min={0}
+          max={40}
+          step={1}
+          value={tariff.wholesalePriceRpKWh}
+          onChange={(e) => tariffStore.set({ wholesalePriceRpKWh: Number(e.target.value) })}
+        />
+        <span className="tariff-unit">Rp/kWh</span>
+      </div>
+      <div className="tariff-row">
+        <span className="tariff-label">Grid maintenance</span>
+        <input
+          type="number"
+          min={0}
+          max={40}
+          step={1}
+          value={tariff.gridMaintenanceRpKWh}
+          onChange={(e) => tariffStore.set({ gridMaintenanceRpKWh: Number(e.target.value) })}
+        />
+        <span className="tariff-unit">Rp/kWh</span>
+      </div>
     </div>
   );
 }

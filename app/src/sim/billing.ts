@@ -28,6 +28,12 @@
  * Swiss "Nebenkostenabrechnung" allocates shared building costs to tenants.
  * A building's own commercial device cost is never split to dwellings — it's
  * the commercial tenant's own equipment, not shared building infrastructure.
+ *
+ * consumptionSeriesW and the two pricing helpers below are also reused
+ * directly by finances.ts to total up what the municipality collects from
+ * consumers municipality-wide — the DSO's own revenue side of the money
+ * ledger is the exact same electricity, priced the exact same way, just
+ * summed across every building instead of billed to one.
  */
 
 import type { Building, Dwelling } from "../data/types";
@@ -136,7 +142,7 @@ const ZERO_BILL: BillBreakdown = {
   netRp: 0,
 };
 
-function consumptionSeriesW(series: CategorySeries): number[] {
+export function consumptionSeriesW(series: CategorySeries): number[] {
   return series.fridgeW.map(
     (_, i) =>
       series.fridgeW[i] +

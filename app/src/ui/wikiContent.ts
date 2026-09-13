@@ -233,6 +233,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
       p(
         "The five flat prices: what exported solar generation earns (feed-in), and what oil, gas, district heating, and petrol cost — oil and petrol per liter (how they're actually sold), the other two per kWh. The first four feed directly into the Bill sections described next; petrol (and every electricity price above) instead feeds mobility's vehicle-type renewal decision (see \"Mobility\") — moving it shifts how attractive an EV looks the next time a car in the municipality wears out, the same way changing oil or gas price shifts heating's own renewal decisions.",
       ),
+      p(
+        "Below those is a second group, \"Municipal utility costs\": the wholesale price the local DSO itself pays for electricity, and what it costs to maintain the local grid. These never appear on a consumer's bill — they're the DSO's own cost side, see \"Municipal finances\" below.",
+      ),
     ],
   },
   {
@@ -256,6 +259,23 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "EV charging cost is billed to the dwelling exactly like any other device — mobility's mode and vehicle-type choice (see \"Mobility\") is fully modeled now, but only the electricity side shows up on a bill: a petrol/diesel car's fuel cost, and any cost of public transit or a bike, aren't billed anywhere yet, the same boundary heating draws around wood and other unpriced fuels.",
       ),
       note("Wood and other unpriced heating sources still get no fuel-cost line — same reasoning as the unmodeled commercial building classes: no price input, no guess."),
+    ],
+  },
+  {
+    id: "municipal-finances",
+    icon: "🏦",
+    title: "Municipal finances",
+    blocks: [
+      p(
+        "Alongside emissions, the municipality's other headline resource is money: what its local electricity utility actually keeps after buying power and maintaining the grid, accumulated as a treasury balance from the very first simulated year onward — the budget future policy and infrastructure spending will eventually draw from.",
+      ),
+      p(
+        "Each completed year, the balance moves by: everything consumers paid for grid electricity, minus what was paid out for solar fed in, minus the wholesale cost of the net electricity the municipality had to buy in (consumption less local solar), minus grid maintenance. Both of the last two are set in Control → Prices, under \"Municipal utility costs\".",
+      ),
+      note(
+        "Deliberately electricity only — heating fuel and petrol/diesel are paid straight to an external supplier, never through the municipal utility, so they don't touch this balance even though they're billed to the consumer. Existing cantonal heat-pump and EV subsidies aren't a municipal cost yet either — they're a program the municipality doesn't control, not something the player has paid for. Both are natural gaps for a future \"direct infrastructure funding\" policy lever to fill.",
+      ),
+      note("Shown in the Year in Review report for now, the same way emissions are — nothing tracks or displays it in real time yet."),
     ],
   },
   {
@@ -320,7 +340,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "The instant the clock crosses into a new calendar year, it automatically pauses and a \"Year in Review\" report card opens — a snapshot of the municipality's just-completed year, on top of whatever building or dwelling panel you happen to have open.",
       ),
       p(
-        "The report leads with the year's emissions (see \"Emissions & net zero\") — a donut chart split by source, and how it compares to the baseline year. Below that comes a municipality-wide energy breakdown, then two sections specific to heating: \"Heating energy by technology\" — how much heat was actually delivered by each system (air/ground heat pump, gas, oil, district heating) for space heating, and by heat pump vs. direct electric for hot water — and \"Heating renewals this year\", a tally of every stock-renewal replacement that happened during the year (e.g. \"14× Oil boiler → Ground heat pump\"), \"like-for-like\" flagged when a building was replaced with the same kind of system it already had.",
+        "The report leads with the year's emissions (see \"Emissions & net zero\") — a donut chart split by source, and how it compares to the baseline year — followed by \"Municipal finances\" (see above): the treasury balance and this year's own revenue/cost breakdown. Below that comes a municipality-wide energy breakdown, then two sections specific to heating: \"Heating energy by technology\" — how much heat was actually delivered by each system (air/ground heat pump, gas, oil, district heating) for space heating, and by heat pump vs. direct electric for hot water — and \"Heating renewals this year\", a tally of every stock-renewal replacement that happened during the year (e.g. \"14× Oil boiler → Ground heat pump\"), \"like-for-like\" flagged when a building was replaced with the same kind of system it already had.",
       ),
       note(
         "The heating-by-technology totals cover every fuel a building might use, not just electricity, so they're deliberately not directly comparable to the \"Energy by category\" pie above them, which only covers what draws grid power.",

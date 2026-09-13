@@ -6,10 +6,11 @@ import { spaceHeatingKWhFor } from "../sim/yearReport";
 import { useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
 import { CONSUMPTION_CATEGORIES } from "./deviceCategories";
-import { formatCO2 } from "./format";
+import { formatCHF, formatCO2 } from "./format";
 import { PieChart, type PieSlice } from "./PieChart";
 import { usePeriodPieEnergy } from "./usePeriodPieEnergy";
 import { useYearEmissions, BASELINE_YEAR, NET_ZERO_TARGET_YEAR } from "./useYearEmissions";
+import { useYearFinances } from "./useYearFinances";
 import { useYearHeatingReport } from "./useYearHeatingReport";
 import "./modal.css";
 import "./panels.css";
@@ -92,6 +93,8 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
       ? ((emissions.current.totalKgCO2 - emissions.baseline.totalKgCO2) / emissions.baseline.totalKgCO2) * 100
       : 0;
 
+  const { data: finances, loading: financesLoading } = useYearFinances(dataset, year);
+
   return (
     <div className="modal-backdrop">
       <div className="modal-shell report-card-shell">
@@ -125,6 +128,47 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
               <p style={{ fontSize: 12, color: "#888", margin: "4px 0 0" }}>
                 Operational emissions only — what's actually burned or drawn from the grid, net of solar exported. Manufacturing a heat pump, an
                 EV's battery, or a solar panel isn't counted.
+              </p>
+            </>
+          )}
+
+          <h2 style={{ fontSize: 14, marginTop: 14 }}>Municipal finances</h2>
+          {financesLoading || !finances ? (
+            <div className="loading-note">Computing…</div>
+          ) : (
+            <>
+              <p style={{ fontSize: 20, fontWeight: 700, margin: "0 0 2px", color: finances.balanceRp >= 0 ? "#1baf7a" : "#b23a2e" }}>
+                {formatCHF(finances.balanceRp)}
+              </p>
+              <p style={{ fontSize: 12, color: "#888", margin: "0 0 8px" }}>Treasury balance, accumulated since {BASELINE_YEAR}.</p>
+              <div className="renewal-tally">
+                <div className="renewal-tally-row">
+                  <span className="renewal-tally-label">Consumer electricity revenue</span>
+                  <span className="finance-value positive">+{formatCHF(finances.current.consumerRevenueRp)}</span>
+                </div>
+                <div className="renewal-tally-row">
+                  <span className="renewal-tally-label">Solar feed-in paid</span>
+                  <span className="finance-value negative">−{formatCHF(finances.current.feedInPaidRp)}</span>
+                </div>
+                <div className="renewal-tally-row">
+                  <span className="renewal-tally-label">Wholesale electricity purchased</span>
+                  <span className="finance-value negative">−{formatCHF(finances.current.wholesaleCostRp)}</span>
+                </div>
+                <div className="renewal-tally-row">
+                  <span className="renewal-tally-label">Grid maintenance</span>
+                  <span className="finance-value negative">−{formatCHF(finances.current.gridMaintenanceCostRp)}</span>
+                </div>
+                <div className="renewal-tally-row" style={{ fontWeight: 600 }}>
+                  <span className="renewal-tally-label">Net this year</span>
+                  <span className={`finance-value ${finances.current.netIncomeRp >= 0 ? "positive" : "negative"}`}>
+                    {finances.current.netIncomeRp >= 0 ? "+" : "−"}
+                    {formatCHF(Math.abs(finances.current.netIncomeRp))}
+                  </span>
+                </div>
+              </div>
+              <p style={{ fontSize: 12, color: "#888", margin: "8px 0 0" }}>
+                Electricity only — heating fuel and petrol/diesel are paid straight to their own suppliers, never through the municipal utility.
+                Heating and EV purchase subsidies are an existing cantonal program, not a municipal cost yet either.
               </p>
             </>
           )}
