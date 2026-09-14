@@ -33,7 +33,10 @@
  * directly by finances.ts to total up what the municipality collects from
  * consumers municipality-wide — the DSO's own revenue side of the money
  * ledger is the exact same electricity, priced the exact same way, just
- * summed across every building instead of billed to one.
+ * summed across every building instead of billed to one. hourOfDayAt is
+ * reused by solarAdoption.ts for the same reason: estimating a candidate
+ * installation's self-consumption-vs-export split needs the same per-interval
+ * TOU rate lookup this module already does for a real bill.
  */
 
 import type { Building, Dwelling } from "../data/types";
@@ -97,7 +100,7 @@ function heatingFuelCostAndQuantity(
   return { costRp: fuelKWh * priceRpKWh, quantity: fuelKWh };
 }
 
-function hourOfDayAt(simTimeMs: number): number {
+export function hourOfDayAt(simTimeMs: number): number {
   const dateMs = toDateMs(simTimeMs);
   return (((dateMs % DAY_MS) + DAY_MS) % DAY_MS) / HOUR_MS;
 }

@@ -11,6 +11,7 @@ import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
 import { buildingHeightM } from "../sim/buildingGeometry";
 import { buildingPowerW } from "../sim/buildingPower";
 import { simClock } from "../sim/engine";
+import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { snowDepthCm } from "../sim/snow";
 import {
   buildingCategoryBucket,
@@ -36,6 +37,7 @@ const DEFAULT_COLOR = "#9db4c9";
 const SELECTED_COLOR = "#f97316";
 const POWER_TICK_MS = 1500;
 const HEATING_TICK_MS = 5000; // renewals are years apart in simulated time — no need for power's snappy cadence
+const SOLAR_TICK_MS = 5000; // new adoptions are decided at most once/year per building — same cadence as heating
 
 type BuildingProperties = {
   egid: string;
@@ -157,6 +159,11 @@ function ml(expr: MapExpr): any {
 }
 
 export interface MapViewProps {
+  // Never construct a new object for this to reflect live state (e.g. a
+  // merged solar-adoption plant list) — the mount effect below is keyed on
+  // its reference and tears down/rebuilds the whole MapLibre map on change.
+  // Live per-building state (power, heating, solar) is instead pushed into
+  // the already-created map by the ticking effects further down.
   dataset: MunicipalityDataset;
   selectedEgid: string | null;
   onSelectBuilding: (egid: string) => void;
@@ -280,11 +287,12 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode }: 
 
       const simTimeMs = simClock.getSimTimeMs();
       const snowCoverCm = snowDepthCm(simTimeMs);
+      const plants = effectivePowerPlantsAt(dataset.buildings, dataset.powerPlants, simTimeMs);
       let minW = 0;
       let maxW = 0;
       for (const feature of [...polyData.features, ...pointData.features]) {
         const building = buildingsByEgid.get(feature.properties.egid);
-        const power = building ? buildingPowerW(building, simTimeMs, dataset.powerPlants, snowCoverCm) : 0;
+        const power = building ? buildingPowerW(building, simTimeMs, plants, snowCoverCm) : 0;
         feature.properties.powerW = power;
         if (power > maxW) maxW = power;
         if (power < minW) minW = power;
@@ -340,6 +348,49 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode }: 
 
     tick();
     const interval = setInterval(tick, HEATING_TICK_MS);
+    return () => clearInterval(interval);
+  }, [colorMode, dataset]);
+
+  // Live solar mode: like heating's tick above, but for solarAdoption.ts's
+  // simulated installations — GWR's real Pronovo plants are baked into the
+  // initial geojson at mount (see the [dataset]-keyed effect), but a new
+  // adoption only ever shows up here, live, once decided. The color scale's
+  // own ceiling can grow over time as bigger installs get adopted, so it's
+  // recomputed every tick rather than fixed at the initial mount-time max.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || colorMode !== "solar") return;
+
+    const buildingsByEgid = new Map(dataset.buildings.map((b) => [b.egid, b]));
+
+    const tick = () => {
+      const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
+      const pointSource = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
+      const polyData = polygonsRef.current;
+      const pointData = pointsRef.current;
+      if (!polySource || !pointSource || !polyData || !pointData) return;
+
+      const simTimeMs = simClock.getSimTimeMs();
+      const plants = effectivePowerPlantsAt(dataset.buildings, dataset.powerPlants, simTimeMs);
+      const solarByEgid = solarCapacityByEgid(plants);
+      let maxKw = 0;
+      for (const feature of [...polyData.features, ...pointData.features]) {
+        const building = buildingsByEgid.get(feature.properties.egid);
+        const kw = building ? (solarByEgid.get(building.egid) ?? 0) : 0;
+        feature.properties.solarCapacityKw = kw;
+        if (kw > maxKw) maxKw = kw;
+      }
+      maxSolarCapacityKwRef.current = maxKw;
+
+      polySource.setData(polyData);
+      pointSource.setData(pointData);
+      const expr = ml(colorExpression("solar", selectedEgidRef.current, { powerMinW: 0, powerMaxW: 0, maxSolarCapacityKw: maxKw }));
+      map.setPaintProperty(POLY_LAYER_ID, "fill-extrusion-color", expr);
+      map.setPaintProperty(POINT_LAYER_ID, "circle-color", expr);
+    };
+
+    tick();
+    const interval = setInterval(tick, SOLAR_TICK_MS);
     return () => clearInterval(interval);
   }, [colorMode, dataset]);
 

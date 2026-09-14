@@ -75,7 +75,11 @@ const MAX_EVENTS_PER_CALL = 1000; // defensive cap against a misconfigured/runaw
 
 const chainCache = new Map<string, RenewalEvent<string>[]>();
 
-function chooseNext<T extends string>(
+/** Exported for solarAdoption.ts, which reuses this exact four-factor
+ * comparison for a binary "stay without / install" choice — same shape,
+ * just without renewalEventsUpTo's periodic wear-out timing around it (solar
+ * adoption is triggered by a hazard check, not a fixed service lifetime). */
+export function chooseNext<T extends string>(
   candidates: RenewalCandidate<T>[],
   incumbent: T,
   uncertaintyFraction: number,

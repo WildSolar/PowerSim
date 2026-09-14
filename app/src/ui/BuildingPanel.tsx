@@ -16,6 +16,7 @@ import {
   HISTORY_REFRESH_MS,
 } from "../sim/history";
 import { pvPowerForBuildingW } from "../sim/pv";
+import { solarAdoptionLog } from "../sim/solarAdoption";
 import { snowDepthCm } from "../sim/snow";
 import { useSimTime, useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
@@ -29,19 +30,22 @@ import { HistoryChart } from "./HistoryChart";
 import { RenewalLogSection } from "./RenewalLogSection";
 import { useBuildingBillSummary } from "./useBillSummary";
 import { useHistorySeries } from "./useHistorySeries";
+import { useLivePowerPlants } from "./useLivePowerPlants";
 import { formatWatts } from "./format";
 import "./panels.css";
 
 export interface BuildingPanelProps {
   building: Building;
-  plants: PowerPlant[];
+  allBuildings: Building[];
+  realPlants: PowerPlant[];
   onSelectDwelling: (ewid: string) => void;
   onClose: () => void;
 }
 
-export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: BuildingPanelProps) {
+export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwelling, onClose }: BuildingPanelProps) {
   const simTimeMs = useSimTime();
   const tariff = useTariff();
+  const plants = useLivePowerPlants(allBuildings, realPlants, simTimeMs);
   const hasHp = hasHeatPump(building, simTimeMs);
   const heatPumpW = hasHp ? heatPumpPowerW(building, simTimeMs) : 0;
   const heatingSystemId = currentHeatingSystemId(building, simTimeMs);
@@ -60,6 +64,7 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
   const snowCoverCm = hasSolar ? snowDepthCm(simTimeMs) : 0;
   const solarGenerationW = hasSolar ? -pvPowerForBuildingW(building.egid, plants, simTimeMs, snowCoverCm) : 0;
   const solarCapacityKw = buildingPlants.reduce((sum, p) => sum + (p.capacityKw ?? 0), 0);
+  const solarLog = solarAdoptionLog(building, simTimeMs);
 
   const history = useHistorySeries(
     () => {
@@ -169,6 +174,7 @@ export function BuildingPanel({ building, plants, onSelectDwelling, onClose }: B
           <span className="device-status">Not installed</span>
         )}
       </div>
+      <RenewalLogSection title="Solar history" entries={solarLog} />
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Daily energy — last 24h</h2>
       <EnergyBreakdown energy={history.energy} />

@@ -89,7 +89,8 @@ export default function App() {
         <DwellingPanel
           building={selectedBuilding}
           dwelling={selectedDwelling}
-          plants={dataset.powerPlants}
+          allBuildings={dataset.buildings}
+          realPlants={dataset.powerPlants}
           onBack={() => setSelectedEwid(null)}
           onClose={() => {
             setSelectedEgid(null);
@@ -99,7 +100,8 @@ export default function App() {
       ) : selectedBuilding ? (
         <BuildingPanel
           building={selectedBuilding}
-          plants={dataset.powerPlants}
+          allBuildings={dataset.buildings}
+          realPlants={dataset.powerPlants}
           onSelectDwelling={setSelectedEwid}
           onClose={() => setSelectedEgid(null)}
         />

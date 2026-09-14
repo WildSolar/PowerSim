@@ -41,3 +41,14 @@ export function polygonPerimeterM(ring: [number, number][]): number {
   }
   return perimeter;
 }
+
+/** Straight-line distance between two WGS84 points, in meters — same flat
+ * equirectangular approximation as the footprint helpers above, accurate
+ * enough for the few-hundred-meter neighbor radius solarAdoption.ts uses it
+ * for (see this module's own doc). */
+export function distanceM(lon1: number, lat1: number, lon2: number, lat2: number): number {
+  const mPerLon = metersPerDegLon((lat1 + lat2) / 2);
+  const dx = (lon2 - lon1) * mPerLon;
+  const dy = (lat2 - lat1) * METERS_PER_DEG_LAT;
+  return Math.hypot(dx, dy);
+}

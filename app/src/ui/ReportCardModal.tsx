@@ -2,6 +2,7 @@ import type { MunicipalityDataset } from "../data/types";
 import { EMISSIONS_SOURCE_COLOR } from "../sim/emissions";
 import { HEATING_SYSTEM_CATALOG, HEATING_SYSTEM_ORDER, WATER_HEATING_KIND_COLOR } from "../sim/heatingSystems";
 import { sampleMunicipalityCategorySeries } from "../sim/history";
+import { effectivePowerPlants, solarAdoptionTallyForYear } from "../sim/solarAdoption";
 import { spaceHeatingKWhFor } from "../sim/yearReport";
 import { useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
@@ -28,15 +29,20 @@ export interface ReportCardModalProps {
  * already-cached Year-tier energy pie (usePeriodPieEnergy) for the overall
  * total exactly as the Control panel's City stats tab does; the heating
  * technology breakdown and renewal tally are computed fresh for this specific
- * year by useYearHeatingReport. */
+ * year by useYearHeatingReport. solarAdoptionTallyForYear (unlike emissions/
+ * finances) is cheap enough to call directly, synchronously, every render —
+ * it only ever reads solarAdoption.ts's own cache, already populated by
+ * effectivePowerPlants above. */
 export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps) {
   const tariff = useTariff();
+  const plantsThisYear = effectivePowerPlants(dataset.buildings, dataset.powerPlants, year);
+  const solarTally = solarAdoptionTallyForYear(dataset.buildings, dataset.powerPlants, year);
 
   const { energy: overallEnergy, loading: overallLoading } = usePeriodPieEnergy(
     dataset.name,
     "year",
-    (times) => sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, dataset.powerPlants),
-    tariffKey(tariff),
+    (times) => sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, plantsThisYear),
+    `${tariffKey(tariff)}:${year}`,
   );
   const overallSlices: PieSlice[] = overallEnergy
     ? CONSUMPTION_CATEGORIES.map((c) => ({ key: c.key, label: c.label, icon: c.icon, color: c.color, valueKWh: overallEnergy[c.key] }))
@@ -158,6 +164,12 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                   <span className="renewal-tally-label">Grid maintenance</span>
                   <span className="finance-value negative">−{formatCHF(finances.current.gridMaintenanceCostRp)}</span>
                 </div>
+                {finances.current.solarSubsidiesPaidRp > 0 && (
+                  <div className="renewal-tally-row">
+                    <span className="renewal-tally-label">Solar subsidies paid</span>
+                    <span className="finance-value negative">−{formatCHF(finances.current.solarSubsidiesPaidRp)}</span>
+                  </div>
+                )}
                 <div className="renewal-tally-row" style={{ fontWeight: 600 }}>
                   <span className="renewal-tally-label">Net this year</span>
                   <span className={`finance-value ${finances.current.netIncomeRp >= 0 ? "positive" : "negative"}`}>
@@ -168,7 +180,8 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
               </div>
               <p style={{ fontSize: 12, color: "#888", margin: "8px 0 0" }}>
                 Electricity only — heating fuel and petrol/diesel are paid straight to their own suppliers, never through the municipal utility.
-                Heating and EV purchase subsidies are an existing cantonal program, not a municipal cost yet either.
+                Heating and EV purchase subsidies are an existing cantonal program, not a municipal cost — solar's own municipal top-up (Control
+                → Policy) is the one subsidy that actually is.
               </p>
             </>
           )}
@@ -218,6 +231,16 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                 ))}
               </div>
             </>
+          )}
+
+          <h2 style={{ fontSize: 14, marginTop: 14 }}>Solar installs this year</h2>
+          {solarTally.count === 0 ? (
+            <p>No buildings installed solar this calendar year.</p>
+          ) : (
+            <p>
+              {solarTally.count} building{solarTally.count === 1 ? "" : "s"} installed solar this year, totaling{" "}
+              {solarTally.totalCapacityKw.toFixed(0)} kWp.
+            </p>
           )}
         </div>
       </div>

@@ -10,7 +10,8 @@ import {
   MUNICIPALITY_HISTORY_SAMPLE_COUNT,
   HISTORY_REFRESH_MS,
 } from "../sim/history";
-import { useTariff } from "../sim/store";
+import { effectivePowerPlantsAt } from "../sim/solarAdoption";
+import { useSimDay, useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
 import { CONSUMPTION_CATEGORIES } from "./deviceCategories";
 import { HistoryChart } from "./HistoryChart";
@@ -44,13 +45,15 @@ function toSlices(energy: CategoryEnergyKWh, categories: typeof CONSUMPTION_CATE
  * than a `.panel` card. */
 export function CityStatsTab({ dataset }: CityStatsTabProps) {
   const tariff = useTariff();
-  const solarPlants = dataset.powerPlants.filter((p) => p.technology === "Photovoltaic");
+  const currentDay = useSimDay();
+  const plants = effectivePowerPlantsAt(dataset.buildings, dataset.powerPlants, currentDay);
+  const solarPlants = plants.filter((p) => p.technology === "Photovoltaic");
   const [granularity, setGranularity] = useState<PieGranularity>("day");
 
   const history = useHistorySeries(
     () => {
       const times = historyTimeSteps(simClock.getSimTimeMs(), HISTORY_WINDOW_MS, MUNICIPALITY_HISTORY_SAMPLE_COUNT);
-      const categorySeries = sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, dataset.powerPlants);
+      const categorySeries = sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, plants);
       return {
         times,
         totalW: netTotalFromCategorySeries(categorySeries),
@@ -59,14 +62,14 @@ export function CityStatsTab({ dataset }: CityStatsTabProps) {
       };
     },
     HISTORY_REFRESH_MS,
-    `${dataset.name}:${tariffKey(tariff)}`,
+    `${dataset.name}:${tariffKey(tariff)}:${currentDay}`,
   );
 
   const { energy: periodEnergy, loading } = usePeriodPieEnergy(
     dataset.name,
     granularity,
-    (times) => sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, dataset.powerPlants),
-    tariffKey(tariff),
+    (times) => sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, plants),
+    `${tariffKey(tariff)}:${currentDay}`,
   );
   const pieEnergy = granularity === "day" ? history.energy : periodEnergy;
 

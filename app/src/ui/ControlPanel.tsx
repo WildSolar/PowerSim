@@ -1,10 +1,12 @@
 import { useState } from "react";
 import type { MunicipalityDataset } from "../data/types";
 import { sampleMunicipalityCategorySeries } from "../sim/history";
-import { useTariff } from "../sim/store";
+import { effectivePowerPlantsAt } from "../sim/solarAdoption";
+import { useSimDay, useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
 import { CityStatsTab } from "./CityStatsTab";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
+import { PolicyControl } from "./PolicyControl";
 import { TariffControl } from "./TariffControl";
 import "./modal.css";
 
@@ -31,6 +33,14 @@ const TABS: { id: ControlTab; icon: string; title: string }[] = [
 export function ControlPanel({ dataset, onClose }: ControlPanelProps) {
   const [tab, setTab] = useState<ControlTab>("prices");
   const tariff = useTariff();
+  const currentDay = useSimDay();
+  // Only resolved for the History tab, and only while it's actually open —
+  // effectivePowerPlantsAt locks in that year's solar adoptions (once, the
+  // first time it's ever queried) using whatever policy is set *right then*
+  // (solarAdoption.ts's own retroactive-but-frozen rule), so merely opening
+  // Control (defaulting to the Prices tab) must never trigger it ahead of
+  // the player ever reaching Policy.
+  const plants = tab === "history" ? effectivePowerPlantsAt(dataset.buildings, dataset.powerPlants, currentDay) : dataset.powerPlants;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -61,19 +71,15 @@ export function ControlPanel({ dataset, onClose }: ControlPanelProps) {
           {tab === "policy" && (
             <>
               <h2>📜 Policy</h2>
-              <p>
-                Subsidies, regulations, and bans aren't implemented yet — this tab is reserved for the long-term policy layer
-                described in the game's design: levers that shift how the building stock adopts heat pumps, solar, EVs and
-                the like over time, funded from their own budget rather than the tariff's.
-              </p>
+              <PolicyControl />
             </>
           )}
           {tab === "stats" && <CityStatsTab dataset={dataset} />}
           {tab === "history" && (
             <HistoricalEnergySection
               entityId="municipality"
-              sampler={(times) => sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, dataset.powerPlants)}
-              tariffKey={tariffKey(tariff)}
+              sampler={(times) => sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, plants)}
+              tariffKey={`${tariffKey(tariff)}:${currentDay}`}
             />
           )}
         </div>

@@ -25,6 +25,7 @@ import type { HeatingSystemId } from "./heatingSystems";
 import { historyTimeSteps, sampleMunicipalityCategorySeries } from "./history";
 import { ANNUAL_CAR_KM, ICE_CAR_L_PER_100KM } from "./mobilitySystems";
 import { currentMobilityMode, currentVehicleType, mobilitySlotCount } from "./mobility";
+import { effectivePowerPlants } from "./solarAdoption";
 import { spaceHeatingThermalDemandW } from "./spaceHeating";
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
@@ -217,11 +218,12 @@ export function computeHeatingRenewalTally(buildings: Building[], year: number):
  * accurately. */
 export async function computeNetElectricityKWh(
   buildings: Building[],
-  plants: PowerPlant[],
+  realPlants: PowerPlant[],
   year: number,
   isCancelled: () => boolean,
 ): Promise<number> {
   const tariff: Tariff = tariffStore.get();
+  const plants = effectivePowerPlants(buildings, realPlants, year);
   let netKWh = 0;
   for (let month = 0; month < 12; month++) {
     if (isCancelled()) return netKWh;

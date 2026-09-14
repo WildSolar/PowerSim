@@ -13,9 +13,19 @@
  * heating/EV subsidies (heatingSystems.ts/mobilitySystems.ts) aren't paid by
  * the municipality either — they're an existing, player-uncontrolled program
  * baked into a household's own renewal decision, not (yet) a lever the
- * player pulls or a cost the player bears. A real gap for the later "direct
- * infrastructure funding" lever to fill, along with any tax/federal funding
- * on the revenue side.
+ * player pulls or a cost the player bears.
+ *
+ * Solar is the first real exception: solarAdoption.ts's municipal top-up
+ * subsidy (policy.ts) *is* a player-controlled lever with a real cost, so it
+ * shows up here as its own line — unlike the federal Einmalvergütung
+ * baseline every installation also gets, which (like the cantonal heating
+ * grants) isn't the municipality's money to begin with.
+ *
+ * `plants` here should always be the *real* static Pronovo list
+ * (dataset.powerPlants) for solarAdoption.ts's own bookkeeping, and the
+ * *effective* (real + adopted) list for everything electricity-metered
+ * (consumption/revenue/feed-in) — see computeMunicipalFinancesForYear's own
+ * parameters below.
  *
  * Same caching principle as emissions.ts: a completed year's finances never
  * change once computed, so they're cached by year forever. And the same
@@ -31,6 +41,7 @@ import { consumptionSeriesW, electricityCostRp, flatCostRp } from "./billing";
 import { toSimTimeMs } from "./calendar";
 import { energyKWh } from "./energy";
 import { historyTimeSteps, sampleMunicipalityCategorySeries } from "./history";
+import { effectivePowerPlants, municipalSolarSubsidiesPaidInYear } from "./solarAdoption";
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 
@@ -39,10 +50,11 @@ const COARSE_SAMPLES_PER_MONTH = 8; // matches yearReport.ts's own coarse densit
 export interface MunicipalFinances {
   year: number;
   consumerRevenueRp: number; // what consumers paid for grid electricity, time-of-use priced — the same rates billing.ts bills them at
-  feedInPaidRp: number; // paid out to solar owners for exported generation
-  wholesaleCostRp: number; // paid upstream for the net electricity actually drawn from the wider grid (consumption minus local solar)
+  feedInPaidRp: number; // paid out to solar owners (real or adopted) for exported generation
+  wholesaleCostRp: number; // paid upstream for the net electricity actually drawn from the wider grid (consumption minus all local solar)
   gridMaintenanceCostRp: number; // wires/upkeep cost, scaled to gross electricity delivered to consumers
-  netIncomeRp: number; // consumerRevenueRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp
+  solarSubsidiesPaidRp: number; // the municipality's own top-up subsidy (policy.ts) for installations adopted this year — never the federal baseline
+  netIncomeRp: number; // consumerRevenueRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - solarSubsidiesPaidRp
 }
 
 const ZERO_FINANCES: Omit<MunicipalFinances, "year"> = {
@@ -50,6 +62,7 @@ const ZERO_FINANCES: Omit<MunicipalFinances, "year"> = {
   feedInPaidRp: 0,
   wholesaleCostRp: 0,
   gridMaintenanceCostRp: 0,
+  solarSubsidiesPaidRp: 0,
   netIncomeRp: 0,
 };
 
@@ -66,7 +79,7 @@ const financesCache = new Map<number, MunicipalFinances>();
  * solar also flowed the other way). */
 export async function computeMunicipalFinancesForYear(
   buildings: Building[],
-  plants: PowerPlant[],
+  realPlants: PowerPlant[],
   year: number,
   isCancelled: () => boolean,
 ): Promise<MunicipalFinances> {
@@ -74,6 +87,7 @@ export async function computeMunicipalFinancesForYear(
   if (cached) return cached;
 
   const tariff: Tariff = tariffStore.get();
+  const plants = effectivePowerPlants(buildings, realPlants, year);
   let consumerRevenueRp = 0;
   let feedInPaidRp = 0;
   let grossConsumptionKWh = 0;
@@ -95,9 +109,18 @@ export async function computeMunicipalFinancesForYear(
 
   const wholesaleCostRp = netElectricityKWh * tariff.wholesalePriceRpKWh;
   const gridMaintenanceCostRp = grossConsumptionKWh * tariff.gridMaintenanceRpKWh;
-  const netIncomeRp = consumerRevenueRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp;
+  const solarSubsidiesPaidRp = municipalSolarSubsidiesPaidInYear(buildings, realPlants, year);
+  const netIncomeRp = consumerRevenueRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - solarSubsidiesPaidRp;
 
-  const result: MunicipalFinances = { year, consumerRevenueRp, feedInPaidRp, wholesaleCostRp, gridMaintenanceCostRp, netIncomeRp };
+  const result: MunicipalFinances = {
+    year,
+    consumerRevenueRp,
+    feedInPaidRp,
+    wholesaleCostRp,
+    gridMaintenanceCostRp,
+    solarSubsidiesPaidRp,
+    netIncomeRp,
+  };
   financesCache.set(year, result);
   return result;
 }

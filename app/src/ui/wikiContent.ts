@@ -186,7 +186,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "A renewal decision uses whatever tariff and prices are set at the moment it happens, then never changes again — moving a price slider later doesn't rewrite a past decision, only shapes whichever renewal comes next.",
       ),
       note(
-        "Heating and mobility (see \"Mobility\") both renew this way now — mobility's mode tier (car/bike/other) uses a simpler weighted-random choice instead of the four-factor one, since a life event changes what a household needs, not what's cheapest; its nested vehicle-type tier (EV vs. ICE, e-bike vs. standard) uses the identical four-factor process heating does. Solar is still static, with the same mechanic planned for it next.",
+        "Heating and mobility (see \"Mobility\") both renew this way now — mobility's mode tier (car/bike/other) uses a simpler weighted-random choice instead of the four-factor one, since a life event changes what a household needs, not what's cheapest; its nested vehicle-type tier (EV vs. ICE, e-bike vs. standard) uses the identical four-factor process heating does. Solar (see \"Solar adoption\") reuses the same four-factor choice for its own if-to-install decision, but — since a building either has it or doesn't, not choosing between several system types — is triggered differently: an annual chance to reconsider, rather than a fixed service lifetime.",
       ),
     ],
   },
@@ -196,10 +196,32 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Solar power",
     blocks: [
       p(
-        "Every rooftop solar installation is a real, registered plant (from the federal/Pronovo power-plant registry) at its real recorded capacity — nothing about who has solar or how much is simulated.",
+        "Every solar installation present at the start is real: a registered plant from the federal/Pronovo power-plant registry, at its real recorded capacity — nothing about the initial state is simulated. From there, new installations can appear over time on any other building (see \"Solar adoption\" below).",
       ),
       p(
         "Generation follows real solar geometry (the sun's position at Schlieren's latitude, time of day, and season) attenuated by cloud cover, including short-term flicker from passing clouds on an otherwise sunny day. Snow sitting on a panel after a snowfall blocks generation until it melts, independent of the sky clearing.",
+      ),
+    ],
+  },
+  {
+    id: "solar-adoption",
+    icon: "🔆",
+    title: "Solar adoption",
+    blocks: [
+      p(
+        "Every building without solar already (and younger than 200 years — old enough to be presumed heritage-protected, a simple stand-in for real protection status) gets an annual chance to seriously consider it. That chance starts low, but rises for a few years after the building's own heating system is renewed (see \"Stock renewal\" — a heat-pump switch is a natural moment to think about solar too), rises further the more nearby buildings already have it (a real, observed \"my neighbor got one\" effect), and can be pushed higher still by the municipality's own outreach effort (Control → Policy).",
+      ),
+      p(
+        "When a building does seriously consider it, the decision itself works like a heating renewal: candidate size is the building's own roof footprint times a randomly-drawn (but expected-value-plausible) usable-roof fraction, times whatever module efficiency is current that year — panels keep getting more efficient over time, so a later install packs more capacity onto the same roof. That candidate is compared, the same four-factor way as every other stock-renewal decision, against staying without: installation cost (which falls per kWp as the system gets bigger, matching how real Swiss PV pricing works) minus subsidies, against the electricity it would actually save and export at today's prices.",
+      ),
+      p(
+        "Subsidies are two-layered: every installation gets Switzerland's real federal one-time payment automatically, and the municipality can add its own top-up on top (Control → Policy) — a real cost, paid out of the municipal treasury the moment a building adopts (see \"Municipal finances\").",
+      ),
+      note(
+        "The self-consumption/export split behind the savings estimate is sampled coarsely (24 points/month, not hour-by-hour), so it's a reasonable approximation of how much a candidate installation would actually be used on-site versus exported — not a precise simulation.",
+      ),
+      note(
+        "A building only ever adopts once — panels last decades, close to the whole game's own horizon, so end-of-life replacement isn't modeled yet.",
       ),
     ],
   },
@@ -270,10 +292,10 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Alongside emissions, the municipality's other headline resource is money: what its local electricity utility actually keeps after buying power and maintaining the grid, accumulated as a treasury balance from the very first simulated year onward — the budget future policy and infrastructure spending will eventually draw from.",
       ),
       p(
-        "Each completed year, the balance moves by: everything consumers paid for grid electricity, minus what was paid out for solar fed in, minus the wholesale cost of the net electricity the municipality had to buy in (consumption less local solar), minus grid maintenance. Both of the last two are set in Control → Prices, under \"Municipal utility costs\".",
+        "Each completed year, the balance moves by: everything consumers paid for grid electricity, minus what was paid out for solar fed in, minus the wholesale cost of the net electricity the municipality had to buy in (consumption less all local solar, real and newly adopted alike), minus grid maintenance, minus any municipal solar subsidies paid out that year (see \"Solar adoption\"). The first two utility costs are set in Control → Prices, under \"Municipal utility costs\"; the solar subsidy is set in Control → Policy.",
       ),
       note(
-        "Deliberately electricity only — heating fuel and petrol/diesel are paid straight to an external supplier, never through the municipal utility, so they don't touch this balance even though they're billed to the consumer. Existing cantonal heat-pump and EV subsidies aren't a municipal cost yet either — they're a program the municipality doesn't control, not something the player has paid for. Both are natural gaps for a future \"direct infrastructure funding\" policy lever to fill.",
+        "Deliberately electricity only — heating fuel and petrol/diesel are paid straight to an external supplier, never through the municipal utility, so they don't touch this balance even though they're billed to the consumer. Existing cantonal heat-pump and EV subsidies still aren't a municipal cost — they're a program the municipality doesn't control, not something the player has paid for. Solar's own subsidy is the one exception: the municipality's top-up is real money, the federal baseline every installation also gets isn't.",
       ),
       note("Shown in the Year in Review report for now, the same way emissions are — nothing tracks or displays it in real time yet."),
     ],
@@ -289,7 +311,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Building type — colored by GWR's coarse residential/non-residential category.",
         "Heating — colored by primary heating system, live: a stock-renewal replacement (see \"Stock renewal\") recolors the building within a few seconds, not just at the moment you happen to look at its panel.",
         "Power draw — colored by live net power right now, on a diverging scale from exporting (solar surplus) to importing; recalculates every 1.5 real seconds.",
-        "Solar — colored by installed solar capacity, from none to the municipality's largest installation.",
+        "Solar — colored by installed solar capacity, from none to the municipality's largest installation; live, the same way Heating is — a new adoption (see \"Solar adoption\") recolors the building within a few seconds.",
       ]),
     ],
   },
@@ -340,7 +362,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "The instant the clock crosses into a new calendar year, it automatically pauses and a \"Year in Review\" report card opens — a snapshot of the municipality's just-completed year, on top of whatever building or dwelling panel you happen to have open.",
       ),
       p(
-        "The report leads with the year's emissions (see \"Emissions & net zero\") — a donut chart split by source, and how it compares to the baseline year — followed by \"Municipal finances\" (see above): the treasury balance and this year's own revenue/cost breakdown. Below that comes a municipality-wide energy breakdown, then two sections specific to heating: \"Heating energy by technology\" — how much heat was actually delivered by each system (air/ground heat pump, gas, oil, district heating) for space heating, and by heat pump vs. direct electric for hot water — and \"Heating renewals this year\", a tally of every stock-renewal replacement that happened during the year (e.g. \"14× Oil boiler → Ground heat pump\"), \"like-for-like\" flagged when a building was replaced with the same kind of system it already had.",
+        "The report leads with the year's emissions (see \"Emissions & net zero\") — a donut chart split by source, and how it compares to the baseline year — followed by \"Municipal finances\" (see above): the treasury balance and this year's own revenue/cost breakdown. Below that comes a municipality-wide energy breakdown, then two sections specific to heating: \"Heating energy by technology\" — how much heat was actually delivered by each system (air/ground heat pump, gas, oil, district heating) for space heating, and by heat pump vs. direct electric for hot water — and \"Heating renewals this year\", a tally of every stock-renewal replacement that happened during the year (e.g. \"14× Oil boiler → Ground heat pump\"), \"like-for-like\" flagged when a building was replaced with the same kind of system it already had. Last is \"Solar installs this year\" — how many buildings adopted solar (see \"Solar adoption\") and how much capacity, in total, they added.",
       ),
       note(
         "The heating-by-technology totals cover every fuel a building might use, not just electricity, so they're deliberately not directly comparable to the \"Energy by category\" pie above them, which only covers what draws grid power.",

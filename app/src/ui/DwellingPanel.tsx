@@ -19,6 +19,7 @@ import { HistoryChart } from "./HistoryChart";
 import { RenewalLogSection } from "./RenewalLogSection";
 import { useDwellingBillSummary } from "./useBillSummary";
 import { useHistorySeries } from "./useHistorySeries";
+import { useLivePowerPlants } from "./useLivePowerPlants";
 import { formatWatts } from "./format";
 import "./panels.css";
 
@@ -27,7 +28,8 @@ const colorOf = (key: (typeof DEVICE_CATEGORIES)[number]["key"]) => DEVICE_CATEG
 export interface DwellingPanelProps {
   building: Building;
   dwelling: Dwelling;
-  plants: PowerPlant[];
+  allBuildings: Building[];
+  realPlants: PowerPlant[];
   onBack: () => void;
   onClose: () => void;
 }
@@ -41,9 +43,10 @@ function formatHourOfDay(ms: number): string {
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
-export function DwellingPanel({ building, dwelling, plants, onBack, onClose }: DwellingPanelProps) {
+export function DwellingPanel({ building, dwelling, allBuildings, realPlants, onBack, onClose }: DwellingPanelProps) {
   const simTimeMs = useSimTime();
   const tariff = useTariff();
+  const plants = useLivePowerPlants(allBuildings, realPlants, simTimeMs);
   const billSummary = useDwellingBillSummary(building, dwelling, plants, tariff);
   const { fridgeW, lightingW, cookingW, laundryW, plugLoadW } = dwellingDevicePowerW(building.egid, dwelling, simTimeMs);
   const evW = mobilityChargingPowerW(building.egid, dwelling, simTimeMs, tariff);
