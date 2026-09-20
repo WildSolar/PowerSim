@@ -21,6 +21,18 @@
  */
 
 import type { Dwelling } from "../data/types";
+import {
+  MOBILITY_TWO_SLOT_BASE_PROBABILITY,
+  MOBILITY_TWO_SLOT_MAX_PROBABILITY,
+  MOBILITY_TWO_SLOT_MIN_PROBABILITY,
+  MOBILITY_TWO_SLOT_REFERENCE_ROOMS,
+  MOBILITY_TWO_SLOT_ROOM_SLOPE,
+  MODE_LIFETIME_MEAN_YEARS,
+  MODE_WEIBULL_SHAPE,
+  VEHICLE_BIAS_MAGNITUDE_RP_PER_YEAR,
+  VEHICLE_UNCERTAINTY_FRACTION,
+  VEHICLE_WEIBULL_SHAPE,
+} from "../config/mobility";
 import { evChargingPowerW, evDailySession, isResponsive, type EvSession } from "./ev";
 import {
   ANNUAL_BIKE_KM,
@@ -43,13 +55,6 @@ import { renewalEventsUpTo, systemAt, type RenewalCandidate, type RenewalEvent, 
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 
-const MODE_WEIBULL_SHAPE = 1.8; // life events are less "wear-out"-shaped than equipment failure — a bit flatter than heating's 2.5
-const MODE_LIFETIME_MEAN_YEARS = 7; // "expected time of around 5-10 years"
-
-const VEHICLE_WEIBULL_SHAPE = 2.2;
-const VEHICLE_UNCERTAINTY_FRACTION = 0.15; // flat — no obvious per-household "size" proxy the way a building's dwelling count works for heating
-const BIAS_MAGNITUDE_RP_PER_YEAR = 60_000; // CHF 600/yr at full lean
-
 // --- slot count --------------------------------------------------------------
 
 /** 1 or 2 independent mobility slots per dwelling, biased toward two for
@@ -60,8 +65,9 @@ const BIAS_MAGNITUDE_RP_PER_YEAR = 60_000; // CHF 600/yr at full lean
  * split alone can't fix that ratio, since it's a share of trips, not a count
  * of vehicles per household. */
 function twoSlotProbability(dwelling: Dwelling): number {
-  const rooms = dwelling.roomCount ?? 3.5; // fallback near the Swiss dwelling average
-  return Math.min(0.92, Math.max(0.1, 0.7 + 0.12 * (rooms - 3.5)));
+  const rooms = dwelling.roomCount ?? MOBILITY_TWO_SLOT_REFERENCE_ROOMS;
+  const raw = MOBILITY_TWO_SLOT_BASE_PROBABILITY + MOBILITY_TWO_SLOT_ROOM_SLOPE * (rooms - MOBILITY_TWO_SLOT_REFERENCE_ROOMS);
+  return Math.min(MOBILITY_TWO_SLOT_MAX_PROBABILITY, Math.max(MOBILITY_TWO_SLOT_MIN_PROBABILITY, raw));
 }
 
 // A pure function of (egid, dwelling), queried at every sample of every
@@ -99,6 +105,8 @@ function modeChainFor(egid: string, ewid: string, slotIndex: number, simTimeMs: 
   return modeEventsUpTo(
     {
       entityKey: modeEntityKey(egid, ewid, slotIndex),
+      egid,
+      labelFor: (id) => MOBILITY_MODE_CATALOG[id].label,
       weibullShape: MODE_WEIBULL_SHAPE,
       lifetimeMeanYears: MODE_LIFETIME_MEAN_YEARS,
       targetShares: modeTargetShares,
@@ -156,7 +164,7 @@ function vehicleEntityKey(egid: string, ewid: string, slotIndex: number, kind: "
 
 function biasStrengthRp(egid: string, ewid: string, slotIndex: number, kind: "car" | "bike"): number {
   const u = mulberry32(hashSeed(egid, ewid, "mobility-vehicle-bias", kind, String(slotIndex)))();
-  return (u - 0.5) * 2 * BIAS_MAGNITUDE_RP_PER_YEAR;
+  return (u - 0.5) * 2 * VEHICLE_BIAS_MAGNITUDE_RP_PER_YEAR;
 }
 
 /** No per-dwelling real ownership data exists to anchor an initial vehicle
@@ -181,6 +189,9 @@ function initialVehicleType(egid: string, ewid: string, slotIndex: number, kind:
 function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "car" | "bike", simTimeMs: number): RenewalEvent<VehicleTypeId>[] {
   const params: RenewalParams<VehicleTypeId> = {
     entityKey: vehicleEntityKey(egid, ewid, slotIndex, kind),
+    egid,
+    kind: kind === "car" ? "mobility-vehicle-car" : "mobility-vehicle-bike",
+    labelFor: (id) => VEHICLE_TYPE_CATALOG[id].label,
     initialSystem: initialVehicleType(egid, ewid, slotIndex, kind),
     weibullShape: VEHICLE_WEIBULL_SHAPE,
     uncertaintyFraction: VEHICLE_UNCERTAINTY_FRACTION,

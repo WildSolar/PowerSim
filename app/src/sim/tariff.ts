@@ -17,6 +17,9 @@
  * the DSO's own cost side: what it pays upstream for wholesale electricity,
  * and what it costs to maintain the local grid. See finances.ts for where
  * they turn into the municipal money ledger.
+ *
+ * Starting values live in config/tariff.ts (re-exported below as
+ * DEFAULT_TARIFF) — edit that file to recalibrate, not this one.
  */
 
 export interface Tariff {
@@ -33,30 +36,7 @@ export interface Tariff {
   gridMaintenanceRpKWh: number; // the DSO's own wires/upkeep cost per kWh delivered — see finances.ts
 }
 
-export const DEFAULT_TARIFF: Tariff = {
-  offPeakPriceRpKWh: 18,
-  peakPriceRpKWh: 32,
-  offPeakStartHour: 21,
-  offPeakEndHour: 6,
-  // Ballpark 2024-2025 Swiss/EKZ-area figures — all four deliberately below the
-  // electricity tariff, matching how feed-in and heating-fuel prices actually sit
-  // relative to grid electricity today. Oil (~100 Rp/L, ~10 kWh/L per
-  // billing.ts) works out close to gas/district heat per kWh delivered, which
-  // matches how the three fuels actually compete with each other in practice.
-  feedInPriceRpKWh: 8,
-  oilPriceRpPerLiter: 100,
-  gasPriceRpKWh: 10,
-  districtHeatingPriceRpKWh: 12,
-  petrolPriceRpPerLiter: 180, // ~CHF 1.80/L — ballpark 2025 Swiss pump price, blended petrol/diesel
-  // Both comfortably below the retail tariff above (18-32 Rp/kWh) — the
-  // margin-above-cost shape a real utility's rates are built from. Ballpark
-  // figures rather than sourced to one specific real number the way the
-  // emissions factors are: recent Swiss/European day-ahead wholesale power
-  // has sat roughly in this range, and a small Swiss DSO's own grid-usage
-  // fee is a similar order of magnitude.
-  wholesalePriceRpKWh: 9,
-  gridMaintenanceRpKWh: 6,
-};
+export { DEFAULT_TARIFF } from "../config/tariff";
 
 export function isOffPeakHour(tariff: Tariff, hourOfDay: number): boolean {
   return hourOfDay >= tariff.offPeakStartHour || hourOfDay < tariff.offPeakEndHour;

@@ -17,6 +17,7 @@
  * affects renewals still to come, never rewrites one already decided.
  */
 
+import { logWeightedDecision, type DecisionCandidateLog } from "./decisionLog";
 import { hashSeed, mulberry32 } from "./rng";
 import { weibullAgedRemainder, weibullSample } from "./weibull";
 
@@ -32,6 +33,10 @@ export interface ModeEvent<T extends string> {
 export interface ModeRenewalParams<T extends string> {
   /** Unique per entity, e.g. `${egid}:${ewid}:mobility-mode:${slotIndex}`. */
   entityKey: string;
+  /** The building this chain belongs to — decisionLog.ts's own identifier. */
+  egid: string;
+  /** Human-readable label per choice id, for the decision log only. */
+  labelFor: (id: T) => string;
   weibullShape: number;
   lifetimeMeanYears: number;
   /** Target shares (need not sum to exactly 1 — normalized internally),
@@ -93,8 +98,20 @@ export function modeEventsUpTo<T extends string>(params: ModeRenewalParams<T>, u
     if (nextInstalledAtMs > uptoMs) break;
 
     const rng = mulberry32(hashSeed(params.entityKey, "mode-choice", String(eventIndex)));
-    const choice = weightedPick(params.targetShares(), rng());
+    const shares = params.targetShares();
+    const choice = weightedPick(shares, rng());
     chain.push({ installedAtMs: nextInstalledAtMs, choice, previousChoice: last.choice });
+    logWeightedDecision({
+      atMs: nextInstalledAtMs,
+      kind: "mobility-mode",
+      egid: params.egid,
+      entityKey: params.entityKey,
+      incumbent: last.choice,
+      chosen: choice,
+      candidates: (Object.entries(shares) as [T, number][]).map(
+        ([id, weight]): DecisionCandidateLog => ({ id, label: params.labelFor(id), weight }),
+      ),
+    });
   }
   if (guard === MAX_EVENTS_PER_CALL) {
     console.warn(`modeRenewal.ts: ${params.entityKey} hit the ${MAX_EVENTS_PER_CALL}-event generation cap before reaching uptoMs=${uptoMs}`);

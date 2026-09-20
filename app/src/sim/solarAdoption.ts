@@ -60,15 +60,27 @@
  */
 
 import type { Building, PowerPlant } from "../data/types";
+import {
+  BASE_ANNUAL_HAZARD,
+  MAX_ANNUAL_HAZARD,
+  NEIGHBOR_BOOST_CAP,
+  NEIGHBOR_BOOST_PER_ADOPTER,
+  NEIGHBOR_RADIUS_M,
+  RENEWAL_BOOST_MULTIPLIER,
+  RENEWAL_BOOST_YEARS,
+  SOLAR_BIAS_MAGNITUDE_RP_PER_YEAR,
+  SOLAR_UNCERTAINTY_FRACTION,
+} from "../config/solar";
 import { consumptionSeriesW, hourOfDayAt } from "./billing";
 import { toDateMs, toSimTimeMs } from "./calendar";
+import { logCandidateDecision } from "./decisionLog";
 import { distanceM } from "./geo";
 import { heatingRenewalsInRange } from "./heatingRenewal";
 import { historyTimeSteps, sampleBuildingCategorySeries } from "./history";
 import type { Policy } from "./policy";
 import { outreachHazardMultiplier, policyStore } from "./policy";
 import { hashSeed, mulberry32 } from "./rng";
-import { chooseNext, type RenewalCandidate } from "./renewal";
+import { candidateLogEntries, chooseNext, type RenewalCandidate } from "./renewal";
 import {
   AGE_EXCLUSION_YEARS,
   federalSubsidyRp,
@@ -85,16 +97,6 @@ const DAY_MS = 24 * 60 * 60_000;
 const YEAR_MS = 365.25 * DAY_MS;
 const HOUR_MS = 3_600_000;
 const ANNUAL_SAMPLES = 288; // 24/month — same density useBillSummary.ts uses for a single building's own annual estimate
-
-const BASE_ANNUAL_HAZARD = 0.02; // 2%/year spontaneous "have I thought about this" baseline
-const RENEWAL_BOOST_MULTIPLIER = 3; // a recent heating renewal roughly triples that year's chance
-const RENEWAL_BOOST_YEARS = 3;
-const NEIGHBOR_RADIUS_M = 250;
-const NEIGHBOR_BOOST_PER_ADOPTER = 0.15; // +15% relative hazard per adopted neighbor within radius
-const NEIGHBOR_BOOST_CAP = 2.5; // neighbor effect alone can at most 2.5x the hazard
-
-const SOLAR_UNCERTAINTY_FRACTION = 0.12; // flat, no size proxy — same judgment call as mobility's vehicle-type choice
-const SOLAR_BIAS_MAGNITUDE_RP_PER_YEAR = 40_000; // CHF 400/yr at full lean
 
 export interface SolarAdoptionRecord {
   installedAtMs: number;
@@ -203,7 +205,21 @@ function candidateAnnualSavingsRp(building: Building, candidateCapacityKw: numbe
   return avoidedCostRp + exportRevenueRp;
 }
 
-function evaluateAdoption(building: Building, year: number, yearStartMs: number, tariff: Tariff, policy: Policy): SolarAdoptionRecord | null {
+interface HazardContext {
+  hazard: number;
+  draw: number;
+  neighborAdopters: number;
+  renewalBoosted: boolean;
+}
+
+function evaluateAdoption(
+  building: Building,
+  year: number,
+  yearStartMs: number,
+  tariff: Tariff,
+  policy: Policy,
+  hazardContext: HazardContext,
+): SolarAdoptionRecord | null {
   const usableDraw = mulberry32(hashSeed(building.egid, "solar-usable-fraction"))();
   const usableFraction = usableRoofFractionFromDraw(usableDraw);
   const capacityKw = (building.footprintAreaM2 ?? 0) * usableFraction * kwpPerM2At(year);
@@ -226,7 +242,33 @@ function evaluateAdoption(building: Building, year: number, yearStartMs: number,
       greenness: 1,
     },
   ];
-  const { chosen } = chooseNext(candidates, "none", SOLAR_UNCERTAINTY_FRACTION, solarBiasStrengthRp(building.egid));
+  const biasRp = solarBiasStrengthRp(building.egid);
+  const { chosen } = chooseNext(candidates, "none", SOLAR_UNCERTAINTY_FRACTION, biasRp);
+
+  logCandidateDecision({
+    atMs: yearStartMs,
+    kind: "solar",
+    egid: building.egid,
+    entityKey: `${building.egid}:solar`,
+    incumbent: "none",
+    chosen,
+    reasonKind: chosen === "solar" ? "financial" : "inKind",
+    candidates: candidateLogEntries(candidates, biasRp, (id) => (id === "solar" ? "Install solar" : "Stay without")),
+    uncertaintyFraction: SOLAR_UNCERTAINTY_FRACTION,
+    biasStrengthRp: biasRp,
+    extra: {
+      hazard: hazardContext.hazard,
+      hazardDraw: hazardContext.draw,
+      neighborAdopters: hazardContext.neighborAdopters,
+      renewalBoosted: hazardContext.renewalBoosted,
+      capacityKw,
+      installCostRp,
+      federalSubsidyRp: federalRp,
+      municipalSubsidyRp: municipalRp,
+      annualSavingsRp,
+    },
+  });
+
   if (chosen !== "solar") return null;
 
   const dayOffset = Math.floor(mulberry32(hashSeed(building.egid, "solar-install-day", String(year)))() * 365);
@@ -243,14 +285,15 @@ function processYear(buildings: Building[], realPlants: PowerPlant[], year: numb
     if (!isEligible(building, realPlants, year)) continue;
 
     const neighborAdopters = countAdoptedNeighbors(building.egid, buildings, realPlants, yearStartMs);
-    const renewalBoost = hadRecentHeatingRenewal(building, yearStartMs) ? RENEWAL_BOOST_MULTIPLIER : 1;
+    const renewalBoosted = hadRecentHeatingRenewal(building, yearStartMs);
+    const renewalBoost = renewalBoosted ? RENEWAL_BOOST_MULTIPLIER : 1;
     const neighborMultiplier = 1 + Math.min(NEIGHBOR_BOOST_CAP - 1, neighborAdopters * NEIGHBOR_BOOST_PER_ADOPTER);
-    const hazard = Math.min(0.95, BASE_ANNUAL_HAZARD * renewalBoost * neighborMultiplier * outreachHazardMultiplier(policy));
+    const hazard = Math.min(MAX_ANNUAL_HAZARD, BASE_ANNUAL_HAZARD * renewalBoost * neighborMultiplier * outreachHazardMultiplier(policy));
 
     const draw = mulberry32(hashSeed(building.egid, "solar-hazard", String(year)))();
     if (draw >= hazard) continue;
 
-    const decision = evaluateAdoption(building, year, yearStartMs, tariff, policy);
+    const decision = evaluateAdoption(building, year, yearStartMs, tariff, policy, { hazard, draw, neighborAdopters, renewalBoosted });
     if (decision) adoptionByEgid.set(building.egid, decision);
   }
 }

@@ -1,0 +1,158 @@
+.decision-log-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.decision-log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.decision-log-toolbar button {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  background: #fff;
+  cursor: pointer;
+}
+
+.decision-log-toolbar button.active {
+  background: #2a78d6;
+  border-color: #2a78d6;
+  color: #fff;
+}
+
+.decision-log-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.decision-log-search {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  flex: 1;
+  min-width: 140px;
+}
+
+.decision-log-list {
+  max-height: 480px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 6px;
+}
+
+.decision-log-entry {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.decision-log-entry:last-child {
+  border-bottom: none;
+}
+
+.decision-log-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 11px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.decision-log-summary:hover {
+  background: #f8f8f8;
+}
+
+.decision-log-date {
+  flex-shrink: 0;
+  color: #898781;
+  font-variant-numeric: tabular-nums;
+  min-width: 72px;
+}
+
+.decision-log-kind {
+  flex-shrink: 0;
+  min-width: 110px;
+  color: #2a78d6;
+  font-weight: 600;
+}
+
+.decision-log-building {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.decision-log-egid {
+  color: #898781;
+}
+
+.decision-log-outcome {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.decision-log-reason {
+  font-weight: 400;
+  color: #898781;
+}
+
+.decision-log-expand-icon {
+  flex-shrink: 0;
+  color: #898781;
+  width: 12px;
+}
+
+.decision-log-detail {
+  padding: 4px 8px 10px 8px;
+  background: #fafafa;
+}
+
+.decision-log-meta {
+  font-size: 11px;
+  color: #898781;
+  margin-bottom: 6px;
+}
+
+.decision-log-candidates {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.decision-log-candidates th,
+.decision-log-candidates td {
+  text-align: left;
+  padding: 3px 6px;
+  border-bottom: 1px solid #eee;
+}
+
+.decision-log-chosen-row {
+  background: #eaf3ff;
+  font-weight: 600;
+}
+
+.decision-log-extra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11px;
+  color: #555;
+}
+
+.decision-log-extra-item strong {
+  color: #1a1a1a;
+}

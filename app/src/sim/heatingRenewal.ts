@@ -25,6 +25,14 @@
  */
 
 import type { Building } from "../data/types";
+import {
+  HEATING_BASE_UNCERTAINTY_FRACTION,
+  HEATING_BIAS_MAGNITUDE_RP_PER_YEAR,
+  HEATING_EXTRA_UNCERTAINTY_FRACTION,
+  HEATING_REFERENCE_ENVELOPE_AREA_M2,
+  HEATING_UNCERTAINTY_DECAY_DWELLINGS,
+  HEATING_WEIBULL_SHAPE,
+} from "../config/heating";
 import { buildingEnvelopeAreaM2 } from "./buildingGeometry";
 import {
   fuelEfficiency,
@@ -43,15 +51,6 @@ import { dailyMeanTempC } from "./weather";
 
 const DAY_MS = 24 * 60 * 60_000;
 const ANNUAL_SAMPLE_DAYS = 365;
-const WEIBULL_SHAPE = 2.5; // moderate wear-out hazard — most units fail somewhere near their mean lifetime, not uniformly spread
-
-const REFERENCE_ENVELOPE_AREA_M2 = 250; // roughly a mid-size single-family house
-
-const BASE_UNCERTAINTY_FRACTION = 0.04; // floor — even a large, professionally-managed building won't chase every last Rappen
-const EXTRA_UNCERTAINTY_FRACTION = 0.21; // -> 25% band for a single dwelling
-const UNCERTAINTY_DECAY_DWELLINGS = 6;
-
-const BIAS_MAGNITUDE_RP_PER_YEAR = 80_000; // CHF 800/yr at full lean — real but not overwhelming next to a typical annualized heating cost
 
 function isGroundSourceReservoir(source: string | null): boolean {
   return (
@@ -108,8 +107,8 @@ function annualHeatingEstimate(building: Building, atMs: number): AnnualHeatingE
 }
 
 function sizeScale(building: Building): number {
-  const area = buildingEnvelopeAreaM2(building) ?? REFERENCE_ENVELOPE_AREA_M2;
-  return Math.min(4, Math.max(0.4, area / REFERENCE_ENVELOPE_AREA_M2));
+  const area = buildingEnvelopeAreaM2(building) ?? HEATING_REFERENCE_ENVELOPE_AREA_M2;
+  return Math.min(4, Math.max(0.4, area / HEATING_REFERENCE_ENVELOPE_AREA_M2));
 }
 
 function runningCostRpFor(id: HeatingSystemId, estimate: AnnualHeatingEstimate, tariff: Tariff, avgElecRpKWh: number): number {
@@ -142,12 +141,12 @@ function candidatesAt(building: Building, atMs: number, incumbent: HeatingSystem
 
 function uncertaintyFraction(building: Building): number {
   const n = Math.max(1, building.dwellings.length);
-  return BASE_UNCERTAINTY_FRACTION + EXTRA_UNCERTAINTY_FRACTION * Math.exp(-(n - 1) / UNCERTAINTY_DECAY_DWELLINGS);
+  return HEATING_BASE_UNCERTAINTY_FRACTION + HEATING_EXTRA_UNCERTAINTY_FRACTION * Math.exp(-(n - 1) / HEATING_UNCERTAINTY_DECAY_DWELLINGS);
 }
 
 function biasStrengthRp(building: Building): number {
   const u = mulberry32(hashSeed(building.egid, "heating-renewal-bias"))();
-  return (u - 0.5) * 2 * BIAS_MAGNITUDE_RP_PER_YEAR;
+  return (u - 0.5) * 2 * HEATING_BIAS_MAGNITUDE_RP_PER_YEAR;
 }
 
 function chainFor(building: Building, simTimeMs: number): RenewalEvent<HeatingSystemId>[] | null {
@@ -155,8 +154,11 @@ function chainFor(building: Building, simTimeMs: number): RenewalEvent<HeatingSy
   if (initial === null) return null;
   const params: RenewalParams<HeatingSystemId> = {
     entityKey: `${building.egid}:heating`,
+    egid: building.egid,
+    kind: "heating",
+    labelFor: (id) => HEATING_SYSTEM_CATALOG[id].label,
     initialSystem: initial,
-    weibullShape: WEIBULL_SHAPE,
+    weibullShape: HEATING_WEIBULL_SHAPE,
     uncertaintyFraction: uncertaintyFraction(building),
     biasStrengthRp: biasStrengthRp(building),
     lifetimeMeanYearsFor: (id) => HEATING_SYSTEM_CATALOG[id].lifetimeMeanYears,

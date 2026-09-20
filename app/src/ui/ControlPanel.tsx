@@ -5,6 +5,7 @@ import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { useSimDay, useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
 import { CityStatsTab } from "./CityStatsTab";
+import { DecisionLogTab } from "./DecisionLogTab";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { PolicyControl } from "./PolicyControl";
 import { TariffControl } from "./TariffControl";
@@ -15,13 +16,14 @@ export interface ControlPanelProps {
   onClose: () => void;
 }
 
-type ControlTab = "prices" | "policy" | "stats" | "history";
+type ControlTab = "prices" | "policy" | "stats" | "history" | "debug";
 
 const TABS: { id: ControlTab; icon: string; title: string }[] = [
   { id: "prices", icon: "💰", title: "Prices" },
   { id: "policy", icon: "📜", title: "Policy" },
   { id: "stats", icon: "📊", title: "City stats" },
   { id: "history", icon: "📈", title: "History" },
+  { id: "debug", icon: "🐛", title: "Debug" },
 ];
 
 /** The central "run the municipality" panel — a Wiki-style modal (no need to
@@ -82,6 +84,7 @@ export function ControlPanel({ dataset, onClose }: ControlPanelProps) {
               tariffKey={`${tariffKey(tariff)}:${currentDay}`}
             />
           )}
+          {tab === "debug" && <DecisionLogTab dataset={dataset} />}
         </div>
       </div>
     </div>

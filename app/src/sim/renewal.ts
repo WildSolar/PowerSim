@@ -22,6 +22,7 @@
  * does.
  */
 
+import { logCandidateDecision, type DecisionCandidateLog, type DecisionLogKind } from "./decisionLog";
 import { hashSeed, mulberry32 } from "./rng";
 import { weibullAgedRemainder, weibullSample } from "./weibull";
 
@@ -52,6 +53,16 @@ export interface RenewalParams<T extends string> {
   /** Unique per entity+category, e.g. `${building.egid}:heating` — seeds every
    * random draw for this chain and keys its cache entry. */
   entityKey: string;
+  /** The building this chain belongs to — decisionLog.ts's own building
+   * identifier, distinct from entityKey (which may also carry a dwelling/slot
+   * suffix a log viewer doesn't need to parse out). */
+  egid: string;
+  /** decisionLog.ts's category for this chain — "heating" or a mobility
+   * vehicle-type kind. */
+  kind: DecisionLogKind;
+  /** Human-readable label per candidate id, for the decision log only (never
+   * used by the decision itself). */
+  labelFor: (id: T) => string;
   initialSystem: T;
   weibullShape: number;
   /** This entity's indifference band, as a fraction of the incumbent's own
@@ -105,6 +116,25 @@ export function chooseNext<T extends string>(
   return { chosen: bestAvailable.id, reasonKind: "financial", bestOverallId: null };
 }
 
+/** Shared between renewalEventsUpTo below and solarAdoption.ts's own direct
+ * chooseNext call — the same effectiveCostRp math chooseNext itself uses
+ * internally, exposed so a decision log entry can show what was actually
+ * compared (not just the raw annualizedCostRp before the bias adjustment). */
+export function candidateLogEntries<T extends string>(
+  candidates: RenewalCandidate<T>[],
+  biasStrengthRp: number,
+  labelFor: (id: T) => string,
+): DecisionCandidateLog[] {
+  return candidates.map((c) => ({
+    id: c.id,
+    label: labelFor(c.id),
+    available: c.available,
+    annualizedCostRp: c.annualizedCostRp,
+    effectiveCostRp: c.annualizedCostRp - biasStrengthRp * c.greenness,
+    greenness: c.greenness,
+  }));
+}
+
 function nextLifetimeMs(entityKey: string, eventIndex: number, shape: number, meanYears: number): number {
   const rng = mulberry32(hashSeed(entityKey, "renewal-lifetime", String(eventIndex)));
   return weibullSample(rng, shape, meanYears * 365.25 * 24 * 60 * 60_000);
@@ -141,6 +171,18 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
     const candidates = params.candidatesAt(nextInstalledAtMs, last.system);
     const { chosen, reasonKind, bestOverallId } = chooseNext(candidates, last.system, params.uncertaintyFraction, params.biasStrengthRp);
     chain.push({ installedAtMs: nextInstalledAtMs, system: chosen, previousSystem: last.system, reasonKind, bestOverallId });
+    logCandidateDecision({
+      atMs: nextInstalledAtMs,
+      kind: params.kind,
+      egid: params.egid,
+      entityKey: params.entityKey,
+      incumbent: last.system,
+      chosen,
+      reasonKind,
+      candidates: candidateLogEntries(candidates, params.biasStrengthRp, params.labelFor),
+      uncertaintyFraction: params.uncertaintyFraction,
+      biasStrengthRp: params.biasStrengthRp,
+    });
   }
   // Exhausting the guard (rather than breaking out of it) means the chain still
   // hasn't reached `uptoMs` — under engine.ts's MAX_SIM_TIME_MS clock ceiling

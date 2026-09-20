@@ -21,12 +21,20 @@
  */
 
 import type { Building } from "../data/types";
+import {
+  COMFORT_TEMP_C,
+  FALLBACK_U_VALUE,
+  HEATING_THRESHOLD_C,
+  U_VALUE_ERA_CURVE,
+  U_VALUE_QUALITY_FACTOR_MAX,
+  U_VALUE_QUALITY_FACTOR_MIN,
+} from "../config/heating";
+import { interpolateCurve } from "../config/curve";
 import { buildingEnvelopeAreaM2 } from "./buildingGeometry";
 import { commercialCategory } from "./commercial";
 import { hashSeed, mulberry32 } from "./rng";
 
-export const HEATING_THRESHOLD_C = 12; // day's characteristic temp above this -> heating off for the day
-export const COMFORT_TEMP_C = 20; // baseline setpoint before a building's own internal-gains offset (see below)
+export { COMFORT_TEMP_C, HEATING_THRESHOLD_C };
 
 export type HeatPumpKind = "air" | "ground";
 
@@ -41,42 +49,13 @@ export function copAt(outsideTempC: number, kind: HeatPumpKind): number {
   return Math.min(4.5, Math.max(1.8, 2.0 + (outsideTempC + 10) * 0.1));
 }
 
-// Construction-era -> typical blended U-value (W/m²K), interpolated between
-// control points rather than a single flat number for every building —
-// judgment-call figures, but shaped on real Swiss building-stock history:
-// solid, uninsulated masonry before WWII; a slow improvement through the
-// postwar decades; the first real jump after the 1970s oil-crisis-driven
-// cantonal insulation standards; another step down through the 1990s-2000s
-// as SIA 380/1 and Minergie took hold; today's new-build code sits close to
-// the curve's own low end. GWR's construction year is real data — only the
-// U-value each era implies is a guess.
-const U_VALUE_ERA_POINTS: { year: number; uValue: number }[] = [
-  { year: 1919, uValue: 1.6 },
-  { year: 1945, uValue: 1.5 },
-  { year: 1960, uValue: 1.4 },
-  { year: 1975, uValue: 1.2 },
-  { year: 1985, uValue: 0.9 },
-  { year: 1995, uValue: 0.7 },
-  { year: 2005, uValue: 0.5 },
-  { year: 2015, uValue: 0.3 },
-  { year: 2025, uValue: 0.22 },
-];
-const FALLBACK_U_VALUE = 1.0; // no construction year on record — roughly the stock-wide average era
-
+// Construction-era -> typical blended U-value (W/m²K) — see config/heating.ts's
+// U_VALUE_ERA_CURVE for the actual milestone points and the real-Swiss-
+// building-stock reasoning behind their shape; GWR's construction year is
+// real data, only the U-value each era implies is a guess.
 function baseUValueForYear(year: number | null): number {
   if (year === null) return FALLBACK_U_VALUE;
-  const points = U_VALUE_ERA_POINTS;
-  if (year <= points[0].year) return points[0].uValue;
-  if (year >= points[points.length - 1].year) return points[points.length - 1].uValue;
-  for (let i = 1; i < points.length; i++) {
-    if (year <= points[i].year) {
-      const a = points[i - 1];
-      const b = points[i];
-      const t = (year - a.year) / (b.year - a.year);
-      return a.uValue + (b.uValue - a.uValue) * t;
-    }
-  }
-  return points[points.length - 1].uValue;
+  return interpolateCurve(U_VALUE_ERA_CURVE, year);
 }
 
 /** Occupancy/usage knocks a bit off the effective comfort gap rather than
@@ -115,7 +94,8 @@ export function buildingThermalProfile(building: Building): BuildingThermalProfi
   if (cached) return cached;
 
   const baseUValue = baseUValueForYear(building.constructionYear);
-  const qualityFactor = 0.75 + mulberry32(hashSeed(building.egid, "thermal-quality"))() * 0.5; // [0.75, 1.25]
+  const qualityRange = U_VALUE_QUALITY_FACTOR_MAX - U_VALUE_QUALITY_FACTOR_MIN;
+  const qualityFactor = U_VALUE_QUALITY_FACTOR_MIN + mulberry32(hashSeed(building.egid, "thermal-quality"))() * qualityRange;
 
   const profile: BuildingThermalProfile = {
     uValueWPerM2K: baseUValue * qualityFactor,
