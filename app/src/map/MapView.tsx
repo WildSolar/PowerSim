@@ -134,14 +134,17 @@ function hideBasemapBuildingLayers(map: MlMap): void {
 
 // The only basemap text layer we keep: street names, set along the road lines.
 const STREET_NAME_LAYER_ID = "transportation_label";
+// Icon layers hidden outright: their symbol is just a box around the (removed) text.
+const HIDDEN_ICON_LAYER_IDS = new Set(["road_number"]);
 
 /** Strips every piece of basemap writing except street names — place, station, POI,
  * park, water, peak/elevation, route-number and house-number labels — while keeping
- * the icons that share a layer with a label (station, POI and route symbols). */
+ * the icons that share a layer with a label (station and POI symbols). Route-number
+ * shields are dropped entirely — without their number they're empty boxes. */
 function hideBasemapLabels(map: MlMap): void {
   for (const layer of map.getStyle().layers ?? []) {
     if (layer.type !== "symbol" || layer.id === STREET_NAME_LAYER_ID) continue;
-    if (layer.layout?.["icon-image"]) {
+    if (layer.layout?.["icon-image"] && !HIDDEN_ICON_LAYER_IDS.has(layer.id)) {
       map.setLayoutProperty(layer.id, "text-field", "");
     } else {
       map.setLayoutProperty(layer.id, "visibility", "none");
