@@ -1,0 +1,80 @@
+.start-menu {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: linear-gradient(160deg, #1d3b5c, #2a78d6);
+  font-family: system-ui, sans-serif;
+  overflow-y: auto;
+}
+
+.start-menu-card {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 28px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3);
+}
+
+.start-menu-card h1 {
+  margin: 0 0 4px;
+  font-size: 26px;
+}
+
+.start-menu-tagline {
+  margin: 0 0 20px;
+  color: #555;
+  font-size: 14px;
+}
+
+.start-menu-status,
+.start-menu-error {
+  font-size: 14px;
+  color: #555;
+}
+
+.start-menu-error {
+  color: #b3261e;
+}
+
+.start-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.start-menu-item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  background: #fff;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.start-menu-item:hover {
+  background: #f0f4fa;
+  border-color: #2a78d6;
+}
+
+.start-menu-name {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.start-menu-meta {
+  font-size: 12px;
+  color: #666;
+}

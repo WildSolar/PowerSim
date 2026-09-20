@@ -6,6 +6,7 @@ import { DwellingPanel } from "./ui/DwellingPanel";
 import { ColorModeControl } from "./ui/ColorModeControl";
 import { ReportCardModal } from "./ui/ReportCardModal";
 import { TimeControl } from "./ui/TimeControl";
+import { StartMenu } from "./ui/StartMenu";
 import { WikiPanel } from "./ui/WikiPanel";
 import { loadDataset } from "./data/loadDataset";
 import type { MunicipalityDataset } from "./data/types";
@@ -16,7 +17,7 @@ import { useReportCardYear } from "./sim/store";
 import { startYearEndWatcher } from "./sim/yearEndWatcher";
 import "./App.css";
 
-export default function App() {
+function Game({ slug }: { slug: string }) {
   const [dataset, setDataset] = useState<MunicipalityDataset | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedEgid, setSelectedEgid] = useState<string | null>(null);
@@ -36,14 +37,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // ?municipality=<slug> picks a different pipeline output (e.g. ?municipality=uster
-    // loads /data/uster.json) — see pipeline/build_dataset.py, which writes one file per
-    // municipality slug. Defaults to Schlieren when the param is absent.
-    const slug = new URLSearchParams(window.location.search).get("municipality");
-    loadDataset(slug ? `/data/${slug}.json` : undefined)
+    loadDataset(`/data/${slug}.json`)
       .then(setDataset)
       .catch((e: Error) => setError(e.message));
-  }, []);
+  }, [slug]);
 
   const selectedBuilding = useMemo(
     () => dataset?.buildings.find((b) => b.egid === selectedEgid) ?? null,
@@ -112,4 +109,9 @@ export default function App() {
       ) : null}
     </div>
   );
+}
+
+export default function App() {
+  const [slug, setSlug] = useState<string | null>(null);
+  return slug ? <Game slug={slug} /> : <StartMenu onStart={setSlug} />;
 }

@@ -28,6 +28,7 @@ from .sources import gwr, powerplants, statent
 
 DEFAULT_BFS_NUMBER = 247  # Schlieren
 OUTPUT_DIR = Path(__file__).resolve().parents[3] / "app" / "public" / "data"
+INDEX_FILENAME = "index.json"
 
 # footprints.py only has a real (non-VECTOR25-blob) source for canton Zürich —
 # see that module's own doc for what was tried and why it isn't national yet.
@@ -189,6 +190,26 @@ def build(bfs_number: int) -> MunicipalityDataset:
     )
 
 
+def write_index() -> None:
+    """Rebuilds app/public/data/index.json — the list of available municipalities
+    the game's start menu reads — by scanning every dataset file in OUTPUT_DIR."""
+    entries = []
+    for path in sorted(OUTPUT_DIR.glob("*.json")):
+        if path.name == INDEX_FILENAME:
+            continue
+        data = json.loads(path.read_text(encoding="utf-8"))
+        entries.append(
+            {
+                "slug": path.stem,
+                "name": data["name"],
+                "bfsNumber": data["bfsNumber"],
+                "buildingCount": len(data["buildings"]),
+            }
+        )
+    entries.sort(key=lambda e: e["name"])
+    (OUTPUT_DIR / INDEX_FILENAME).write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -205,6 +226,7 @@ def main() -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     payload = _to_camel(dataclasses.asdict(dataset))
     output_path.write_text(json.dumps(payload, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+    write_index()
     print(f"Wrote {output_path} ({len(dataset.buildings)} buildings, {len(dataset.power_plants)} power plants)")
 
 
