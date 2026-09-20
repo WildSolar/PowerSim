@@ -45,14 +45,22 @@ BUILDING_ART = "Gebäude"
 # Land-cover classes a new building could plausibly be built on (sites.py subtracts
 # roads, water, forest, existing buildings and anything outside a building zone).
 OPEN_LAND_ARTS = {"Acker, Wiese, Weide", "Gartenanlage", "humusierte Fläche"}
+# Land cover a new building must keep clear of (sites.py buffers each kind by its own distance).
+BARRIER_ARTS = {
+    "road": {"Strasse, Weg"},
+    "rail": {"Bahngebiet"},
+    "forest": {"geschlossener Wald"},
+    "water": {"fliessendes Gewässer", "stehendes Gewässer"},
+}
 
 
 def fetch_land_cover(
     min_e: float, min_n: float, max_e: float, max_n: float
-) -> tuple[dict[int, list[tuple[float, float]]], list]:
+) -> tuple[dict[int, list[tuple[float, float]]], dict[str, list]]:
     """One WFS request, two products: building footprint rings (LV95) keyed by GWR
-    EGID for buildings whose cadastral polygon falls within the given bbox, and the
-    shapely polygons of open (buildable in principle) land in the same bbox."""
+    EGID for buildings whose cadastral polygon falls within the given bbox, and shapely
+    polygons of the land cover around them, by kind: "open" (buildable in principle)
+    plus the barriers in BARRIER_ARTS."""
     params = {
         "Service": "WFS",
         "Request": "GetFeature",
@@ -65,7 +73,9 @@ def fetch_land_cover(
     response.raise_for_status()
     features = response.json()["features"]
 
-    open_land = [shape(f["geometry"]) for f in features if f["properties"].get("art") in OPEN_LAND_ARTS]
+    land: dict[str, list] = {"open": [shape(f["geometry"]) for f in features if f["properties"].get("art") in OPEN_LAND_ARTS]}
+    for kind, arts in BARRIER_ARTS.items():
+        land[kind] = [shape(f["geometry"]) for f in features if f["properties"].get("art") in arts]
 
     parts_by_egid: dict[int, list] = defaultdict(list)
     for feature in features:
@@ -86,4 +96,4 @@ def fetch_land_cover(
             continue
         footprints[egid] = list(geometry.exterior.coords)
 
-    return footprints, open_land
+    return footprints, land

@@ -22,10 +22,13 @@ ZONING_URL = "https://api3.geo.admin.ch/rest/services/api/MapServer/find"
 # zones) and the rest are deliberately not buildable here.
 ZONE_BY_CODE = {"11": "residential", "12": "work", "13": "mixed", "14": "centre", "15": "public"}
 
-SETBACK_M = 4.0  # gap kept clear around every existing building
+# Minimum clearances, in meters, kept between a new building and what is already there.
+SETBACK_M = 4.0  # existing buildings
+CLEARANCE_M = {"road": 3.0, "rail": 8.0, "forest": 15.0, "water": 6.0}  # roads, railway, forest edge (Waldabstand), water
+EXCLUDED_AREA_MARGIN_M = 3.0  # parks, sports fields, cemeteries, allotments
 EDGE_MARGIN_M = 1.5  # pieces are eroded by this so a placed building never touches a zone edge
-MIN_AREA_M2 = 300.0
-MIN_SHORT_SIDE_M = 10.0
+MIN_AREA_M2 = 500.0
+MIN_SHORT_SIDE_M = 12.0
 MAX_SITES = 600
 
 
@@ -74,11 +77,15 @@ def _long_axis_angle_deg(polygon: Polygon) -> tuple[float, float]:
     return angle, min(lengths)
 
 
-def compute_sites(zones: dict[str, list], open_land: list, footprints: list[list[tuple[float, float]]]) -> list[dict]:
-    if not open_land or not zones:
+def compute_sites(zones: dict[str, list], land: dict[str, list], footprints: list[list[tuple[float, float]]], excluded: list) -> list[dict]:
+    if not land.get("open") or not zones:
         return []
-    open_union = unary_union([make_valid(p) for p in open_land])
-    built = unary_union([Polygon(ring).buffer(SETBACK_M) for ring in footprints if len(ring) >= 4])
+    open_union = unary_union([make_valid(p) for p in land["open"]])
+    blocked = [Polygon(ring).buffer(SETBACK_M) for ring in footprints if len(ring) >= 4]
+    for kind, clearance in CLEARANCE_M.items():
+        blocked.extend(make_valid(p).buffer(clearance) for p in land.get(kind, []))
+    blocked.extend(p.buffer(EXCLUDED_AREA_MARGIN_M) for p in excluded)
+    built = unary_union(blocked)
 
     sites: list[dict] = []
     for zone, polys in zones.items():

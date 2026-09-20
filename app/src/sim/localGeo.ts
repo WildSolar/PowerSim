@@ -136,8 +136,8 @@ export function rectsOverlap(a: OrientedRect, b: OrientedRect, margin: number): 
 
 /** Long and short side of the smallest-area rectangle (tried at 5-degree steps)
  * enclosing a footprint — a building's own proportions, whatever way it's turned. */
-export function boundingRectSides(ring: XY[]): { long: number; short: number } {
-  let best = { area: Infinity, long: 0, short: 0 };
+export function boundingRectSides(ring: XY[]): { long: number; short: number; angleRad: number } {
+  let best = { area: Infinity, long: 0, short: 0, angleRad: 0 };
   for (let deg = 0; deg < 90; deg += 5) {
     const c = Math.cos((deg * Math.PI) / 180);
     const s = Math.sin((deg * Math.PI) / 180);
@@ -155,9 +155,10 @@ export function boundingRectSides(ring: XY[]): { long: number; short: number } {
     }
     const w = maxX - minX;
     const h = maxY - minY;
-    if (w * h < best.area) best = { area: w * h, long: Math.max(w, h), short: Math.min(w, h) };
+    // The rotated frame u axis points at `deg`; the long side runs along u when w >= h, else along v (90 degrees on).
+    if (w * h < best.area) best = { area: w * h, long: Math.max(w, h), short: Math.min(w, h), angleRad: ((deg + (w >= h ? 0 : 90)) * Math.PI) / 180 };
   }
-  return { long: best.long, short: best.short };
+  return { long: best.long, short: best.short, angleRad: best.angleRad };
 }
 
 /** Uniform-grid spatial hash over points — radius queries without the O(n^2) scan. */

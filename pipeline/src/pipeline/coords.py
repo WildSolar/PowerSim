@@ -3,6 +3,13 @@
 from pyproj import Transformer
 
 _LV95_TO_WGS84 = Transformer.from_crs("EPSG:2056", "EPSG:4326", always_xy=True)
+_WGS84_TO_LV95 = Transformer.from_crs("EPSG:4326", "EPSG:2056", always_xy=True)
+
+
+def lonlat_to_lv95(lon: float, lat: float) -> tuple[float, float]:
+    """Convert a single WGS84 (lon, lat) point to LV95 (E, N)."""
+    e, n = _WGS84_TO_LV95.transform(lon, lat)
+    return e, n
 
 
 def lv95_to_lonlat(easting: float, northing: float) -> tuple[float, float]:

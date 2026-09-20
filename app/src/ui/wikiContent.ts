@@ -107,7 +107,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Renewal: a building is safe from replacement for its first 30 years; after that its chance rises every year it ages. When one is replaced, neighbouring buildings of the exact same construction year often go with it — a housing estate is usually one project. A replacement keeps the address and the footprint but holds 20-30% more dwellings, with extra floors as needed (never towering over its surroundings). Its heating, insulation and solar are decided when the permit is issued, not when it's finished.",
       ),
       p(
-        "Growth: new buildings appear at random on vacant building land (zoned for building and still open ground), sized like existing buildings of the same kind. The pace is steered toward the municipality's historic growth in floor space. When the vacant land runs out, growth has to come from replacing old buildings with denser ones, so the pace slows.",
+        "Growth: new buildings appear at random on vacant building land (zoned for building and still open ground — parks, sports fields, playgrounds, allotments and cemeteries are kept free, as are clearances around roads, rail, forest and water). Each is sized and turned like the buildings around it, apart from the occasional small plot filled with something smaller. The pace is steered toward the municipality's historic growth in floor space. When the vacant land runs out, growth has to come from replacing old buildings with denser ones, so the pace slows.",
       ),
       list([
         "A new or replacement building is mostly heat pumps (fossil heating is not permitted in new buildings by default); district heating only where a network already runs nearby",

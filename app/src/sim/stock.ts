@@ -45,7 +45,14 @@ import {
   HEIGHT_CAP_EXTRA_FLOORS,
   HEIGHT_CAP_MIN_FLOORS,
   HEIGHT_CAP_RADIUS_M,
+  MATCH_MIN_SIZE_FRACTION,
+  MATCH_MODE_SHRINK_STEPS,
   MIN_RENEWAL_AGE_YEARS,
+  NEIGHBORHOOD_EXCEPTION_PROBABILITY,
+  NEIGHBORHOOD_MIN_BUILDINGS,
+  NEIGHBORHOOD_RADIUS_M,
+  ORIENTATION_MIN_ASPECT,
+  ORIENTATION_RADIUS_M,
   NEW_BUILDING_SIZE_JITTER,
   PERMIT_DELAY_MONTHS,
   RENEWAL_CALIBRATION_HORIZON_YEARS,
@@ -57,7 +64,7 @@ import {
   REPLACEMENT_UPLIFT_MIN,
   SITE_EXHAUSTED_AFTER_FAILURES,
   SITE_NEW_BUILDING_MARGIN_M,
-  SITE_PLACEMENT_ATTEMPTS,
+  SITE_POINT_SAMPLES,
   SITE_SIZE_SHRINK_STEPS,
   SMALL_RESIDENTIAL_SITE_M2,
   ZONE_GROUP_WEIGHTS,
@@ -94,6 +101,13 @@ const MONTH_MS = YEAR_MS / 12;
  * so the player's renewal-rate multiplier can raise the rate up to this factor at any
  * time without rescheduling anything. */
 const THINNING_CAP = 2;
+
+// A building that will not fit at its neighbours' proportions may be stretched (same area) before it is shrunk.
+const ASPECT_STRETCHES = [1, 1.6, 2.4];
+const MAX_ASPECT = 4;
+const MATCH_MISSES_BEFORE_SKIP = 3;
+
+type PlacementMode = "match" | "fill";
 
 type StockEvent = { type: "renewalTrigger"; egid: string } | { type: "newArrival" } | { type: "transition" };
 
@@ -135,13 +149,15 @@ interface SiteState {
   site: DevelopmentSite;
   rings: XY[][];
   angleRad: number;
-  minU: number;
-  maxU: number;
-  minV: number;
-  maxV: number;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
   used: OrientedRect[];
   usedAreaM2: number;
   failures: number;
+  /** Times a search for a neighbour-like building on this site came up empty; after a few, match mode skips it. */
+  matchMisses: number;
   exhausted: boolean;
 }
 
@@ -189,6 +205,15 @@ class StockStore {
   private gfaPerApartment = GFA_PER_APARTMENT_FALLBACK_M2;
   private meanProjectGfa = 600; // running estimate of a new building's floor space, refined as buildings are placed
   private sites: SiteState[] = [];
+  private templateCache = new Map<string, Template | null>();
+  // Footprint of a small (10th percentile) existing building of each kind — a site must be able to hold this to be offered to that kind.
+  private smallFootprint: Record<BuildingGroup, number> = { houseSingle: 0, apartments: 0, commercial: 0, industrial: 0, public: 0 };
+  private medianFootprint: Record<BuildingGroup, number> = { houseSingle: 0, apartments: 0, commercial: 0, industrial: 0, public: 0 };
+  private orientationCache = new Map<string, { angleRad: number; aspect: number }>();
+  // Neighbourhood lookups repeat for nearby candidate points within one placement search, so they are
+  // cached per 30 m cell and dropped whenever a building is added or removed.
+  private neighbourCache = new Map<string, Template[]>();
+  private orientationNearCache = new Map<string, number | null>();
 
   private heap = new MinHeap<StockEvent>();
   private growthRate = GROWTH_RATE_DEFAULT;
@@ -373,29 +398,20 @@ class StockStore {
 
   private buildTemplatesAndPools(): void {
     this.templates = { houseSingle: [], apartments: [], commercial: [], industrial: [], public: [] };
+    this.templateCache = new Map();
+    this.orientationCache = new Map();
+    this.neighbourCache = new Map();
+    this.orientationNearCache = new Map();
     const recentPool: { rooms: number | null; area: number | null }[] = [];
     const anyPool: { rooms: number | null; area: number | null }[] = [];
     const gfaPerApt: number[] = [];
 
     for (const b of this.all) {
       const group = this.groupOf.get(b.egid);
-      if (!group || !b.footprintAreaM2 || b.footprintAreaM2 < 40) continue;
-      const ring = this.ringXY.get(b.egid) as XY[];
-      const { long, short } = boundingRectSides(ring);
-      const floors = Math.max(1, b.floorCount ?? 2);
-      if (group === "houseSingle" && (b.dwellings.length < 1 || b.dwellings.length > 2)) continue;
-      if (group === "apartments" && b.dwellings.length < 3) continue;
-      this.templates[group].push({
-        footprintAreaM2: b.footprintAreaM2,
-        floors,
-        long,
-        short: Math.max(short, 1),
-        dwellings: b.dwellings.length,
-        gfa: b.footprintAreaM2 * floors,
-        buildingClass: b.buildingClass,
-        category: b.category,
-      });
-      if (group === "apartments") gfaPerApt.push((b.footprintAreaM2 * floors) / b.dwellings.length);
+      const template = this.templateFor(b);
+      if (!group || !template) continue;
+      this.templates[group].push(template);
+      if (group === "apartments") gfaPerApt.push(template.gfa / b.dwellings.length);
       if (group === "apartments" || group === "houseSingle") {
         for (const d of b.dwellings) {
           if (d.areaM2 == null && d.roomCount == null) continue;
@@ -404,6 +420,11 @@ class StockStore {
         }
       }
     }
+    for (const group of Object.keys(this.templates) as BuildingGroup[]) {
+      const sizes = this.templates[group].map((t) => t.footprintAreaM2).sort((a, b) => a - b);
+      this.smallFootprint[group] = sizes.length > 0 ? sizes[Math.floor(sizes.length * 0.1)] : Infinity;
+      this.medianFootprint[group] = sizes.length > 0 ? sizes[Math.floor(sizes.length / 2)] : Infinity;
+    }
     this.dwellingPool = recentPool.length >= 30 ? recentPool : anyPool;
     if (gfaPerApt.length > 0) {
       gfaPerApt.sort((a, b) => a - b);
@@ -411,26 +432,54 @@ class StockStore {
     }
   }
 
+  /** A building as a template for new construction of its kind. Null for anything that
+   * is not one: ancillary structures, slivers, or a house / apartment block with an odd dwelling count. */
+  private templateFor(b: Building): Template | null {
+    const cached = this.templateCache.get(b.egid);
+    if (cached !== undefined) return cached;
+    let template: Template | null = null;
+    const group = this.groupOf.get(b.egid);
+    const ring = this.ringXY.get(b.egid);
+    const validCount = group === "houseSingle" ? b.dwellings.length >= 1 && b.dwellings.length <= 2 : group === "apartments" ? b.dwellings.length >= 3 : true;
+    if (group && ring && b.footprintAreaM2 && b.footprintAreaM2 >= 40 && validCount) {
+      const { long, short } = boundingRectSides(ring);
+      const floors = Math.max(1, b.floorCount ?? 2);
+      template = {
+        footprintAreaM2: b.footprintAreaM2,
+        floors,
+        long,
+        short: Math.max(short, 1),
+        dwellings: b.dwellings.length,
+        gfa: b.footprintAreaM2 * floors,
+        buildingClass: b.buildingClass,
+        category: b.category,
+      };
+    }
+    this.templateCache.set(b.egid, template);
+    return template;
+  }
+
   private buildSites(): void {
     this.sites = [];
     for (const site of this.dataset?.developmentSites ?? []) {
       const rings = site.rings.map((r) => r.map(([lon, lat]) => this.projection.toXY(lon, lat)));
       const angleRad = (site.angleDeg * Math.PI) / 180;
-      const c = Math.cos(angleRad);
-      const s = Math.sin(angleRad);
-      let minU = Infinity;
-      let maxU = -Infinity;
-      let minV = Infinity;
-      let maxV = -Infinity;
-      for (const [x, y] of rings[0]) {
-        const u = x * c + y * s;
-        const v = -x * s + y * c;
-        minU = Math.min(minU, u);
-        maxU = Math.max(maxU, u);
-        minV = Math.min(minV, v);
-        maxV = Math.max(maxV, v);
-      }
-      this.sites.push({ site, rings, angleRad, minU, maxU, minV, maxV, used: [], usedAreaM2: 0, failures: 0, exhausted: false });
+      const xs = rings[0].map((p) => p[0]);
+      const ys = rings[0].map((p) => p[1]);
+      this.sites.push({
+        site,
+        rings,
+        angleRad,
+        minX: Math.min(...xs),
+        maxX: Math.max(...xs),
+        minY: Math.min(...ys),
+        maxY: Math.max(...ys),
+        used: [],
+        usedAreaM2: 0,
+        failures: 0,
+        matchMisses: 0,
+        exhausted: false,
+      });
     }
   }
 
@@ -660,12 +709,20 @@ class StockStore {
     return placed;
   }
 
+  /** Places one new building. Normally it has to be a proper neighbour (see templateNear's
+   * "match" mode); a share of arrivals, and any arrival that finds no such place, instead
+   * fill a small plot with whatever fits ("fill" mode). */
   private placeNewBuilding(atMs: number): boolean {
     const rules = constructionRules(policyStore.get(), yearOf(atMs));
     const rng = this.rng("arrival", String(this.arrivalCounter++));
+    const modes: PlacementMode[] = rng() < NEIGHBORHOOD_EXCEPTION_PROBABILITY ? ["fill"] : ["match", "fill"];
+    return modes.some((mode) => this.attemptPlacement(atMs, rules, rng, mode));
+  }
 
-    for (let tries = 0; tries < 6; tries++) {
-      const open = this.sites.filter((s) => !s.exhausted);
+  private attemptPlacement(atMs: number, rules: ConstructionRules, rng: () => number, mode: PlacementMode): boolean {
+    const maxShrinkSteps = mode === "match" ? MATCH_MODE_SHRINK_STEPS : SITE_SIZE_SHRINK_STEPS;
+    for (let tries = 0; tries < 8; tries++) {
+      const open = this.sites.filter((s) => !s.exhausted && (mode === "fill" || s.matchMisses < MATCH_MISSES_BEFORE_SKIP));
       if (open.length === 0) return false;
       const state = pickWeighted(open, open.map((s) => Math.sqrt(Math.max(1, s.site.areaM2 - s.usedAreaM2))), rng());
 
@@ -674,19 +731,49 @@ class StockStore {
         state.exhausted = true;
         continue;
       }
-      const pool = this.templates[group];
       const remaining = state.site.areaM2 - state.usedAreaM2;
-      const fitting = pool.filter((t) => t.footprintAreaM2 <= remaining * 0.6);
-      const template = (fitting.length > 0 ? fitting : [pool.reduce((a, b) => (b.footprintAreaM2 < a.footprintAreaM2 ? b : a))])[Math.floor(rng() * (fitting.length || 1))];
-      const targetArea = template.footprintAreaM2 * (1 + (rng() * 2 - 1) * NEW_BUILDING_SIZE_JITTER);
-      const aspect = clamp(template.long / template.short, 1, 3);
-
-      const rect = this.fitRect(state, targetArea, aspect, rng);
-      if (!rect) {
-        state.failures++;
-        if (state.failures >= SITE_EXHAUSTED_AFTER_FAILURES) state.exhausted = true;
+      // Every location is tried at full size before anything is shrunk: otherwise the first
+      // thing to fit wins, which systematically favours small buildings.
+      let placed: { rect: OrientedRect; template: Template } | null = null;
+      search: for (let step = 0; step <= maxShrinkSteps; step++) {
+        const shrink = Math.pow(0.85, step);
+        for (let sample = 0; sample < SITE_POINT_SAMPLES; sample++) {
+          const point = this.samplePoint(state, rng);
+          if (!point) continue;
+          const template = this.templateNear(point, group, remaining, rng, mode);
+          if (!template) continue;
+          const targetArea = template.footprintAreaM2 * (1 + (rng() * 2 - 1) * NEW_BUILDING_SIZE_JITTER) * shrink * shrink;
+          const aspect = clamp(template.long / template.short, 1, 3);
+          // Prefer lining up with the street (the nearest building); a narrow plot may
+          // instead take the building along its own axis, or a longer and thinner shape.
+          const neighbourAngle = this.orientationNear(point);
+          const angles = neighbourAngle === null ? [state.angleRad] : [neighbourAngle, state.angleRad];
+          let rect: OrientedRect | null = null;
+          for (const angle of angles) {
+            for (const stretch of ASPECT_STRETCHES) {
+              rect = this.fitRectAt(state, point, targetArea, Math.min(aspect * stretch, MAX_ASPECT), angle);
+              if (rect) break;
+            }
+            if (rect) break;
+          }
+          if (rect) {
+            placed = { rect, template };
+            break search;
+          }
+        }
+      }
+      if (!placed) {
+        // Only a fill-mode failure says the plot itself is unusable; a match-mode miss just means
+        // it cannot take a building like its neighbours.
+        if (mode === "fill") {
+          state.failures++;
+          if (state.failures >= SITE_EXHAUSTED_AFTER_FAILURES) state.exhausted = true;
+        } else {
+          state.matchMisses++;
+        }
         continue;
       }
+      const { rect, template } = placed;
       state.failures = 0;
       state.used.push(rect);
       const footprintArea = 4 * rect.halfLong * rect.halfShort;
@@ -745,40 +832,124 @@ class StockStore {
       weights.houseSingle = small ? 0.8 : 0.15;
       weights.apartments = small ? 0.2 : 0.85;
     }
-    const groups = (Object.keys(weights) as BuildingGroup[]).filter((g) => (weights[g] ?? 0) > 0 && this.templates[g].length > 0);
+    const remaining = state.site.areaM2 - state.usedAreaM2;
+    const groups = (Object.keys(weights) as BuildingGroup[]).filter(
+      (g) => (weights[g] ?? 0) > 0 && this.templates[g].length > 0 && this.smallFootprint[g] <= remaining * 0.6,
+    );
     if (groups.length === 0) return null;
-    return pickWeighted(groups, groups.map((g) => weights[g] as number), rng());
+
+    // Favour the kinds whose typical local building actually fits this plot: a small plot
+    // among houses gets a house, and offices go where an office-sized plot is free.
+    const centre: XY = [(state.minX + state.maxX) / 2, (state.minY + state.maxY) / 2];
+    const nearby = this.grid.query(centre[0], centre[1], NEIGHBORHOOD_RADIUS_M);
+    const weightFor = (g: BuildingGroup): number => {
+      const sizes: number[] = [];
+      for (const id of nearby) {
+        const b = this.byEgid.get(id);
+        if (!b || b.demolishedAtMs !== undefined || this.groupOf.get(id) !== g) continue;
+        const t = this.templateFor(b);
+        if (t) sizes.push(t.footprintAreaM2);
+      }
+      sizes.sort((a, b) => a - b);
+      const typical = sizes.length >= NEIGHBORHOOD_MIN_BUILDINGS ? sizes[Math.floor(sizes.length / 2)] : this.medianFootprint[g];
+      const fit = Math.min(1, (remaining * 0.6) / typical);
+      return (weights[g] as number) * Math.max(0.02, fit * fit);
+    };
+    return pickWeighted(groups, groups.map(weightFor), rng());
   }
 
-  private fitRect(state: SiteState, area: number, aspect: number, rng: () => number): OrientedRect | null {
-    const c = Math.cos(state.angleRad);
-    const s = Math.sin(state.angleRad);
-    for (let step = 0; step <= SITE_SIZE_SHRINK_STEPS; step++) {
-      const shrink = Math.pow(0.85, step);
-      const halfLong = (Math.sqrt(area * aspect) * shrink) / 2;
-      const halfShort = (Math.sqrt(area / aspect) * shrink) / 2;
-      const uRange = state.maxU - state.minU - 2 * halfLong;
-      const vRange = state.maxV - state.minV - 2 * halfShort;
-      if (uRange <= 0 || vRange <= 0) continue;
-      for (let attempt = 0; attempt < SITE_PLACEMENT_ATTEMPTS / (SITE_SIZE_SHRINK_STEPS + 1) + 8; attempt++) {
-        const u = state.minU + halfLong + rng() * uRange;
-        const v = state.minV + halfShort + rng() * vRange;
-        const rect: OrientedRect = { cx: u * c - v * s, cy: u * s + v * c, halfLong, halfShort, angleRad: state.angleRad };
-        const corners = rectCorners(rect);
-        const probes: XY[] = [
-          ...corners,
-          [(corners[0][0] + corners[1][0]) / 2, (corners[0][1] + corners[1][1]) / 2],
-          [(corners[1][0] + corners[2][0]) / 2, (corners[1][1] + corners[2][1]) / 2],
-          [(corners[2][0] + corners[3][0]) / 2, (corners[2][1] + corners[3][1]) / 2],
-          [(corners[3][0] + corners[0][0]) / 2, (corners[3][1] + corners[0][1]) / 2],
-          [rect.cx, rect.cy],
-        ];
-        if (!probes.every((p) => pointInPolygon(p, state.rings))) continue;
-        if (state.used.some((other) => rectsOverlap(rect, other, SITE_NEW_BUILDING_MARGIN_M / 2))) continue;
-        return rect;
-      }
+  private samplePoint(state: SiteState, rng: () => number): XY | null {
+    for (let i = 0; i < 25; i++) {
+      const p: XY = [state.minX + rng() * (state.maxX - state.minX), state.minY + rng() * (state.maxY - state.minY)];
+      if (pointInPolygon(p, state.rings)) return p;
     }
     return null;
+  }
+
+  /** The size template for a new building at `p`, drawn from same-kind buildings within the
+   * neighbourhood (or the whole town when there are too few). "match" mode only accepts a
+   * building at least MATCH_MIN_SIZE_FRACTION as large as the local typical one, so new
+   * buildings look like their surroundings; "fill" mode accepts anything that fits the plot.
+   * Null when nothing qualifies. */
+  private templateNear(p: XY, group: BuildingGroup, remainingAreaM2: number, rng: () => number, mode: PlacementMode): Template | null {
+    const neighbours = this.neighbourTemplates(p, group);
+    const pool = neighbours.length >= NEIGHBORHOOD_MIN_BUILDINGS ? neighbours : this.templates[group];
+    const fitting = pool.filter((t) => t.footprintAreaM2 <= remainingAreaM2 * 0.6);
+    if (mode === "fill") {
+      if (fitting.length === 0) return pool.reduce((a, b) => (b.footprintAreaM2 < a.footprintAreaM2 ? b : a));
+      return fitting[Math.floor(rng() * fitting.length)];
+    }
+    const sizes = pool.map((t) => t.footprintAreaM2).sort((a, b) => a - b);
+    const typical = sizes[Math.floor(sizes.length / 2)];
+    const proper = fitting.filter((t) => t.footprintAreaM2 >= typical * MATCH_MIN_SIZE_FRACTION);
+    return proper.length > 0 ? proper[Math.floor(rng() * proper.length)] : null;
+  }
+
+  private neighbourTemplates(p: XY, group: BuildingGroup): Template[] {
+    const key = `${group}:${Math.floor(p[0] / 30)},${Math.floor(p[1] / 30)}`;
+    let found = this.neighbourCache.get(key);
+    if (!found) {
+      found = [];
+      for (const id of this.grid.query(p[0], p[1], NEIGHBORHOOD_RADIUS_M)) {
+        const b = this.byEgid.get(id);
+        if (!b || b.demolishedAtMs !== undefined || this.groupOf.get(id) !== group) continue;
+        const t = this.templateFor(b);
+        if (t) found.push(t);
+      }
+      this.neighbourCache.set(key, found);
+    }
+    return found;
+  }
+
+  /** The direction (long axis) of the nearest clearly-elongated building, so a new
+   * building lines up with its street rather than with the site outline. */
+  private orientationNear(p: XY): number | null {
+    const key = `${Math.floor(p[0] / 30)},${Math.floor(p[1] / 30)}`;
+    const cached = this.orientationNearCache.get(key);
+    if (cached !== undefined) return cached;
+    const result = this.orientationNearUncached(p);
+    this.orientationNearCache.set(key, result);
+    return result;
+  }
+
+  private orientationNearUncached(p: XY): number | null {
+    let checked = 0;
+    for (const id of this.grid.query(p[0], p[1], ORIENTATION_RADIUS_M)) {
+      const b = this.byEgid.get(id);
+      if (!b || b.demolishedAtMs !== undefined) continue;
+      let o = this.orientationCache.get(id);
+      if (!o) {
+        const { long, short, angleRad } = boundingRectSides(this.ringXY.get(id) as XY[]);
+        o = { angleRad, aspect: long / Math.max(short, 1) };
+        this.orientationCache.set(id, o);
+      }
+      if (o.aspect >= ORIENTATION_MIN_ASPECT) return o.angleRad;
+      if (++checked >= 3) break;
+    }
+    return null;
+  }
+
+  /** A rectangle of the given area centred on `p`, if every probe point is inside the
+   * site and it clears the buildings already placed there. */
+  private fitRectAt(state: SiteState, p: XY, area: number, aspect: number, angleRad: number): OrientedRect | null {
+    const rect: OrientedRect = {
+      cx: p[0],
+      cy: p[1],
+      halfLong: Math.sqrt(area * aspect) / 2,
+      halfShort: Math.sqrt(area / aspect) / 2,
+      angleRad,
+    };
+    const corners = rectCorners(rect);
+    const probes: XY[] = [
+      ...corners,
+      [(corners[0][0] + corners[1][0]) / 2, (corners[0][1] + corners[1][1]) / 2],
+      [(corners[1][0] + corners[2][0]) / 2, (corners[1][1] + corners[2][1]) / 2],
+      [(corners[2][0] + corners[3][0]) / 2, (corners[2][1] + corners[3][1]) / 2],
+      [(corners[3][0] + corners[0][0]) / 2, (corners[3][1] + corners[0][1]) / 2],
+    ];
+    if (!probes.every((q) => pointInPolygon(q, state.rings))) return null;
+    if (state.used.some((other) => rectsOverlap(rect, other, SITE_NEW_BUILDING_MARGIN_M / 2))) return null;
+    return rect;
   }
 
   // --- shared ---
@@ -844,6 +1015,8 @@ class StockStore {
   }
 
   private register(b: Building, atMs: number): void {
+    this.neighbourCache.clear();
+    this.orientationNearCache.clear();
     this.all.push(b);
     this.byEgid.set(b.egid, b);
     const ring = this.ringXY.get(b.egid);

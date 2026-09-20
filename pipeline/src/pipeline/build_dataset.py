@@ -25,6 +25,7 @@ from . import coords
 from .schema import Building, Dwelling, MunicipalityDataset, PowerPlant
 from .sources import footprints as footprints_source
 from .sources import boundary as boundary_source
+from .sources import exclusions as exclusions_source
 from .sources import gwr, powerplants, sites as sites_source, statent, stock_history
 
 DEFAULT_BFS_NUMBER = 247  # Schlieren
@@ -112,7 +113,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
     max_n = buildings_df["N-Gebaeudekoordinate"].max()
 
     print(f"Fetching building footprints over bbox ({min_e:.0f},{min_n:.0f})-({max_e:.0f},{max_n:.0f})...")
-    footprint_by_egid, open_land = footprints_source.fetch_land_cover(min_e, min_n, max_e, max_n)
+    footprint_by_egid, land = footprints_source.fetch_land_cover(min_e, min_n, max_e, max_n)
     matched_count = sum(1 for egid in egids if egid in footprint_by_egid)
     print(f"  matched {matched_count} / {len(buildings_df)} {municipality_name} buildings to a footprint")
 
@@ -125,8 +126,14 @@ def build(bfs_number: int) -> MunicipalityDataset:
     buildings_df = buildings_df[buildings_df[gwr.EGID_COL].astype(int).isin(footprint_by_egid)].copy()
     print(f"  dropped {dropped_count} building(s) with no footprint match")
 
+    print("Fetching parks / sports fields / cemeteries (OpenStreetMap)...")
+    margin = 300  # meters, so an area straddling the border is still seen
+    min_lon, min_lat = coords.lv95_to_lonlat(min_e - margin, min_n - margin)
+    max_lon, max_lat = coords.lv95_to_lonlat(max_e + margin, max_n + margin)
+    excluded = exclusions_source.fetch_excluded_areas(min_lon, min_lat, max_lon, max_lat)
+    print(f"  {len(excluded)} areas kept out of development")
     development_sites = sites_source.compute_sites(
-        sites_source.fetch_zones(bfs_number), open_land, list(footprint_by_egid.values())
+        sites_source.fetch_zones(bfs_number), land, list(footprint_by_egid.values()), excluded
     )
     print(f"  {len(development_sites)} development sites")
 

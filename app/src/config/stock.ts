@@ -38,11 +38,22 @@ export const GROWTH_RATE_CAP = 0.02;
 export const GROWTH_CORRECTION_MIN = 0.3;
 export const GROWTH_CORRECTION_MAX = 3;
 
-export const SITE_PLACEMENT_ATTEMPTS = 60;
+export const SITE_POINT_SAMPLES = 12; // candidate locations tried per size step before shrinking the building
 export const SITE_SIZE_SHRINK_STEPS = 4; // retry smaller (x0.85 each) before giving up on a site
 export const SITE_NEW_BUILDING_MARGIN_M = 6; // clear gap kept between two new buildings on one site
 export const SITE_EXHAUSTED_AFTER_FAILURES = 2;
 export const NEW_BUILDING_SIZE_JITTER = 0.15;
+
+// A new building is sized and turned like its surroundings: it copies a same-kind building
+// within NEIGHBORHOOD_RADIUS_M (when there are enough of them), aligns with the nearest
+// building, and only occasionally is drawn from the whole town instead.
+export const NEIGHBORHOOD_RADIUS_M = 150;
+export const NEIGHBORHOOD_MIN_BUILDINGS = 3;
+export const NEIGHBORHOOD_EXCEPTION_PROBABILITY = 0.15; // share of arrivals that may fill a small plot instead of matching the neighbourhood
+export const MATCH_MIN_SIZE_FRACTION = 0.6; // a matching building is at least this fraction of the local typical footprint
+export const MATCH_MODE_SHRINK_STEPS = 2; // ...and may only be squeezed a little (area x0.52) to fit
+export const ORIENTATION_RADIUS_M = 60;
+export const ORIENTATION_MIN_ASPECT = 1.2; // a near-square building has no meaningful direction to copy
 
 // --- Construction timeline ---
 
