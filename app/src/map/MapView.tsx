@@ -132,6 +132,23 @@ function hideBasemapBuildingLayers(map: MlMap): void {
   }
 }
 
+// The only basemap text layer we keep: street names, set along the road lines.
+const STREET_NAME_LAYER_ID = "transportation_label";
+
+/** Strips every piece of basemap writing except street names — place, station, POI,
+ * park, water, peak/elevation, route-number and house-number labels — while keeping
+ * the icons that share a layer with a label (station, POI and route symbols). */
+function hideBasemapLabels(map: MlMap): void {
+  for (const layer of map.getStyle().layers ?? []) {
+    if (layer.type !== "symbol" || layer.id === STREET_NAME_LAYER_ID) continue;
+    if (layer.layout?.["icon-image"]) {
+      map.setLayoutProperty(layer.id, "text-field", "");
+    } else {
+      map.setLayoutProperty(layer.id, "visibility", "none");
+    }
+  }
+}
+
 interface ColorScales {
   powerMinW: number;
   powerMaxW: number;
@@ -221,6 +238,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     // layers) to finish loading tiles, which can take much longer or stall.
     map.on("style.load", () => {
       hideBasemapBuildingLayers(map);
+      hideBasemapLabels(map);
 
       if (dataset.boundary) addBoundaryMask(map, dataset.boundary);
       map.addSource(POLY_SOURCE_ID, { type: "geojson", data: geojson.polygons });
