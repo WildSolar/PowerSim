@@ -32,6 +32,7 @@ import { commercialPowerWFromProfile, makeCommercialProfile, type CommercialProf
 import { heatPumpPowerWWithWeather } from "./heatPump";
 import { mobilityChargingPowerW } from "./mobility";
 import { pvPowerW } from "./pv";
+import { existsAt } from "./lifetime";
 import { hashSeed } from "./rng";
 import { snowDepthCm } from "./snow";
 import type { Tariff } from "./tariff";
@@ -39,6 +40,7 @@ import { dwellingWaterHeaterProfile, hasElectricWaterHeating, waterHeaterPowerW,
 import { dailyMeanTempC, weatherAt } from "./weather";
 
 interface DwellingProfiles {
+  building: Building;
   egid: string;
   dwelling: Dwelling;
   fridge: FridgeProfile;
@@ -67,6 +69,7 @@ function getDwellingProfiles(building: Building, dwelling: Dwelling): DwellingPr
   let profiles = profileCache.get(key);
   if (!profiles) {
     profiles = {
+      building,
       egid: building.egid,
       dwelling,
       fridge: makeFridgeProfile(hashSeed(building.egid, dwelling.ewid, "fridge")),
@@ -136,6 +139,7 @@ function dwellingCategoryTotals(profileSets: DwellingProfiles[], times: number[]
     let plugLoad = 0;
     let ev = 0;
     for (const p of profileSets) {
+      if (!existsAt(p.building, t)) continue;
       fridge += fridgePowerW(p.fridge, t);
       lighting += lightingPowerW(p.lighting, t);
       cooking += cookingPowerW(p.cooking, t);
@@ -166,6 +170,7 @@ function climateControlCategorySeries(buildings: Building[], times: number[]): {
     let heatPump = 0;
     let ac = 0;
     for (const building of buildings) {
+      if (!existsAt(building, t)) continue;
       heatPump += heatPumpPowerWWithWeather(building, dailyMeanC, outsideTempC, t);
       ac += acPowerWWithWeather(building, dailyMeanC, outsideTempC);
     }
@@ -188,7 +193,7 @@ function waterHeatingCategorySeries(buildings: Building[], times: number[]): num
   return times.map((t) => {
     let sum = 0;
     for (const building of buildings) {
-      if (!hasElectricWaterHeating(building, t)) continue;
+      if (!existsAt(building, t) || !hasElectricWaterHeating(building, t)) continue;
       for (const dwelling of building.dwellings) {
         sum += waterHeaterPowerW(getDwellingProfiles(building, dwelling).waterHeater, t);
       }
@@ -212,12 +217,12 @@ function getCommercialProfile(building: Building): CommercialProfile | null {
  * resolved through the cache above rather than rebuilt (the per-building random
  * intensity multiplier) on every one of the 96 samples. */
 function commercialCategorySeries(buildings: Building[], times: number[]): number[] {
-  const profiles: CommercialProfile[] = [];
+  const profiles: { building: Building; profile: CommercialProfile }[] = [];
   for (const building of buildings) {
     const profile = getCommercialProfile(building);
-    if (profile) profiles.push(profile);
+    if (profile) profiles.push({ building, profile });
   }
-  return times.map((t) => profiles.reduce((sum, p) => sum + commercialPowerWFromProfile(p, t), 0));
+  return times.map((t) => profiles.reduce((sum, p) => sum + (existsAt(p.building, t) ? commercialPowerWFromProfile(p.profile, t) : 0), 0));
 }
 
 /** Snow cover changes on a day+ timescale, so one value for the whole (24h) chart

@@ -42,13 +42,17 @@ from shapely.ops import unary_union
 WFS_URL = "https://maps.zh.ch/wfs/AVZHWFS"
 LAYER = "ms:bodenbedeckung_f"
 BUILDING_ART = "Gebäude"
+# Land-cover classes a new building could plausibly be built on (sites.py subtracts
+# roads, water, forest, existing buildings and anything outside a building zone).
+OPEN_LAND_ARTS = {"Acker, Wiese, Weide", "Gartenanlage", "humusierte Fläche"}
 
 
-def fetch_building_footprints(
+def fetch_land_cover(
     min_e: float, min_n: float, max_e: float, max_n: float
-) -> dict[int, list[tuple[float, float]]]:
-    """Building footprint rings (LV95 coordinates) keyed by GWR EGID, for buildings
-    whose cadastral polygon falls within the given bbox."""
+) -> tuple[dict[int, list[tuple[float, float]]], list]:
+    """One WFS request, two products: building footprint rings (LV95) keyed by GWR
+    EGID for buildings whose cadastral polygon falls within the given bbox, and the
+    shapely polygons of open (buildable in principle) land in the same bbox."""
     params = {
         "Service": "WFS",
         "Request": "GetFeature",
@@ -60,6 +64,8 @@ def fetch_building_footprints(
     response = requests.get(WFS_URL, params=params, timeout=60)
     response.raise_for_status()
     features = response.json()["features"]
+
+    open_land = [shape(f["geometry"]) for f in features if f["properties"].get("art") in OPEN_LAND_ARTS]
 
     parts_by_egid: dict[int, list] = defaultdict(list)
     for feature in features:
@@ -80,4 +86,4 @@ def fetch_building_footprints(
             continue
         footprints[egid] = list(geometry.exterior.coords)
 
-    return footprints
+    return footprints, open_land

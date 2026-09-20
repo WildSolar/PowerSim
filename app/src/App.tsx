@@ -15,6 +15,8 @@ import { simClock } from "./sim/engine";
 import { reportCardStore } from "./sim/reportCardStore";
 import { useReportCardYear } from "./sim/store";
 import { useTimeKeyboard } from "./ui/useTimeKeyboard";
+import { useStockBuildings } from "./ui/useStock";
+import { stock } from "./sim/stock";
 import { startYearEndWatcher } from "./sim/yearEndWatcher";
 import "./App.css";
 
@@ -29,6 +31,9 @@ function returnToMenu() {
   }
 }
 
+// Dev-only handle for inspecting the simulation from the browser console.
+if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock } });
+
 function Game({ slug }: { slug: string }) {
   const [dataset, setDataset] = useState<MunicipalityDataset | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +43,7 @@ function Game({ slug }: { slug: string }) {
   const [showControl, setShowControl] = useState(false);
   const [showWiki, setShowWiki] = useState(false);
   const reportCardYear = useReportCardYear();
+  const stockBuildings = useStockBuildings();
   const keyboardEnabled = !showControl && !showWiki && reportCardYear === null;
   useTimeKeyboard(keyboardEnabled);
 
@@ -52,13 +58,20 @@ function Game({ slug }: { slug: string }) {
 
   useEffect(() => {
     loadDataset(`/data/${slug}.json`)
-      .then(setDataset)
+      .then((loaded) => {
+        stock.init(loaded);
+        setDataset(loaded);
+      })
       .catch((e: Error) => setError(e.message));
   }, [slug]);
 
+  // The dataset as it stands now: the base buildings plus everything built since (sim/stock.ts).
+  // MapView keeps the original dataset (its mount is keyed on that reference) and reads the stock itself.
+  const liveDataset = useMemo(() => (dataset ? { ...dataset, buildings: stockBuildings } : null), [dataset, stockBuildings]);
+
   const selectedBuilding = useMemo(
-    () => dataset?.buildings.find((b) => b.egid === selectedEgid) ?? null,
-    [dataset, selectedEgid],
+    () => stockBuildings.find((b) => b.egid === selectedEgid) ?? null,
+    [stockBuildings, selectedEgid],
   );
   const selectedDwelling = useMemo(
     () => selectedBuilding?.dwellings.find((d) => d.ewid === selectedEwid) ?? null,
@@ -99,16 +112,16 @@ function Game({ slug }: { slug: string }) {
           ☰ Main menu
         </button>
       </div>
-      {showControl && <ControlPanel dataset={dataset} onClose={() => setShowControl(false)} />}
+      {showControl && <ControlPanel dataset={liveDataset ?? dataset} onClose={() => setShowControl(false)} />}
       {showWiki && <WikiPanel onClose={() => setShowWiki(false)} />}
       {reportCardYear !== null && (
-        <ReportCardModal dataset={dataset} year={reportCardYear} onClose={() => reportCardStore.dismiss()} />
+        <ReportCardModal dataset={liveDataset ?? dataset} year={reportCardYear} onClose={() => reportCardStore.dismiss()} />
       )}
       {selectedDwelling && selectedBuilding ? (
         <DwellingPanel
           building={selectedBuilding}
           dwelling={selectedDwelling}
-          allBuildings={dataset.buildings}
+          allBuildings={stockBuildings}
           realPlants={dataset.powerPlants}
           onBack={() => setSelectedEwid(null)}
           onClose={() => {
@@ -119,7 +132,7 @@ function Game({ slug }: { slug: string }) {
       ) : selectedBuilding ? (
         <BuildingPanel
           building={selectedBuilding}
-          allBuildings={dataset.buildings}
+          allBuildings={stockBuildings}
           realPlants={dataset.powerPlants}
           onSelectDwelling={setSelectedEwid}
           onClose={() => setSelectedEgid(null)}

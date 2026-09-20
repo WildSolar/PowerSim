@@ -111,6 +111,7 @@ export function isSunRising(simTimeMs: number): boolean {
  * feeds directly into the same "total power" sums as every consuming device. */
 export function pvPowerW(plant: PowerPlant, simTimeMs: number, snowCoverCm?: number): number {
   if (plant.technology !== "Photovoltaic" || !plant.capacityKw) return 0;
+  if (plant.activeToMs !== undefined && simTimeMs >= plant.activeToMs) return 0; // its building has been demolished
   const irradiance = irradianceWm2(simTimeMs, snowCoverCm);
   return -(plant.capacityKw * 1000 * (irradiance / PEAK_IRRADIANCE_WM2));
 }

@@ -1,3 +1,5 @@
+import { existsAt } from "../sim/lifetime";
+import { lifecycleNotes } from "./lifecycleNotes";
 import type { Building, PowerPlant } from "../data/types";
 import { hasAC, acPowerW } from "../sim/ac";
 import { buildingEnvelopeAreaM2 } from "../sim/buildingGeometry";
@@ -82,6 +84,30 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
   );
 
   const billSummary = useBuildingBillSummary(building, plants, tariff);
+  const notes = lifecycleNotes(building, simTimeMs);
+
+  // A construction site (or a building already gone) has no devices, bills or history to show.
+  if (!existsAt(building, simTimeMs)) {
+    return (
+      <div className="panel">
+        <button className="panel-close" onClick={onClose} aria-label="Close">
+          ×
+        </button>
+        <h2>{building.address ?? `Building ${building.egid}`}</h2>
+        {notes.map((note) => (
+          <p key={note} style={{ fontSize: 12 }}>
+            {note}
+          </p>
+        ))}
+        <dl>
+          <dt>Planned</dt>
+          <dd>
+            {building.floorCount ?? "?"} floors, {building.dwellings.length} dwelling{building.dwellings.length === 1 ? "" : "s"}
+          </dd>
+        </dl>
+      </div>
+    );
+  }
 
   return (
     <div className="panel">
@@ -89,6 +115,11 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
         ×
       </button>
       <h2>{building.address ?? `Building ${building.egid}`}</h2>
+      {notes.map((note) => (
+        <p key={note} style={{ fontSize: 12, margin: "0 0 6px" }}>
+          {note}
+        </p>
+      ))}
       <dl>
         <dt>Category</dt>
         <dd>{building.category ?? "Unknown"}</dd>

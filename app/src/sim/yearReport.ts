@@ -17,6 +17,7 @@
  * synchronously.
  */
 
+import { existsAt } from "./lifetime";
 import type { Building, PowerPlant } from "../data/types";
 import { toSimTimeMs } from "./calendar";
 import { categoryEnergyFromSeries, energyKWh } from "./energy";
@@ -93,6 +94,7 @@ function sampleTechnologySeries(buildings: Building[], waterProfilesByEgid: Map<
     let hpWater = 0;
     let directWater = 0;
     for (const building of buildings) {
+      if (!existsAt(building, t)) continue;
       const heatingId = currentHeatingSystemId(building, t);
       if (heatingId) {
         const thermalW = spaceHeatingThermalDemandW(building, dailyMeanC, outsideTempC);
@@ -196,6 +198,7 @@ export function computeHeatingRenewalTally(buildings: Building[], year: number):
   const counts = new Map<string, RenewalTallyEntry>();
   for (const building of buildings) {
     for (const record of heatingRenewalsInRange(building, yearStartMs, yearEndMs)) {
+      if (!existsAt(building, record.installedAtMs)) continue; // a demolished building no longer renews anything
       const key = `${record.previousSystem}>${record.system}`;
       const existing = counts.get(key);
       if (existing) existing.count++;
@@ -270,6 +273,7 @@ export async function computeMobilityFuelLiters(buildings: Building[], year: num
     for (const t of times) {
       totalSamples++;
       for (const building of buildings) {
+        if (!existsAt(building, t)) continue;
         for (const dwelling of building.dwellings) {
           const slotCount = mobilitySlotCount(building.egid, dwelling);
           for (let slot = 0; slot < slotCount; slot++) {

@@ -16,6 +16,14 @@ import { DEFAULT_POLICY, OUTREACH_MAX_MULTIPLIER_BONUS } from "../config/policy"
 export interface Policy {
   solarOutreachLevel: number; // 0-100 — "how much the municipality promotes solar", drives solarAdoption.ts's hazard multiplier
   solarSubsidyRpPerKwp: number; // player-set top-up subsidy, on top of the federal baseline
+
+  // Levers on town growth and building renewal (sim/stock.ts, via constructionRules.ts).
+  // Applied to a project when its permit is decided, so they take effect with a lag.
+  newBuildSolarMandatePct: number; // 0-100 — share of a new roof's usable capacity it must carry (the code minimum still applies below this)
+  newBuildInsulationLevel: number; // 0-100 — 0 = code standard, 100 = passive-house-grade envelope
+  newBuildFossilHeatingAllowed: boolean; // the building code forbids fossil heating in new builds by default
+  growthMultiplier: number; // scales the municipality's historic growth rate (zoning ambition); 1 = as before
+  renewalRateMultiplier: number; // scales how often old buildings are replaced (replacement incentives); 1 = as before
 }
 
 export { DEFAULT_POLICY };

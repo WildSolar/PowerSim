@@ -1,5 +1,6 @@
 import type { Building, PowerPlant } from "../data/types";
 import { acPowerW } from "./ac";
+import { existsAt } from "./lifetime";
 import { commercialPowerW } from "./commercial";
 import { dwellingDevicePowerW } from "./devices";
 import { heatPumpPowerW } from "./heatPump";
@@ -16,6 +17,7 @@ import { waterHeatingPowerW } from "./waterHeating";
  * (see MapView's power-draw tick) rather than have each one redo the same 30-day
  * snow lookback; defaults to computing it fresh for a single call. */
 export function buildingPowerW(building: Building, simTimeMs: number, plants: PowerPlant[], snowCoverCm?: number): number {
+  if (!existsAt(building, simTimeMs)) return 0; // not built yet, or already demolished
   const snow = snowCoverCm ?? snowDepthCm(simTimeMs);
   let total =
     heatPumpPowerW(building, simTimeMs) +

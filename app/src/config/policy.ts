@@ -10,6 +10,11 @@ import type { Policy } from "../sim/policy";
 export const DEFAULT_POLICY: Policy = {
   solarOutreachLevel: 0,
   solarSubsidyRpPerKwp: 0,
+  newBuildSolarMandatePct: 0,
+  newBuildInsulationLevel: 0,
+  newBuildFossilHeatingAllowed: false,
+  growthMultiplier: 1,
+  renewalRateMultiplier: 1,
 };
 
 // outreachHazardMultiplier(level) = 1 + (level/100) * OUTREACH_MAX_MULTIPLIER_BONUS

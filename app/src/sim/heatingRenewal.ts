@@ -158,6 +158,7 @@ function chainFor(building: Building, simTimeMs: number): RenewalEvent<HeatingSy
     kind: "heating",
     labelFor: (id) => HEATING_SYSTEM_CATALOG[id].label,
     initialSystem: initial,
+    initialInstalledAtMs: building.builtAtMs,
     weibullShape: HEATING_WEIBULL_SHAPE,
     uncertaintyFraction: uncertaintyFraction(building),
     biasStrengthRp: biasStrengthRp(building),
@@ -165,6 +166,70 @@ function chainFor(building: Building, simTimeMs: number): RenewalEvent<HeatingSy
     candidatesAt: (atMs, incumbent) => candidatesAt(building, atMs, incumbent),
   };
   return renewalEventsUpTo(params, simTimeMs);
+}
+
+export interface NewBuildHeatingCandidate {
+  id: HeatingSystemId;
+  label: string;
+  available: boolean;
+  annualizedCostRp: number;
+  effectiveCostRp: number;
+  greenness: number;
+  weight: number;
+}
+
+/** Picks the heating system for a building that doesn't have one yet (a replacement
+ * or new build at permit time). Uses the same annualized-cost comparison and hidden
+ * progressive/conservative bias as a renewal, but with no incumbent to stay with:
+ * among the systems the building code allows (and that are physically available),
+ * the choice is a weighted draw that favors the cheaper ones — mostly the winner,
+ * sometimes not, "by chance" as the design calls for. `available` is decided by the
+ * caller (rules + district-heat reach), overriding the renewal engine's own stub. */
+export function chooseNewBuildHeating(
+  building: Building,
+  atMs: number,
+  isAvailable: (id: HeatingSystemId) => boolean,
+  draw: number,
+  temperatureFraction: number,
+): { chosen: HeatingSystemId; candidates: NewBuildHeatingCandidate[]; biasStrengthRp: number } {
+  const bias = biasStrengthRp(building);
+  const base = candidatesAt(building, atMs, "airHeatPump");
+  const scored = base.map((c) => ({
+    ...c,
+    available: isAvailable(c.id),
+    effectiveCostRp: c.annualizedCostRp - bias * c.greenness,
+  }));
+  const available = scored.filter((c) => c.available);
+  const pool = available.length > 0 ? available : scored.filter((c) => c.id === "airHeatPump");
+  const cheapest = Math.min(...pool.map((c) => c.effectiveCostRp));
+  const width = Math.max(1, temperatureFraction * Math.abs(cheapest));
+  const weights = pool.map((c) => Math.exp(-(c.effectiveCostRp - cheapest) / width));
+  const total = weights.reduce((a, b) => a + b, 0);
+
+  let pick = draw * total;
+  let chosen = pool[pool.length - 1].id;
+  for (let i = 0; i < pool.length; i++) {
+    pick -= weights[i];
+    if (pick <= 0) {
+      chosen = pool[i].id;
+      break;
+    }
+  }
+
+  const weightById = new Map(pool.map((c, i) => [c.id, weights[i] / total]));
+  return {
+    chosen,
+    biasStrengthRp: bias,
+    candidates: scored.map((c) => ({
+      id: c.id,
+      label: HEATING_SYSTEM_CATALOG[c.id].label,
+      available: c.available,
+      annualizedCostRp: c.annualizedCostRp,
+      effectiveCostRp: c.effectiveCostRp,
+      greenness: c.greenness,
+      weight: weightById.get(c.id) ?? 0,
+    })),
+  };
 }
 
 /** The heating system actually in force at `simTimeMs` — null for a building

@@ -1,4 +1,4 @@
-import { CATEGORY_LEGEND, HEATING_LEGEND, POWER_RAMP, EXPORT_RAMP, SOLAR_RAMP, type ColorMode } from "../map/colorModes";
+import { AGE_LEGEND, CATEGORY_LEGEND, CONSTRUCTION_COLOR, HEATING_LEGEND, POWER_RAMP, EXPORT_RAMP, SOLAR_RAMP, type ColorMode } from "../map/colorModes";
 import "./colorModeControl.css";
 
 const MODES: { key: ColorMode; label: string }[] = [
@@ -7,6 +7,7 @@ const MODES: { key: ColorMode; label: string }[] = [
   { key: "heating", label: "Heating" },
   { key: "power", label: "Power draw" },
   { key: "solar", label: "Solar" },
+  { key: "age", label: "Age" },
 ];
 
 const DIVERGING_POWER_GRADIENT = [...[...EXPORT_RAMP].reverse(), ...POWER_RAMP].join(",");
@@ -18,7 +19,7 @@ export interface ColorModeControlProps {
 }
 
 export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
-  const legend = mode === "category" ? CATEGORY_LEGEND : mode === "heating" ? HEATING_LEGEND : null;
+  const legend = mode === "category" ? CATEGORY_LEGEND : mode === "heating" ? HEATING_LEGEND : mode === "age" ? AGE_LEGEND : null;
 
   return (
     <div className="color-mode-control">
@@ -40,6 +41,12 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
           ))}
         </div>
       )}
+      <div className="legend" style={{ marginTop: 6 }}>
+        <div className="legend-row">
+          <span className="swatch" style={{ background: CONSTRUCTION_COLOR }} />
+          <span>Construction site</span>
+        </div>
+      </div>
       {mode === "power" && (
         <div className="legend power-legend">
           <div className="power-gradient" style={{ background: `linear-gradient(to right, ${DIVERGING_POWER_GRADIENT})` }} />

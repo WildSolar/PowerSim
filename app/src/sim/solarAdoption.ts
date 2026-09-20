@@ -71,10 +71,13 @@ import {
   SOLAR_BIAS_MAGNITUDE_RP_PER_YEAR,
   SOLAR_UNCERTAINTY_FRACTION,
 } from "../config/solar";
+import { NEW_BUILD_VOLUNTARY_SOLAR_SHARE } from "../config/stock";
 import { consumptionSeriesW, hourOfDayAt } from "./billing";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { logCandidateDecision } from "./decisionLog";
-import { distanceM } from "./geo";
+import { LocalProjection, PointGrid } from "./localGeo";
+import { existsAt } from "./lifetime";
+import type { ConstructionRules } from "./constructionRules";
 import { heatingRenewalsInRange } from "./heatingRenewal";
 import { historyTimeSteps, sampleBuildingCategorySeries } from "./history";
 import type { Policy } from "./policy";
@@ -105,6 +108,8 @@ export interface SolarAdoptionRecord {
   federalSubsidyRp: number;
   municipalSubsidyRp: number;
   annualSavingsRp: number;
+  /** A new building's array, fixed at permit time by the construction rules rather than an owner's choice. */
+  origin?: "mandate" | "voluntary";
 }
 
 const adoptionByEgid = new Map<string, SolarAdoptionRecord>();
@@ -119,26 +124,34 @@ function realPvEgids(realPlants: PowerPlant[]): Set<string> {
   return realPvEgidsCache;
 }
 
+let neighborListFor: Building[] | null = null;
+
+/** Buildings within NEIGHBOR_RADIUS_M of each other, via a spatial grid rather than
+ * an all-pairs scan (which does not scale to a 48k-building city). Rebuilt whenever
+ * the stock changes (a new array identity, see stock.ts), so new buildings count
+ * as neighbours too. */
 function neighborList(buildings: Building[]): Map<string, string[]> {
-  if (neighborListCache) return neighborListCache;
+  if (neighborListCache && neighborListFor === buildings) return neighborListCache;
+  const projection = new LocalProjection(buildings[0]?.lon ?? 0, buildings[0]?.lat ?? 0);
+  const grid = new PointGrid(NEIGHBOR_RADIUS_M);
   const list = new Map<string, string[]>();
-  for (const b of buildings) list.set(b.egid, []);
-  for (let i = 0; i < buildings.length; i++) {
-    for (let j = i + 1; j < buildings.length; j++) {
-      const a = buildings[i];
-      const b = buildings[j];
-      if (distanceM(a.lon, a.lat, b.lon, b.lat) <= NEIGHBOR_RADIUS_M) {
-        list.get(a.egid)!.push(b.egid);
-        list.get(b.egid)!.push(a.egid);
-      }
-    }
+  for (const b of buildings) {
+    const [x, y] = projection.toXY(b.lon, b.lat);
+    grid.insert(b.egid, x, y);
+    list.set(b.egid, []);
+  }
+  for (const b of buildings) {
+    const [x, y] = projection.toXY(b.lon, b.lat);
+    for (const id of grid.query(x, y, NEIGHBOR_RADIUS_M)) if (id !== b.egid) list.get(b.egid)!.push(id);
   }
   neighborListCache = list;
+  neighborListFor = buildings;
   return list;
 }
 
 function isEligible(building: Building, realPlants: PowerPlant[], year: number): boolean {
   if (building.footprintAreaM2 == null || building.footprintAreaM2 <= 0) return false;
+  if (!existsAt(building, toSimTimeMs(Date.UTC(year, 0, 1)))) return false; // not yet built (or already demolished) at the start of the year
   if (building.constructionYear != null && year - building.constructionYear > AGE_EXCLUSION_YEARS) return false;
   if (realPvEgids(realPlants).has(building.egid)) return false;
   return true;
@@ -306,7 +319,30 @@ function ensureAdvancedThrough(buildings: Building[], realPlants: PowerPlant[], 
   }
 }
 
-function synthesizedPlants(cutoffMs: number): PowerPlant[] {
+const buildingLookupCache = new WeakMap<Building[], Map<string, Building>>();
+
+function buildingLookup(buildings: Building[]): Map<string, Building> {
+  let lookup = buildingLookupCache.get(buildings);
+  if (!lookup) {
+    lookup = new Map(buildings.map((b) => [b.egid, b]));
+    buildingLookupCache.set(buildings, lookup);
+  }
+  return lookup;
+}
+
+/** Real registry plants, each closed off at its building demolition (a plant is
+ * a physical thing on that roof: it goes when the roof does). Only the few plants
+ * of demolished buildings are copied. */
+function realPlantsWithDemolitions(buildings: Building[], realPlants: PowerPlant[]): PowerPlant[] {
+  const lookup = buildingLookup(buildings);
+  return realPlants.map((plant) => {
+    const demolishedAtMs = plant.egid ? lookup.get(plant.egid)?.demolishedAtMs : undefined;
+    return demolishedAtMs === undefined ? plant : { ...plant, activeToMs: demolishedAtMs };
+  });
+}
+
+function synthesizedPlants(buildings: Building[], cutoffMs: number): PowerPlant[] {
+  const lookup = buildingLookup(buildings);
   const synthesized: PowerPlant[] = [];
   for (const [egid, record] of adoptionByEgid) {
     if (record.installedAtMs >= cutoffMs) continue;
@@ -320,6 +356,7 @@ function synthesizedPlants(cutoffMs: number): PowerPlant[] {
       technology: "Photovoltaic",
       commissioningDate: null,
       egid,
+      activeToMs: lookup.get(egid)?.demolishedAtMs,
     });
   }
   return synthesized;
@@ -335,7 +372,7 @@ function synthesizedPlants(cutoffMs: number): PowerPlant[] {
 export function effectivePowerPlants(buildings: Building[], realPlants: PowerPlant[], year: number): PowerPlant[] {
   ensureAdvancedThrough(buildings, realPlants, year);
   const cutoffMs = toSimTimeMs(Date.UTC(year + 1, 0, 1));
-  return [...realPlants, ...synthesizedPlants(cutoffMs)];
+  return [...realPlantsWithDemolitions(buildings, realPlants), ...synthesizedPlants(buildings, cutoffMs)];
 }
 
 /** Real Pronovo plants plus every adoption already reached as of the exact
@@ -351,7 +388,47 @@ export function effectivePowerPlants(buildings: Building[], realPlants: PowerPla
 export function effectivePowerPlantsAt(buildings: Building[], realPlants: PowerPlant[], simTimeMs: number): PowerPlant[] {
   const year = new Date(toDateMs(simTimeMs)).getUTCFullYear();
   ensureAdvancedThrough(buildings, realPlants, year);
-  return [...realPlants, ...synthesizedPlants(simTimeMs)];
+  return [...realPlantsWithDemolitions(buildings, realPlants), ...synthesizedPlants(buildings, simTimeMs)];
+}
+
+/** A new or replacement building rooftop array, decided at permit time: the
+ * building code (and any solar mandate policy) sets a floor, and otherwise the owner
+ * either covers the whole usable roof or installs nothing beyond the minimum, by
+ * chance. Installed the day the building is finished. Never touches the municipal
+ * subsidy ledger (the federal one-off subsidy still applies). */
+export function registerNewBuildSolar(building: Building, builtAtMs: number, rules: ConstructionRules, voluntaryDraw: number): void {
+  const year = new Date(toDateMs(builtAtMs)).getUTCFullYear();
+  const usableFraction = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
+  const usableCapacityKw = (building.footprintAreaM2 ?? 0) * usableFraction * kwpPerM2At(year);
+  if (usableCapacityKw <= 0) return;
+
+  const codeKw = ((building.energyReferenceAreaM2 ?? 0) * rules.minSolarWPerM2Ebf) / 1000;
+  const requiredKw = Math.min(usableCapacityKw, Math.max(codeKw, rules.solarMandateFraction * usableCapacityKw));
+  const voluntary = voluntaryDraw < NEW_BUILD_VOLUNTARY_SOLAR_SHARE;
+  const capacityKw = voluntary ? usableCapacityKw : requiredKw;
+
+  logCandidateDecision({
+    atMs: builtAtMs,
+    kind: "construction",
+    egid: building.egid,
+    entityKey: `${building.egid}:new-build-solar`,
+    incumbent: null,
+    chosen: capacityKw > 0 ? "solar" : "none",
+    reasonKind: voluntary ? "voluntary" : "mandate",
+    candidates: [],
+    extra: { usableCapacityKw, requiredKw, capacityKw, codeKw, mandateFraction: rules.solarMandateFraction },
+  });
+  if (capacityKw <= 0) return;
+
+  adoptionByEgid.set(building.egid, {
+    installedAtMs: builtAtMs,
+    capacityKw,
+    installCostRp: capacityKw * installCostRpPerKwp(capacityKw),
+    federalSubsidyRp: federalSubsidyRp(capacityKw),
+    municipalSubsidyRp: 0,
+    annualSavingsRp: 0,
+    origin: voluntary ? "voluntary" : "mandate",
+  });
 }
 
 export interface SolarAdoptionLogEntry {
@@ -368,6 +445,10 @@ export interface SolarAdoptionLogEntry {
 export function solarAdoptionLog(building: Building, simTimeMs: number): SolarAdoptionLogEntry[] {
   const record = adoptionByEgid.get(building.egid);
   if (!record || record.installedAtMs > simTimeMs) return [];
+  if (record.origin) {
+    const why = record.origin === "mandate" ? "the minimum the building rules required" : "the whole usable roof, beyond what the rules required";
+    return [{ installedAtMs: record.installedAtMs, note: `Solar panels came with the new building: ${record.capacityKw.toFixed(1)} kWp, ${why}.` }];
+  }
   const totalSubsidyRp = record.federalSubsidyRp + record.municipalSubsidyRp;
   const subsidyNote = totalSubsidyRp > 0 ? ` after ${subsidyNoteFragment(record)}` : "";
   const note = `Solar panels were installed on the roof — ${record.capacityKw.toFixed(1)} kWp, a decision that penciled out against the electricity it would save and export${subsidyNote}.`;

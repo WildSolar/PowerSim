@@ -53,7 +53,7 @@ export function copAt(outsideTempC: number, kind: HeatPumpKind): number {
 // U_VALUE_ERA_CURVE for the actual milestone points and the real-Swiss-
 // building-stock reasoning behind their shape; GWR's construction year is
 // real data, only the U-value each era implies is a guess.
-function baseUValueForYear(year: number | null): number {
+export function baseUValueForYear(year: number | null): number {
   if (year === null) return FALLBACK_U_VALUE;
   return interpolateCurve(U_VALUE_ERA_CURVE, year);
 }
@@ -93,12 +93,18 @@ export function buildingThermalProfile(building: Building): BuildingThermalProfi
   const cached = thermalProfileCache.get(building.egid);
   if (cached) return cached;
 
-  const baseUValue = baseUValueForYear(building.constructionYear);
-  const qualityRange = U_VALUE_QUALITY_FACTOR_MAX - U_VALUE_QUALITY_FACTOR_MIN;
-  const qualityFactor = U_VALUE_QUALITY_FACTOR_MIN + mulberry32(hashSeed(building.egid, "thermal-quality"))() * qualityRange;
+  // A new build carries its own U-value, fixed at permit time from the building code
+  // and the insulation policy (see newBuild.ts) — no era lookup or random quality draw.
+  let uValueWPerM2K = building.uValueWPerM2K;
+  if (uValueWPerM2K === undefined) {
+    const baseUValue = baseUValueForYear(building.constructionYear);
+    const qualityRange = U_VALUE_QUALITY_FACTOR_MAX - U_VALUE_QUALITY_FACTOR_MIN;
+    const qualityFactor = U_VALUE_QUALITY_FACTOR_MIN + mulberry32(hashSeed(building.egid, "thermal-quality"))() * qualityRange;
+    uValueWPerM2K = baseUValue * qualityFactor;
+  }
 
   const profile: BuildingThermalProfile = {
-    uValueWPerM2K: baseUValue * qualityFactor,
+    uValueWPerM2K,
     comfortTempC: COMFORT_TEMP_C - usageInternalGainOffsetC(building),
   };
   thermalProfileCache.set(building.egid, profile);

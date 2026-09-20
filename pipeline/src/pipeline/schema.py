@@ -53,5 +53,7 @@ class MunicipalityDataset:
     name: str
     employment_by_sector: dict[str, int]
     boundary: list  # official municipal boundary: polygons -> rings (outer first, then holes) -> [lon, lat]
+    stock_history: dict  # first_year, built_gfa_m2[], demolished_gfa_m2[], total_gfa_m2 — see sources/stock_history.py
+    development_sites: list  # vacant buildable land — see sources/sites.py
     buildings: list[Building]
     power_plants: list[PowerPlant]

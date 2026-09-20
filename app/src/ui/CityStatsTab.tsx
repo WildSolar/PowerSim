@@ -1,3 +1,4 @@
+import { existsAt } from "../sim/lifetime";
 import { useState } from "react";
 import type { MunicipalityDataset } from "../data/types";
 import { simClock } from "../sim/engine";
@@ -47,7 +48,8 @@ export function CityStatsTab({ dataset }: CityStatsTabProps) {
   const tariff = useTariff();
   const currentDay = useSimDay();
   const plants = effectivePowerPlantsAt(dataset.buildings, dataset.powerPlants, currentDay);
-  const solarPlants = plants.filter((p) => p.technology === "Photovoltaic");
+  const solarPlants = plants.filter((p) => p.technology === "Photovoltaic" && (p.activeToMs === undefined || p.activeToMs > currentDay));
+  const standing = dataset.buildings.filter((b) => existsAt(b, currentDay));
   const [granularity, setGranularity] = useState<PieGranularity>("day");
 
   const history = useHistorySeries(
@@ -77,9 +79,9 @@ export function CityStatsTab({ dataset }: CityStatsTabProps) {
     <div className="panel-typography">
       <dl>
         <dt>Buildings</dt>
-        <dd>{dataset.buildings.length}</dd>
+        <dd>{standing.length}</dd>
         <dt>Dwellings</dt>
-        <dd>{dataset.buildings.reduce((sum, b) => sum + b.dwellings.length, 0)}</dd>
+        <dd>{standing.reduce((sum, b) => sum + b.dwellings.length, 0)}</dd>
         <dt>Solar installations</dt>
         <dd>
           {solarPlants.length} ({solarPlants.reduce((sum, p) => sum + (p.capacityKw ?? 0), 0).toFixed(0)} kWp total)

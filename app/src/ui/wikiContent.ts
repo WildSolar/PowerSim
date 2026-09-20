@@ -96,6 +96,31 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "growth",
+    icon: "🏗️",
+    title: "Town growth & building renewal",
+    blocks: [
+      p(
+        "The town doesn't stand still. Old buildings get replaced and new ones get built, at rates calibrated to what this municipality really did over the last 15 years (its own construction and demolition history in the federal building register).",
+      ),
+      p(
+        "Renewal: a building is safe from replacement for its first 30 years; after that its chance rises every year it ages. When one is replaced, neighbouring buildings of the exact same construction year often go with it — a housing estate is usually one project. A replacement keeps the address and the footprint but holds 20-30% more dwellings, with extra floors as needed (never towering over its surroundings). Its heating, insulation and solar are decided when the permit is issued, not when it's finished.",
+      ),
+      p(
+        "Growth: new buildings appear at random on vacant building land (zoned for building and still open ground), sized like existing buildings of the same kind. The pace is steered toward the municipality's historic growth in floor space. When the vacant land runs out, growth has to come from replacing old buildings with denser ones, so the pace slows.",
+      ),
+      list([
+        "A new or replacement building is mostly heat pumps (fossil heating is not permitted in new buildings by default); district heating only where a network already runs nearby",
+        "It is insulated to today's standard, and carries at least the rooftop solar the building code requires — often the whole roof",
+        "Each project takes months to permit and one to two years to build. In between, the site shows as an amber construction site and draws no power",
+        "The Age layer shows every building by construction era, with buildings built during the game in green",
+      ]),
+      note(
+        "Known simplifications: building sites come from zoning and land-cover data (available for canton Zürich today), so a plot's shape is a rectangle fitted into the free space, not a real design. Existing rooftop solar registered on a building disappears with it. Policies to steer all of this (solar mandates, insulation standards, growth and replacement rates) are wired in but have no controls yet.",
+      ),
+    ],
+  },
+  {
     id: "home-electronics",
     icon: "🧊",
     title: "Fridge, lighting & other plug loads",

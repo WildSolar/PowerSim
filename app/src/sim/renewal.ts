@@ -64,6 +64,10 @@ export interface RenewalParams<T extends string> {
    * used by the decision itself). */
   labelFor: (id: T) => string;
   initialSystem: T;
+  /** When the initial system was actually installed, for a brand-new building; the first
+   * renewal is then a full lifetime later. Absent for a system observed at game start,
+   * whose install date is unknown (its first renewal comes after an assumed-aged remainder). */
+  initialInstalledAtMs?: number;
   weibullShape: number;
   /** This entity's indifference band, as a fraction of the incumbent's own
    * annualized cost — smaller for entities that can justify a more careful
@@ -163,9 +167,10 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
     const eventIndex = chain.length;
     const meanYears = params.lifetimeMeanYearsFor(last.system);
     const nextInstalledAtMs =
-      eventIndex === 1
+      eventIndex === 1 && params.initialInstalledAtMs === undefined
         ? firstRemainingLifetimeMs(params.entityKey, params.weibullShape, meanYears)
-        : last.installedAtMs + nextLifetimeMs(params.entityKey, eventIndex, params.weibullShape, meanYears);
+        : (eventIndex === 1 ? (params.initialInstalledAtMs as number) : last.installedAtMs) +
+          nextLifetimeMs(params.entityKey, eventIndex, params.weibullShape, meanYears);
     if (nextInstalledAtMs > uptoMs) break;
 
     const candidates = params.candidatesAt(nextInstalledAtMs, last.system);

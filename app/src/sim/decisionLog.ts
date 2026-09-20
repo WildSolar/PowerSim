@@ -35,7 +35,7 @@ export interface DecisionCandidateLog {
   greenness?: number;
 }
 
-export type DecisionLogKind = "heating" | "mobility-mode" | "mobility-vehicle-car" | "mobility-vehicle-bike" | "solar";
+export type DecisionLogKind = "heating" | "mobility-mode" | "mobility-vehicle-car" | "mobility-vehicle-bike" | "solar" | "construction";
 
 export interface DecisionLogEntry {
   seq: number;

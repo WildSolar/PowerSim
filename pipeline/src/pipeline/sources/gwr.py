@@ -157,6 +157,14 @@ def fetch_buildings(bfs_number: int) -> pd.DataFrame:
     return df[df["Gebaeudestatus_Code"] == EXISTING_BUILDING_STATUS_CODE].copy()
 
 
+def fetch_building_records(bfs_number: int) -> pd.DataFrame:
+    """Every GWR building record for the municipality regardless of status, including
+    demolished (GSTAT 1007, with a demolition year in GABBJ) ones, for
+    stock_history.py."""
+    raw = _read_csv(_download_zip(bfs_number), BUILDINGS_CSV)
+    return raw[raw["GGDENR"] == bfs_number].copy()
+
+
 def fetch_dwellings(bfs_number: int, egids: set[int]) -> pd.DataFrame:
     """Dwellings whose building EGID is in the given set."""
     zf = _download_zip(bfs_number)

@@ -11,12 +11,17 @@ import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
 import { buildingHeightM } from "../sim/buildingGeometry";
 import { buildingPowerW } from "../sim/buildingPower";
 import { simClock } from "../sim/engine";
+import { stock } from "../sim/stock";
+import { underConstructionAt, visibleAt } from "../sim/lifetime";
 import { addBoundaryLine, addBoundaryMask } from "./boundaryLayers";
 import { useMapKeyboard } from "./useMapKeyboard";
 import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { snowDepthCm } from "../sim/snow";
 import {
+  AGE_LEGEND,
+  buildingAgeBucket,
   buildingCategoryBucket,
+  CONSTRUCTION_COLOR,
   buildingHeatingBucket,
   buildingHeatingBucketAt,
   CATEGORY_LEGEND,
@@ -44,6 +49,8 @@ const SOLAR_TICK_MS = 5000; // new adoptions are decided at most once/year per b
 type BuildingProperties = {
   egid: string;
   category: string;
+  age: string;
+  constructing: number;
   heating: string;
   powerW: number;
   solarCapacityKw: number;
@@ -75,11 +82,17 @@ function solarCapacityByEgid(plants: PowerPlant[]): Map<string, number> {
   return byEgid;
 }
 
+const CONSTRUCTION_SITE_HEIGHT_M = 4;
+
+/** Every building visible at `simTimeMs`: standing ones, plus construction sites drawn
+ * as low amber blocks (they draw no power and house nobody yet). */
 function buildingsToGeoJSON(
-  buildings: Building[],
+  allBuildings: Building[],
   plants: PowerPlant[],
+  simTimeMs: number,
 ): { polygons: BuildingFeatureCollection; points: BuildingFeatureCollection } {
   const solarByEgid = solarCapacityByEgid(plants);
+  const buildings = allBuildings.filter((b) => visibleAt(b, simTimeMs));
 
   const polygonFeatures = buildings
     .filter((b) => b.footprint && b.footprint.length >= 3)
@@ -88,10 +101,12 @@ function buildingsToGeoJSON(
       properties: {
         egid: b.egid,
         category: buildingCategoryBucket(b),
+        age: buildingAgeBucket(b),
+        constructing: underConstructionAt(b, simTimeMs) ? 1 : 0,
         heating: buildingHeatingBucket(b),
         powerW: 0,
         solarCapacityKw: solarByEgid.get(b.egid) ?? 0,
-        heightM: buildingHeightM(b),
+        heightM: underConstructionAt(b, simTimeMs) ? CONSTRUCTION_SITE_HEIGHT_M : buildingHeightM(b),
       },
       geometry: {
         type: "Polygon" as const,
@@ -106,6 +121,8 @@ function buildingsToGeoJSON(
       properties: {
         egid: b.egid,
         category: buildingCategoryBucket(b),
+        age: buildingAgeBucket(b),
+        constructing: underConstructionAt(b, simTimeMs) ? 1 : 0,
         heating: buildingHeatingBucket(b),
         powerW: 0,
         solarCapacityKw: solarByEgid.get(b.egid) ?? 0,
@@ -164,12 +181,21 @@ function colorExpression(mode: ColorMode, selectedEgid: string | null, scales: C
       ? legendMatchExpression("category", CATEGORY_LEGEND)
       : mode === "heating"
         ? legendMatchExpression("heating", HEATING_LEGEND)
-        : mode === "power"
-          ? powerColorExpression(scales.powerMinW, scales.powerMaxW)
-          : mode === "solar"
-            ? solarColorExpression(scales.maxSolarCapacityKw)
-            : DEFAULT_COLOR;
-  return ["case", ["==", ["get", "egid"], selectedEgid ?? "__none__"], SELECTED_COLOR, base];
+        : mode === "age"
+          ? legendMatchExpression("age", AGE_LEGEND)
+          : mode === "power"
+            ? powerColorExpression(scales.powerMinW, scales.powerMaxW)
+            : mode === "solar"
+              ? solarColorExpression(scales.maxSolarCapacityKw)
+              : DEFAULT_COLOR;
+  return [
+    "case",
+    ["==", ["get", "egid"], selectedEgid ?? "__none__"],
+    SELECTED_COLOR,
+    ["==", ["get", "constructing"], 1],
+    CONSTRUCTION_COLOR,
+    base,
+  ];
 }
 
 /** maplibre-gl's own expression-spec types are a deep literal-tuple union that a
@@ -224,9 +250,10 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       bearing: -15,
     });
     mapRef.current = map;
+    if (import.meta.env.DEV) Object.assign(window, { __map: map });
     map.addControl(new NavigationControl({ visualizePitch: true }), "top-right");
 
-    const geojson = buildingsToGeoJSON(buildings, dataset.powerPlants);
+    const geojson = buildingsToGeoJSON(stock.getAll(), effectivePowerPlantsAt(stock.getAll(), dataset.powerPlants, simClock.getSimTimeMs()), simClock.getSimTimeMs());
     polygonsRef.current = geojson.polygons;
     pointsRef.current = geojson.points;
     maxSolarCapacityKwRef.current = Math.max(
@@ -297,6 +324,29 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset]);
 
+  // The stock changed (something was permitted, started, finished or demolished): redraw the
+  // building set from scratch. Cheap next to how rarely it happens.
+  useEffect(() => {
+    return stock.subscribe(() => {
+      const map = mapRef.current;
+      const polySource = map?.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
+      const pointSource = map?.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
+      if (!polySource || !pointSource) return;
+      const simTimeMs = simClock.getSimTimeMs();
+      const plants = effectivePowerPlantsAt(stock.getAll(), dataset.powerPlants, simTimeMs);
+      const fresh = buildingsToGeoJSON(stock.getAll(), plants, simTimeMs);
+      polygonsRef.current = fresh.polygons;
+      pointsRef.current = fresh.points;
+      maxSolarCapacityKwRef.current = Math.max(
+        0,
+        ...fresh.polygons.features.map((f) => f.properties.solarCapacityKw),
+        ...fresh.points.features.map((f) => f.properties.solarCapacityKw),
+      );
+      polySource.setData(fresh.polygons);
+      pointSource.setData(fresh.points);
+    });
+  }, [dataset]);
+
   // Live power-draw mode: periodically recompute every building's current device
   // draw and push it into the source data + a fresh color scale. Devices are pure
   // functions of (seed, simTime), so this is a cheap recomputation, not a simulation
@@ -304,8 +354,6 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
   useEffect(() => {
     const map = mapRef.current;
     if (!map || colorMode !== "power") return;
-
-    const buildingsByEgid = new Map(dataset.buildings.map((b) => [b.egid, b]));
 
     const tick = () => {
       const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
@@ -316,11 +364,11 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
 
       const simTimeMs = simClock.getSimTimeMs();
       const snowCoverCm = snowDepthCm(simTimeMs);
-      const plants = effectivePowerPlantsAt(dataset.buildings, dataset.powerPlants, simTimeMs);
+      const plants = effectivePowerPlantsAt(stock.getAll(), dataset.powerPlants, simTimeMs);
       let minW = 0;
       let maxW = 0;
       for (const feature of [...polyData.features, ...pointData.features]) {
-        const building = buildingsByEgid.get(feature.properties.egid);
+        const building = stock.lookup(feature.properties.egid);
         const power = building ? buildingPowerW(building, simTimeMs, plants, snowCoverCm) : 0;
         feature.properties.powerW = power;
         if (power > maxW) maxW = power;
@@ -356,8 +404,6 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     const map = mapRef.current;
     if (!map || colorMode !== "heating") return;
 
-    const buildingsByEgid = new Map(dataset.buildings.map((b) => [b.egid, b]));
-
     const tick = () => {
       const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
       const pointSource = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
@@ -367,7 +413,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
 
       const simTimeMs = simClock.getSimTimeMs();
       for (const feature of [...polyData.features, ...pointData.features]) {
-        const building = buildingsByEgid.get(feature.properties.egid);
+        const building = stock.lookup(feature.properties.egid);
         if (building) feature.properties.heating = buildingHeatingBucketAt(building, simTimeMs);
       }
 
@@ -390,8 +436,6 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     const map = mapRef.current;
     if (!map || colorMode !== "solar") return;
 
-    const buildingsByEgid = new Map(dataset.buildings.map((b) => [b.egid, b]));
-
     const tick = () => {
       const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
       const pointSource = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
@@ -400,11 +444,11 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       if (!polySource || !pointSource || !polyData || !pointData) return;
 
       const simTimeMs = simClock.getSimTimeMs();
-      const plants = effectivePowerPlantsAt(dataset.buildings, dataset.powerPlants, simTimeMs);
+      const plants = effectivePowerPlantsAt(stock.getAll(), dataset.powerPlants, simTimeMs);
       const solarByEgid = solarCapacityByEgid(plants);
       let maxKw = 0;
       for (const feature of [...polyData.features, ...pointData.features]) {
-        const building = buildingsByEgid.get(feature.properties.egid);
+        const building = stock.lookup(feature.properties.egid);
         const kw = building ? (solarByEgid.get(building.egid) ?? 0) : 0;
         feature.properties.solarCapacityKw = kw;
         if (kw > maxKw) maxKw = kw;

@@ -1,7 +1,7 @@
 import type { Building } from "../data/types";
 import { currentHeatingSystemId } from "../sim/heatingRenewal";
 
-export type ColorMode = "none" | "category" | "heating" | "power" | "solar";
+export type ColorMode = "none" | "category" | "heating" | "power" | "solar" | "age";
 
 export interface LegendEntry {
   bucket: string;
@@ -163,6 +163,30 @@ export function solarColorExpression(maxCapacityKw: number): MapExpr {
       SOLAR_RAMP[4],
     ],
   ];
+}
+
+// Sequential light->dark blue by construction era, with buildings that appeared during
+// the game in a hue of their own (they are the point of the layer). Construction
+// sites use the amber below in every layer, not just this one.
+export const AGE_LEGEND: LegendEntry[] = [
+  { bucket: "age1", label: "Before 1946", color: "#d9e6f2" },
+  { bucket: "age2", label: "1946-1975", color: "#a9c6e4" },
+  { bucket: "age3", label: "1976-2000", color: "#6fa3d6" },
+  { bucket: "age4", label: "2001 to game start", color: "#2a78d6" },
+  { bucket: "new", label: "Built during the game", color: "#1baf7a" },
+  { bucket: "unknown", label: "Unknown", color: UNKNOWN_COLOR },
+];
+
+export const CONSTRUCTION_COLOR = "#f2b01e";
+
+export function buildingAgeBucket(building: Building): string {
+  if (building.origin !== undefined) return "new";
+  const year = building.constructionYear;
+  if (year == null) return "unknown";
+  if (year < 1946) return "age1";
+  if (year < 1976) return "age2";
+  if (year < 2001) return "age3";
+  return "age4";
 }
 
 export function buildingCategoryBucket(building: Building): string {

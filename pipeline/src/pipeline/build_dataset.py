@@ -25,7 +25,7 @@ from . import coords
 from .schema import Building, Dwelling, MunicipalityDataset, PowerPlant
 from .sources import footprints as footprints_source
 from .sources import boundary as boundary_source
-from .sources import gwr, powerplants, statent
+from .sources import gwr, powerplants, sites as sites_source, statent, stock_history
 
 DEFAULT_BFS_NUMBER = 247  # Schlieren
 OUTPUT_DIR = Path(__file__).resolve().parents[3] / "app" / "public" / "data"
@@ -112,7 +112,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
     max_n = buildings_df["N-Gebaeudekoordinate"].max()
 
     print(f"Fetching building footprints over bbox ({min_e:.0f},{min_n:.0f})-({max_e:.0f},{max_n:.0f})...")
-    footprint_by_egid = footprints_source.fetch_building_footprints(min_e, min_n, max_e, max_n)
+    footprint_by_egid, open_land = footprints_source.fetch_land_cover(min_e, min_n, max_e, max_n)
     matched_count = sum(1 for egid in egids if egid in footprint_by_egid)
     print(f"  matched {matched_count} / {len(buildings_df)} {municipality_name} buildings to a footprint")
 
@@ -124,6 +124,11 @@ def build(bfs_number: int) -> MunicipalityDataset:
     dropped_count = len(buildings_df) - matched_count
     buildings_df = buildings_df[buildings_df[gwr.EGID_COL].astype(int).isin(footprint_by_egid)].copy()
     print(f"  dropped {dropped_count} building(s) with no footprint match")
+
+    development_sites = sites_source.compute_sites(
+        sites_source.fetch_zones(bfs_number), open_land, list(footprint_by_egid.values())
+    )
+    print(f"  {len(development_sites)} development sites")
 
     dwellings_by_egid: dict[int, list[Dwelling]] = {}
     for _, row in dwellings_df.iterrows():
@@ -187,6 +192,8 @@ def build(bfs_number: int) -> MunicipalityDataset:
         name=municipality_name,
         employment_by_sector=statent.fetch_employment_by_sector(bfs_number),
         boundary=boundary_source.fetch_boundary(bfs_number),
+        stock_history=stock_history.compute_stock_history(gwr.fetch_building_records(bfs_number)),
+        development_sites=development_sites,
         buildings=buildings,
         power_plants=plants,
     )

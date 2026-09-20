@@ -1,3 +1,6 @@
+import { existsAt } from "../sim/lifetime";
+import { toSimTimeMs } from "../sim/calendar";
+import { stock } from "../sim/stock";
 import type { MunicipalityDataset } from "../data/types";
 import { EMISSIONS_SOURCE_COLOR } from "../sim/emissions";
 import { HEATING_SYSTEM_CATALOG, HEATING_SYSTEM_ORDER, WATER_HEATING_KIND_COLOR } from "../sim/heatingSystems";
@@ -36,6 +39,9 @@ export interface ReportCardModalProps {
 export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps) {
   const tariff = useTariff();
   const plantsThisYear = effectivePowerPlants(dataset.buildings, dataset.powerPlants, year);
+  const yearEndMs = toSimTimeMs(Date.UTC(year + 1, 0, 1)) - 1;
+  const standing = dataset.buildings.filter((b) => existsAt(b, yearEndMs));
+  const development = stock.summaryForYear(year);
   const solarTally = solarAdoptionTallyForYear(dataset.buildings, dataset.powerPlants, year);
 
   const { energy: overallEnergy, loading: overallLoading } = usePeriodPieEnergy(
@@ -110,7 +116,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
         <div className="modal-content">
           <h2>🎉 Year in Review — {year}</h2>
           <p>
-            {dataset.name}, {year}: {dataset.buildings.length} buildings, {dataset.buildings.reduce((sum, b) => sum + b.dwellings.length, 0)}{" "}
+            {dataset.name}, {year}: {standing.length} buildings, {standing.reduce((sum, b) => sum + b.dwellings.length, 0)}{" "}
             dwellings.
           </p>
 
@@ -240,6 +246,19 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
             <p>
               {solarTally.count} building{solarTally.count === 1 ? "" : "s"} installed solar this year, totaling{" "}
               {solarTally.totalCapacityKw.toFixed(0)} kWp.
+            </p>
+          )}
+
+          <h2 style={{ fontSize: 14, marginTop: 14 }}>Construction this year</h2>
+          {development.newBuildings + development.replacementBuildings + development.demolished === 0 ? (
+            <p>Nothing was completed or demolished this calendar year.</p>
+          ) : (
+            <p>
+              {development.newBuildings} new building{development.newBuildings === 1 ? "" : "s"} and {development.replacementBuildings} replacement
+              building{development.replacementBuildings === 1 ? "" : "s"} completed ({development.dwellingsBuilt} dwellings,{" "}
+              {Math.round(development.gfaBuiltM2).toLocaleString("de-CH")} m² of floor space); {development.demolished} demolished (
+              {development.dwellingsDemolished} dwellings, {Math.round(development.gfaDemolishedM2).toLocaleString("de-CH")} m²). Net floor space{" "}
+              {development.netGrowthPct >= 0 ? "grew" : "shrank"} by {Math.abs(development.netGrowthPct).toFixed(1)}%.
             </p>
           )}
         </div>
