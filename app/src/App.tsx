@@ -17,6 +17,17 @@ import { useReportCardYear } from "./sim/store";
 import { startYearEndWatcher } from "./sim/yearEndWatcher";
 import "./App.css";
 
+// The simulation's state lives in many module-level singletons and caches (policy,
+// tariffs, solar adoption, decision log, per-year finances/emissions...), so a page
+// reload is the one reliable way to get a clean slate for the next municipality. The
+// app always opens on the start menu, so reloading lands there. There's no save
+// system yet, so the current run is lost — hence the confirm.
+function returnToMenu() {
+  if (window.confirm("Return to the main menu? Your current run will be lost.")) {
+    window.location.reload();
+  }
+}
+
 function Game({ slug }: { slug: string }) {
   const [dataset, setDataset] = useState<MunicipalityDataset | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +90,9 @@ function Game({ slug }: { slug: string }) {
         </button>
         <button className="pill-button" onClick={() => setShowWiki(true)}>
           📖 Wiki
+        </button>
+        <button className="pill-button" onClick={returnToMenu}>
+          ☰ Main menu
         </button>
       </div>
       {showControl && <ControlPanel dataset={dataset} onClose={() => setShowControl(false)} />}
