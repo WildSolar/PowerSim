@@ -52,5 +52,6 @@ class MunicipalityDataset:
     bfs_number: int
     name: str
     employment_by_sector: dict[str, int]
+    boundary: list  # official municipal boundary: polygons -> rings (outer first, then holes) -> [lon, lat]
     buildings: list[Building]
     power_plants: list[PowerPlant]

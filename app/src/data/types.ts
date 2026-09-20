@@ -38,10 +38,15 @@ export interface PowerPlant {
   egid: string | null;
 }
 
+/** Polygons -> rings (outer ring first, then holes) -> [lon, lat]. */
+export type MunicipalityBoundary = number[][][][];
+
 export interface MunicipalityDataset {
   bfsNumber: number;
   name: string;
   employmentBySector: Record<string, number>;
+  /** Absent in datasets built before boundaries were added — the map just skips the border. */
+  boundary?: MunicipalityBoundary;
   buildings: Building[];
   powerPlants: PowerPlant[];
 }

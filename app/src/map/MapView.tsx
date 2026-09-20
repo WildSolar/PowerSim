@@ -11,6 +11,7 @@ import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
 import { buildingHeightM } from "../sim/buildingGeometry";
 import { buildingPowerW } from "../sim/buildingPower";
 import { simClock } from "../sim/engine";
+import { addBoundaryLine, addBoundaryMask } from "./boundaryLayers";
 import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { snowDepthCm } from "../sim/snow";
 import {
@@ -217,6 +218,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode }: 
     map.on("style.load", () => {
       hideBasemapBuildingLayers(map);
 
+      if (dataset.boundary) addBoundaryMask(map, dataset.boundary);
       map.addSource(POLY_SOURCE_ID, { type: "geojson", data: geojson.polygons });
       map.addLayer({
         id: POLY_LAYER_ID,
@@ -246,6 +248,8 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode }: 
           "circle-stroke-width": 1,
         },
       });
+
+      if (dataset.boundary) addBoundaryLine(map, dataset.boundary);
 
       const handleClick = (e: MapMouseEvent & { features?: MapGeoJSONFeature[] }) => {
         const feature = e.features?.[0];

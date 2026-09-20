@@ -24,6 +24,7 @@ import pandas as pd
 from . import coords
 from .schema import Building, Dwelling, MunicipalityDataset, PowerPlant
 from .sources import footprints as footprints_source
+from .sources import boundary as boundary_source
 from .sources import gwr, powerplants, statent
 
 DEFAULT_BFS_NUMBER = 247  # Schlieren
@@ -185,6 +186,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
         bfs_number=bfs_number,
         name=municipality_name,
         employment_by_sector=statent.fetch_employment_by_sector(bfs_number),
+        boundary=boundary_source.fetch_boundary(bfs_number),
         buildings=buildings,
         power_plants=plants,
     )
