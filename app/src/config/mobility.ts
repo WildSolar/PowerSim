@@ -23,9 +23,11 @@ export interface MobilityModeSpec {
   targetShare: number;
 }
 
-// Kanton Zürich's 2021 Mikrozensus Mobilität und Verkehr (BFS/ARE) modal
-// split by daily distance — the best available real proxy for "how Schlieren
-// gets around": no municipality-level modal-split survey exists, and no
+// Switzerland-wide 2021 Mikrozensus Mobilität und Verkehr (BFS/ARE) modal
+// split by daily distance (MIV ≈ 69%, ÖV just under 20%, FVV the ~11%
+// remainder) — a national figure so the game works for any municipality; it
+// overstates car use for cities (Kanton Zürich alone is 62/10/28) and understates it
+// for rural areas. No municipality-level modal-split survey exists, and no
 // registry exists for bike/PT use the way it does for cars (see
 // MOBILITY_TWO_SLOT_* below for slot-count calibration against BFS's real,
 // municipality-level passenger-car register instead, which anchors car
@@ -35,9 +37,9 @@ export interface MobilityModeSpec {
 // (public transport) plus the remaining "other" (taxi/coach) bucket combine
 // into this game's single "other" mode.
 export const MOBILITY_MODE_CATALOG: Record<MobilityMode, MobilityModeSpec> = {
-  car: { mode: "car", label: "Car", icon: "🚗", color: "#eb6834", targetShare: 0.62 },
-  bike: { mode: "bike", label: "Bicycle", icon: "🚲", color: "#1baf7a", targetShare: 0.1 },
-  other: { mode: "other", label: "Public transit / other", icon: "🚌", color: "#2a78d6", targetShare: 0.28 },
+  car: { mode: "car", label: "Car", icon: "🚗", color: "#eb6834", targetShare: 0.69 },
+  bike: { mode: "bike", label: "Bicycle", icon: "🚲", color: "#1baf7a", targetShare: 0.11 },
+  other: { mode: "other", label: "Public transit / other", icon: "🚌", color: "#2a78d6", targetShare: 0.2 },
 };
 
 export type VehicleTypeId = "carEV" | "carICE" | "bikeElectric" | "bikeStandard";

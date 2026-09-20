@@ -1,22 +1,37 @@
 """Orchestrates the GWR + power-plant + footprint sources into one per-municipality
 dataset consumed by the game client (written to app/public/data/<slug>.json).
+
+Takes a BFS municipality number on the command line (`python -m pipeline.build_dataset
+247`), defaulting to Schlieren if none is given. gwr.py's own data is national — any
+Swiss municipality's BFS number works there — but footprints.py is still canton-
+Zürich-only (see that module's own doc for why), so this fails fast with a clear
+message for a municipality outside canton ZH rather than silently producing a
+dataset with no building shapes.
 """
 
 from __future__ import annotations
 
+import argparse
 import dataclasses
 import json
 import math
+import re
+import unicodedata
 from pathlib import Path
+
+import pandas as pd
 
 from . import coords
 from .schema import Building, Dwelling, MunicipalityDataset, PowerPlant
 from .sources import footprints as footprints_source
 from .sources import gwr, powerplants, statent
 
-BFS_NUMBER = 247
-MUNICIPALITY_NAME = "Schlieren"
-OUTPUT_PATH = Path(__file__).resolve().parents[3] / "app" / "public" / "data" / "schlieren.json"
+DEFAULT_BFS_NUMBER = 247  # Schlieren
+OUTPUT_DIR = Path(__file__).resolve().parents[3] / "app" / "public" / "data"
+
+# footprints.py only has a real (non-VECTOR25-blob) source for canton Zürich —
+# see that module's own doc for what was tried and why it isn't national yet.
+SUPPORTED_FOOTPRINT_CANTONS = {"ZH"}
 
 
 def _clean_int(value) -> int | None:
@@ -51,22 +66,42 @@ def _to_camel(obj):
     return obj
 
 
-def build() -> MunicipalityDataset:
-    print(f"Fetching GWR buildings for BFS {BFS_NUMBER}...")
-    buildings_df = gwr.fetch_buildings(BFS_NUMBER)
+def _slug(name: str) -> str:
+    """Municipality name -> filename-safe slug, e.g. 'Schlieren' -> 'schlieren',
+    'La Chaux-de-Fonds' -> 'la-chaux-de-fonds'."""
+    normalized = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-z0-9]+", "-", normalized.lower()).strip("-")
+    return slug or "municipality"
+
+
+def build(bfs_number: int) -> MunicipalityDataset:
+    print(f"Fetching GWR buildings for BFS {bfs_number}...")
+    buildings_df = gwr.fetch_buildings(bfs_number)
+    if buildings_df.empty:
+        raise SystemExit(f"No buildings found for BFS number {bfs_number} — check the number against {gwr.AUTHORITIES_URL}")
+    municipality_name = str(buildings_df["Gemeindename"].iloc[0])
     egids = {int(v) for v in buildings_df[gwr.EGID_COL].dropna()}
-    print(f"  {len(buildings_df)} buildings")
+    print(f"  {len(buildings_df)} buildings in {municipality_name}")
+
+    canton = gwr.municipality_canton(bfs_number)
+    if canton not in SUPPORTED_FOOTPRINT_CANTONS:
+        raise SystemExit(
+            f"{municipality_name} is in canton {canton}, but footprints.py only has a real building-shape "
+            f"source for {', '.join(sorted(SUPPORTED_FOOTPRINT_CANTONS))} today — see that module's own doc "
+            "for what was investigated and why. GWR itself (buildings/dwellings/addresses) is national and "
+            "would work fine; only the map footprint shapes are the blocker."
+        )
 
     print("Fetching GWR dwellings...")
-    dwellings_df = gwr.fetch_dwellings(egids)
+    dwellings_df = gwr.fetch_dwellings(bfs_number, egids)
     print(f"  {len(dwellings_df)} dwellings")
 
     print("Fetching GWR addresses...")
-    address_by_egid = gwr.fetch_addresses(egids)
+    address_by_egid = gwr.fetch_addresses(bfs_number, egids)
     print(f"  {len(address_by_egid)} / {len(buildings_df)} buildings matched an address")
 
     print("Fetching power plant registry...")
-    plants_df = powerplants.fetch_power_plants(MUNICIPALITY_NAME)
+    plants_df = powerplants.fetch_power_plants(municipality_name)
     print(f"  {len(plants_df)} plants")
 
     min_e = buildings_df["E-Gebaeudekoordinate"].min()
@@ -77,7 +112,7 @@ def build() -> MunicipalityDataset:
     print(f"Fetching building footprints over bbox ({min_e:.0f},{min_n:.0f})-({max_e:.0f},{max_n:.0f})...")
     footprint_by_egid = footprints_source.fetch_building_footprints(min_e, min_n, max_e, max_n)
     matched_count = sum(1 for egid in egids if egid in footprint_by_egid)
-    print(f"  matched {matched_count} / {len(buildings_df)} Schlieren buildings to a footprint")
+    print(f"  matched {matched_count} / {len(buildings_df)} {municipality_name} buildings to a footprint")
 
     # Buildings with no cadastral footprint match render as a bare point marker,
     # which reads badly on the map (often sitting inside a neighboring building's
@@ -129,6 +164,8 @@ def build() -> MunicipalityDataset:
 
     plants: list[PowerPlant] = []
     for _, row in plants_df.iterrows():
+        if pd.isna(row["_x"]) or pd.isna(row["_y"]):
+            continue  # registry rows without coordinates can't be placed (and NaN isn't valid JSON)
         lon, lat = coords.lv95_to_lonlat(row["_x"], row["_y"])
         plant_egid = _clean_int(row.get("EGID"))
         plants.append(
@@ -144,20 +181,31 @@ def build() -> MunicipalityDataset:
         )
 
     return MunicipalityDataset(
-        bfs_number=BFS_NUMBER,
-        name=MUNICIPALITY_NAME,
-        employment_by_sector=statent.fetch_employment_by_sector(BFS_NUMBER),
+        bfs_number=bfs_number,
+        name=municipality_name,
+        employment_by_sector=statent.fetch_employment_by_sector(bfs_number),
         buildings=buildings,
         power_plants=plants,
     )
 
 
 def main() -> None:
-    dataset = build()
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "bfs_number",
+        type=int,
+        nargs="?",
+        default=DEFAULT_BFS_NUMBER,
+        help=f"BFS municipality number (default: {DEFAULT_BFS_NUMBER}, Schlieren). Look one up at {gwr.AUTHORITIES_URL}",
+    )
+    args = parser.parse_args()
+
+    dataset = build(args.bfs_number)
+    output_path = OUTPUT_DIR / f"{_slug(dataset.name)}.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     payload = _to_camel(dataclasses.asdict(dataset))
-    OUTPUT_PATH.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-    print(f"Wrote {OUTPUT_PATH} ({len(dataset.buildings)} buildings, {len(dataset.power_plants)} power plants)")
+    output_path.write_text(json.dumps(payload, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+    print(f"Wrote {output_path} ({len(dataset.buildings)} buildings, {len(dataset.power_plants)} power plants)")
 
 
 if __name__ == "__main__":

@@ -36,7 +36,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    loadDataset()
+    // ?municipality=<slug> picks a different pipeline output (e.g. ?municipality=uster
+    // loads /data/uster.json) — see pipeline/build_dataset.py, which writes one file per
+    // municipality slug. Defaults to Schlieren when the param is absent.
+    const slug = new URLSearchParams(window.location.search).get("municipality");
+    loadDataset(slug ? `/data/${slug}.json` : undefined)
       .then(setDataset)
       .catch((e: Error) => setError(e.message));
   }, []);
@@ -54,7 +58,7 @@ export default function App() {
     return <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>Failed to load dataset: {error}</div>;
   }
   if (!dataset) {
-    return <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>Loading Schlieren…</div>;
+    return <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>Loading…</div>;
   }
 
   return (
