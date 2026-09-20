@@ -102,7 +102,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
     print(f"  {len(address_by_egid)} / {len(buildings_df)} buildings matched an address")
 
     print("Fetching power plant registry...")
-    plants_df = powerplants.fetch_power_plants(municipality_name)
+    plants_df = powerplants.fetch_power_plants(municipality_name, canton, egids)
     print(f"  {len(plants_df)} plants")
 
     min_e = buildings_df["E-Gebaeudekoordinate"].min()
@@ -210,22 +210,49 @@ def write_index() -> None:
     (OUTPUT_DIR / INDEX_FILENAME).write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def build_and_write(bfs_number: int) -> tuple[Path, MunicipalityDataset]:
+    dataset = build(bfs_number)
+    output_path = OUTPUT_DIR / f"{_slug(dataset.name)}.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = _to_camel(dataclasses.asdict(dataset))
+    output_path.write_text(json.dumps(payload, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+    return output_path, dataset
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "bfs_number",
         type=int,
         nargs="?",
-        default=DEFAULT_BFS_NUMBER,
+        default=None,
         help=f"BFS municipality number (default: {DEFAULT_BFS_NUMBER}, Schlieren). Look one up at {gwr.AUTHORITIES_URL}",
+    )
+    parser.add_argument(
+        "--canton",
+        help="build every municipality in this canton (e.g. ZH) instead of a single one; "
+        "a municipality that fails is reported at the end and doesn't stop the rest",
     )
     args = parser.parse_args()
 
-    dataset = build(args.bfs_number)
-    output_path = OUTPUT_DIR / f"{_slug(dataset.name)}.json"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    payload = _to_camel(dataclasses.asdict(dataset))
-    output_path.write_text(json.dumps(payload, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+    if args.canton:
+        bfs_numbers = gwr.canton_municipalities(args.canton)
+        failures: list[tuple[int, str, str]] = []
+        for i, (bfs_number, name) in enumerate(bfs_numbers, 1):
+            print(f"\n=== [{i}/{len(bfs_numbers)}] {name} (BFS {bfs_number}) ===")
+            try:
+                output_path, dataset = build_and_write(bfs_number)
+                print(f"Wrote {output_path} ({len(dataset.buildings)} buildings, {len(dataset.power_plants)} power plants)")
+            except (Exception, SystemExit) as e:
+                print(f"FAILED: {e}")
+                failures.append((bfs_number, name, str(e)))
+        write_index()
+        print(f"\nDone:{len(bfs_numbers) - len(failures)} built, {len(failures)} failed")
+        for bfs_number, name, reason in failures:
+            print(f"  {name} (BFS {bfs_number}): {reason}")
+        return
+
+    output_path, dataset = build_and_write(args.bfs_number or DEFAULT_BFS_NUMBER)
     write_index()
     print(f"Wrote {output_path} ({len(dataset.buildings)} buildings, {len(dataset.power_plants)} power plants)")
 

@@ -114,6 +114,18 @@ def _decode_column(series: pd.Series, field: str, decoder: dict[tuple[str, int],
     return series.map(decode_one)
 
 
+def canton_municipalities(canton: str) -> list[tuple[int, str]]:
+    """(BFS number, name) of every municipality in the given canton."""
+    response = requests.get(AUTHORITIES_URL, timeout=60)
+    response.raise_for_status()
+    found = [
+        (int(e["id"]), e["name"])
+        for e in response.json()
+        if e.get("type") == "municipality" and e.get("canton") == canton.upper()
+    ]
+    return sorted(found)
+
+
 def municipality_canton(bfs_number: int) -> str | None:
     """This municipality's 2-letter canton abbreviation (e.g. 'ZH') — footprints.py
     uses this to pick its own per-canton source. Looked up from the same
