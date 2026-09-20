@@ -12,6 +12,7 @@ import { buildingHeightM } from "../sim/buildingGeometry";
 import { buildingPowerW } from "../sim/buildingPower";
 import { simClock } from "../sim/engine";
 import { addBoundaryLine, addBoundaryMask } from "./boundaryLayers";
+import { useMapKeyboard } from "./useMapKeyboard";
 import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { snowDepthCm } from "../sim/snow";
 import {
@@ -169,11 +170,14 @@ export interface MapViewProps {
   selectedEgid: string | null;
   onSelectBuilding: (egid: string) => void;
   colorMode: ColorMode;
+  /** WASD/QE/RF camera keys; off while a modal is open. */
+  keyboardEnabled: boolean;
 }
 
-export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode }: MapViewProps) {
+export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, keyboardEnabled }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
+  useMapKeyboard(mapRef, keyboardEnabled);
   const onSelectBuildingRef = useRef(onSelectBuilding);
   onSelectBuildingRef.current = onSelectBuilding;
   const selectedEgidRef = useRef(selectedEgid);

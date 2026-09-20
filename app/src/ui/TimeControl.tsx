@@ -1,4 +1,4 @@
-import { simClock } from "../sim/engine";
+import { PAUSE_SPEED, RUNNING_SPEEDS, setSpeed } from "../sim/timeControls";
 import { ghiWm2 } from "../sim/pv";
 import { useSimTime, useSimSpeed } from "../sim/store";
 import { formatDate, formatTime, formatWeekday } from "../sim/calendar";
@@ -7,18 +7,7 @@ import { dayNightStatus } from "./dayNightDisplay";
 import { CONDITION_ICON, CONDITION_LABEL } from "./weatherDisplay";
 import "./timeControl.css";
 
-// simTime advances every animation frame regardless of multiplier (see engine.ts) —
-// there's no fixed-size "tick" whose cost scales with speed, so these top out where
-// they do only because nobody had asked to go faster yet, not because of a cost model.
-const SPEEDS: { label: string; value: number }[] = [
-  { label: "II", value: 0 },
-  { label: "×1", value: 1 },
-  { label: "×60", value: 60 },
-  { label: "×720", value: 720 },
-  { label: "×3600", value: 3600 },
-  { label: "×21600", value: 21600 },
-  { label: "×86400", value: 86400 },
-];
+const SPEEDS = [{ label: "II", value: PAUSE_SPEED }, ...RUNNING_SPEEDS];
 
 export function TimeControl() {
   const simTimeMs = useSimTime();
@@ -49,7 +38,12 @@ export function TimeControl() {
       </div>
       <div className="speed-buttons">
         {SPEEDS.map((s) => (
-          <button key={s.value} className={s.value === speed ? "active" : ""} onClick={() => simClock.setSpeed(s.value)}>
+          <button
+            key={s.value}
+            title={s.value === PAUSE_SPEED ? "Pause / resume (Space)" : "Cycle speed (Tab)"}
+            className={s.value === speed ? "active" : ""}
+            onClick={() => setSpeed(s.value)}
+          >
             {s.label}
           </button>
         ))}

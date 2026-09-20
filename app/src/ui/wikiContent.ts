@@ -46,6 +46,21 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "controls",
+    icon: "⌨️",
+    title: "Keyboard controls",
+    blocks: [
+      list([
+        "Space — pause / resume the simulation (resumes at the speed you paused from)",
+        "Tab — step to the next speed (×1 → ×60 → ×720 → … → ×86400, then back to ×1); while paused, resumes at the next speed",
+        "W A S D — move the map up / left / down / right, relative to the way you're facing",
+        "Q / E — rotate the view left / right",
+        "R / F — tilt the view toward the horizon / toward straight-down",
+      ]),
+      note("Keys are ignored while a panel or window (Control, Wiki, Year in Review) is open, or while you're typing in a text field."),
+    ],
+  },
+  {
     id: "time",
     icon: "🕐",
     title: "Time, weather & sun",

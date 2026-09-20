@@ -14,6 +14,7 @@ import type { ColorMode } from "./map/colorModes";
 import { simClock } from "./sim/engine";
 import { reportCardStore } from "./sim/reportCardStore";
 import { useReportCardYear } from "./sim/store";
+import { useTimeKeyboard } from "./ui/useTimeKeyboard";
 import { startYearEndWatcher } from "./sim/yearEndWatcher";
 import "./App.css";
 
@@ -37,6 +38,8 @@ function Game({ slug }: { slug: string }) {
   const [showControl, setShowControl] = useState(false);
   const [showWiki, setShowWiki] = useState(false);
   const reportCardYear = useReportCardYear();
+  const keyboardEnabled = !showControl && !showWiki && reportCardYear === null;
+  useTimeKeyboard(keyboardEnabled);
 
   useEffect(() => {
     simClock.start();
@@ -79,6 +82,7 @@ function Game({ slug }: { slug: string }) {
           setSelectedEwid(null);
         }}
         colorMode={colorMode}
+        keyboardEnabled={keyboardEnabled}
       />
       <div className="top-left-stack">
         <TimeControl />
