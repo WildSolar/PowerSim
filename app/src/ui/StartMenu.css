@@ -40,28 +40,50 @@
   color: #b3261e;
 }
 
+.start-menu-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.start-menu-search:focus {
+  outline: 2px solid #2a78d6;
+  border-color: transparent;
+}
+
+/* Each row is 40px tall with a 6px gap, so ten rows show at once and the rest scroll. */
 .start-menu-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 4px 0 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  max-height: 454px;
+  overflow-y: auto;
 }
 
 .start-menu-item {
   width: 100%;
+  height: 40px;
+  box-sizing: border-box;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 12px 14px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px;
   border: 1px solid #ddd;
   border-radius: 10px;
   background: #fff;
   font-family: inherit;
   text-align: left;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .start-menu-item:hover {
@@ -70,11 +92,12 @@
 }
 
 .start-menu-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
 }
 
 .start-menu-meta {
   font-size: 12px;
   color: #666;
+  white-space: nowrap;
 }
