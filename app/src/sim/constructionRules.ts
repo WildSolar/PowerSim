@@ -23,6 +23,8 @@ export interface ConstructionRules {
   minSolarWPerM2Ebf: number;
   /** Share (0-1) of a roof's usable PV capacity the mandate requires. */
   solarMandateFraction: number;
+  /** Buildings with a smaller footprint are exempt from the mandate (the code minimum still applies). */
+  solarMandateMinFootprintM2: number;
   /** Multiplier on the code-standard U-value; below 1 = better insulated than code. */
   uValueFactor: number;
   /** Multipliers on the historic growth rate and renewal rate. */
@@ -55,6 +57,7 @@ export function constructionRules(policy: Policy, _year: number): ConstructionRu
     allowedHeating: new Set(policy.newBuildFossilHeatingAllowed ? ALL_HEATING : CLEAN_HEATING),
     minSolarWPerM2Ebf: CODE_SOLAR_W_PER_M2_EBF,
     solarMandateFraction: policy.newBuildSolarMandatePct / 100,
+    solarMandateMinFootprintM2: policy.newBuildSolarMandateMinFootprintM2,
     uValueFactor: 1 - (policy.newBuildInsulationLevel / 100) * PASSIVE_HOUSE_U_VALUE_REDUCTION,
     growthMultiplier: policy.growthMultiplier,
     renewalRateMultiplier: policy.renewalRateMultiplier,

@@ -7,28 +7,17 @@
  */
 
 import { baseUValueForYear } from "./spaceHeating";
-import { CODE_SOLAR_W_PER_M2_EBF, DISTRICT_HEATING_REACH_M, EBF_FRACTION_OF_GFA, HEATING_CHOICE_TEMPERATURE, NEW_BUILD_QUALITY_FACTOR_RANGE, type BuildingGroup } from "../config/stock";
+import { CODE_SOLAR_W_PER_M2_EBF, DISTRICT_HEATING_REACH_M, EBF_FRACTION_OF_GFA, HEATING_CHOICE_TEMPERATURE, NEW_BUILD_QUALITY_FACTOR_RANGE } from "../config/stock";
 import type { Building } from "../data/types";
 import type { ConstructionRules } from "./constructionRules";
+import { buildingGroup } from "./buildingGroup";
 import { logCandidateDecision } from "./decisionLog";
 import { chooseNewBuildHeating } from "./heatingRenewal";
 import type { HeatingSystemId } from "./heatingSystems";
 import { registerNewBuildSolar } from "./solarAdoption";
 
+export { buildingGroup };
 export { CODE_SOLAR_W_PER_M2_EBF, DISTRICT_HEATING_REACH_M };
-
-/** The building's use, reduced to the groups new construction is drawn from. Null for
- * ancillary structures (garages, sheds, silos, farm buildings) — replaced along with a
- * neighbouring project but never a template for new construction. */
-export function buildingGroup(building: Building): BuildingGroup | null {
-  const c = building.buildingClass ?? "";
-  if (/einer Wohnung|zwei\s+Wohnungen/.test(c)) return "houseSingle";
-  if (/drei oder mehr|Gemeinschaften/.test(c)) return "apartments";
-  if (/Büro|Einzelhandel|Hotel/.test(c)) return "commercial";
-  if (/Industrie/.test(c)) return "industrial";
-  if (/Schul|Sport|Kult|Kranken|Museen/.test(c)) return "public";
-  return null;
-}
 
 export function gfaOf(building: Building): number {
   return (building.footprintAreaM2 ?? 0) * Math.max(1, building.floorCount ?? 2);

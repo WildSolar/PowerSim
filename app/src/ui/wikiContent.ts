@@ -96,6 +96,28 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "measures",
+    icon: "🏛️",
+    title: "Measures: what the municipality can decide",
+    blocks: [
+      p(
+        "Control → Measures lists everything the municipality can enact, in four kinds: subsidies (money for households that act), infrastructure (things the municipality builds itself), information (campaigns and advice that help people decide), and laws (bans, mandates and standards). Each has options you set, a cost, and a lead time.",
+      ),
+      list([
+        "Lead time: nothing happens the day you decide. A subsidy takes a month or two to set up; a law can take one to three years. Changing an enacted measure starts a new lead time, and the old settings stay in force until then. Repealing is immediate.",
+        "Cost: a subsidy costs money only when a household actually takes it up; a campaign costs a little every month it runs; infrastructure costs what it costs when it is built. All of it comes out of the treasury.",
+        "Information measures narrow the uncertainty investment decisions are made under, so people act on clear savings and stop chasing marginal ones. They cost a running programme budget.",
+        "Laws can slow things down as well as speed them up: a minimum standard for renovations, for instance, discourages owners who would have done a smaller upgrade.",
+      ]),
+      p(
+        "The canton and the federal government act on their own schedule too — a cantonal ban on new fossil heating, a federal end to new petrol and diesel car sales, a cantonal renovation standard. You have no say and pay nothing, but they change what people decide. Each is announced some years ahead, and the Outlook at the top of Measures shows what is coming, so you can plan around it rather than duplicate it.",
+      ),
+      note(
+        "How early the higher levels of government act depends on the difficulty you chose at the start: earlier on Easy, later (or not at all) on Hard. Solar decisions are settled once a year, so a solar subsidy, campaign or programme changed mid-year is picked up from the next year's round.",
+      ),
+    ],
+  },
+  {
     id: "growth",
     icon: "🏗️",
     title: "Town growth & building renewal",
@@ -265,13 +287,13 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Solar adoption",
     blocks: [
       p(
-        "Every building without solar already (and younger than 200 years — old enough to be presumed heritage-protected, a simple stand-in for real protection status) gets an annual chance to seriously consider it. That chance starts low, but rises for a few years after the building's own heating system is renewed (see \"Stock renewal\" — a heat-pump switch is a natural moment to think about solar too), rises further the more nearby buildings already have it (a real, observed \"my neighbor got one\" effect), and can be pushed higher still by the municipality's own outreach effort (Control → Policy).",
+        "Every building without solar already (and younger than 200 years — old enough to be presumed heritage-protected, a simple stand-in for real protection status) gets an annual chance to seriously consider it. That chance starts low, but rises for a few years after the building's own heating system is renewed (see \"Stock renewal\" — a heat-pump switch is a natural moment to think about solar too), rises further the more nearby buildings already have it (a real, observed \"my neighbor got one\" effect), and can be pushed higher still by the municipality's own outreach effort (Control → Measures).",
       ),
       p(
         "When a building does seriously consider it, the decision itself works like a heating renewal: candidate size is the building's own roof footprint times a randomly-drawn (but expected-value-plausible) usable-roof fraction, times whatever module efficiency is current that year — panels keep getting more efficient over time, so a later install packs more capacity onto the same roof. That candidate is compared, the same four-factor way as every other stock-renewal decision, against staying without: installation cost (which falls per kWp as the system gets bigger, matching how real Swiss PV pricing works) minus subsidies, against the electricity it would actually save and export at today's prices.",
       ),
       p(
-        "Subsidies are two-layered: every installation gets Switzerland's real federal one-time payment automatically, and the municipality can add its own top-up on top (Control → Policy) — a real cost, paid out of the municipal treasury the moment a building adopts (see \"Municipal finances\").",
+        "Subsidies are two-layered: every installation gets Switzerland's real federal one-time payment automatically, and the municipality can add its own top-up on top (Control → Measures) — a real cost, paid out of the municipal treasury the moment a building adopts (see \"Municipal finances\").",
       ),
       note(
         "The self-consumption/export split behind the savings estimate is sampled coarsely (24 points/month, not hour-by-hour), so it's a reasonable approximation of how much a candidate installation would actually be used on-site versus exported — not a precise simulation.",
@@ -348,7 +370,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Alongside emissions, the municipality's other headline resource is money: one treasury for the whole energy department, always shown top-left. It starts with some cash, receives an annual allocation from the overall government (credited each 1 January, sized by the population), and settles what its local electricity utility keeps after buying power and maintaining the grid once a year. The budget you spend from on subsidies and, later, infrastructure.",
       ),
       p(
-        "Money leaves the treasury only when a decision actually happens: the day a household installs a subsidised heat pump, buys a subsidised electric car, upgrades its insulation, or puts up solar panels, the municipal top-up is paid out. A grant nobody takes up costs nothing — but a grant also goes to everyone who would have decided the same way anyway, and finding the level that tips the undecided without overpaying the rest is the whole game of subsidy planning. The grants are set in Control → Policy.",
+        "Money leaves the treasury only when a decision actually happens: the day a household installs a subsidised heat pump, buys a subsidised electric car, upgrades its insulation, or puts up solar panels, the municipal top-up is paid out. A grant nobody takes up costs nothing — but a grant also goes to everyone who would have decided the same way anyway, and finding the level that tips the undecided without overpaying the rest is the whole game of subsidy planning. The grants are set in Control → Measures.",
       ),
       p(
         "Each completed year, the balance moves by: what consumers paid for grid electricity, plus the government allocation, minus the solar fed in, the wholesale cost of the net electricity bought in, grid maintenance, and every subsidy paid out that year. The utility costs are set in Control → Prices, under \"Municipal utility costs\".",

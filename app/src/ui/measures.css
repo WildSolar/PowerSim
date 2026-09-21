@@ -1,0 +1,171 @@
+.measures-tab {
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  color: #1a1a1a;
+  max-width: 560px;
+}
+
+.measures-intro {
+  font-size: 12px;
+  color: #898781;
+  margin: 0 0 12px;
+}
+
+.measures-section {
+  margin-bottom: 18px;
+}
+
+.measures-section h3 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #898781;
+}
+
+.measure-card {
+  border: 1px solid #e4e2dc;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+
+.measure-card.external {
+  background: #f7f6f2;
+}
+
+.measure-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.measure-title {
+  font-weight: 600;
+}
+
+.measure-status {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.measure-status.off {
+  background: #eee;
+  color: #777;
+}
+
+.measure-status.pending {
+  background: #fdf0cc;
+  color: #7a5200;
+}
+
+.measure-status.active {
+  background: #d9f2e6;
+  color: #0d5b44;
+}
+
+.measure-summary {
+  margin: 6px 0 8px;
+  font-size: 12px;
+  color: #52514e;
+}
+
+.measure-note {
+  font-size: 11px;
+  color: #898781;
+  margin: 2px 0;
+}
+
+.measure-param {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.measure-param-label {
+  flex: 0 0 150px;
+  font-size: 12px;
+}
+
+.measure-param input[type="range"] {
+  flex: 1;
+  min-width: 80px;
+}
+
+.measure-param select {
+  flex: 1;
+  padding: 3px 5px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.measure-param-value {
+  flex: 0 0 120px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.measure-param-value small {
+  font-weight: 400;
+  color: #898781;
+}
+
+.measure-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 11px;
+  color: #898781;
+  margin: 8px 0;
+}
+
+.measure-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.measure-actions button {
+  border: 1px solid #ccc;
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.measure-actions .measure-enact {
+  background: #2a78d6;
+  border-color: #2a78d6;
+  color: #fff;
+}
+
+.measure-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.measure-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+}
+
+.measure-log li {
+  padding: 3px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.measure-log-date {
+  color: #898781;
+  margin-right: 6px;
+  font-variant-numeric: tabular-nums;
+}

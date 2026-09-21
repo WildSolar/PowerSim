@@ -7,7 +7,7 @@ import { tariffKey } from "../sim/tariff";
 import { CityStatsTab } from "./CityStatsTab";
 import { DecisionLogTab } from "./DecisionLogTab";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
-import { PolicyControl } from "./PolicyControl";
+import { MeasuresTab } from "./MeasuresTab";
 import { TariffControl } from "./TariffControl";
 import "./modal.css";
 
@@ -16,11 +16,11 @@ export interface ControlPanelProps {
   onClose: () => void;
 }
 
-type ControlTab = "prices" | "policy" | "stats" | "history" | "debug";
+type ControlTab = "prices" | "measures" | "stats" | "history" | "debug";
 
 const TABS: { id: ControlTab; icon: string; title: string }[] = [
   { id: "prices", icon: "💰", title: "Prices" },
-  { id: "policy", icon: "📜", title: "Policy" },
+  { id: "measures", icon: "🏛️", title: "Measures" },
   { id: "stats", icon: "📊", title: "City stats" },
   { id: "history", icon: "📈", title: "History" },
   { id: "debug", icon: "🐛", title: "Debug" },
@@ -41,7 +41,7 @@ export function ControlPanel({ dataset, onClose }: ControlPanelProps) {
   // first time it's ever queried) using whatever policy is set *right then*
   // (solarAdoption.ts's own retroactive-but-frozen rule), so merely opening
   // Control (defaulting to the Prices tab) must never trigger it ahead of
-  // the player ever reaching Policy.
+  // the player ever reaching the Measures tab.
   const plants = tab === "history" ? effectivePowerPlantsAt(dataset.buildings, dataset.powerPlants, currentDay) : dataset.powerPlants;
 
   return (
@@ -70,12 +70,7 @@ export function ControlPanel({ dataset, onClose }: ControlPanelProps) {
               <TariffControl />
             </>
           )}
-          {tab === "policy" && (
-            <>
-              <h2>📜 Policy</h2>
-              <PolicyControl />
-            </>
-          )}
+          {tab === "measures" && <MeasuresTab />}
           {tab === "stats" && <CityStatsTab dataset={dataset} />}
           {tab === "history" && (
             <HistoricalEnergySection

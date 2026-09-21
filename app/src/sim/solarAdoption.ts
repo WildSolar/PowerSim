@@ -76,6 +76,7 @@ import { consumptionSeriesW, hourOfDayAt } from "./billing";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { logCandidateDecision } from "./decisionLog";
 import { LocalProjection, PointGrid } from "./localGeo";
+import { buildingGroup } from "./buildingGroup";
 import { existsAt } from "./lifetime";
 import type { ConstructionRules } from "./constructionRules";
 import { heatingRenewalsInRange } from "./heatingRenewal";
@@ -110,7 +111,7 @@ export interface SolarAdoptionRecord {
   municipalSubsidyRp: number;
   annualSavingsRp: number;
   /** A new building's array, fixed at permit time by the construction rules rather than an owner's choice. */
-  origin?: "mandate" | "voluntary";
+  origin?: "mandate" | "voluntary" | "municipal";
 }
 
 const adoptionByEgid = new Map<string, SolarAdoptionRecord>();
@@ -241,7 +242,7 @@ function evaluateAdoption(
 
   const installCostRp = capacityKw * installCostRpPerKwp(capacityKw);
   const federalRp = federalSubsidyRp(capacityKw);
-  const municipalRp = Math.max(0, Math.min(capacityKw * policy.solarSubsidyRpPerKwp, installCostRp - federalRp));
+  const municipalRp = Math.max(0, Math.min(capacityKw * policy.solarSubsidyRpPerKwp + policy.solarSubsidyFixedRp, installCostRp - federalRp));
   const subsidyRp = federalRp + municipalRp;
 
   const annualSavingsRp = candidateAnnualSavingsRp(building, capacityKw, yearStartMs, tariff);
@@ -257,7 +258,7 @@ function evaluateAdoption(
     },
   ];
   const biasRp = solarBiasStrengthRp(building.egid);
-  const { chosen } = chooseNext(candidates, "none", SOLAR_UNCERTAINTY_FRACTION, biasRp);
+  const { chosen } = chooseNext(candidates, "none", SOLAR_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier, biasRp);
 
   logCandidateDecision({
     atMs: yearStartMs,
@@ -289,10 +290,53 @@ function evaluateAdoption(
   return { installedAtMs: yearStartMs + dayOffset * DAY_MS, capacityKw, installCostRp, federalSubsidyRp: federalRp, municipalSubsidyRp: municipalRp, annualSavingsRp };
 }
 
+const MUNICIPAL_SOLAR_MIN_FOOTPRINT_M2 = 200;
+
+/** The municipality puts solar on some of its own (public) buildings this year — a measure, not an
+ * owner's decision: full usable roof, paid for by the treasury (less the federal payment every
+ * installation gets), generating from the install date. */
+function installMunicipalSolar(buildings: Building[], realPlants: PowerPlant[], year: number, yearStartMs: number): void {
+  const perYear = policyStore.get().municipalSolarBuildingsPerYear;
+  if (perYear <= 0) return;
+  const whole = Math.floor(perYear);
+  const count = whole + (mulberry32(hashSeed("municipal-solar-count", String(year)))() < perYear - whole ? 1 : 0);
+  const realEgids = realPvEgids(realPlants);
+  const candidates = buildings
+    .filter(
+      (b) =>
+        buildingGroup(b) === "public" &&
+        (b.footprintAreaM2 ?? 0) >= MUNICIPAL_SOLAR_MIN_FOOTPRINT_M2 &&
+        existsAt(b, yearStartMs) &&
+        !adoptionByEgid.has(b.egid) &&
+        !realEgids.has(b.egid),
+    )
+    .sort((a, b) => hashSeed(a.egid, "municipal-solar", String(year)) - hashSeed(b.egid, "municipal-solar", String(year)));
+  for (const building of candidates.slice(0, count)) {
+    const usable = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
+    const capacityKw = (building.footprintAreaM2 ?? 0) * usable * kwpPerM2At(year);
+    if (capacityKw <= 0) continue;
+    const installCostRp = capacityKw * installCostRpPerKwp(capacityKw);
+    const federalRp = federalSubsidyRp(capacityKw);
+    const dayOffset = Math.floor(mulberry32(hashSeed(building.egid, "municipal-solar-day", String(year)))() * 365);
+    const installedAtMs = yearStartMs + dayOffset * DAY_MS;
+    adoptionByEgid.set(building.egid, {
+      installedAtMs,
+      capacityKw,
+      installCostRp,
+      federalSubsidyRp: federalRp,
+      municipalSubsidyRp: 0,
+      annualSavingsRp: 0,
+      origin: "municipal",
+    });
+    treasury.recordPayout("infrastructure", installedAtMs, Math.max(0, installCostRp - federalRp), building.egid);
+  }
+}
+
 function processYear(buildings: Building[], realPlants: PowerPlant[], year: number): void {
   const policy = policyStore.get();
   const tariff = tariffStore.get();
   const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
+  installMunicipalSolar(buildings, realPlants, year, yearStartMs);
 
   for (const building of buildings) {
     if (adoptionByEgid.has(building.egid)) continue;
@@ -407,7 +451,8 @@ export function registerNewBuildSolar(building: Building, builtAtMs: number, rul
   if (usableCapacityKw <= 0) return;
 
   const codeKw = ((building.energyReferenceAreaM2 ?? 0) * rules.minSolarWPerM2Ebf) / 1000;
-  const requiredKw = Math.min(usableCapacityKw, Math.max(codeKw, rules.solarMandateFraction * usableCapacityKw));
+  const mandatedFraction = (building.footprintAreaM2 ?? 0) >= rules.solarMandateMinFootprintM2 ? rules.solarMandateFraction : 0;
+  const requiredKw = Math.min(usableCapacityKw, Math.max(codeKw, mandatedFraction * usableCapacityKw));
   const voluntary = voluntaryDraw < NEW_BUILD_VOLUNTARY_SOLAR_SHARE;
   const capacityKw = voluntary ? usableCapacityKw : requiredKw;
 
@@ -449,6 +494,9 @@ export interface SolarAdoptionLogEntry {
 export function solarAdoptionLog(building: Building, simTimeMs: number): SolarAdoptionLogEntry[] {
   const record = adoptionByEgid.get(building.egid);
   if (!record || record.installedAtMs > simTimeMs) return [];
+  if (record.origin === "municipal") {
+    return [{ installedAtMs: record.installedAtMs, note: `The municipality put solar panels on this public building: ${record.capacityKw.toFixed(1)} kWp, paid from the treasury.` }];
+  }
   if (record.origin) {
     const why = record.origin === "mandate" ? "the minimum the building rules required" : "the whole usable roof, beyond what the rules required";
     return [{ installedAtMs: record.installedAtMs, note: `Solar panels came with the new building: ${record.capacityKw.toFixed(1)} kWp, ${why}.` }];

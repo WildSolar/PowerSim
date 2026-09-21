@@ -8,7 +8,7 @@ import { HEATING_SYSTEM_CATALOG, HEATING_SYSTEM_ORDER, WATER_HEATING_KIND_COLOR 
 import { sampleMunicipalityCategorySeries } from "../sim/history";
 import { effectivePowerPlants, solarAdoptionTallyForYear } from "../sim/solarAdoption";
 import { computeRetrofitTally, spaceHeatingKWhFor } from "../sim/yearReport";
-import { SUBSIDY_CATEGORIES, SUBSIDY_LABEL } from "../sim/treasury";
+import { PAYOUT_CATEGORIES, PAYOUT_LABEL } from "../sim/treasury";
 import { useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
 import { CONSUMPTION_CATEGORIES } from "./deviceCategories";
@@ -177,10 +177,10 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                   <span className="renewal-tally-label">Grid maintenance</span>
                   <span className="finance-value negative">−{formatCHF(finances.current.gridMaintenanceCostRp)}</span>
                 </div>
-                {SUBSIDY_CATEGORIES.filter((c) => finances.current.subsidiesPaidRp[c] > 0).map((c) => (
+                {PAYOUT_CATEGORIES.filter((c) => finances.current.spendingRp[c] > 0).map((c) => (
                   <div className="renewal-tally-row" key={c}>
-                    <span className="renewal-tally-label">{SUBSIDY_LABEL[c]}</span>
-                    <span className="finance-value negative">−{formatCHF(finances.current.subsidiesPaidRp[c])}</span>
+                    <span className="renewal-tally-label">{PAYOUT_LABEL[c]}</span>
+                    <span className="finance-value negative">−{formatCHF(finances.current.spendingRp[c])}</span>
                   </div>
                 ))}
                 <div className="renewal-tally-row" style={{ fontWeight: 600 }}>

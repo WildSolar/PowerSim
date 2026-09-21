@@ -101,3 +101,35 @@
   color: #666;
   white-space: nowrap;
 }
+
+.start-menu-difficulty {
+  margin-bottom: 14px;
+}
+
+.start-menu-difficulty-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.start-menu-difficulty-buttons button {
+  flex: 1;
+  padding: 6px 0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.start-menu-difficulty-buttons button.active {
+  background: #2a78d6;
+  border-color: #2a78d6;
+  color: #fff;
+}
+
+.start-menu-difficulty p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #666;
+}

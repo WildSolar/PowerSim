@@ -19,7 +19,9 @@ import { useTimeKeyboard } from "./ui/useTimeKeyboard";
 import { useStockBuildings } from "./ui/useStock";
 import { stock } from "./sim/stock";
 import { policyStore } from "./sim/policy";
+import { measures } from "./sim/measures";
 import { treasury } from "./sim/treasury";
+import type { Difficulty } from "./config/difficulty";
 import { startYearEndWatcher } from "./sim/yearEndWatcher";
 import "./App.css";
 
@@ -35,9 +37,9 @@ function returnToMenu() {
 }
 
 // Dev-only handle for inspecting the simulation from the browser console.
-if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury } });
+if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures } });
 
-function Game({ slug }: { slug: string }) {
+function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
   const [dataset, setDataset] = useState<MunicipalityDataset | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedEgid, setSelectedEgid] = useState<string | null>(null);
@@ -62,11 +64,12 @@ function Game({ slug }: { slug: string }) {
   useEffect(() => {
     loadDataset(`/data/${slug}.json`)
       .then((loaded) => {
+        measures.init(difficulty); // before the stock: it registers the town size the measures' costs scale with
         stock.init(loaded);
         setDataset(loaded);
       })
       .catch((e: Error) => setError(e.message));
-  }, [slug]);
+  }, [slug, difficulty]);
 
   // The dataset as it stands now: the base buildings plus everything built since (sim/stock.ts).
   // MapView keeps the original dataset (its mount is keyed on that reference) and reads the stock itself.
@@ -147,6 +150,6 @@ function Game({ slug }: { slug: string }) {
 }
 
 export default function App() {
-  const [slug, setSlug] = useState<string | null>(null);
-  return slug ? <Game slug={slug} /> : <StartMenu onStart={setSlug} />;
+  const [choice, setChoice] = useState<{ slug: string; difficulty: Difficulty } | null>(null);
+  return choice ? <Game slug={choice.slug} difficulty={choice.difficulty} /> : <StartMenu onStart={(slug, difficulty) => setChoice({ slug, difficulty })} />;
 }

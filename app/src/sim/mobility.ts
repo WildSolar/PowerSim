@@ -51,6 +51,7 @@ import {
 } from "./mobilitySystems";
 import { modeAt, modeEventsUpTo, type ModeEvent } from "./modeRenewal";
 import type { Building } from "../data/types";
+import { policyStore } from "./policy";
 import { municipalVehicleSubsidyRp } from "./subsidies";
 import { hashSeed, mulberry32 } from "./rng";
 import { peekRenewalChain, renewalEventsUpTo, systemAt, type RenewalCandidate, type RenewalEvent, type RenewalParams } from "./renewal";
@@ -139,7 +140,7 @@ function carCandidatesAt(tariff: Tariff): RenewalCandidate<VehicleTypeId>[] {
         : (ANNUAL_CAR_KM / 100) * ICE_CAR_L_PER_100KM * tariff.petrolPriceRpPerLiter;
     return {
       id,
-      available: true,
+      available: !(id === "carICE" && policyStore.get().iceCarPurchaseBanned),
       annualizedCostRp: installCostRp / spec.lifetimeMeanYears + runningCostRp,
       lifetimeMeanYears: spec.lifetimeMeanYears,
       municipalSubsidyRp: municipalRp,

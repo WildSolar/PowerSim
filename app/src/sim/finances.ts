@@ -45,7 +45,7 @@ import { existsAt } from "./lifetime";
 import { effectivePowerPlants } from "./solarAdoption";
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
-import { governmentAllocationRp as governmentAllocationRpFor, SUBSIDY_CATEGORIES, treasury, type PayoutsByCategory } from "./treasury";
+import { PAYOUT_CATEGORIES, treasury, type PayoutsByCategory } from "./treasury";
 
 const COARSE_SAMPLES_PER_MONTH = 8; // matches yearReport.ts's own coarse density for smooth municipality-wide electricity quantities
 
@@ -56,9 +56,9 @@ export interface MunicipalFinances {
   wholesaleCostRp: number; // paid upstream for the net electricity actually drawn from the wider grid (consumption minus all local solar)
   gridMaintenanceCostRp: number; // wires/upkeep cost, scaled to gross electricity delivered to consumers
   governmentAllocationRp: number; // this year's allocation from the overall government (a placeholder framing, see config/treasury.ts)
-  subsidiesPaidRp: PayoutsByCategory; // the municipality's own top-ups, per kind, paid out as decisions happened this year — never the federal/cantonal grants
-  subsidiesPaidTotalRp: number;
-  netIncomeRp: number; // consumerRevenueRp + governmentAllocationRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - subsidiesPaidTotalRp
+  spendingRp: PayoutsByCategory; // the municipality's own top-ups, per kind, paid out as decisions happened this year — never the federal/cantonal grants
+  spendingTotalRp: number;
+  netIncomeRp: number; // consumerRevenueRp + governmentAllocationRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - spendingTotalRp
 }
 
 const ZERO_FINANCES: Omit<MunicipalFinances, "year"> = {
@@ -67,8 +67,8 @@ const ZERO_FINANCES: Omit<MunicipalFinances, "year"> = {
   wholesaleCostRp: 0,
   gridMaintenanceCostRp: 0,
   governmentAllocationRp: 0,
-  subsidiesPaidRp: { solar: 0, heating: 0, vehicle: 0, retrofit: 0 },
-  subsidiesPaidTotalRp: 0,
+  spendingRp: { solar: 0, heating: 0, vehicle: 0, retrofit: 0, programs: 0, infrastructure: 0 },
+  spendingTotalRp: 0,
   netIncomeRp: 0,
 };
 
@@ -120,11 +120,11 @@ export async function computeMunicipalFinancesForYear(
   const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
   const yearEndMs = toSimTimeMs(Date.UTC(year + 1, 0, 1));
   treasury.settleThrough(yearEndMs);
-  const subsidiesPaidRp = treasury.paidOut(yearStartMs, yearEndMs);
-  const subsidiesPaidTotalRp = SUBSIDY_CATEGORIES.reduce((sum, c) => sum + subsidiesPaidRp[c], 0);
+  const spendingRp = treasury.paidOut(yearStartMs, yearEndMs);
+  const spendingTotalRp = PAYOUT_CATEGORIES.reduce((sum, c) => sum + spendingRp[c], 0);
   const dwellingsAtYearStart = buildings.reduce((sum, b) => sum + (existsAt(b, yearStartMs) ? b.dwellings.length : 0), 0);
-  const governmentAllocationRp = governmentAllocationRpFor(dwellingsAtYearStart);
-  const netIncomeRp = consumerRevenueRp + governmentAllocationRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - subsidiesPaidTotalRp;
+  const governmentAllocationRp = treasury.allocationRp(dwellingsAtYearStart);
+  const netIncomeRp = consumerRevenueRp + governmentAllocationRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - spendingTotalRp;
 
   const result: MunicipalFinances = {
     year,
@@ -133,8 +133,8 @@ export async function computeMunicipalFinancesForYear(
     wholesaleCostRp,
     gridMaintenanceCostRp,
     governmentAllocationRp,
-    subsidiesPaidRp,
-    subsidiesPaidTotalRp,
+    spendingRp,
+    spendingTotalRp,
     netIncomeRp,
   };
   financesCache.set(year, result);

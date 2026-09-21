@@ -93,6 +93,7 @@ import { applyNewBuildAttributes, buildingGroup, gfaOf } from "./newBuild";
 import { policyStore } from "./policy";
 import { commitVehicleDecisions } from "./mobility";
 import { energyClassAt } from "./retrofit";
+import { measures } from "./measures";
 import { treasury } from "./treasury";
 import { hashSeed, mulberry32 } from "./rng";
 
@@ -302,6 +303,7 @@ class StockStore {
   init(dataset: MunicipalityDataset): void {
     this.unsubscribeClock?.();
     treasury.reset(); // a new municipality starts with an empty ledger
+    measures.setDwellingCounter((atMs) => this.all.reduce((sum, b) => sum + (existsAt(b, atMs) ? b.dwellings.length : 0), 0));
     treasury.setSettler((atMs) => this.commitDecisions(atMs));
     this.dataset = dataset;
     this.seed = `stock:${dataset.bfsNumber}`;

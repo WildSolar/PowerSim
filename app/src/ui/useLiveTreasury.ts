@@ -4,7 +4,7 @@ import { toDateMs, toSimTimeMs } from "../sim/calendar";
 import { cachedCumulativeBalanceRp, computeCumulativeBalanceRp } from "../sim/finances";
 import { existsAt } from "../sim/lifetime";
 import { useSimDay } from "../sim/store";
-import { governmentAllocationRp, treasury } from "../sim/treasury";
+import { treasury } from "../sim/treasury";
 import { BASELINE_YEAR } from "./useYearEmissions";
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -61,7 +61,7 @@ export function useLiveTreasury(dataset: MunicipalityDataset): LiveTreasury {
 
   const budgetRp = useMemo(() => {
     const dwellings = dataset.buildings.reduce((sum, b) => sum + (existsAt(b, yearStartMs) ? b.dwellings.length : 0), 0);
-    return governmentAllocationRp(dwellings);
+    return treasury.allocationRp(dwellings);
   }, [dataset.buildings, yearStartMs]);
 
   const paidOutRp = treasury.paidOutTotal(yearStartMs, simDay + DAY_MS);

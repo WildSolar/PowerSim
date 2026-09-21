@@ -34,6 +34,7 @@ import {
   HEATING_WEIBULL_SHAPE,
 } from "../config/heating";
 import { buildingEnvelopeAreaM2 } from "./buildingGeometry";
+import { policyStore } from "./policy";
 import { municipalHeatingSubsidyRp } from "./subsidies";
 import {
   fuelEfficiency,
@@ -137,6 +138,7 @@ function candidatesAt(
   const tariff = tariffStore.get();
   const estimate = annualHeatingEstimate(building, atMs);
   const scale = sizeScale(building);
+  const fossilBanned = policyStore.get().fossilHeatingInstallBanned;
   const avgElecRpKWh = (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2;
 
   return HEATING_SYSTEM_ORDER.map((id) => {
@@ -147,7 +149,7 @@ function candidatesAt(
     return {
       id,
       municipalSubsidyRp: municipalRp,
-      available: id === "districtHeating" ? incumbent === "districtHeating" : true,
+      available: (id === "districtHeating" ? incumbent === "districtHeating" : true) && !(fossilBanned && (id === "gasBoiler" || id === "oilBoiler")),
       annualizedCostRp: installCostRp / spec.lifetimeMeanYears + runningCostRpFor(id, estimate, tariff, avgElecRpKWh),
       lifetimeMeanYears: spec.lifetimeMeanYears,
       greenness: spec.greenness,

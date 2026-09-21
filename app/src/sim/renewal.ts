@@ -22,6 +22,7 @@
  * does.
  */
 
+import { policyStore } from "./policy";
 import { subsidyCategoryForDecision, treasury } from "./treasury";
 import { logCandidateDecision, type DecisionCandidateLog, type DecisionLogKind } from "./decisionLog";
 import { hashSeed, mulberry32 } from "./rng";
@@ -199,7 +200,8 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
     }
 
     const candidates = params.candidatesAt(nextInstalledAtMs, last.system);
-    const { chosen, reasonKind, bestOverallId } = chooseNext(candidates, last.system, params.uncertaintyFraction, params.biasStrengthRp);
+    const uncertaintyFraction = params.uncertaintyFraction * policyStore.get().uncertaintyMultiplier; // information measures narrow it
+    const { chosen, reasonKind, bestOverallId } = chooseNext(candidates, last.system, uncertaintyFraction, params.biasStrengthRp);
     const winner = candidates.find((c) => c.id === chosen);
     chain.push({ installedAtMs: nextInstalledAtMs, system: chosen, previousSystem: last.system, reasonKind, bestOverallId, municipalSubsidyRp: winner?.municipalSubsidyRp });
     // The money leaves the treasury now, when the decision happens — never before, never for an option nobody takes.
