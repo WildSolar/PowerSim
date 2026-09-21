@@ -8,6 +8,7 @@ import { HEATING_SYSTEM_CATALOG, HEATING_SYSTEM_ORDER, WATER_HEATING_KIND_COLOR 
 import { sampleMunicipalityCategorySeries } from "../sim/history";
 import { effectivePowerPlants, solarAdoptionTallyForYear } from "../sim/solarAdoption";
 import { computeRetrofitTally, spaceHeatingKWhFor } from "../sim/yearReport";
+import { SUBSIDY_CATEGORIES, SUBSIDY_LABEL } from "../sim/treasury";
 import { useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
 import { CONSUMPTION_CATEGORIES } from "./deviceCategories";
@@ -161,6 +162,10 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                   <span className="finance-value positive">+{formatCHF(finances.current.consumerRevenueRp)}</span>
                 </div>
                 <div className="renewal-tally-row">
+                  <span className="renewal-tally-label">Government energy budget</span>
+                  <span className="finance-value positive">+{formatCHF(finances.current.governmentAllocationRp)}</span>
+                </div>
+                <div className="renewal-tally-row">
                   <span className="renewal-tally-label">Solar feed-in paid</span>
                   <span className="finance-value negative">−{formatCHF(finances.current.feedInPaidRp)}</span>
                 </div>
@@ -172,12 +177,12 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                   <span className="renewal-tally-label">Grid maintenance</span>
                   <span className="finance-value negative">−{formatCHF(finances.current.gridMaintenanceCostRp)}</span>
                 </div>
-                {finances.current.solarSubsidiesPaidRp > 0 && (
-                  <div className="renewal-tally-row">
-                    <span className="renewal-tally-label">Solar subsidies paid</span>
-                    <span className="finance-value negative">−{formatCHF(finances.current.solarSubsidiesPaidRp)}</span>
+                {SUBSIDY_CATEGORIES.filter((c) => finances.current.subsidiesPaidRp[c] > 0).map((c) => (
+                  <div className="renewal-tally-row" key={c}>
+                    <span className="renewal-tally-label">{SUBSIDY_LABEL[c]}</span>
+                    <span className="finance-value negative">−{formatCHF(finances.current.subsidiesPaidRp[c])}</span>
                   </div>
-                )}
+                ))}
                 <div className="renewal-tally-row" style={{ fontWeight: 600 }}>
                   <span className="renewal-tally-label">Net this year</span>
                   <span className={`finance-value ${finances.current.netIncomeRp >= 0 ? "positive" : "negative"}`}>
@@ -187,9 +192,9 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                 </div>
               </div>
               <p style={{ fontSize: 12, color: "#888", margin: "8px 0 0" }}>
-                Electricity only — heating fuel and petrol/diesel are paid straight to their own suppliers, never through the municipal utility.
-                Heating and EV purchase subsidies are an existing cantonal program, not a municipal cost — solar's own municipal top-up (Control
-                → Policy) is the one subsidy that actually is.
+                Electricity operations settle once a year; heating fuel and petrol/diesel are paid straight to their own suppliers, never through
+                the municipal utility. Subsidies leave the treasury only when a household actually makes the decision — including households
+                that would have made it anyway. Federal and cantonal grants are not municipal money.
               </p>
             </>
           )}

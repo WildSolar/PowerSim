@@ -52,9 +52,53 @@ export function PolicyControl() {
       </p>
 
       <div className="tariff-divider" />
+      <div className="tariff-title">Other subsidies</div>
+      <div className="tariff-row">
+        <span className="tariff-label">Heat pump grant</span>
+        <input
+          type="number"
+          min={0}
+          max={20000}
+          step={500}
+          value={policy.heatPumpSubsidyRp / 100}
+          onChange={(e) => policyStore.set({ heatPumpSubsidyRp: Number(e.target.value) * 100 })}
+        />
+        <span className="tariff-unit">CHF each</span>
+      </div>
+      <div className="tariff-row">
+        <span className="tariff-label">Electric car grant</span>
+        <input
+          type="number"
+          min={0}
+          max={10000}
+          step={500}
+          value={policy.evSubsidyRp / 100}
+          onChange={(e) => policyStore.set({ evSubsidyRp: Number(e.target.value) * 100 })}
+        />
+        <span className="tariff-unit">CHF each</span>
+      </div>
+      <div className="tariff-row">
+        <span className="tariff-label">Insulation retrofit top-up</span>
+        <input
+          type="number"
+          min={0}
+          max={200}
+          step={5}
+          value={policy.retrofitSubsidyRpPerM2 / 100}
+          onChange={(e) => policyStore.set({ retrofitSubsidyRpPerM2: Number(e.target.value) * 100 })}
+        />
+        <span className="tariff-unit">CHF/m²</span>
+      </div>
+      <p style={{ fontSize: 11, color: "#898781", margin: "0 0 10px" }}>
+        Paid from the treasury each time a household actually decides — so a grant also goes to everyone who would have decided the
+        same way anyway. Aim for enough to tip the marginal cases without paying for the rest. Applies to replacements and retrofits,
+        not to new buildings (whose heating and insulation the building code already governs).
+      </p>
+
+      <div className="tariff-divider" />
       <p style={{ fontSize: 12, color: "#898781" }}>
-        Bans, other subsidies, and direct infrastructure funding aren't implemented yet — this tab will grow into the rest of
-        the policy layer described in the game's design.
+        Bans, regulations, and direct infrastructure funding aren't implemented yet — this tab will grow into the rest of the
+        policy layer described in the game's design.
       </p>
     </div>
   );

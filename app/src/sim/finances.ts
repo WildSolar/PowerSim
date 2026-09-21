@@ -41,9 +41,11 @@ import { consumptionSeriesW, electricityCostRp, flatCostRp } from "./billing";
 import { toSimTimeMs } from "./calendar";
 import { energyKWh } from "./energy";
 import { historyTimeSteps, sampleMunicipalityCategorySeries } from "./history";
-import { effectivePowerPlants, municipalSolarSubsidiesPaidInYear } from "./solarAdoption";
+import { existsAt } from "./lifetime";
+import { effectivePowerPlants } from "./solarAdoption";
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
+import { governmentAllocationRp as governmentAllocationRpFor, SUBSIDY_CATEGORIES, treasury, type PayoutsByCategory } from "./treasury";
 
 const COARSE_SAMPLES_PER_MONTH = 8; // matches yearReport.ts's own coarse density for smooth municipality-wide electricity quantities
 
@@ -53,8 +55,10 @@ export interface MunicipalFinances {
   feedInPaidRp: number; // paid out to solar owners (real or adopted) for exported generation
   wholesaleCostRp: number; // paid upstream for the net electricity actually drawn from the wider grid (consumption minus all local solar)
   gridMaintenanceCostRp: number; // wires/upkeep cost, scaled to gross electricity delivered to consumers
-  solarSubsidiesPaidRp: number; // the municipality's own top-up subsidy (policy.ts) for installations adopted this year — never the federal baseline
-  netIncomeRp: number; // consumerRevenueRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - solarSubsidiesPaidRp
+  governmentAllocationRp: number; // this year's allocation from the overall government (a placeholder framing, see config/treasury.ts)
+  subsidiesPaidRp: PayoutsByCategory; // the municipality's own top-ups, per kind, paid out as decisions happened this year — never the federal/cantonal grants
+  subsidiesPaidTotalRp: number;
+  netIncomeRp: number; // consumerRevenueRp + governmentAllocationRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - subsidiesPaidTotalRp
 }
 
 const ZERO_FINANCES: Omit<MunicipalFinances, "year"> = {
@@ -62,7 +66,9 @@ const ZERO_FINANCES: Omit<MunicipalFinances, "year"> = {
   feedInPaidRp: 0,
   wholesaleCostRp: 0,
   gridMaintenanceCostRp: 0,
-  solarSubsidiesPaidRp: 0,
+  governmentAllocationRp: 0,
+  subsidiesPaidRp: { solar: 0, heating: 0, vehicle: 0, retrofit: 0 },
+  subsidiesPaidTotalRp: 0,
   netIncomeRp: 0,
 };
 
@@ -109,8 +115,16 @@ export async function computeMunicipalFinancesForYear(
 
   const wholesaleCostRp = netElectricityKWh * tariff.wholesalePriceRpKWh;
   const gridMaintenanceCostRp = grossConsumptionKWh * tariff.gridMaintenanceRpKWh;
-  const solarSubsidiesPaidRp = municipalSolarSubsidiesPaidInYear(buildings, realPlants, year);
-  const netIncomeRp = consumerRevenueRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - solarSubsidiesPaidRp;
+
+  // Every household decision due this year has to have committed (and paid out) before the year is summed.
+  const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
+  const yearEndMs = toSimTimeMs(Date.UTC(year + 1, 0, 1));
+  treasury.settleThrough(yearEndMs);
+  const subsidiesPaidRp = treasury.paidOut(yearStartMs, yearEndMs);
+  const subsidiesPaidTotalRp = SUBSIDY_CATEGORIES.reduce((sum, c) => sum + subsidiesPaidRp[c], 0);
+  const dwellingsAtYearStart = buildings.reduce((sum, b) => sum + (existsAt(b, yearStartMs) ? b.dwellings.length : 0), 0);
+  const governmentAllocationRp = governmentAllocationRpFor(dwellingsAtYearStart);
+  const netIncomeRp = consumerRevenueRp + governmentAllocationRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - subsidiesPaidTotalRp;
 
   const result: MunicipalFinances = {
     year,
@@ -118,10 +132,13 @@ export async function computeMunicipalFinancesForYear(
     feedInPaidRp,
     wholesaleCostRp,
     gridMaintenanceCostRp,
-    solarSubsidiesPaidRp,
+    governmentAllocationRp,
+    subsidiesPaidRp,
+    subsidiesPaidTotalRp,
     netIncomeRp,
   };
   financesCache.set(year, result);
+  treasury.notifyBooked(); // live readouts waiting on this year can refresh
   return result;
 }
 
@@ -139,10 +156,21 @@ export async function computeCumulativeBalanceRp(
   baselineYear: number,
   isCancelled: () => boolean,
 ): Promise<number> {
-  let balanceRp = 0;
+  let balanceRp = treasury.openingBalanceRp();
   for (let year = baselineYear; year <= throughYear; year++) {
     if (isCancelled()) return balanceRp;
     const finances = await computeMunicipalFinancesForYear(buildings, plants, year, isCancelled);
+    balanceRp += finances.netIncomeRp;
+  }
+  return balanceRp;
+}
+
+/** The same balance, but only if every year through `throughYear` is already booked — no computing. */
+export function cachedCumulativeBalanceRp(throughYear: number, baselineYear: number): number | null {
+  let balanceRp = treasury.openingBalanceRp();
+  for (let year = baselineYear; year <= throughYear; year++) {
+    const finances = financesCache.get(year);
+    if (!finances) return null;
     balanceRp += finances.netIncomeRp;
   }
   return balanceRp;

@@ -6,6 +6,7 @@ import { DwellingPanel } from "./ui/DwellingPanel";
 import { ColorModeControl } from "./ui/ColorModeControl";
 import { ReportCardModal } from "./ui/ReportCardModal";
 import { TimeControl } from "./ui/TimeControl";
+import { TreasuryPanel } from "./ui/TreasuryPanel";
 import { StartMenu } from "./ui/StartMenu";
 import { WikiPanel } from "./ui/WikiPanel";
 import { loadDataset } from "./data/loadDataset";
@@ -18,6 +19,7 @@ import { useTimeKeyboard } from "./ui/useTimeKeyboard";
 import { useStockBuildings } from "./ui/useStock";
 import { stock } from "./sim/stock";
 import { policyStore } from "./sim/policy";
+import { treasury } from "./sim/treasury";
 import { startYearEndWatcher } from "./sim/yearEndWatcher";
 import "./App.css";
 
@@ -33,7 +35,7 @@ function returnToMenu() {
 }
 
 // Dev-only handle for inspecting the simulation from the browser console.
-if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore } });
+if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury } });
 
 function Game({ slug }: { slug: string }) {
   const [dataset, setDataset] = useState<MunicipalityDataset | null>(null);
@@ -100,6 +102,7 @@ function Game({ slug }: { slug: string }) {
       />
       <div className="top-left-stack">
         <TimeControl />
+        <TreasuryPanel dataset={liveDataset ?? dataset} />
         <ColorModeControl mode={colorMode} onChange={setColorMode} />
       </div>
       <div className="bottom-left-stack">

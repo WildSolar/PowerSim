@@ -91,7 +91,9 @@ import {
 } from "./localGeo";
 import { applyNewBuildAttributes, buildingGroup, gfaOf } from "./newBuild";
 import { policyStore } from "./policy";
+import { commitVehicleDecisions } from "./mobility";
 import { energyClassAt } from "./retrofit";
+import { treasury } from "./treasury";
 import { hashSeed, mulberry32 } from "./rng";
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -299,6 +301,8 @@ class StockStore {
 
   init(dataset: MunicipalityDataset): void {
     this.unsubscribeClock?.();
+    treasury.reset(); // a new municipality starts with an empty ledger
+    treasury.setSettler((atMs) => this.commitDecisions(atMs));
     this.dataset = dataset;
     this.seed = `stock:${dataset.bfsNumber}`;
     this.all = dataset.buildings.slice();
@@ -350,13 +354,23 @@ class StockStore {
     }
     if (changed) this.commit();
 
-    // A decision chain that nothing happens to query would otherwise be settled late, under
-    // whatever policy and prices apply by then. Touching every building's envelope chain once a
-    // simulated month makes each decision commit close to when it falls due.
+    // Once a simulated month, settle the household decisions that have fallen due (see commitDecisions).
     const month = Math.floor(nowMs / MONTH_MS);
     if (month !== this.lastDecisionMonth) {
       this.lastDecisionMonth = month;
-      for (const b of this.all) if (existsAt(b, nowMs)) energyClassAt(b, nowMs);
+      this.commitDecisions(nowMs);
+    }
+  }
+
+  /** Settles every household decision (heating system, envelope, vehicles) that has fallen due by
+   * `nowMs`. Decision chains otherwise commit only when something happens to look at them; this makes
+   * each one commit under the policy and prices of the time, and record its subsidy payout. */
+  commitDecisions(nowMs: number): void {
+    for (const b of this.all) {
+      if (!existsAt(b, nowMs)) continue;
+      energyClassAt(b, nowMs);
+      currentHeatingSystemId(b, nowMs);
+      commitVehicleDecisions(b, nowMs);
     }
   }
 

@@ -22,6 +22,7 @@
  * does.
  */
 
+import { subsidyCategoryForDecision, treasury } from "./treasury";
 import { logCandidateDecision, type DecisionCandidateLog, type DecisionLogKind } from "./decisionLog";
 import { hashSeed, mulberry32 } from "./rng";
 import { weibullAgedRemainder, weibullConditionalRemainder, weibullSample } from "./weibull";
@@ -201,6 +202,9 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
     const { chosen, reasonKind, bestOverallId } = chooseNext(candidates, last.system, params.uncertaintyFraction, params.biasStrengthRp);
     const winner = candidates.find((c) => c.id === chosen);
     chain.push({ installedAtMs: nextInstalledAtMs, system: chosen, previousSystem: last.system, reasonKind, bestOverallId, municipalSubsidyRp: winner?.municipalSubsidyRp });
+    // The money leaves the treasury now, when the decision happens — never before, never for an option nobody takes.
+    const category = subsidyCategoryForDecision(params.kind);
+    if (category && winner?.municipalSubsidyRp) treasury.recordPayout(category, nextInstalledAtMs, winner.municipalSubsidyRp, params.egid);
     logCandidateDecision({
       atMs: nextInstalledAtMs,
       kind: params.kind,

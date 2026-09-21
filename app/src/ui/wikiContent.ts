@@ -345,15 +345,18 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Municipal finances",
     blocks: [
       p(
-        "Alongside emissions, the municipality's other headline resource is money: what its local electricity utility actually keeps after buying power and maintaining the grid, accumulated as a treasury balance from the very first simulated year onward — the budget future policy and infrastructure spending will eventually draw from.",
+        "Alongside emissions, the municipality's other headline resource is money: one treasury for the whole energy department, always shown top-left. It starts with some cash, receives an annual allocation from the overall government (credited each 1 January, sized by the population), and settles what its local electricity utility keeps after buying power and maintaining the grid once a year. The budget you spend from on subsidies and, later, infrastructure.",
       ),
       p(
-        "Each completed year, the balance moves by: everything consumers paid for grid electricity, minus what was paid out for solar fed in, minus the wholesale cost of the net electricity the municipality had to buy in (consumption less all local solar, real and newly adopted alike), minus grid maintenance, minus any municipal solar subsidies paid out that year (see \"Solar adoption\"). The first two utility costs are set in Control → Prices, under \"Municipal utility costs\"; the solar subsidy is set in Control → Policy.",
+        "Money leaves the treasury only when a decision actually happens: the day a household installs a subsidised heat pump, buys a subsidised electric car, upgrades its insulation, or puts up solar panels, the municipal top-up is paid out. A grant nobody takes up costs nothing — but a grant also goes to everyone who would have decided the same way anyway, and finding the level that tips the undecided without overpaying the rest is the whole game of subsidy planning. The grants are set in Control → Policy.",
+      ),
+      p(
+        "Each completed year, the balance moves by: what consumers paid for grid electricity, plus the government allocation, minus the solar fed in, the wholesale cost of the net electricity bought in, grid maintenance, and every subsidy paid out that year. The utility costs are set in Control → Prices, under \"Municipal utility costs\".",
       ),
       note(
-        "Deliberately electricity only — heating fuel and petrol/diesel are paid straight to an external supplier, never through the municipal utility, so they don't touch this balance even though they're billed to the consumer. Existing cantonal heat-pump and EV subsidies still aren't a municipal cost — they're a program the municipality doesn't control, not something the player has paid for. Solar's own subsidy is the one exception: the municipality's top-up is real money, the federal baseline every installation also gets isn't.",
+        "Deliberately electricity only for the utility side — heating fuel and petrol/diesel are paid straight to an external supplier, never through the municipal utility. Federal and cantonal grants (the baseline every heat pump, EV and solar installation already gets) are not municipal money; only the municipality's own top-up is.",
       ),
-      note("Shown in the Year in Review report for now, the same way emissions are — nothing tracks or displays it in real time yet."),
+      note("The government allocation and the starting cash are placeholders while the money model is still being designed. The electricity margin is currently large next to them."),
     ],
   },
   {

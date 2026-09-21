@@ -29,6 +29,10 @@ export interface Policy {
   // Levers on insulation retrofits of existing buildings (sim/retrofit.ts, via constructionRules.ts).
   retrofitSubsidyRpPerM2: number; // municipal top-up per m2 of envelope on an upgrade, on top of the federal building-program grant
   retrofitMinClass: EnergyClassId | "none"; // an envelope renovation must reach at least this class (no half-measures)
+
+  // Municipal grants on top of the federal/cantonal ones, paid from the treasury when a decision happens.
+  heatPumpSubsidyRp: number; // flat, per heat pump installed (air or ground)
+  evSubsidyRp: number; // flat, per electric car bought
 }
 
 export { DEFAULT_POLICY };

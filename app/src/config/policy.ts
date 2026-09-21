@@ -17,6 +17,8 @@ export const DEFAULT_POLICY: Policy = {
   renewalRateMultiplier: 1,
   retrofitSubsidyRpPerM2: 0,
   retrofitMinClass: "none",
+  heatPumpSubsidyRp: 0,
+  evSubsidyRp: 0,
 };
 
 // outreachHazardMultiplier(level) = 1 + (level/100) * OUTREACH_MAX_MULTIPLIER_BONUS

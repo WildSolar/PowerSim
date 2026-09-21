@@ -95,6 +95,7 @@ import {
 import { pvPowerW } from "./pv";
 import { isOffPeakHour, type Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
+import { treasury } from "./treasury";
 
 const DAY_MS = 24 * 60 * 60_000;
 const YEAR_MS = 365.25 * DAY_MS;
@@ -307,7 +308,10 @@ function processYear(buildings: Building[], realPlants: PowerPlant[], year: numb
     if (draw >= hazard) continue;
 
     const decision = evaluateAdoption(building, year, yearStartMs, tariff, policy, { hazard, draw, neighborAdopters, renewalBoosted });
-    if (decision) adoptionByEgid.set(building.egid, decision);
+    if (decision) {
+      adoptionByEgid.set(building.egid, decision);
+      treasury.recordPayout("solar", decision.installedAtMs, decision.municipalSubsidyRp, building.egid);
+    }
   }
 }
 
@@ -460,21 +464,6 @@ function subsidyNoteFragment(record: SolarAdoptionRecord): string {
   if (record.federalSubsidyRp > 0) parts.push("the federal one-time subsidy");
   if (record.municipalSubsidyRp > 0) parts.push("the municipality's own top-up");
   return `${parts.join(" and ")}`;
-}
-
-/** Municipal-treasury cost this calendar year — the player's own top-up
- * subsidy only, never the federal Einmalvergütung baseline (a program the
- * municipality doesn't fund or control — see solarSystems.ts). Used by
- * finances.ts. */
-export function municipalSolarSubsidiesPaidInYear(buildings: Building[], realPlants: PowerPlant[], year: number): number {
-  ensureAdvancedThrough(buildings, realPlants, year);
-  const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
-  const yearEndMs = toSimTimeMs(Date.UTC(year + 1, 0, 1));
-  let total = 0;
-  for (const record of adoptionByEgid.values()) {
-    if (record.installedAtMs >= yearStartMs && record.installedAtMs < yearEndMs) total += record.municipalSubsidyRp;
-  }
-  return total;
 }
 
 export interface SolarAdoptionYearTally {

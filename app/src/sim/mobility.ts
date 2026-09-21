@@ -50,8 +50,10 @@ import {
   type VehicleTypeId,
 } from "./mobilitySystems";
 import { modeAt, modeEventsUpTo, type ModeEvent } from "./modeRenewal";
+import type { Building } from "../data/types";
+import { municipalVehicleSubsidyRp } from "./subsidies";
 import { hashSeed, mulberry32 } from "./rng";
-import { renewalEventsUpTo, systemAt, type RenewalCandidate, type RenewalEvent, type RenewalParams } from "./renewal";
+import { peekRenewalChain, renewalEventsUpTo, systemAt, type RenewalCandidate, type RenewalEvent, type RenewalParams } from "./renewal";
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 
@@ -128,7 +130,9 @@ function avgElecRpKWh(tariff: Tariff): number {
 function carCandidatesAt(tariff: Tariff): RenewalCandidate<VehicleTypeId>[] {
   return CAR_VEHICLE_ORDER.map((id) => {
     const spec = VEHICLE_TYPE_CATALOG[id];
-    const installCostRp = Math.max(0, spec.baseInstallCostRp - spec.subsidyRp);
+    const beforeMunicipalRp = Math.max(0, spec.baseInstallCostRp - spec.subsidyRp);
+    const municipalRp = Math.min(municipalVehicleSubsidyRp(id), beforeMunicipalRp);
+    const installCostRp = beforeMunicipalRp - municipalRp;
     const runningCostRp =
       id === "carEV"
         ? (ANNUAL_CAR_KM / 100) * EV_CAR_KWH_PER_100KM * avgElecRpKWh(tariff)
@@ -138,6 +142,7 @@ function carCandidatesAt(tariff: Tariff): RenewalCandidate<VehicleTypeId>[] {
       available: true,
       annualizedCostRp: installCostRp / spec.lifetimeMeanYears + runningCostRp,
       lifetimeMeanYears: spec.lifetimeMeanYears,
+      municipalSubsidyRp: municipalRp,
       greenness: spec.greenness,
     };
   });
@@ -187,12 +192,15 @@ function initialVehicleType(egid: string, ewid: string, slotIndex: number, kind:
  * matches, and mobilityRenewalLog only narrates a vehicle renewal that
  * happened while its mode was the active one. */
 function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "car" | "bike", simTimeMs: number): RenewalEvent<VehicleTypeId>[] {
+  const cached = peekRenewalChain<VehicleTypeId>(vehicleEntityKey(egid, ewid, slotIndex, kind), simTimeMs);
+  if (cached) return cached;
   const params: RenewalParams<VehicleTypeId> = {
     entityKey: vehicleEntityKey(egid, ewid, slotIndex, kind),
     egid,
     kind: kind === "car" ? "mobility-vehicle-car" : "mobility-vehicle-bike",
     labelFor: (id) => VEHICLE_TYPE_CATALOG[id].label,
     initialSystem: initialVehicleType(egid, ewid, slotIndex, kind),
+    conditionalFirstLifetime: true,
     weibullShape: VEHICLE_WEIBULL_SHAPE,
     uncertaintyFraction: VEHICLE_UNCERTAINTY_FRACTION,
     biasStrengthRp: biasStrengthRp(egid, ewid, slotIndex, kind),
@@ -200,6 +208,19 @@ function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "c
     candidatesAt: () => (kind === "car" ? carCandidatesAt(tariffStore.get()) : bikeCandidatesAt(tariffStore.get())),
   };
   return renewalEventsUpTo(params, simTimeMs);
+}
+
+/** Settles every vehicle purchase of a building's dwellings that has fallen due by `simTimeMs`
+ * (both the car and the bike chain of every slot, which age independently of the current mode),
+ * so each records its subsidy payout close to when it happened. */
+export function commitVehicleDecisions(building: Building, simTimeMs: number): void {
+  for (const dwelling of building.dwellings) {
+    const slots = mobilitySlotCount(building.egid, dwelling);
+    for (let slot = 0; slot < slots; slot++) {
+      vehicleChainFor(building.egid, dwelling.ewid, slot, "car", simTimeMs);
+      vehicleChainFor(building.egid, dwelling.ewid, slot, "bike", simTimeMs);
+    }
+  }
 }
 
 export function currentVehicleType(egid: string, ewid: string, slotIndex: number, mode: MobilityMode, simTimeMs: number): VehicleTypeId | null {

@@ -34,6 +34,7 @@ import {
   HEATING_WEIBULL_SHAPE,
 } from "../config/heating";
 import { buildingEnvelopeAreaM2 } from "./buildingGeometry";
+import { municipalHeatingSubsidyRp } from "./subsidies";
 import {
   fuelEfficiency,
   HEATING_SYSTEM_CATALOG,
@@ -127,7 +128,12 @@ function runningCostRpFor(id: HeatingSystemId, estimate: AnnualHeatingEstimate, 
   return consumedKWh * tariff.districtHeatingPriceRpKWh;
 }
 
-function candidatesAt(building: Building, atMs: number, incumbent: HeatingSystemId): RenewalCandidate<HeatingSystemId>[] {
+function candidatesAt(
+  building: Building,
+  atMs: number,
+  incumbent: HeatingSystemId,
+  withMunicipalSubsidy = true,
+): RenewalCandidate<HeatingSystemId>[] {
   const tariff = tariffStore.get();
   const estimate = annualHeatingEstimate(building, atMs);
   const scale = sizeScale(building);
@@ -135,9 +141,12 @@ function candidatesAt(building: Building, atMs: number, incumbent: HeatingSystem
 
   return HEATING_SYSTEM_ORDER.map((id) => {
     const spec = HEATING_SYSTEM_CATALOG[id];
-    const installCostRp = Math.max(0, spec.baseInstallCostRp * scale - spec.subsidyRp);
+    const beforeMunicipalRp = Math.max(0, spec.baseInstallCostRp * scale - spec.subsidyRp);
+    const municipalRp = withMunicipalSubsidy ? Math.min(municipalHeatingSubsidyRp(id), beforeMunicipalRp) : 0;
+    const installCostRp = beforeMunicipalRp - municipalRp;
     return {
       id,
+      municipalSubsidyRp: municipalRp,
       available: id === "districtHeating" ? incumbent === "districtHeating" : true,
       annualizedCostRp: installCostRp / spec.lifetimeMeanYears + runningCostRpFor(id, estimate, tariff, avgElecRpKWh),
       lifetimeMeanYears: spec.lifetimeMeanYears,
@@ -168,6 +177,7 @@ function chainFor(building: Building, simTimeMs: number): RenewalEvent<HeatingSy
     labelFor: (id) => HEATING_SYSTEM_CATALOG[id].label,
     initialSystem: initial,
     initialInstalledAtMs: building.builtAtMs,
+    conditionalFirstLifetime: true,
     weibullShape: HEATING_WEIBULL_SHAPE,
     uncertaintyFraction: uncertaintyFraction(building),
     biasStrengthRp: biasStrengthRp(building),
@@ -212,7 +222,7 @@ export function chooseNewBuildHeating(
   temperatureFraction: number,
 ): { chosen: HeatingSystemId; candidates: NewBuildHeatingCandidate[]; biasStrengthRp: number } {
   const bias = biasStrengthRp(building);
-  const base = candidatesAt(building, atMs, "airHeatPump");
+  const base = candidatesAt(building, atMs, "airHeatPump", false); // a new build gets no renovation grant
   const scored = base.map((c) => ({
     ...c,
     available: isAvailable(c.id),
