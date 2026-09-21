@@ -118,6 +118,25 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "approval",
+    icon: "🗳️",
+    title: "Public approval",
+    blocks: [
+      p(
+        "Everything the municipality decides is judged by the people who live in it. Approval is one number, top-left, but behind it are groups of people who feel differently: homeowners, tenants, drivers and commuters, businesses, and climate-concerned residents. A heat pump grant delights homeowners; a ban on petrol cars enrages drivers; and nobody tells you exactly who thinks what — you learn it from how the number moves and from the public reaction shown on each measure.",
+      ),
+      list([
+        "Decisions land at once: enacting a measure moves opinion straight away, in proportion to how each group feels about it. Repealing gives most of that back, but looks indecisive.",
+        "Then opinion settles: while a measure stays in force, each group drifts toward a level set by everything in force. Piling up popular measures has diminishing returns.",
+        "Votes: the big bans always go to a public vote, and other laws do when they are contested. Beforehand a poll shows where support stands (polls have an error). If the voters reject a measure it is struck down — the money already spent stays spent — and approval takes a hit. If they back you, it gets a small boost.",
+        "Consequences: approval below 25% for six months gets you recalled, and every four years (the first in 2030) there is an election you must win with at least 45%. Either ends the game. Approval also nudges the government's yearly allocation up or down a little.",
+      ]),
+      note(
+        "Approval currently reacts only to your decisions, not yet to how things turn out (emissions, prices, bills). The difficulty setting scales how strongly decisions move opinion: gentler on Easy, harsher on Hard. Measures imposed by the canton or the federal government do not cost you approval.",
+      ),
+    ],
+  },
+  {
     id: "growth",
     icon: "🏗️",
     title: "Town growth & building renewal",

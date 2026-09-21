@@ -15,6 +15,8 @@ export interface DifficultySpec {
   openingTreasuryMultiplier: number;
   /** Scales the annual allocation from the overall government. */
   governmentAllocationMultiplier: number;
+  /** Scales how strongly measures move approval: forgiving on Easy, harsh on Hard. */
+  approvalSensitivity: number;
 }
 
 export const DIFFICULTY_ORDER: Difficulty[] = ["easy", "normal", "hard"];
@@ -25,18 +27,21 @@ export const DIFFICULTY_SPECS: Record<Difficulty, DifficultySpec> = {
     description: "Canton and federal government act early, and the budget is generous.",
     openingTreasuryMultiplier: 1.5,
     governmentAllocationMultiplier: 1.25,
+    approvalSensitivity: 0.8,
   },
   normal: {
     label: "Normal",
     description: "Higher levels of government act on a realistic schedule.",
     openingTreasuryMultiplier: 1,
     governmentAllocationMultiplier: 1,
+    approvalSensitivity: 1,
   },
   hard: {
     label: "Hard",
     description: "Little outside help: most of the work, and the cost, is yours.",
     openingTreasuryMultiplier: 0.6,
     governmentAllocationMultiplier: 0.8,
+    approvalSensitivity: 1.25,
   },
 };
 

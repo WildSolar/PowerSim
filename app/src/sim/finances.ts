@@ -41,6 +41,7 @@ import { consumptionSeriesW, electricityCostRp, flatCostRp } from "./billing";
 import { toSimTimeMs } from "./calendar";
 import { energyKWh } from "./energy";
 import { historyTimeSteps, sampleMunicipalityCategorySeries } from "./history";
+import { allocationApprovalFactor, approval } from "./approval";
 import { existsAt } from "./lifetime";
 import { effectivePowerPlants } from "./solarAdoption";
 import type { Tariff } from "./tariff";
@@ -123,7 +124,7 @@ export async function computeMunicipalFinancesForYear(
   const spendingRp = treasury.paidOut(yearStartMs, yearEndMs);
   const spendingTotalRp = PAYOUT_CATEGORIES.reduce((sum, c) => sum + spendingRp[c], 0);
   const dwellingsAtYearStart = buildings.reduce((sum, b) => sum + (existsAt(b, yearStartMs) ? b.dwellings.length : 0), 0);
-  const governmentAllocationRp = treasury.allocationRp(dwellingsAtYearStart);
+  const governmentAllocationRp = treasury.allocationRp(dwellingsAtYearStart, allocationApprovalFactor(approval.atYearStart(year)));
   const netIncomeRp = consumerRevenueRp + governmentAllocationRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - spendingTotalRp;
 
   const result: MunicipalFinances = {

@@ -30,7 +30,14 @@ interface MeasureState {
   /** Enacted or changed, waiting out its lead time. */
   pending: { params: MeasureParams; activeFromMs: number } | null;
   enactedAtMs: number;
+  /** A public vote is scheduled on this measure (approval.ts): if it is lost, the measure is struck down. */
+  vote: { atMs: number } | null;
 }
+
+export type MeasureEvent =
+  | { kind: "enacted" | "changed"; id: string; def: MeasureDef; params: MeasureParams; previousParams: MeasureParams | null; atMs: number }
+  | { kind: "repealed"; id: string; def: MeasureDef; params: MeasureParams; atMs: number }
+  | { kind: "activated"; id: string; def: MeasureDef; params: MeasureParams; atMs: number };
 
 export interface MeasureLogEntry {
   atMs: number;
@@ -62,6 +69,8 @@ class MeasureEngine {
   private unsubscribeClock: (() => void) | null = null;
   private lastChargedMonth: number | null = null;
   private dwellingCount: (atMs: number) => number = () => 0;
+  private readonly eventListeners = new Set<(event: MeasureEvent) => void>();
+  private frozen = false;
 
   // --- lifecycle ---
 
@@ -73,6 +82,7 @@ class MeasureEngine {
     this.externalAnnounced = new Set();
     this.history = [];
     this.lastChargedMonth = null;
+    this.frozen = false;
     treasury.setDifficulty(DIFFICULTY_SPECS[difficulty]);
     this.recompute();
     this.unsubscribeClock = simClock.subscribe(() => this.advance(simClock.getSimTimeMs()));
@@ -108,6 +118,35 @@ class MeasureEngine {
     return this.states.get(id);
   }
 
+  /** Measures that are in force right now, with the settings they are in force under. */
+  getActiveMeasures(): { def: MeasureDef; params: MeasureParams }[] {
+    const active: { def: MeasureDef; params: MeasureParams }[] = [];
+    for (const [id, state] of this.states) {
+      const def = MEASURE_BY_ID.get(id);
+      if (def && state.active) active.push({ def, params: state.active });
+    }
+    return active;
+  }
+
+  getDef(id: string): MeasureDef | undefined {
+    return MEASURE_BY_ID.get(id);
+  }
+
+  onEvent(listener: (event: MeasureEvent) => void): () => void {
+    this.eventListeners.add(listener);
+    return () => this.eventListeners.delete(listener);
+  }
+
+  /** After game over nothing can be enacted or repealed any more. */
+  freeze(): void {
+    this.frozen = true;
+    this.bump();
+  }
+
+  isFrozen(): boolean {
+    return this.frozen;
+  }
+
   getHistory(): MeasureLogEntry[] {
     return this.history;
   }
@@ -136,7 +175,7 @@ class MeasureEngine {
   /** Enacts a measure, or changes an enacted one's options. Returns false if nothing changed. */
   enact(id: string, rawParams: MeasureParams = {}): boolean {
     const def = MEASURE_BY_ID.get(id);
-    if (!def) return false;
+    if (!def || this.frozen) return false;
     const params = sanitizeParams(def, { ...defaultParams(def), ...rawParams });
     const now = simClock.getSimTimeMs();
 
@@ -148,10 +187,11 @@ class MeasureEngine {
     const oneOffRp = def.oneOffCostRp?.(params, ctx) ?? 0;
     if (oneOffRp > 0) treasury.recordPayout(def.costCategory ?? "programs", now, oneOffRp, id);
 
-    const state: MeasureState = existing ?? { active: null, pending: null, enactedAtMs: now };
+    const state: MeasureState = existing ?? { active: null, pending: null, enactedAtMs: now, vote: null };
     state.pending = { params, activeFromMs: now + def.leadTimeMonths * MONTH_MS };
     this.states.set(id, state);
     this.log(now, `${existing ? "Changed" : "Enacted"}: ${def.title}. In effect from ${this.formatDate(state.pending.activeFromMs)}.`);
+    this.emit({ kind: existing ? "changed" : "enacted", id, def, params, previousParams: latest, atMs: now });
     this.advance(now); // a measure with no lead time takes effect immediately
     this.bump();
     return true;
@@ -160,11 +200,37 @@ class MeasureEngine {
   /** Repeals a measure — immediately, and it stops costing. */
   repeal(id: string): boolean {
     const def = MEASURE_BY_ID.get(id);
-    if (!def || !this.states.has(id)) return false;
+    const state = this.states.get(id);
+    if (!def || !state || this.frozen) return false;
     this.states.delete(id);
-    this.log(simClock.getSimTimeMs(), `Repealed: ${def.title}.`);
+    const now = simClock.getSimTimeMs();
+    this.log(now, `Repealed: ${def.title}.`);
+    this.emit({ kind: "repealed", id, def, params: state.pending?.params ?? (state.active as MeasureParams), atMs: now });
     this.recompute();
     return true;
+  }
+
+  /** approval.ts: schedules (or clears) the public vote on a measure. */
+  setVote(id: string, atMs: number | null): void {
+    const state = this.states.get(id);
+    if (!state) return;
+    state.vote = atMs === null ? null : { atMs };
+    this.bump();
+  }
+
+  /** approval.ts: the vote is in. A measure the voters reject is struck down (its one-off cost stays spent). */
+  resolveVote(id: string, accepted: boolean, atMs: number): void {
+    const state = this.states.get(id);
+    const def = MEASURE_BY_ID.get(id);
+    if (!state || !def) return;
+    state.vote = null;
+    if (!accepted) {
+      this.states.delete(id);
+      this.log(atMs, `Struck down by the voters: ${def.title}.`);
+      this.recompute();
+      return;
+    }
+    this.bump();
   }
 
   // --- time ---
@@ -177,6 +243,8 @@ class MeasureEngine {
         state.active = state.pending.params;
         state.pending = null;
         this.log(nowMs, `In effect: ${MEASURE_BY_ID.get(id)?.title ?? id}.`);
+        const activated = MEASURE_BY_ID.get(id);
+        if (activated) this.emit({ kind: "activated", id, def: activated, params: state.active, atMs: nowMs });
         changed = true;
       }
     }
@@ -230,6 +298,10 @@ class MeasureEngine {
     }
     this.channels = combineChannels(patches);
     this.bump();
+  }
+
+  private emit(event: MeasureEvent): void {
+    this.eventListeners.forEach((l) => l(event));
   }
 
   private bump(): void {

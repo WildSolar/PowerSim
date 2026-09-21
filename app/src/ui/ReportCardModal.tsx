@@ -1,3 +1,4 @@
+import { approval } from "../sim/approval";
 import { ENERGY_CLASS_CATALOG } from "../sim/energyClass";
 import { existsAt } from "../sim/lifetime";
 import { toSimTimeMs } from "../sim/calendar";
@@ -44,6 +45,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
   const yearEndMs = toSimTimeMs(Date.UTC(year + 1, 0, 1)) - 1;
   const standing = dataset.buildings.filter((b) => existsAt(b, yearEndMs));
   const development = stock.summaryForYear(year);
+  const approvalChange = approval.atYearStart(year + 1) - approval.atYearStart(year);
   const retrofits = computeRetrofitTally(dataset.buildings, year);
   const solarTally = solarAdoptionTallyForYear(dataset.buildings, dataset.powerPlants, year);
 
@@ -121,6 +123,12 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
           <p>
             {dataset.name}, {year}: {standing.length} buildings, {standing.reduce((sum, b) => sum + b.dwellings.length, 0)}{" "}
             dwellings.
+          </p>
+
+          <h2 style={{ fontSize: 14, marginTop: 14 }}>Public approval</h2>
+          <p>
+            Approval stands at {Math.round(approval.getApproval())}%
+            {Math.abs(approvalChange) >= 1 ? `, ${approvalChange > 0 ? "up" : "down"} ${Math.abs(Math.round(approvalChange))} points over the year` : ", about where it was a year ago"}.
           </p>
 
           <h2 style={{ fontSize: 14, marginTop: 14 }}>Emissions</h2>

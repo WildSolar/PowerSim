@@ -27,6 +27,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     ],
     leadTimeMonths: 1,
     effects: (p) => ({ solarSubsidyRpPerKwp: num(p, "perKwp") * CHF, solarSubsidyFixedRp: num(p, "fixed") * CHF }),
+    approval: () => ({ homeowners: 0.5, tenants: 0.1, business: 0.2, climate: 0.6 }),
   },
   {
     id: "heat-pump-grant",
@@ -36,6 +37,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [{ kind: "slider", key: "amount", label: "Grant", min: 0, max: 20000, step: 500, unit: "CHF each", default: 5000 }],
     leadTimeMonths: 1,
     effects: (p) => ({ heatPumpSubsidyRp: num(p, "amount") * CHF }),
+    approval: () => ({ homeowners: 0.6, tenants: 0.1, business: 0.1, climate: 0.6 }),
   },
   {
     id: "ev-grant",
@@ -45,6 +47,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [{ kind: "slider", key: "amount", label: "Grant", min: 0, max: 10000, step: 500, unit: "CHF each", default: 3000 }],
     leadTimeMonths: 1,
     effects: (p) => ({ evSubsidyRp: num(p, "amount") * CHF }),
+    approval: () => ({ drivers: 0.5, homeowners: 0.2, climate: 0.5 }),
   },
   {
     id: "retrofit-topup",
@@ -54,6 +57,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [{ kind: "slider", key: "perM2", label: "Top-up", min: 0, max: 200, step: 5, unit: "CHF/m²", default: 40 }],
     leadTimeMonths: 2,
     effects: (p) => ({ retrofitSubsidyRpPerM2: num(p, "perM2") * CHF }),
+    approval: () => ({ homeowners: 0.6, tenants: 0.2, climate: 0.5 }),
   },
 
   // --- Infrastructure -----------------------------------------------------------------------
@@ -66,6 +70,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [{ kind: "slider", key: "perYear", label: "Buildings per year", min: 0, max: 20, step: 1, unit: "per year", default: 3 }],
     leadTimeMonths: 6,
     effects: (p) => ({ municipalSolarBuildingsPerYear: num(p, "perYear") }),
+    approval: () => ({ climate: 0.6, tenants: 0.1, homeowners: 0.1, business: -0.1 }),
   },
 
   // --- Information ----------------------------------------------------------------------------
@@ -78,6 +83,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     leadTimeMonths: 3,
     effects: (p) => ({ solarOutreachLevel: num(p, "level") }),
     annualCostRp: (p, ctx) => (num(p, "level") / 100) * ctx.residents * 6 * CHF,
+    approval: () => ({ climate: 0.3, homeowners: 0.1 }),
   },
   {
     id: "energy-consulting",
@@ -101,6 +107,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     effects: (p) => ({ uncertaintyMultiplier: p.scope === "extensive" ? 0.6 : 0.85 }),
     oneOffCostRp: () => 50_000 * CHF,
     annualCostRp: (p, ctx) => ctx.residents * (p.scope === "extensive" ? 14 : 4) * CHF,
+    approval: () => ({ homeowners: 0.3, tenants: 0.2, business: 0.2, climate: 0.3 }),
   },
 
   // --- Laws ------------------------------------------------------------------------------------
@@ -116,6 +123,11 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     ],
     leadTimeMonths: 12,
     effects: (p) => ({ newBuildSolarMandatePct: num(p, "share"), newBuildSolarMandateMinFootprintM2: num(p, "minFootprint") }),
+    approval: (p) => {
+      const share = num(p, "share") / 100;
+      return { homeowners: -0.1 - 0.4 * share, business: -0.05 - 0.25 * share, climate: 0.3 + 0.4 * share };
+    },
+    referendum: "optional",
   },
   {
     id: "insulation-standard",
@@ -125,6 +137,11 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [{ kind: "slider", key: "level", label: "Standard", min: 0, max: 100, step: 10, unit: "% toward passive house", default: 50 }],
     leadTimeMonths: 12,
     effects: (p) => ({ newBuildInsulationLevel: num(p, "level") }),
+    approval: (p) => {
+      const level = num(p, "level") / 100;
+      return { homeowners: -0.1 - 0.3 * level, tenants: -0.05 - 0.15 * level, business: -0.1 - 0.2 * level, climate: 0.3 + 0.4 * level };
+    },
+    referendum: "optional",
   },
   {
     id: "retrofit-minimum",
@@ -146,6 +163,8 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     ],
     leadTimeMonths: 12,
     effects: (p) => ({ retrofitMinClass: p.minClass as "standard" | "minergie" }),
+    approval: (p) => ({ homeowners: p.minClass === "minergie" ? -0.7 : -0.5, tenants: -0.3, business: -0.1, climate: 0.4 }),
+    referendum: "optional",
   },
   {
     id: "fossil-heating-ban",
@@ -155,6 +174,8 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [],
     leadTimeMonths: 24,
     effects: () => ({ fossilHeatingInstallBanned: true }),
+    approval: () => ({ homeowners: -0.5, tenants: -0.1, business: -0.2, climate: 0.8 }),
+    referendum: "mandatory",
   },
   {
     id: "ice-car-ban",
@@ -164,6 +185,8 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [],
     leadTimeMonths: 36,
     effects: () => ({ iceCarPurchaseBanned: true }),
+    approval: () => ({ drivers: -0.8, homeowners: -0.2, tenants: -0.2, business: -0.4, climate: 0.8 }),
+    referendum: "mandatory",
   },
 ];
 

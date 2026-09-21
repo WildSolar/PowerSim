@@ -6,6 +6,7 @@
  * to know it exists.
  */
 
+import type { Bloc } from "../config/approval";
 import type { Channels } from "./channels";
 import type { PayoutCategory } from "./treasury";
 
@@ -48,6 +49,11 @@ export interface MeasureDef {
   annualCostRp?(params: MeasureParams, ctx: MeasureCostContext): number;
   /** Which ledger line the costs above belong on (default: programs). */
   costCategory?: PayoutCategory;
+  /** How each voter bloc feels about the measure at these settings, -1 (bitterly opposed) to +1 (delighted).
+   * Blocs not listed don't care. Hidden from the player. */
+  approval?(params: MeasureParams): Partial<Record<Bloc, number>>;
+  /** Whether the measure goes to a public vote: always, or only when contested. Laws only. */
+  referendum?: "mandatory" | "optional";
 }
 
 export function defaultParams(def: MeasureDef): MeasureParams {

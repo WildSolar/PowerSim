@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from "react";
 import { formatDate } from "../sim/calendar";
 import { MEASURE_CATALOG } from "../sim/measureCatalog";
 import { defaultParams, MEASURE_CATEGORY_LABEL, type MeasureCategory, type MeasureDef, type MeasureParams } from "../sim/measureTypes";
+import { approval } from "../sim/approval";
 import { measures } from "../sim/measures";
 import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
@@ -15,12 +16,14 @@ function sameParams(a: MeasureParams, b: MeasureParams): boolean {
 
 /** One measure: what it is, its options, what it costs, where it stands, and the buttons to enact,
  * change or repeal it. The draft the player is editing lives here; only Enact/Apply touches the game. */
-function MeasureCard({ def }: { def: MeasureDef }) {
+function MeasureCard({ def, nowMs }: { def: MeasureDef; nowMs: number }) {
   const state = measures.getState(def.id);
   const latest = state?.pending?.params ?? state?.active ?? null;
   const [draft, setDraft] = useState<MeasureParams>(latest ?? defaultParams(def));
 
   const cost = measures.costPreview(def, draft);
+  const reaction = approval.reaction(def, draft);
+  const vote = approval.getVoteInfo(def.id, def, nowMs);
   const changed = latest === null || !sameParams(latest, draft);
 
   let status: { label: string; tone: "off" | "pending" | "active" } = { label: "Not enacted", tone: "off" };
@@ -78,7 +81,15 @@ function MeasureCard({ def }: { def: MeasureDef }) {
         </span>
         {cost.oneOffRp > 0 && <span>One-off cost {formatCHF(cost.oneOffRp)}</span>}
         {cost.annualRp > 0 && <span>Running cost {formatCHF(cost.annualRp)} / year</span>}
+        <span className={`measure-reaction ${reaction.tone}`}>Public reaction: {reaction.label}</span>
+        {def.referendum === "mandatory" && <span>Goes to a public vote</span>}
+        {def.referendum === "optional" && <span>May go to a public vote if contested</span>}
       </div>
+      {vote && (
+        <div className="measure-vote">
+          Public vote in {formatDate(vote.atMs).replace(/^\w+, \d+ /, "")} — latest poll: {Math.round(vote.pollYes)}% in favour
+        </div>
+      )}
 
       <div className="measure-actions">
         <button className="measure-enact" disabled={!changed} onClick={() => measures.enact(def.id, draft)}>
@@ -101,9 +112,13 @@ export function MeasuresTab() {
     (listener) => measures.subscribe(listener),
     () => measures.getVersion(),
   );
+  useSyncExternalStore(
+    (listener) => approval.subscribe(listener),
+    () => approval.getVersion(),
+  );
   const nowMs = useSimDay();
   const outlook = measures.externalOutlook(nowMs);
-  const history = measures.getHistory();
+  const history = [...measures.getHistory(), ...approval.getLog()].sort((a, b) => b.atMs - a.atMs);
 
   return (
     <div className="measures-tab">
@@ -137,7 +152,7 @@ export function MeasuresTab() {
           <h3>{MEASURE_CATEGORY_LABEL[category]}</h3>
           {MEASURE_CATALOG.filter((m) => m.category === category).map((def) => {
             const s = measures.getState(def.id);
-            return <MeasureCard key={`${def.id}:${JSON.stringify(s?.pending?.params ?? s?.active ?? null)}`} def={def} />;
+            return <MeasureCard key={`${def.id}:${JSON.stringify(s?.pending?.params ?? s?.active ?? null)}`} def={def} nowMs={nowMs} />;
           })}
         </section>
       ))}

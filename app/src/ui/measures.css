@@ -169,3 +169,20 @@
   margin-right: 6px;
   font-variant-numeric: tabular-nums;
 }
+
+.measure-reaction.good {
+  color: #0d5b44;
+}
+
+.measure-reaction.bad {
+  color: #b23a2e;
+}
+
+.measure-vote {
+  margin: 0 0 8px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: #fdf0cc;
+  color: #7a5200;
+  font-size: 12px;
+}

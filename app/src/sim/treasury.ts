@@ -82,8 +82,9 @@ class Treasury {
     this.notify();
   }
 
-  allocationRp(dwellingCount: number): number {
-    return Math.round(dwellingCount * RESIDENTS_PER_DWELLING * GOVERNMENT_ALLOCATION_CHF_PER_RESIDENT * this.allocationMultiplier * 100);
+  /** `approvalFactor` is approval.ts's allocationApprovalFactor for the year in question. */
+  allocationRp(dwellingCount: number, approvalFactor = 1): number {
+    return Math.round(dwellingCount * RESIDENTS_PER_DWELLING * GOVERNMENT_ALLOCATION_CHF_PER_RESIDENT * this.allocationMultiplier * approvalFactor * 100);
   }
 
   /** A fresh game: forget every payout. */

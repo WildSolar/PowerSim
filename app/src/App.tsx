@@ -6,6 +6,8 @@ import { DwellingPanel } from "./ui/DwellingPanel";
 import { ColorModeControl } from "./ui/ColorModeControl";
 import { ReportCardModal } from "./ui/ReportCardModal";
 import { TimeControl } from "./ui/TimeControl";
+import { ApprovalPanel } from "./ui/ApprovalPanel";
+import { GameOverModal } from "./ui/GameOverModal";
 import { TreasuryPanel } from "./ui/TreasuryPanel";
 import { StartMenu } from "./ui/StartMenu";
 import { WikiPanel } from "./ui/WikiPanel";
@@ -19,6 +21,7 @@ import { useTimeKeyboard } from "./ui/useTimeKeyboard";
 import { useStockBuildings } from "./ui/useStock";
 import { stock } from "./sim/stock";
 import { policyStore } from "./sim/policy";
+import { approval } from "./sim/approval";
 import { measures } from "./sim/measures";
 import { treasury } from "./sim/treasury";
 import type { Difficulty } from "./config/difficulty";
@@ -37,7 +40,7 @@ function returnToMenu() {
 }
 
 // Dev-only handle for inspecting the simulation from the browser console.
-if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures } });
+if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval } });
 
 function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
   const [dataset, setDataset] = useState<MunicipalityDataset | null>(null);
@@ -65,6 +68,7 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
     loadDataset(`/data/${slug}.json`)
       .then((loaded) => {
         measures.init(difficulty); // before the stock: it registers the town size the measures' costs scale with
+        approval.init(difficulty, `approval:${loaded.bfsNumber}`);
         stock.init(loaded);
         setDataset(loaded);
       })
@@ -106,6 +110,7 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
       <div className="top-left-stack">
         <TimeControl />
         <TreasuryPanel dataset={liveDataset ?? dataset} />
+        <ApprovalPanel />
         <ColorModeControl mode={colorMode} onChange={setColorMode} />
       </div>
       <div className="bottom-left-stack">
@@ -119,6 +124,7 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
           ☰ Main menu
         </button>
       </div>
+      <GameOverModal />
       {showControl && <ControlPanel dataset={liveDataset ?? dataset} onClose={() => setShowControl(false)} />}
       {showWiki && <WikiPanel onClose={() => setShowWiki(false)} />}
       {reportCardYear !== null && (

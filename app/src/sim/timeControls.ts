@@ -1,3 +1,4 @@
+import { approval } from "./approval";
 import { simClock } from "./engine";
 
 // simTime advances every animation frame regardless of multiplier (see engine.ts) —
@@ -21,11 +22,13 @@ const DEFAULT_RUNNING_SPEED = 720;
 let lastRunningSpeed = DEFAULT_RUNNING_SPEED;
 
 export function setSpeed(value: number): void {
+  if (approval.getGameOver()) return;
   if (value !== PAUSE_SPEED) lastRunningSpeed = value;
   simClock.setSpeed(value);
 }
 
 export function togglePause(): void {
+  if (approval.getGameOver()) return;
   if (simClock.getSpeed() === PAUSE_SPEED) {
     simClock.setSpeed(lastRunningSpeed);
   } else {
@@ -37,6 +40,7 @@ export function togglePause(): void {
 /** Steps to the next running speed, wrapping from the fastest back to ×1. While
  * paused this resumes at the speed after the one that was running before the pause. */
 export function cycleSpeed(): void {
+  if (approval.getGameOver()) return;
   const current = simClock.getSpeed() === PAUSE_SPEED ? lastRunningSpeed : simClock.getSpeed();
   const index = RUNNING_SPEEDS.findIndex((s) => s.value === current);
   setSpeed(RUNNING_SPEEDS[(index + 1) % RUNNING_SPEEDS.length].value);
