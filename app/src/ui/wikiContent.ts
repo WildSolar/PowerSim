@@ -107,6 +107,8 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Lead time: nothing happens the day you decide. A subsidy takes a month or two to set up; a law can take one to three years. Changing an enacted measure starts a new lead time, and the old settings stay in force until then. Repealing is immediate.",
         "Cost: a subsidy costs money only when a household actually takes it up; a campaign costs a little every month it runs; infrastructure costs what it costs when it is built. All of it comes out of the treasury.",
         "Information measures narrow the uncertainty investment decisions are made under, so people act on clear savings and stop chasing marginal ones. They cost a running programme budget.",
+        "Mobility measures act slowly and diffusely: a bicycle network, better public transport, or tougher parking rules shift a little of everyone's travel each time a household rethinks how it gets around, never all at once. The car always keeps a share.",
+        "Green power and clean district heating cut the emissions attributed to the electricity and district heat the town uses; a climate awareness campaign nudges every household a little toward the greener option when the numbers are close.",
         "Laws can slow things down as well as speed them up: a minimum standard for renovations, for instance, discourages owners who would have done a smaller upgrade.",
       ]),
       p(
@@ -129,6 +131,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Decisions land at once: enacting a measure moves opinion straight away, in proportion to how each group feels about it. Repealing gives most of that back, but looks indecisive.",
         "Then opinion settles: while a measure stays in force, each group drifts toward a level set by everything in force. Piling up popular measures has diminishing returns.",
         "Votes: the big bans always go to a public vote, and other laws do when they are contested. Beforehand a poll shows where support stands (polls have an error). If the voters reject a measure it is struck down — the money already spent stays spent — and approval takes a hit. If they back you, it gets a small boost.",
+        "Spending: taxpayers accept about what the government allocates to the energy department each year. Spend well beyond it and every group grows resentful, taxpayers and businesses most. Grants that mostly pay people who would have acted anyway are the usual way to overspend.",
         "Consequences: approval below 25% for six months gets you recalled, and every four years (the first in 2030) there is an election you must win with at least 45%. Either ends the game. Approval also nudges the government's yearly allocation up or down a little.",
       ]),
       note(
@@ -397,7 +400,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       note(
         "Deliberately electricity only for the utility side — heating fuel and petrol/diesel are paid straight to an external supplier, never through the municipal utility. Federal and cantonal grants (the baseline every heat pump, EV and solar installation already gets) are not municipal money; only the municipality's own top-up is.",
       ),
-      note("The government allocation and the starting cash are placeholders while the money model is still being designed. The electricity margin is currently large next to them."),
+      note("The government allocation and the starting cash are placeholders while the money model is still being designed. The utility's margin (a few million a year at the default prices) is small next to a serious subsidy programme, so choices about what to fund matter."),
     ],
   },
   {

@@ -94,6 +94,10 @@ class MeasureEngine {
     this.dwellingCount = counter;
   }
 
+  getDwellingCount(atMs: number): number {
+    return this.dwellingCount(atMs);
+  }
+
   // --- reading ---
 
   getDifficulty(): Difficulty {
@@ -172,12 +176,13 @@ class MeasureEngine {
 
   // --- acting ---
 
-  /** Enacts a measure, or changes an enacted one's options. Returns false if nothing changed. */
-  enact(id: string, rawParams: MeasureParams = {}): boolean {
+  /** Enacts a measure, or changes an enacted one's options. Returns false if nothing changed. `atMsOverride`
+   * is for scripted scenario runs (dev/scenario.ts), which drive the engines without the clock. */
+  enact(id: string, rawParams: MeasureParams = {}, atMsOverride?: number): boolean {
     const def = MEASURE_BY_ID.get(id);
     if (!def || this.frozen) return false;
     const params = sanitizeParams(def, { ...defaultParams(def), ...rawParams });
-    const now = simClock.getSimTimeMs();
+    const now = atMsOverride ?? simClock.getSimTimeMs();
 
     const existing = this.states.get(id);
     const latest = existing?.pending?.params ?? existing?.active ?? null;

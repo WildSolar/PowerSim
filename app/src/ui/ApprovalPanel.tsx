@@ -15,8 +15,8 @@ export function ApprovalPanel() {
   const current = approval.getApproval();
   const history = approval.getHistory();
   const latest = history[history.length - 1];
-  const past = [...history].reverse().find((p) => p.atMs <= latest.atMs - TREND_MONTHS * MONTH_MS) ?? history[0];
-  const delta = current - past.approval;
+  const past = latest ? ([...history].reverse().find((p) => p.atMs <= latest.atMs - TREND_MONTHS * MONTH_MS) ?? history[0]) : undefined;
+  const delta = past ? current - past.approval : 0;
   const election = approval.nextElectionMs();
 
   const color = current >= 60 ? "#1baf7a" : current >= 40 ? "#1a1a1a" : "#b23a2e";

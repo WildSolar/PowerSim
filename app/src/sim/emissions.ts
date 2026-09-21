@@ -17,6 +17,8 @@
  * redo the *baseline* year's full chunked computation every time.
  */
 
+import { GREEN_POWER_MAX_EMISSION_REDUCTION } from "../config/policy";
+import { policyStore } from "./policy";
 import type { Building, PowerPlant } from "../data/types";
 import {
   DISTRICT_HEATING_KG_CO2_PER_KWH,
@@ -83,7 +85,8 @@ export async function computeEmissionsForYear(
   const iceCarLiters = await computeMobilityFuelLiters(buildings, year, isCancelled);
   if (isCancelled()) return { year, ...ZERO_EMISSIONS };
 
-  const electricityKgCO2 = (netElectricityKWh * gridCarbonIntensityGPerKWh(year)) / 1000;
+  const greenShare = policyStore.get().greenPowerShare / 100;
+  const electricityKgCO2 = (netElectricityKWh * gridCarbonIntensityGPerKWh(year) * (1 - GREEN_POWER_MAX_EMISSION_REDUCTION * greenShare)) / 1000;
 
   const gasFuelKWh = heatingTechnology.gasBoilerSpaceKWh / GAS_BOILER_EFFICIENCY;
   const gasKgCO2 = gasFuelKWh * NATURAL_GAS_KG_CO2_PER_KWH;
@@ -92,7 +95,7 @@ export async function computeEmissionsForYear(
   const oilKgCO2 = oilFuelLiters * HEATING_OIL_KG_CO2_PER_LITER;
 
   // District heating's efficiency is defined as 1.0 (billing.ts prices it as delivered), so delivered kWh = fuel kWh.
-  const districtHeatingKgCO2 = heatingTechnology.districtHeatingSpaceKWh * DISTRICT_HEATING_KG_CO2_PER_KWH;
+  const districtHeatingKgCO2 = heatingTechnology.districtHeatingSpaceKWh * DISTRICT_HEATING_KG_CO2_PER_KWH * (1 - policyStore.get().districtHeatCleanShare / 100);
 
   const mobilityKgCO2 = iceCarLiters * ICE_CAR_FUEL_KG_CO2_PER_LITER;
 

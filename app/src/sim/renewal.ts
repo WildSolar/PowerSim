@@ -201,7 +201,7 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
 
     const candidates = params.candidatesAt(nextInstalledAtMs, last.system);
     const uncertaintyFraction = params.uncertaintyFraction * policyStore.get().uncertaintyMultiplier; // information measures narrow it
-    const { chosen, reasonKind, bestOverallId } = chooseNext(candidates, last.system, uncertaintyFraction, params.biasStrengthRp);
+    const { chosen, reasonKind, bestOverallId } = chooseNext(candidates, last.system, uncertaintyFraction, params.biasStrengthRp + policyStore.get().progressiveNudgeRp);
     const winner = candidates.find((c) => c.id === chosen);
     chain.push({ installedAtMs: nextInstalledAtMs, system: chosen, previousSystem: last.system, reasonKind, bestOverallId, municipalSubsidyRp: winner?.municipalSubsidyRp });
     // The money leaves the treasury now, when the decision happens — never before, never for an option nobody takes.

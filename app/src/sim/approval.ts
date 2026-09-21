@@ -27,6 +27,9 @@ import {
   ELECTION_MONTH,
   ELECTION_THRESHOLD,
   ENACT_SHOCK_POINTS,
+  FISCAL_BLOC_WEIGHT,
+  FISCAL_FULL_RATIO,
+  FISCAL_MAX_PENALTY_POINTS,
   MAX_SWING,
   OPTIONAL_REFERENDUM_STANCE,
   POLL_NOISE_POINTS,
@@ -52,6 +55,7 @@ import { simClock } from "./engine";
 import type { MeasureDef, MeasureParams } from "./measureTypes";
 import { measures, type MeasureEvent } from "./measures";
 import { hashSeed, mulberry32 } from "./rng";
+import { treasury } from "./treasury";
 
 const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
 
@@ -233,15 +237,26 @@ class ApprovalEngine {
   }
 
   /** Where a bloc settles given the measures in force. */
-  private restingLevel(bloc: Bloc): number {
+  private restingLevel(bloc: Bloc, fiscalPenalty: number): number {
     let stance = 0;
     for (const { def, params } of measures.getActiveMeasures()) stance += this.stancesOf(def, params)[bloc] ?? 0;
-    return clamp(BASE_APPROVAL + MAX_SWING * this.sensitivity * Math.tanh(STANCE_SATURATION * stance), 0, 100);
+    const level = BASE_APPROVAL + MAX_SWING * this.sensitivity * Math.tanh(STANCE_SATURATION * stance);
+    return clamp(level - fiscalPenalty * FISCAL_BLOC_WEIGHT[bloc] * this.sensitivity, 0, 100);
+  }
+
+  /** How far the last twelve months' spending overshot the government's allocation, as approval points. */
+  private fiscalPenalty(atMs: number): number {
+    const budget = treasury.allocationRp(measures.getDwellingCount(atMs));
+    if (budget <= 0) return 0;
+    const spent = treasury.paidOutTotal(atMs - 12 * MONTH_MS, atMs);
+    const overshoot = (spent / budget - 1) / (FISCAL_FULL_RATIO - 1);
+    return FISCAL_MAX_PENALTY_POINTS * clamp(overshoot, 0, 1);
   }
 
   private monthlyStep(atMs: number): void {
     const k = 1 - Math.exp(-1 / RELAXATION_MONTHS);
-    for (const b of BLOC_ORDER) this.levels[b] += (this.restingLevel(b) - this.levels[b]) * k;
+    const penalty = this.fiscalPenalty(atMs);
+    for (const b of BLOC_ORDER) this.levels[b] += (this.restingLevel(b, penalty) - this.levels[b]) * k;
 
     const approval = this.aggregate();
     this.history.push({ atMs, approval });

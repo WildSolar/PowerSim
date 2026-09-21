@@ -27,8 +27,17 @@ export interface Channels {
   fossilHeatingInstallBanned: boolean; // no new gas or oil heating when a system is replaced
   iceCarPurchaseBanned: boolean; // no new petrol or diesel cars
 
+  iceScrappageBonusRp: number; // extra municipal grant when a petrol/diesel car is replaced by an electric one
+  modeShiftToBikePts: number; // percentage points of trips moved from the car to the bicycle at each household life event
+  modeShiftToOtherPts: number; // ... and to public transport and other modes
+
   // Decisions in general
   uncertaintyMultiplier: number; // scales the indifference band of every investment decision (information campaigns shrink it)
+  progressiveNudgeRp: number; // Rp/year added to every household's progressive lean (climate-awareness campaigns)
+
+  // Electricity supply
+  greenPowerShare: number; // 0-100: share of the utility's supply covered by certified renewable power
+  districtHeatCleanShare: number; // 0-100: how much of the district heat is now produced without fossil fuels
 
   // New buildings and growth
   newBuildSolarMandatePct: number; // 0-100: share of a new roof's usable capacity it must carry
@@ -50,7 +59,13 @@ export const CHANNEL_DEFAULTS: Channels = {
   retrofitMinClass: "none",
   fossilHeatingInstallBanned: false,
   iceCarPurchaseBanned: false,
+  iceScrappageBonusRp: 0,
+  modeShiftToBikePts: 0,
+  modeShiftToOtherPts: 0,
   uncertaintyMultiplier: 1,
+  progressiveNudgeRp: 0,
+  greenPowerShare: 0,
+  districtHeatCleanShare: 0,
   newBuildSolarMandatePct: 0,
   newBuildSolarMandateMinFootprintM2: 0,
   newBuildInsulationLevel: 0,
@@ -80,7 +95,13 @@ const COMBINERS: { [K in keyof Channels]: Combiner<Channels[K]> } = {
   retrofitMinClass: strictestClass,
   fossilHeatingInstallBanned: any,
   iceCarPurchaseBanned: any,
+  iceScrappageBonusRp: sum,
+  modeShiftToBikePts: sum,
+  modeShiftToOtherPts: sum,
   uncertaintyMultiplier: product,
+  progressiveNudgeRp: sum,
+  greenPowerShare: max,
+  districtHeatCleanShare: max,
   newBuildSolarMandatePct: max,
   newBuildSolarMandateMinFootprintM2: latest,
   newBuildInsulationLevel: max,

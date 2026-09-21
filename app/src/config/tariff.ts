@@ -31,5 +31,10 @@ export const DEFAULT_TARIFF: Tariff = {
   // has sat roughly in this range, and a small Swiss DSO's own grid-usage
   // fee is a similar order of magnitude.
   wholesalePriceRpKWh: 9,
-  gridMaintenanceRpKWh: 6,
+  // Grid usage fees in Switzerland run around 10-12 Rp/kWh, plus federal levies that also pass
+  // through the utility. At 6 the local utility kept a ~CHF 12M/yr margin on a town of 20,000 —
+  // far more than a real small DSO — which made every treasury decision free. 13 covers the grid
+  // (and, until the grid layer models it properly, its capital costs) and leaves a margin of a
+  // few million.
+  gridMaintenanceRpKWh: 13,
 };

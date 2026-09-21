@@ -42,7 +42,9 @@ import { toSimTimeMs } from "./calendar";
 import { energyKWh } from "./energy";
 import { historyTimeSteps, sampleMunicipalityCategorySeries } from "./history";
 import { allocationApprovalFactor, approval } from "./approval";
+import { GREEN_POWER_PREMIUM_RP_PER_KWH } from "../config/policy";
 import { existsAt } from "./lifetime";
+import { policyStore } from "./policy";
 import { effectivePowerPlants } from "./solarAdoption";
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
@@ -114,7 +116,8 @@ export async function computeMunicipalFinancesForYear(
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
 
-  const wholesaleCostRp = netElectricityKWh * tariff.wholesalePriceRpKWh;
+  const greenShare = policyStore.get().greenPowerShare / 100;
+  const wholesaleCostRp = netElectricityKWh * (tariff.wholesalePriceRpKWh + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare);
   const gridMaintenanceCostRp = grossConsumptionKWh * tariff.gridMaintenanceRpKWh;
 
   // Every household decision due this year has to have committed (and paid out) before the year is summed.

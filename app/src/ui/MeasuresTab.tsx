@@ -5,6 +5,7 @@ import { defaultParams, MEASURE_CATEGORY_LABEL, type MeasureCategory, type Measu
 import { approval } from "../sim/approval";
 import { measures } from "../sim/measures";
 import { useSimDay } from "../sim/store";
+import { treasury } from "../sim/treasury";
 import { formatCHF } from "./format";
 import "./measures.css";
 
@@ -118,6 +119,9 @@ export function MeasuresTab() {
   );
   const nowMs = useSimDay();
   const outlook = measures.externalOutlook(nowMs);
+  const YEAR_MS = 365.25 * 24 * 60 * 60_000;
+  const budgetRp = treasury.allocationRp(measures.getDwellingCount(nowMs));
+  const spentRp = treasury.paidOutTotal(nowMs - YEAR_MS, nowMs + 24 * 60 * 60_000);
   const history = [...measures.getHistory(), ...approval.getLog()].sort((a, b) => b.atMs - a.atMs);
 
   return (
@@ -126,6 +130,10 @@ export function MeasuresTab() {
       <p className="measures-intro">
         What the municipality can decide. Money leaves the treasury only when something actually happens — a subsidy when a household takes it up, a
         campaign month by month. Laws and programmes take months to years to come into effect.
+      </p>
+      <p className="measures-intro" style={{ color: spentRp > budgetRp ? "#b23a2e" : undefined }}>
+        Spent over the last 12 months: {formatCHF(spentRp)}, against a yearly government allocation of {formatCHF(budgetRp)}. Spending well beyond the
+        allocation costs you approval with taxpayers.
       </p>
 
       <section className="measures-section">

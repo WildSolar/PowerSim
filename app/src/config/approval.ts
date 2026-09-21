@@ -50,6 +50,20 @@ export const POLL_NOISE_POINTS = 4; // a poll's error, +-percentage points
 export const VOTE_WON_POINTS = 2; // approval bonus for everyone when the voters back you
 export const VOTE_LOST_POINTS = 4; // and the rebuke when they don't
 
+// --- Fiscal responsibility ---
+// Taxpayers accept spending up to the government's own yearly allocation for the energy department; beyond it
+// (the utility's margin quietly covers the difference) they start to grumble. The penalty is on every bloc's
+// resting level, growing from nothing at the allocation to the maximum at FISCAL_FULL_RATIO times it.
+export const FISCAL_FULL_RATIO = 2.5;
+export const FISCAL_MAX_PENALTY_POINTS = 18;
+export const FISCAL_BLOC_WEIGHT: Record<Bloc, number> = {
+  homeowners: 1.2,
+  tenants: 0.7,
+  drivers: 1,
+  business: 1.4,
+  climate: 0.5,
+};
+
 // --- Consequences ---
 
 export const WARNING_APPROVAL = 40;

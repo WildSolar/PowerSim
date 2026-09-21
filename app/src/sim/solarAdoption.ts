@@ -258,7 +258,7 @@ function evaluateAdoption(
     },
   ];
   const biasRp = solarBiasStrengthRp(building.egid);
-  const { chosen } = chooseNext(candidates, "none", SOLAR_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier, biasRp);
+  const { chosen } = chooseNext(candidates, "none", SOLAR_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier, biasRp + policy.progressiveNudgeRp);
 
   logCandidateDecision({
     atMs: yearStartMs,

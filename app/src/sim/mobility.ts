@@ -92,11 +92,21 @@ export function mobilitySlotCount(egid: string, dwelling: Dwelling): 1 | 2 {
 
 // --- mode tier ---------------------------------------------------------------
 
+// However much infrastructure and restriction the municipality adds, the car keeps at least this share.
+const MIN_CAR_SHARE = 0.15;
+
+/** The modal split a household's next life event draws from: the survey baseline, with whatever the
+ * municipality has done (bike lanes, better transit, parking rules) moving trips off the car. */
 function modeTargetShares(): Record<MobilityMode, number> {
+  const p = policyStore.get();
+  const car = MOBILITY_MODE_CATALOG.car.targetShare;
+  const wanted = (p.modeShiftToBikePts + p.modeShiftToOtherPts) / 100;
+  const moved = Math.min(wanted, Math.max(0, car - MIN_CAR_SHARE));
+  const scale = wanted > 0 ? moved / wanted : 0;
   return {
-    car: MOBILITY_MODE_CATALOG.car.targetShare,
-    bike: MOBILITY_MODE_CATALOG.bike.targetShare,
-    other: MOBILITY_MODE_CATALOG.other.targetShare,
+    car: car - moved,
+    bike: MOBILITY_MODE_CATALOG.bike.targetShare + (p.modeShiftToBikePts / 100) * scale,
+    other: MOBILITY_MODE_CATALOG.other.targetShare + (p.modeShiftToOtherPts / 100) * scale,
   };
 }
 
@@ -128,11 +138,12 @@ function avgElecRpKWh(tariff: Tariff): number {
   return (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2;
 }
 
-function carCandidatesAt(tariff: Tariff): RenewalCandidate<VehicleTypeId>[] {
+function carCandidatesAt(tariff: Tariff, incumbent: VehicleTypeId): RenewalCandidate<VehicleTypeId>[] {
   return CAR_VEHICLE_ORDER.map((id) => {
     const spec = VEHICLE_TYPE_CATALOG[id];
     const beforeMunicipalRp = Math.max(0, spec.baseInstallCostRp - spec.subsidyRp);
-    const municipalRp = Math.min(municipalVehicleSubsidyRp(id), beforeMunicipalRp);
+    const scrappageRp = id === "carEV" && incumbent === "carICE" ? policyStore.get().iceScrappageBonusRp : 0;
+    const municipalRp = Math.min(municipalVehicleSubsidyRp(id) + scrappageRp, beforeMunicipalRp);
     const installCostRp = beforeMunicipalRp - municipalRp;
     const runningCostRp =
       id === "carEV"
@@ -206,7 +217,7 @@ function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "c
     uncertaintyFraction: VEHICLE_UNCERTAINTY_FRACTION,
     biasStrengthRp: biasStrengthRp(egid, ewid, slotIndex, kind),
     lifetimeMeanYearsFor: (id) => VEHICLE_TYPE_CATALOG[id].lifetimeMeanYears,
-    candidatesAt: () => (kind === "car" ? carCandidatesAt(tariffStore.get()) : bikeCandidatesAt(tariffStore.get())),
+    candidatesAt: (_atMs, incumbent) => (kind === "car" ? carCandidatesAt(tariffStore.get(), incumbent) : bikeCandidatesAt(tariffStore.get())),
   };
   return renewalEventsUpTo(params, simTimeMs);
 }
