@@ -17,6 +17,7 @@ import { useReportCardYear } from "./sim/store";
 import { useTimeKeyboard } from "./ui/useTimeKeyboard";
 import { useStockBuildings } from "./ui/useStock";
 import { stock } from "./sim/stock";
+import { policyStore } from "./sim/policy";
 import { startYearEndWatcher } from "./sim/yearEndWatcher";
 import "./App.css";
 
@@ -32,7 +33,7 @@ function returnToMenu() {
 }
 
 // Dev-only handle for inspecting the simulation from the browser console.
-if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock } });
+if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore } });
 
 function Game({ slug }: { slug: string }) {
   const [dataset, setDataset] = useState<MunicipalityDataset | null>(null);

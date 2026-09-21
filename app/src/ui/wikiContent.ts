@@ -209,6 +209,22 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "insulation",
+    icon: "🧱",
+    title: "Insulation & energy classes",
+    blocks: [
+      p(
+        "How much heat a building loses depends on its envelope — walls, windows, roof — summarized as one U-value. Every building has an energy class read off that U-value: Unrenovated, Partly insulated, Current standard, Minergie, or Minergie-P. Existing buildings start in the class their age (and a little luck) implies; a new building starts in the class the building rules and the insulation standard of its permit give it. The Insulation layer on the map colors buildings by class.",
+      ),
+      p(
+        "Every few decades an owner reconsiders the envelope. Like a heating replacement, the choice weighs cost against benefit: the work above the maintenance that is needed anyway, less the federal building-program grant (and any municipal top-up), against what a year of heating would cost afterwards — with that building's own heating system at current prices. The owner also stays put unless an upgrade is clearly better, and a hidden progressive or conservative streak nudges close calls. A retrofit that leaves the building in a better class lowers its heat demand for good.",
+      ),
+      note(
+        "Because the payoff is lower heating cost, a retrofit tends to pay off on an oil- or gas-heated house and much less on one already heated by a heat pump — cheap heat makes insulation a poorer investment. Costs and grants are ballpark figures, not quotes.",
+      ),
+    ],
+  },
+  {
     id: "stock-renewal",
     icon: "🔄",
     title: "Stock renewal: when infrastructure gets replaced",

@@ -35,7 +35,7 @@ export function hasHeatPump(building: Building, simTimeMs: number): boolean {
 export function heatPumpPowerWWithWeather(building: Building, dailyMeanC: number, outsideTempC: number, simTimeMs: number): number {
   const id = currentHeatingSystemId(building, simTimeMs);
   if (id !== "airHeatPump" && id !== "groundHeatPump") return 0;
-  const thermalPowerW = spaceHeatingThermalDemandW(building, dailyMeanC, outsideTempC);
+  const thermalPowerW = spaceHeatingThermalDemandW(building, dailyMeanC, outsideTempC, simTimeMs);
   if (thermalPowerW === 0) return 0;
   return thermalPowerW / copAt(outsideTempC, id === "groundHeatPump" ? "ground" : "air");
 }

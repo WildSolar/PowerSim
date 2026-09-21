@@ -49,3 +49,18 @@ export function weibullAgedRemainder(ageRng: () => number, lifeRng: () => number
   const totalMs = weibullSample(lifeRng, shape, meanValueMs);
   return Math.max(MIN_LIFETIME_MS, totalMs - assumedAgeMs);
 }
+
+/** The statistically proper "how long is left" for something already `age` old: a lifetime
+ * drawn from the distribution *conditional on having lasted that long*, so nothing is ever
+ * overdue and there is no pile-up of immediate renewals. (weibullAgedRemainder above instead
+ * floors an overdue item to the minimum lifetime — its long-standing behaviour for heating
+ * and vehicles, kept as is because their calibration was tuned against it.) */
+export function weibullConditionalRemainder(ageRng: () => number, lifeRng: () => number, shape: number, meanValueMs: number): number {
+  const scale = meanValueMs / gamma(1 + 1 / shape);
+  const assumedAgeMs = ageRng() * meanValueMs;
+  const survivalAtAge = Math.exp(-Math.pow(assumedAgeMs / scale, shape));
+  const u = Math.min(0.999999, Math.max(0.000001, lifeRng()));
+  // Inverse CDF restricted to lifetimes beyond the assumed age.
+  const totalMs = scale * Math.pow(-Math.log(survivalAtAge * (1 - u)), 1 / shape);
+  return Math.max(MIN_LIFETIME_MS, totalMs - assumedAgeMs);
+}

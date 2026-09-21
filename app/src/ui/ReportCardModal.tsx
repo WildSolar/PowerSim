@@ -1,3 +1,4 @@
+import { ENERGY_CLASS_CATALOG } from "../sim/energyClass";
 import { existsAt } from "../sim/lifetime";
 import { toSimTimeMs } from "../sim/calendar";
 import { stock } from "../sim/stock";
@@ -6,7 +7,7 @@ import { EMISSIONS_SOURCE_COLOR } from "../sim/emissions";
 import { HEATING_SYSTEM_CATALOG, HEATING_SYSTEM_ORDER, WATER_HEATING_KIND_COLOR } from "../sim/heatingSystems";
 import { sampleMunicipalityCategorySeries } from "../sim/history";
 import { effectivePowerPlants, solarAdoptionTallyForYear } from "../sim/solarAdoption";
-import { spaceHeatingKWhFor } from "../sim/yearReport";
+import { computeRetrofitTally, spaceHeatingKWhFor } from "../sim/yearReport";
 import { useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
 import { CONSUMPTION_CATEGORIES } from "./deviceCategories";
@@ -42,6 +43,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
   const yearEndMs = toSimTimeMs(Date.UTC(year + 1, 0, 1)) - 1;
   const standing = dataset.buildings.filter((b) => existsAt(b, yearEndMs));
   const development = stock.summaryForYear(year);
+  const retrofits = computeRetrofitTally(dataset.buildings, year);
   const solarTally = solarAdoptionTallyForYear(dataset.buildings, dataset.powerPlants, year);
 
   const { energy: overallEnergy, loading: overallLoading } = usePeriodPieEnergy(
@@ -232,6 +234,29 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                       {" → "}
                       {HEATING_SYSTEM_CATALOG[r.system].icon} {HEATING_SYSTEM_CATALOG[r.system].label}
                       {r.previousSystem === r.system && <span className="ev-badge">like-for-like</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          <h2 style={{ fontSize: 14, marginTop: 14 }}>Insulation retrofits this year</h2>
+          {retrofits.total === 0 ? (
+            <p>No building had its envelope upgraded this calendar year.</p>
+          ) : (
+            <>
+              <p>
+                {retrofits.total} building{retrofits.total === 1 ? "" : "s"} upgraded {retrofits.total === 1 ? "its" : "their"} insulation this year.
+              </p>
+              <div className="renewal-tally">
+                {retrofits.entries.map((r) => (
+                  <div className="renewal-tally-row" key={`${r.from}>${r.to}`}>
+                    <span className="renewal-tally-count">{r.count}×</span>
+                    <span className="renewal-tally-label">
+                      {ENERGY_CLASS_CATALOG[r.from].label}
+                      {" → "}
+                      {ENERGY_CLASS_CATALOG[r.to].label}
                     </span>
                   </div>
                 ))}

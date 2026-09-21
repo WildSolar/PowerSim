@@ -15,6 +15,8 @@ export const DEFAULT_POLICY: Policy = {
   newBuildFossilHeatingAllowed: false,
   growthMultiplier: 1,
   renewalRateMultiplier: 1,
+  retrofitSubsidyRpPerM2: 0,
+  retrofitMinClass: "none",
 };
 
 // outreachHazardMultiplier(level) = 1 + (level/100) * OUTREACH_MAX_MULTIPLIER_BONUS

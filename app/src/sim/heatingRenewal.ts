@@ -43,8 +43,8 @@ import {
 } from "./heatingSystems";
 import { impliesHeatPump } from "./heatPumpSources";
 import { hashSeed, mulberry32 } from "./rng";
-import { renewalEventsUpTo, systemAt, type RenewalCandidate, type RenewalEvent, type RenewalParams } from "./renewal";
-import { copAt, spaceHeatingThermalDemandW } from "./spaceHeating";
+import { peekRenewalChain, renewalEventsUpTo, systemAt, type RenewalCandidate, type RenewalEvent, type RenewalParams } from "./renewal";
+import { buildingThermalProfile, copAt, spaceHeatingThermalDemandW } from "./spaceHeating";
 import { tariffStore } from "./tariffStore";
 import type { Tariff } from "./tariff";
 import { dailyMeanTempC } from "./weather";
@@ -90,14 +90,21 @@ interface AnnualHeatingEstimate {
  * (spaceHeating.ts), just integrated over a full year up front instead of
  * per-frame, since a renewal decision needs one annual figure to compare
  * against, not a live reading. */
-function annualHeatingEstimate(building: Building, atMs: number): AnnualHeatingEstimate {
+function annualHeatingEstimate(building: Building, atMs: number, uValueOverride?: number): AnnualHeatingEstimate {
+  // One snapshot of the envelope as of the decision moment, not re-read for every day of the year
+  // ahead: a later retrofit is not something this decision knows about (and looking it up would
+  // tie two decision chains together).
+  // (Read as of just *before* the decision moment: a retrofit decision at the same instant reads
+  // the heating system the same way, and each looking strictly earlier is what keeps the two
+  // chains from waiting on each other forever.)
+  const uValue = uValueOverride ?? buildingThermalProfile(building, atMs - 1).uValueWPerM2K;
   let thermalKWh = 0;
   let airHeatPumpElectricKWh = 0;
   let groundHeatPumpElectricKWh = 0;
   for (let i = 0; i < ANNUAL_SAMPLE_DAYS; i++) {
     const t = atMs + i * DAY_MS;
     const dailyMeanC = dailyMeanTempC(t);
-    const thermalW = spaceHeatingThermalDemandW(building, dailyMeanC, dailyMeanC);
+    const thermalW = spaceHeatingThermalDemandW(building, dailyMeanC, dailyMeanC, t, uValue);
     const dayThermalKWh = (thermalW * 24) / 1000;
     thermalKWh += dayThermalKWh;
     airHeatPumpElectricKWh += dayThermalKWh / copAt(dailyMeanC, "air");
@@ -150,6 +157,8 @@ function biasStrengthRp(building: Building): number {
 }
 
 function chainFor(building: Building, simTimeMs: number): RenewalEvent<HeatingSystemId>[] | null {
+  const cached = peekRenewalChain<HeatingSystemId>(`${building.egid}:heating`, simTimeMs);
+  if (cached) return cached;
   const initial = initialHeatingSystemId(building);
   if (initial === null) return null;
   const params: RenewalParams<HeatingSystemId> = {
@@ -166,6 +175,16 @@ function chainFor(building: Building, simTimeMs: number): RenewalEvent<HeatingSy
     candidatesAt: (atMs, incumbent) => candidatesAt(building, atMs, incumbent),
   };
   return renewalEventsUpTo(params, simTimeMs);
+}
+
+/** What a year of space heating would cost this building at `atMs` prices if its envelope had
+ * the given U-value, heated by whatever system it has then (gas if that is not one we price).
+ * Retrofit decisions weigh this against the cost of the work. */
+export function annualHeatingCostRp(building: Building, atMs: number, uValueWPerM2K: number): number {
+  const tariff = tariffStore.get();
+  const estimate = annualHeatingEstimate(building, atMs, uValueWPerM2K);
+  const avgElecRpKWh = (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2;
+  return runningCostRpFor(currentHeatingSystemId(building, atMs - 1) ?? "gasBoiler", estimate, tariff, avgElecRpKWh);
 }
 
 export interface NewBuildHeatingCandidate {

@@ -32,6 +32,7 @@ import {
 import { interpolateCurve } from "../config/curve";
 import { buildingEnvelopeAreaM2 } from "./buildingGeometry";
 import { commercialCategory } from "./commercial";
+import { retrofitUValueAt } from "./retrofit";
 import { hashSeed, mulberry32 } from "./rng";
 
 export { COMFORT_TEMP_C, HEATING_THRESHOLD_C };
@@ -76,10 +77,10 @@ export interface BuildingThermalProfile {
   comfortTempC: number; // BASE_COMFORT_TEMP_C net of this building's usage offset
 }
 
-const thermalProfileCache = new Map<string, BuildingThermalProfile>();
+const baseProfileCache = new Map<string, BuildingThermalProfile>();
 
-/** A building's own heat-loss characteristics, computed once and cached
- * (like buildingGeometry.ts's envelope-area cache) rather than re-derived
+/** A building's own heat-loss characteristics as first built or first observed, computed
+ * once and cached (like buildingGeometry.ts's envelope-area cache) rather than re-derived
  * every call — three factors, each independently justified:
  *  - Age: GWR's real construction year, through the era curve above.
  *  - Usage: occupancy/equipment internal gains offsetting the comfort gap
@@ -88,13 +89,13 @@ const thermalProfileCache = new Map<string, BuildingThermalProfile>();
  *    in for everything age alone doesn't explain — workmanship quality, an
  *    unlisted renovation, general draftiness — fixed for the building's life
  *    rather than redrawn, the same way every other seeded per-building trait
- *    in this codebase (bias, uncertainty, uncounted traits) works. */
-export function buildingThermalProfile(building: Building): BuildingThermalProfile {
-  const cached = thermalProfileCache.get(building.egid);
+ *    in this codebase (bias, uncertainty, uncounted traits) works.
+ * A new build carries its own U-value instead (set at permit time, see newBuild.ts).
+ * An insulation retrofit later replaces the U-value (retrofit.ts); this stays the "before". */
+function baseThermalProfile(building: Building): BuildingThermalProfile {
+  const cached = baseProfileCache.get(building.egid);
   if (cached) return cached;
 
-  // A new build carries its own U-value, fixed at permit time from the building code
-  // and the insulation policy (see newBuild.ts) — no era lookup or random quality draw.
   let uValueWPerM2K = building.uValueWPerM2K;
   if (uValueWPerM2K === undefined) {
     const baseUValue = baseUValueForYear(building.constructionYear);
@@ -102,13 +103,22 @@ export function buildingThermalProfile(building: Building): BuildingThermalProfi
     const qualityFactor = U_VALUE_QUALITY_FACTOR_MIN + mulberry32(hashSeed(building.egid, "thermal-quality"))() * qualityRange;
     uValueWPerM2K = baseUValue * qualityFactor;
   }
-
-  const profile: BuildingThermalProfile = {
-    uValueWPerM2K,
-    comfortTempC: COMFORT_TEMP_C - usageInternalGainOffsetC(building),
-  };
-  thermalProfileCache.set(building.egid, profile);
+  const profile: BuildingThermalProfile = { uValueWPerM2K, comfortTempC: COMFORT_TEMP_C - usageInternalGainOffsetC(building) };
+  baseProfileCache.set(building.egid, profile);
   return profile;
+}
+
+/** The U-value the building had before any retrofit — what its energy class starts from. */
+export function originalUValue(building: Building): number {
+  return baseThermalProfile(building).uValueWPerM2K;
+}
+
+/** The building's thermal profile at a moment in time: its original U-value until an
+ * insulation retrofit has happened, that retrofit's afterwards. */
+export function buildingThermalProfile(building: Building, simTimeMs: number): BuildingThermalProfile {
+  const base = baseThermalProfile(building);
+  const retrofitted = retrofitUValueAt(building, simTimeMs);
+  return retrofitted === null ? base : { uValueWPerM2K: retrofitted, comfortTempC: base.comfortTempC };
 }
 
 /** The building's raw heat-loss demand — envelope area times how far outside
@@ -120,12 +130,21 @@ export function buildingThermalProfile(building: Building): BuildingThermalProfi
  * instead, since the physical demand doesn't care what's burning to meet it.
  * Returns 0 for a building with no footprint/height data or on a day that
  * doesn't need heating, regardless of what heats it. */
-export function spaceHeatingThermalDemandW(building: Building, dailyMeanC: number, outsideTempC: number): number {
+export function spaceHeatingThermalDemandW(
+  building: Building,
+  dailyMeanC: number,
+  outsideTempC: number,
+  simTimeMs: number,
+  /** A hypothetical U-value instead of the building's actual one — retrofit decisions price "what if". */
+  uValueOverride?: number,
+): number {
   const envelopeAreaM2 = buildingEnvelopeAreaM2(building);
   if (envelopeAreaM2 === null) return 0;
   if (dailyMeanC >= HEATING_THRESHOLD_C) return 0;
 
-  const profile = buildingThermalProfile(building);
-  const deltaTC = Math.max(0, profile.comfortTempC - outsideTempC);
-  return profile.uValueWPerM2K * envelopeAreaM2 * deltaTC;
+  // With an override the retrofit state is never consulted: retrofit decisions price hypothetical
+  // U-values from inside their own chain, and looking that chain up again would recurse.
+  const uValue = uValueOverride ?? buildingThermalProfile(building, simTimeMs).uValueWPerM2K;
+  const deltaTC = Math.max(0, baseThermalProfile(building).comfortTempC - outsideTempC);
+  return uValue * envelopeAreaM2 * deltaTC;
 }

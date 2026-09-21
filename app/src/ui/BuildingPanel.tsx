@@ -1,3 +1,6 @@
+import { ENERGY_CLASS_CATALOG } from "../sim/energyClass";
+import { energyClassAt, retrofitLog } from "../sim/retrofit";
+import { buildingThermalProfile } from "../sim/spaceHeating";
 import { existsAt } from "../sim/lifetime";
 import { lifecycleNotes } from "./lifecycleNotes";
 import type { Building, PowerPlant } from "../data/types";
@@ -129,6 +132,10 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
         <dd>{building.constructionYear ?? "Unknown"}</dd>
         <dt>Floors</dt>
         <dd>{building.floorCount ?? "Unknown"}</dd>
+        <dt>Insulation</dt>
+        <dd>
+          {ENERGY_CLASS_CATALOG[energyClassAt(building, simTimeMs)].label} (U {buildingThermalProfile(building, simTimeMs).uValueWPerM2K.toFixed(2)} W/m²K)
+        </dd>
         <dt>Heating</dt>
         <dd>
           {heatingSystemId ? (
@@ -168,6 +175,7 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
         )}
       </div>
       <RenewalLogSection title="Heating history" entries={heatingLog} />
+      <RenewalLogSection title="Insulation history" entries={retrofitLog(building, simTimeMs)} />
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Hot water</h2>
       <div className={`device-row${hasElectricWater ? "" : " inactive"}`}>

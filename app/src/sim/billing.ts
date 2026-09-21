@@ -70,15 +70,15 @@ export function heatingFuelType(building: Building, atSimTimeMs: number): Heatin
  * point, not liters — the liter conversion only matters for oil, and only at
  * the point of pricing/display (below), to keep this series usable directly
  * with energy.ts's plain kWh integration regardless of fuel. */
-function heatingFuelPowerW(building: Building, fuel: HeatingFuel, dailyMeanC: number, outsideTempC: number): number {
+function heatingFuelPowerW(building: Building, fuel: HeatingFuel, dailyMeanC: number, outsideTempC: number, simTimeMs: number): number {
   if (!fuel) return 0;
-  const thermalW = spaceHeatingThermalDemandW(building, dailyMeanC, outsideTempC);
+  const thermalW = spaceHeatingThermalDemandW(building, dailyMeanC, outsideTempC, simTimeMs);
   return thermalW / fuelEfficiency(fuel);
 }
 
 function heatingFuelSeriesW(building: Building, fuel: HeatingFuel, times: number[]): number[] {
   if (!fuel) return times.map(() => 0);
-  return times.map((t) => heatingFuelPowerW(building, fuel, dailyMeanTempC(t), weatherAt(t).tempC));
+  return times.map((t) => heatingFuelPowerW(building, fuel, dailyMeanTempC(t), weatherAt(t).tempC, t));
 }
 
 /** Cost and physical quantity consumed (liters for oil, kWh for gas/district

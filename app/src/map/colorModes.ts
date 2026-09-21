@@ -1,7 +1,8 @@
 import type { Building } from "../data/types";
+import { ENERGY_CLASS_CATALOG, ENERGY_CLASS_ORDER } from "../sim/energyClass";
 import { currentHeatingSystemId } from "../sim/heatingRenewal";
 
-export type ColorMode = "none" | "category" | "heating" | "power" | "solar" | "age";
+export type ColorMode = "none" | "category" | "heating" | "power" | "solar" | "age" | "insulation";
 
 export interface LegendEntry {
   bucket: string;
@@ -176,6 +177,12 @@ export const AGE_LEGEND: LegendEntry[] = [
   { bucket: "new", label: "Built during the game", color: "#1baf7a" },
   { bucket: "unknown", label: "Unknown", color: UNKNOWN_COLOR },
 ];
+
+export const INSULATION_LEGEND: LegendEntry[] = ENERGY_CLASS_ORDER.map((id) => ({
+  bucket: id,
+  label: ENERGY_CLASS_CATALOG[id].label,
+  color: ENERGY_CLASS_CATALOG[id].color,
+}));
 
 export const CONSTRUCTION_COLOR = "#f2b01e";
 

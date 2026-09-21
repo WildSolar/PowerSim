@@ -91,6 +91,7 @@ import {
 } from "./localGeo";
 import { applyNewBuildAttributes, buildingGroup, gfaOf } from "./newBuild";
 import { policyStore } from "./policy";
+import { energyClassAt } from "./retrofit";
 import { hashSeed, mulberry32 } from "./rng";
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -229,6 +230,7 @@ class StockStore {
   private egidCounter = 0;
   private arrivalCounter = 0;
   private thinCounter = 0;
+  private lastDecisionMonth = -1;
   private projects: StockProject[] = [];
 
   // --- public API ---
@@ -307,6 +309,7 @@ class StockStore {
     this.egidCounter = 0;
     this.arrivalCounter = 0;
     this.thinCounter = 0;
+    this.lastDecisionMonth = -1;
     this.startYear = yearOf(0);
 
     const first = this.all[0];
@@ -346,6 +349,15 @@ class StockStore {
       else changed = true;
     }
     if (changed) this.commit();
+
+    // A decision chain that nothing happens to query would otherwise be settled late, under
+    // whatever policy and prices apply by then. Touching every building's envelope chain once a
+    // simulated month makes each decision commit close to when it falls due.
+    const month = Math.floor(nowMs / MONTH_MS);
+    if (month !== this.lastDecisionMonth) {
+      this.lastDecisionMonth = month;
+      for (const b of this.all) if (existsAt(b, nowMs)) energyClassAt(b, nowMs);
+    }
   }
 
   // --- setup ---

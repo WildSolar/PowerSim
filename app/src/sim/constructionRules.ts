@@ -11,6 +11,7 @@
  */
 
 import { CODE_SOLAR_W_PER_M2_EBF } from "../config/stock";
+import type { EnergyClassId } from "./energyClass";
 import type { HeatingSystemId } from "./heatingSystems";
 import type { Policy } from "./policy";
 
@@ -27,6 +28,21 @@ export interface ConstructionRules {
   /** Multipliers on the historic growth rate and renewal rate. */
   growthMultiplier: number;
   renewalRateMultiplier: number;
+}
+
+export interface RetrofitRules {
+  /** Municipal top-up per m2 of envelope on an upgrade. */
+  municipalSubsidyRpPerM2: number;
+  /** The lowest class an envelope renovation may end at, or null for no minimum. */
+  minClass: EnergyClassId | null;
+}
+
+/** The rules for retrofits of existing buildings — the same hook, read by sim/retrofit.ts. */
+export function retrofitRules(policy: Policy, _year: number): RetrofitRules {
+  return {
+    municipalSubsidyRpPerM2: policy.retrofitSubsidyRpPerM2,
+    minClass: policy.retrofitMinClass === "none" ? null : policy.retrofitMinClass,
+  };
 }
 
 const CLEAN_HEATING: HeatingSystemId[] = ["airHeatPump", "groundHeatPump", "districtHeating"];

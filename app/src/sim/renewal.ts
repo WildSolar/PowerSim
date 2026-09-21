@@ -24,13 +24,16 @@
 
 import { logCandidateDecision, type DecisionCandidateLog, type DecisionLogKind } from "./decisionLog";
 import { hashSeed, mulberry32 } from "./rng";
-import { weibullAgedRemainder, weibullSample } from "./weibull";
+import { weibullAgedRemainder, weibullConditionalRemainder, weibullSample } from "./weibull";
 
 export interface RenewalCandidate<T extends string> {
   id: T;
   available: boolean;
   annualizedCostRp: number; // straight-line: (installCost - subsidy) / lifetime + running cost, all per year
   lifetimeMeanYears: number;
+  /** The part of the up-front cost the municipality pays (already netted out of annualizedCostRp).
+   * Recorded on the event when this candidate wins, so the treasury can be charged for it then. */
+  municipalSubsidyRp?: number;
   /** Signed "how renewable/progressive this option reads" — positive leans
    * renewable, negative leans fossil/conventional. Scaled by the entity's own
    * bias trait when ranking; never shown to the player. */
@@ -44,6 +47,8 @@ export interface RenewalEvent<T extends string> {
   system: T;
   previousSystem: T | null; // null only for the synthetic "initial" event
   reasonKind: RenewalReasonKind;
+  /** Municipal subsidy paid out when this event committed (the winning candidate's), if any. */
+  municipalSubsidyRp?: number;
   /** Only set for "forcedByAvailability": the option that would have won on
    * cost alone if it had been available. */
   bestOverallId: T | null;
@@ -68,6 +73,9 @@ export interface RenewalParams<T extends string> {
    * renewal is then a full lifetime later. Absent for a system observed at game start,
    * whose install date is unknown (its first renewal comes after an assumed-aged remainder). */
   initialInstalledAtMs?: number;
+  /** Draw an observed system's remaining life conditional on its assumed age (no overdue pile-up),
+   * instead of the legacy floor-at-minimum behaviour. */
+  conditionalFirstLifetime?: boolean;
   weibullShape: number;
   /** This entity's indifference band, as a fraction of the incumbent's own
    * annualized cost — smaller for entities that can justify a more careful
@@ -89,6 +97,16 @@ export interface RenewalParams<T extends string> {
 const MAX_EVENTS_PER_CALL = 1000; // defensive cap against a misconfigured/runaway chain, not a real limit
 
 const chainCache = new Map<string, RenewalEvent<string>[]>();
+// When each chain's next event falls due: until then the cached chain is complete, so a lookup
+// need not rebuild its params or redraw a lifetime (the hot path in municipality-wide sampling).
+const nextDueCache = new Map<string, number>();
+
+/** The cached chain for `entityKey` if it is already complete up to `uptoMs`, else null. */
+export function peekRenewalChain<T extends string>(entityKey: string, uptoMs: number): RenewalEvent<T>[] | null {
+    const due = nextDueCache.get(entityKey);
+    if (due === undefined || uptoMs >= due) return null;
+    return (chainCache.get(entityKey) as RenewalEvent<T>[] | undefined) ?? null;
+}
 
 /** Exported for solarAdoption.ts, which reuses this exact four-factor
  * comparison for a binary "stay without / install" choice — same shape,
@@ -144,10 +162,11 @@ function nextLifetimeMs(entityKey: string, eventIndex: number, shape: number, me
   return weibullSample(rng, shape, meanYears * 365.25 * 24 * 60 * 60_000);
 }
 
-function firstRemainingLifetimeMs(entityKey: string, shape: number, meanYears: number): number {
+function firstRemainingLifetimeMs(entityKey: string, shape: number, meanYears: number, conditional: boolean): number {
   const ageRng = mulberry32(hashSeed(entityKey, "renewal-initial-age"));
   const lifeRng = mulberry32(hashSeed(entityKey, "renewal-initial-lifetime"));
-  return weibullAgedRemainder(ageRng, lifeRng, shape, meanYears * 365.25 * 24 * 60 * 60_000);
+  const draw = conditional ? weibullConditionalRemainder : weibullAgedRemainder;
+  return draw(ageRng, lifeRng, shape, meanYears * 365.25 * 24 * 60 * 60_000);
 }
 
 /** Every event for this entity up to and including `uptoMs`, extending and
@@ -155,6 +174,8 @@ function firstRemainingLifetimeMs(entityKey: string, shape: number, meanYears: n
  * repeatedly with the same or a larger `uptoMs` (the common case — every
  * render just asks "up to right now"). */
 export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, uptoMs: number): RenewalEvent<T>[] {
+  const fresh = peekRenewalChain<T>(params.entityKey, uptoMs);
+  if (fresh) return fresh;
   let chain = chainCache.get(params.entityKey);
   if (!chain) {
     chain = [{ installedAtMs: Number.NEGATIVE_INFINITY, system: params.initialSystem, previousSystem: null, reasonKind: "initial", bestOverallId: null }];
@@ -168,14 +189,18 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
     const meanYears = params.lifetimeMeanYearsFor(last.system);
     const nextInstalledAtMs =
       eventIndex === 1 && params.initialInstalledAtMs === undefined
-        ? firstRemainingLifetimeMs(params.entityKey, params.weibullShape, meanYears)
+        ? firstRemainingLifetimeMs(params.entityKey, params.weibullShape, meanYears, params.conditionalFirstLifetime === true)
         : (eventIndex === 1 ? (params.initialInstalledAtMs as number) : last.installedAtMs) +
           nextLifetimeMs(params.entityKey, eventIndex, params.weibullShape, meanYears);
-    if (nextInstalledAtMs > uptoMs) break;
+    if (nextInstalledAtMs > uptoMs) {
+      nextDueCache.set(params.entityKey, nextInstalledAtMs);
+      break;
+    }
 
     const candidates = params.candidatesAt(nextInstalledAtMs, last.system);
     const { chosen, reasonKind, bestOverallId } = chooseNext(candidates, last.system, params.uncertaintyFraction, params.biasStrengthRp);
-    chain.push({ installedAtMs: nextInstalledAtMs, system: chosen, previousSystem: last.system, reasonKind, bestOverallId });
+    const winner = candidates.find((c) => c.id === chosen);
+    chain.push({ installedAtMs: nextInstalledAtMs, system: chosen, previousSystem: last.system, reasonKind, bestOverallId, municipalSubsidyRp: winner?.municipalSubsidyRp });
     logCandidateDecision({
       atMs: nextInstalledAtMs,
       kind: params.kind,

@@ -12,6 +12,7 @@ import { buildingHeightM } from "../sim/buildingGeometry";
 import { buildingPowerW } from "../sim/buildingPower";
 import { simClock } from "../sim/engine";
 import { stock } from "../sim/stock";
+import { energyClassAt } from "../sim/retrofit";
 import { underConstructionAt, visibleAt } from "../sim/lifetime";
 import { addBoundaryLine, addBoundaryMask } from "./boundaryLayers";
 import { useMapKeyboard } from "./useMapKeyboard";
@@ -24,6 +25,7 @@ import {
   CONSTRUCTION_COLOR,
   buildingHeatingBucket,
   buildingHeatingBucketAt,
+  INSULATION_LEGEND,
   CATEGORY_LEGEND,
   HEATING_LEGEND,
   legendMatchExpression,
@@ -50,6 +52,7 @@ type BuildingProperties = {
   egid: string;
   category: string;
   age: string;
+  energyClass: string;
   constructing: number;
   heating: string;
   powerW: number;
@@ -102,6 +105,7 @@ function buildingsToGeoJSON(
         egid: b.egid,
         category: buildingCategoryBucket(b),
         age: buildingAgeBucket(b),
+        energyClass: "unrenovated", // live value is filled in by the insulation-layer tick
         constructing: underConstructionAt(b, simTimeMs) ? 1 : 0,
         heating: buildingHeatingBucket(b),
         powerW: 0,
@@ -122,6 +126,7 @@ function buildingsToGeoJSON(
         egid: b.egid,
         category: buildingCategoryBucket(b),
         age: buildingAgeBucket(b),
+        energyClass: "unrenovated",
         constructing: underConstructionAt(b, simTimeMs) ? 1 : 0,
         heating: buildingHeatingBucket(b),
         powerW: 0,
@@ -183,6 +188,8 @@ function colorExpression(mode: ColorMode, selectedEgid: string | null, scales: C
         ? legendMatchExpression("heating", HEATING_LEGEND)
         : mode === "age"
           ? legendMatchExpression("age", AGE_LEGEND)
+          : mode === "insulation"
+          ? legendMatchExpression("energyClass", INSULATION_LEGEND)
           : mode === "power"
             ? powerColorExpression(scales.powerMinW, scales.powerMaxW)
             : mode === "solar"
@@ -417,6 +424,32 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         if (building) feature.properties.heating = buildingHeatingBucketAt(building, simTimeMs);
       }
 
+      polySource.setData(polyData);
+      pointSource.setData(pointData);
+    };
+
+    tick();
+    const interval = setInterval(tick, HEATING_TICK_MS);
+    return () => clearInterval(interval);
+  }, [colorMode, dataset]);
+
+  // Live insulation mode: like heating's tick — retrofits are years apart, so a slow repaint suffices.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || colorMode !== "insulation") return;
+
+    const tick = () => {
+      const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
+      const pointSource = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
+      const polyData = polygonsRef.current;
+      const pointData = pointsRef.current;
+      if (!polySource || !pointSource || !polyData || !pointData) return;
+
+      const simTimeMs = simClock.getSimTimeMs();
+      for (const feature of [...polyData.features, ...pointData.features]) {
+        const building = stock.lookup(feature.properties.egid);
+        if (building) feature.properties.energyClass = energyClassAt(building, simTimeMs);
+      }
       polySource.setData(polyData);
       pointSource.setData(pointData);
     };

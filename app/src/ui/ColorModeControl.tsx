@@ -1,4 +1,4 @@
-import { AGE_LEGEND, CATEGORY_LEGEND, CONSTRUCTION_COLOR, HEATING_LEGEND, POWER_RAMP, EXPORT_RAMP, SOLAR_RAMP, type ColorMode } from "../map/colorModes";
+import { AGE_LEGEND, CATEGORY_LEGEND, CONSTRUCTION_COLOR, HEATING_LEGEND, INSULATION_LEGEND, POWER_RAMP, EXPORT_RAMP, SOLAR_RAMP, type ColorMode } from "../map/colorModes";
 import "./colorModeControl.css";
 
 const MODES: { key: ColorMode; label: string }[] = [
@@ -8,6 +8,7 @@ const MODES: { key: ColorMode; label: string }[] = [
   { key: "power", label: "Power draw" },
   { key: "solar", label: "Solar" },
   { key: "age", label: "Age" },
+  { key: "insulation", label: "Insulation" },
 ];
 
 const DIVERGING_POWER_GRADIENT = [...[...EXPORT_RAMP].reverse(), ...POWER_RAMP].join(",");
@@ -19,7 +20,7 @@ export interface ColorModeControlProps {
 }
 
 export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
-  const legend = mode === "category" ? CATEGORY_LEGEND : mode === "heating" ? HEATING_LEGEND : mode === "age" ? AGE_LEGEND : null;
+  const legend = mode === "category" ? CATEGORY_LEGEND : mode === "heating" ? HEATING_LEGEND : mode === "age" ? AGE_LEGEND : mode === "insulation" ? INSULATION_LEGEND : null;
 
   return (
     <div className="color-mode-control">

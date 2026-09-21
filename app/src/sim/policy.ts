@@ -12,6 +12,7 @@
  */
 
 import { DEFAULT_POLICY, OUTREACH_MAX_MULTIPLIER_BONUS } from "../config/policy";
+import type { EnergyClassId } from "./energyClass";
 
 export interface Policy {
   solarOutreachLevel: number; // 0-100 — "how much the municipality promotes solar", drives solarAdoption.ts's hazard multiplier
@@ -24,6 +25,10 @@ export interface Policy {
   newBuildFossilHeatingAllowed: boolean; // the building code forbids fossil heating in new builds by default
   growthMultiplier: number; // scales the municipality's historic growth rate (zoning ambition); 1 = as before
   renewalRateMultiplier: number; // scales how often old buildings are replaced (replacement incentives); 1 = as before
+
+  // Levers on insulation retrofits of existing buildings (sim/retrofit.ts, via constructionRules.ts).
+  retrofitSubsidyRpPerM2: number; // municipal top-up per m2 of envelope on an upgrade, on top of the federal building-program grant
+  retrofitMinClass: EnergyClassId | "none"; // an envelope renovation must reach at least this class (no half-measures)
 }
 
 export { DEFAULT_POLICY };

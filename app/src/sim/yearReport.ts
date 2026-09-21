@@ -18,6 +18,8 @@
  */
 
 import { existsAt } from "./lifetime";
+import type { EnergyClassId } from "./energyClass";
+import { retrofitsInRange } from "./retrofit";
 import type { Building, PowerPlant } from "../data/types";
 import { toSimTimeMs } from "./calendar";
 import { categoryEnergyFromSeries, energyKWh } from "./energy";
@@ -97,7 +99,7 @@ function sampleTechnologySeries(buildings: Building[], waterProfilesByEgid: Map<
       if (!existsAt(building, t)) continue;
       const heatingId = currentHeatingSystemId(building, t);
       if (heatingId) {
-        const thermalW = spaceHeatingThermalDemandW(building, dailyMeanC, outsideTempC);
+        const thermalW = spaceHeatingThermalDemandW(building, dailyMeanC, outsideTempC, t);
         if (heatingId === "airHeatPump") air += thermalW;
         else if (heatingId === "groundHeatPump") ground += thermalW;
         else if (heatingId === "gasBoiler") gas += thermalW;
@@ -288,4 +290,37 @@ export async function computeMobilityFuelLiters(buildings: Building[], year: num
   }
   const avgIceCarCount = totalSamples > 0 ? iceCarSlotSamples / totalSamples : 0;
   return avgIceCarCount * (ANNUAL_CAR_KM / 100) * ICE_CAR_L_PER_100KM;
+}
+
+export interface RetrofitTallyEntry {
+  from: EnergyClassId;
+  to: EnergyClassId;
+  count: number;
+}
+
+export interface RetrofitYearTally {
+  entries: RetrofitTallyEntry[];
+  total: number;
+  municipalSubsidyRp: number;
+}
+
+/** Insulation retrofits completed in the given calendar year, by class change, most common first. */
+export function computeRetrofitTally(buildings: Building[], year: number): RetrofitYearTally {
+  const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
+  const yearEndMs = toSimTimeMs(Date.UTC(year + 1, 0, 1));
+  const counts = new Map<string, RetrofitTallyEntry>();
+  let total = 0;
+  let municipalSubsidyRp = 0;
+  for (const building of buildings) {
+    for (const record of retrofitsInRange(building, yearStartMs, yearEndMs)) {
+      if (!existsAt(building, record.installedAtMs)) continue;
+      const key = `${record.from}>${record.to}`;
+      const existing = counts.get(key);
+      if (existing) existing.count++;
+      else counts.set(key, { from: record.from, to: record.to, count: 1 });
+      total++;
+      municipalSubsidyRp += record.municipalSubsidyRp;
+    }
+  }
+  return { entries: [...counts.values()].sort((a, b) => b.count - a.count), total, municipalSubsidyRp };
 }
