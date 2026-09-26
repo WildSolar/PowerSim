@@ -137,7 +137,11 @@ export function DistrictHeatPanel() {
               {Math.round(demand.annualHeatKWh / 1000)} MWh/yr · {Math.round(heatPerMetre)} kWh/m
             </span>
           </div>
-          {!quote.connected && <p className="dh-warning">Not every picked street connects to the network.</p>}
+          {!quote.connected && (
+            <p className="dh-warning">
+              The streets in red don't connect to the network — pick the streets in between too, or drop them.
+            </p>
+          )}
           <div className="dh-actions">
             <button className="dh-order" disabled={!quote.connected} onClick={() => districtHeat.order(simClock.getSimTimeMs())}>
               Order for {formatCHF(quote.costRp)}

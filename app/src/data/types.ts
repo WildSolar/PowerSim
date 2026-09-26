@@ -108,6 +108,9 @@ export interface StreetSegment {
   lengthM: number;
   /** How wide the street is (both carriageways, for one drawn as two) — for drawing it. */
   widthM: number;
+  /** Every junction along it, ends included: a short stretch merged into this one leaves the
+   * junction between them inside it. Absent in older datasets (then just a and b). */
+  nodes?: number[];
   line: [number, number][]; // [lon, lat]
 }
 

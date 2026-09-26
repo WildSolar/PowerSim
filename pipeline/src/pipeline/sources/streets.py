@@ -13,9 +13,11 @@ The merged street's width spans both carriageways.
 
 Pieces meeting end to end at a plain bend (no third street) are then joined back up when
 they carry the same name (even where the class changes), so a segment is "this street from
-one junction to the next". Only segments whose midpoint lies inside the municipality are kept. Motorways, service
-access roads, ferries and unnamed footpaths are left out; named paths stay (buildings are
-addressed from them).
+one junction to the next". A stretch too short to pick on the map (under MIN_SEGMENT_M) is
+merged into a neighbour it meets end to end, so a segment may run past a junction; its
+`nodes` lists every junction along it. Only segments whose midpoint lies inside the
+municipality are kept. Motorways, service access roads, ferries and unnamed footpaths are
+left out; named paths stay (buildings are addressed from them).
 
 Buildings are linked to the segment(s) in front of them through GWR's entrance records:
 for each entrance, the nearest segment carrying the entrance's own street name, falling
@@ -71,8 +73,10 @@ ABSORB_MIN_STREET_WIDTH_M = 6.0
 ABSORB_MAX_GAP_M = 20.0
 ABSORB_MIN_SHARE = 0.7
 # Stretches shorter than this between two junctions (the knots of a big crossing) are contracted
-# into a single junction: too small to click, and nothing to lay a pipe along.
-MIN_SEGMENT_M = 8.0
+# into a single junction: nothing to lay a pipe along.
+MIN_KNOT_M = 4.0
+# Stretches shorter than this are merged into a neighbouring one: too small to pick on the map.
+MIN_SEGMENT_M = 25.0
 
 NAMED_MATCH_RADIUS_M = 150  # an entrance's own street, if a segment of it is this close
 ANY_MATCH_RADIUS_M = 60  # otherwise the nearest street of any name, if this close
@@ -92,6 +96,9 @@ class Segment:
     lv95: list[tuple[float, float]]
     length_m: float = 0.0
     width_m: float = 0.0
+    # Every junction along it, in order, ends included: a short stretch merged into this one
+    # leaves the junction between them inside it (see _merge_short_segments).
+    nodes: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -430,11 +437,11 @@ def fetch_segments(boundary_lv95: list[Polygon], min_e: float, min_n: float, max
                 width_m=road.width_m,
             )
         )
-    return _contract_short_segments(segments)
+    return _merge_short_segments(_contract_knots(segments))
 
 
-def _contract_short_segments(segments: list[Segment]) -> list[Segment]:
-    """Drops stretches shorter than MIN_SEGMENT_M: one between two junctions is shrunk to a
+def _contract_knots(segments: list[Segment]) -> list[Segment]:
+    """Drops stretches shorter than MIN_KNOT_M: one between two junctions is shrunk to a
     point (its two end nodes become one junction), a short dead end simply goes. Ids and node
     ids are renumbered compactly."""
     degree: dict[int, int] = defaultdict(int)
@@ -450,7 +457,7 @@ def _contract_short_segments(segments: list[Segment]) -> list[Segment]:
 
     kept = []
     for s in segments:
-        if s.length_m >= MIN_SEGMENT_M or s.a == s.b:
+        if s.length_m >= MIN_KNOT_M or s.a == s.b:
             kept.append(s)
             continue
         if degree[s.a] >= 2 and degree[s.b] >= 2:
@@ -464,9 +471,90 @@ def _contract_short_segments(segments: list[Segment]) -> list[Segment]:
     for s in kept:
         a = node_ids.setdefault(find(s.a), len(node_ids))
         b = node_ids.setdefault(find(s.b), len(node_ids))
-        if a == b and s.length_m < MIN_SEGMENT_M * 3:
+        if a == b and s.length_m < MIN_KNOT_M * 3:
             continue  # a loop shrunk onto a single junction
-        result.append(Segment(len(result), s.name, s.highway, a, b, s.lv95, s.length_m, s.width_m))
+        result.append(Segment(len(result), s.name, s.highway, a, b, s.lv95, s.length_m, s.width_m, [a, b]))
+    return result
+
+
+def _merge_short_segments(segments: list[Segment]) -> list[Segment]:
+    """Merges every stretch shorter than MIN_SEGMENT_M into a neighbour it meets end to end —
+    preferably one of the same street carrying straight on — shortest first, until none is left
+    that can be. The junction between them stays in the merged segment's `nodes`, so the streets
+    meeting there still connect to it."""
+    alive: dict[int, Segment] = {s.id: s for s in segments}
+    at_end: dict[int, set[int]] = defaultdict(set)  # node -> ids of segments ending there
+    for seg in segments:
+        at_end[seg.a].add(seg.id)
+        at_end[seg.b].add(seg.id)
+
+    def heading(seg: Segment, node: int) -> tuple[float, float]:
+        """Unit direction leaving `node` along `seg` (node is one of its ends)."""
+        pts = seg.lv95 if node == seg.a else seg.lv95[::-1]
+        p0 = pts[0]
+        p1 = next((q for q in pts[1:] if math.hypot(q[0] - p0[0], q[1] - p0[1]) > 3), pts[-1])
+        dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+        n = math.hypot(dx, dy) or 1.0
+        return dx / n, dy / n
+
+    next_id = max(alive) + 1 if alive else 0
+    while True:
+        short = sorted((seg for seg in alive.values() if seg.length_m < MIN_SEGMENT_M), key=lambda seg: seg.length_m)
+        merged_any = False
+        for seg in short:
+            if seg.id not in alive:
+                continue
+            best = None
+            for node, far in ((seg.a, seg.b), (seg.b, seg.a)):
+                for oid in at_end[node]:
+                    if oid == seg.id:
+                        continue
+                    other = alive[oid]
+                    other_far = other.b if other.a == node else other.a
+                    if other_far in (far, node):
+                        continue  # the two would close a loop
+                    h1, h2 = heading(seg, node), heading(other, node)
+                    straightness = -(h1[0] * h2[0] + h1[1] * h2[1])  # 1: carries straight on
+                    score = (seg.name is not None and seg.name == other.name, straightness)
+                    if best is None or score > best[0]:
+                        best = (score, node, other)
+            if best is None:
+                continue
+            _, node, other = best
+            # Orient: `other` runs into `node`, `seg` runs out of it.
+            o_pts = other.lv95 if other.b == node else other.lv95[::-1]
+            o_nodes = other.nodes if other.b == node else other.nodes[::-1]
+            s_pts = seg.lv95 if seg.a == node else seg.lv95[::-1]
+            s_nodes = seg.nodes if seg.a == node else seg.nodes[::-1]
+            main = other if other.length_m >= seg.length_m else seg
+            merged = Segment(
+                id=next_id,
+                name=main.name,
+                highway=main.highway,
+                a=o_nodes[0],
+                b=s_nodes[-1],
+                lv95=o_pts + s_pts[1:],
+                length_m=other.length_m + seg.length_m,
+                width_m=max(other.width_m, seg.width_m),
+                nodes=o_nodes + s_nodes[1:],
+            )
+            next_id += 1
+            for old in (seg, other):
+                del alive[old.id]
+                at_end[old.a].discard(old.id)
+                at_end[old.b].discard(old.id)
+            alive[merged.id] = merged
+            at_end[merged.a].add(merged.id)
+            at_end[merged.b].add(merged.id)
+            merged_any = True
+        if not merged_any:
+            break
+
+    node_ids: dict[int, int] = {}
+    result = []
+    for seg in alive.values():
+        nodes = [node_ids.setdefault(n, len(node_ids)) for n in seg.nodes]
+        result.append(Segment(len(result), seg.name, seg.highway, nodes[0], nodes[-1], seg.lv95, seg.length_m, seg.width_m, nodes))
     return result
 
 

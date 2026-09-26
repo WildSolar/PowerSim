@@ -244,6 +244,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
                 length_m=round(s.length_m, 1),
                 width_m=round(s.width_m, 1),
                 line=[tuple(round(v, 6) for v in coords.lv95_to_lonlat(x, y)) for x, y in s.lv95],
+                nodes=s.nodes,
             )
             for s in segments
         ],

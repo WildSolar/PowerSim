@@ -45,6 +45,8 @@ export interface SelectionQuote {
   months: number;
   /** Every selected segment reaches the network (directly or through other selected ones). */
   connected: boolean;
+  /** The selected segments that don't. */
+  unconnected: number[];
 }
 
 export function segmentCostRp(segmentId: number): number {
@@ -144,13 +146,15 @@ class DistrictHeatNetwork {
 
   quote(): SelectionQuote {
     const segments = [...this.selection];
+    const unconnected = this.unconnectedOf(segments);
     const lengthM = segments.reduce((sum, id) => sum + (streets.get(id)?.lengthM ?? 0), 0);
     return {
       segments,
       lengthM,
       costRp: segments.reduce((sum, id) => sum + segmentCostRp(id), 0),
       months: buildMonths(lengthM),
-      connected: segments.length > 0 && this.reachesNetwork(segments),
+      connected: segments.length > 0 && unconnected.length === 0,
+      unconnected,
     };
   }
 
@@ -174,29 +178,26 @@ class DistrictHeatNetwork {
     return order;
   }
 
-  /** Every segment must touch the network (piped or being built, or the source's feed point),
-   * directly or through other segments of the same selection. */
-  private reachesNetwork(selected: number[]): boolean {
+  /** The selected segments that don't touch the network (piped or being built, or the source's
+   * feed point) — directly, or through other segments of the same selection. */
+  private unconnectedOf(selected: number[]): number[] {
     const reached = new Set<number>();
     if (this.source) reached.add(this.source.node);
-    for (const id of this.builtAtMs.keys()) {
-      const s = streets.get(id);
-      if (s) reached.add(s.a).add(s.b);
-    }
+    for (const id of this.builtAtMs.keys()) for (const n of streets.nodesOf(id)) reached.add(n);
     const pending = new Set(selected);
     let progress = true;
     while (pending.size > 0 && progress) {
       progress = false;
       for (const id of pending) {
-        const s = streets.get(id);
-        if (s && (reached.has(s.a) || reached.has(s.b))) {
-          reached.add(s.a).add(s.b);
+        const nodes = streets.nodesOf(id);
+        if (nodes.some((n) => reached.has(n))) {
+          for (const n of nodes) reached.add(n);
           pending.delete(id);
           progress = true;
         }
       }
     }
-    return pending.size === 0;
+    return [...pending];
   }
 
   // --- subscription ---

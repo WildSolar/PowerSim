@@ -7,7 +7,9 @@ import {
   INSULATION_LEGEND,
   PIPE_COLOR,
   PIPE_PLANNED_COLOR,
+  PIPE_UNCONNECTED_COLOR,
   PIPE_UNDER_CONSTRUCTION_COLOR,
+  STREET_UNPIPED_COLOR,
   POWER_RAMP,
   EXPORT_RAMP,
   SOLAR_RAMP,
@@ -70,6 +72,8 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
             { label: "Piped street", color: PIPE_COLOR },
             { label: "Pipes being laid", color: PIPE_UNDER_CONSTRUCTION_COLOR },
             { label: "Planned extension", color: PIPE_PLANNED_COLOR },
+            { label: "Planned, not connected", color: PIPE_UNCONNECTED_COLOR },
+            { label: "Street without pipes", color: STREET_UNPIPED_COLOR },
           ].map((line) => (
             <div className="legend-row" key={line.label}>
               <span className="swatch line-swatch" style={{ background: line.color }} />

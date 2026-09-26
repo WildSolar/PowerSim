@@ -49,6 +49,7 @@ class StreetSegment:
     length_m: float
     width_m: float  # the carriageway's width (both carriageways and the gap, for a merged street)
     line: list[tuple[float, float]]  # WGS84 (lon, lat)
+    nodes: list[int]  # every junction along it, ends included (a short stretch merged in leaves one inside)
 
 
 @dataclass

@@ -27,6 +27,7 @@ import {
   HEATING_LEGEND,
   PIPE_COLOR,
   PIPE_PLANNED_COLOR,
+  PIPE_UNCONNECTED_COLOR,
   PIPE_UNDER_CONSTRUCTION_COLOR,
   STREET_UNPIPED_COLOR,
   legendMatchExpression,
@@ -172,14 +173,17 @@ function buildingsToGeoJSON(
 }
 
 /** Every street segment, by where it stands in the district heating network — piped, being
- * built, picked for the next extension, or without pipes. */
+ * built, picked for the next extension (and whether it connects), or without pipes. */
 function streetsToGeoJSON(simTimeMs: number) {
   const selection = districtHeat.getSelection();
+  const unconnected = new Set(districtHeat.quote().unconnected);
+  const stateOf = (id: number) =>
+    selection.has(id) ? (unconnected.has(id) ? "plannedUnconnected" : "planned") : districtHeat.stateAt(id, simTimeMs);
   return {
     type: "FeatureCollection" as const,
     features: streets.all().map((s) => ({
       type: "Feature" as const,
-      properties: { id: s.id, state: selection.has(s.id) ? "planned" : districtHeat.stateAt(s.id, simTimeMs) },
+      properties: { id: s.id, state: stateOf(s.id) },
       geometry: { type: "LineString" as const, coordinates: s.line },
     })),
   };
@@ -358,16 +362,18 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         source: STREET_SOURCE_ID,
         filter: ["==", ["get", "state"], "none"],
         layout: { visibility: dhVisibility, "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": STREET_UNPIPED_COLOR, "line-width": 2, "line-opacity": 0.8 },
+        // A clear band along every street the network could be extended along, lighter than the
+        // network itself so the two don't compete.
+        paint: { "line-color": STREET_UNPIPED_COLOR, "line-width": metresWide(NETWORK_LINE_WIDTH_M * 0.6, 3) as never, "line-opacity": 0.45 },
       });
       map.addLayer({
         id: STREET_LINE_LAYER_ID,
         type: "line",
         source: STREET_SOURCE_ID,
-        filter: ["in", ["get", "state"], ["literal", ["piped", "planned"]]],
+        filter: ["in", ["get", "state"], ["literal", ["piped", "planned", "plannedUnconnected"]]],
         layout: { visibility: dhVisibility, "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": ["match", ["get", "state"], "planned", PIPE_PLANNED_COLOR, PIPE_COLOR],
+          "line-color": ["match", ["get", "state"], "planned", PIPE_PLANNED_COLOR, "plannedUnconnected", PIPE_UNCONNECTED_COLOR, PIPE_COLOR],
           "line-width": metresWide(NETWORK_LINE_WIDTH_M, 4) as never,
         },
       });

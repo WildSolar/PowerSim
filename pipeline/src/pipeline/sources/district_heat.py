@@ -71,8 +71,12 @@ def infer_network(
 
     adjacency: dict[int, list[tuple[int, int, float]]] = defaultdict(list)  # node -> (neighbour, segment, length)
     for s in segments:
-        adjacency[s.a].append((s.b, s.id, s.length_m))
-        adjacency[s.b].append((s.a, s.id, s.length_m))
+        # A segment passes every junction in `nodes`; each hop along it costs its share of the length.
+        nodes = s.nodes or [s.a, s.b]
+        hop = s.length_m / max(1, len(nodes) - 1)
+        for n0, n1 in zip(nodes, nodes[1:]):
+            adjacency[n0].append((n1, s.id, hop))
+            adjacency[n1].append((n0, s.id, hop))
 
     piped: set[int] = set()
     tree_nodes = {feed_node}
@@ -110,7 +114,7 @@ def infer_network(
         tree_nodes.add(target_node)
         seg = segments[target_segment]
         piped.add(target_segment)
-        tree_nodes.update((seg.a, seg.b))
+        tree_nodes.update(seg.nodes or (seg.a, seg.b))
         remaining.discard(target_segment)
         remaining -= piped
 

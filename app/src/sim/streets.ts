@@ -68,7 +68,7 @@ class StreetNetwork {
     this.segments = dataset.streets ?? [];
     this.byNode = new Map();
     for (const s of this.segments) {
-      for (const node of [s.a, s.b]) {
+      for (const node of this.nodesOf(s.id)) {
         const list = this.byNode.get(node) ?? [];
         list.push(s.id);
         this.byNode.set(node, list);
@@ -87,7 +87,13 @@ class StreetNetwork {
     return this.segments[id];
   }
 
-  /** Segment ids meeting at a junction node. */
+  /** Every junction along a segment, ends included. */
+  nodesOf(id: number): number[] {
+    const s = this.segments[id];
+    return s ? (s.nodes ?? [s.a, s.b]) : [];
+  }
+
+  /** Segment ids meeting at a junction node (ending there or passing through it). */
   atNode(node: number): number[] {
     return this.byNode.get(node) ?? [];
   }

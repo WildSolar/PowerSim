@@ -201,7 +201,9 @@ export const DISTRICT_HEAT_LEGEND: LegendEntry[] = [
 export const PIPE_COLOR = "#8b80d6";
 export const PIPE_UNDER_CONSTRUCTION_COLOR = "#f2b01e";
 export const PIPE_PLANNED_COLOR = "#f97316";
-export const STREET_UNPIPED_COLOR = "#9e9c95";
+// Picked, but not connected to the network (so the extension can't be ordered yet).
+export const PIPE_UNCONNECTED_COLOR = "#d0342c";
+export const STREET_UNPIPED_COLOR = "#7a776f";
 
 export const CONSTRUCTION_COLOR = "#f2b01e";
 
