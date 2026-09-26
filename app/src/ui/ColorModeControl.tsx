@@ -101,6 +101,10 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
             <span className="swatch" style={{ background: "#fff", boxShadow: "0 0 0 2px #fff, 0 0 0 4px #9a988f", borderRadius: "50%" }} />
             <span>Fast-charging hub (outer ring)</span>
           </div>
+          <div className="legend-row">
+            <span className="swatch" style={{ background: "#fff", boxShadow: "0 0 0 2px #fff, 0 0 0 4px #7a4fd1", borderRadius: "50%" }} />
+            <span>Lorry charging park (violet ring)</span>
+          </div>
         </div>
       )}
       <div className="legend" style={{ marginTop: 6 }}>

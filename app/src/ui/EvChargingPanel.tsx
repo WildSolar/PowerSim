@@ -15,7 +15,13 @@ const YEAR_MS = 365.25 * 24 * 60 * 60_000;
 const QUARTER_HOUR_MS = 15 * 60_000;
 const HISTORY_YEARS = 8;
 
-const KIND_LABEL: Record<ChargingKind, string> = { ac: "On-street", dc: "Fast charging" };
+const KIND_LABEL: Record<ChargingKind, string> = { ac: "On-street", dc: "Fast charging", fleet: "Lorries and vans only" };
+const BUILD_HINT: Record<ChargingKind, string> = {
+  ac: "Cars and vans within 300 m, charging overnight",
+  dc: "Cars and vans within 1.5 km, and lorries",
+  fleet: "Businesses' lorries and vans only, across the town",
+};
+const KIND_ICON: Record<ChargingKind, string> = { ac: "", dc: "⚡ ", fleet: "🚚 " };
 
 function percent(part: number, total: number): string {
   return total > 0 ? `${Math.round((part / total) * 100)}%` : "–";
@@ -299,7 +305,7 @@ export function EvChargingPanel() {
         </>
       ) : (
         <div className="ev-build">
-          {(["ac", "dc"] as ChargingKind[]).map((kind) => {
+          {(["ac", "dc", "fleet"] as ChargingKind[]).map((kind) => {
             const spec = BUILD_SPEC[kind];
             return (
               <button key={kind} onClick={() => publicCharging.startPlacing(kind)}>
@@ -307,6 +313,7 @@ export function EvChargingPanel() {
                 <span className="ev-build-detail">
                   {spec.points} × {spec.powerKw} kW · {formatCHF(spec.costChf * 100)} · {spec.buildMonths} months
                 </span>
+                <span className="ev-build-detail">{BUILD_HINT[kind]}</span>
               </button>
             );
           })}
@@ -326,7 +333,7 @@ export function EvChargingPanel() {
               onClick={() => publicCharging.select(site.id)}
             >
               <span className="ev-list-name">
-                {site.kind === "dc" ? "⚡ " : ""}
+                {KIND_ICON[site.kind]}
                 {site.name}
               </span>
               <span className="info-value">{percent(users, capacity)}</span>

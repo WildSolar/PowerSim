@@ -13,7 +13,8 @@
  * moment is simply the assignments covering it. A full site takes no new cars. Businesses' vans and
  * trucks without a yard to charge in (fleet.ts) are booked the same way, taking up room by the
  * energy they need — a van about two cars' worth, a truck about twenty (trucks only at fast
- * chargers).
+ * chargers). The municipality can also build lorry charging parks: high-power bays for businesses'
+ * lorries and vans only, so cars can't fill them.
  *
  * Sites come from three places: the real ones in the federal register at game start (private),
  * the ones the player orders (municipal: built over a few months, their sales go to the treasury
@@ -139,7 +140,7 @@ export interface SiteStats {
   upkeepPerYearRp: number;
 }
 
-const SITE_NAME_PREFIX: Record<ChargingKind, string> = { ac: "On-street charger", dc: "Fast-charging hub" };
+const SITE_NAME_PREFIX: Record<ChargingKind, string> = { ac: "On-street charger", dc: "Fast-charging hub", fleet: "Lorry charging park" };
 
 export function pointsAt(site: ChargingSite, atMs: number): number {
   if (atMs < site.openedAtMs) return 0;
@@ -155,7 +156,7 @@ export function siteCapacityAt(site: ChargingSite, atMs: number): number {
 export function sitePriceRpPerKWh(site: ChargingSite): number {
   if (site.owner === "private") return PRIVATE_PRICE_RP_PER_KWH[site.kind];
   const tariff = tariffStore.get();
-  return site.kind === "dc" ? tariff.publicChargingDcRpKWh : tariff.publicChargingAcRpKWh;
+  return site.kind === "fleet" ? tariff.publicChargingFleetRpKWh : site.kind === "dc" ? tariff.publicChargingDcRpKWh : tariff.publicChargingAcRpKWh;
 }
 
 function yearStartMs(year: number): number {
@@ -472,6 +473,7 @@ class PublicCharging {
       const [x, y] = this.projection.toXY(b.lon, b.lat);
       let others: PublicAccess = "none";
       for (const { site, room } of open) {
+        if (!CAR_NEED.kinds.includes(site.kind)) continue; // lorry parks: not for cars
         if (Math.hypot(site.x - x, site.y - y) > REACH_M[site.kind]) continue;
         if (!room) {
           if (others === "none") others = "full";

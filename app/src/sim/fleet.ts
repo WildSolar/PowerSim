@@ -9,9 +9,11 @@
  * Each vehicle wears out on its own schedule and is replaced by the same four-factor decision as a
  * household's car (renewal.ts): purchase price, running cost, a business's (narrower) indifference
  * band and a (smaller) seeded leaning. An electric van or lorry with a depot charges there
- * overnight, at the off-peak price; one without has to rely on a public charger with room in reach
- * (publicCharging.ts) — a van on-street or at a fast-charging hub, a lorry only at a hub — and
- * without one, electric isn't an option. Lorries pay the heavy vehicle fee (LSVA) on diesel, from
+ * overnight, at the off-peak price, once a charger is installed there (a wallbox for a van, a costly
+ * high-power one for a lorry) — unless a public charger nearby is the better deal, a lorry charging
+ * park say; one without a depot has to rely on a public charger with room in reach
+ * (publicCharging.ts) — a van on-street, at a fast-charging hub or a lorry charging park, a lorry
+ * only at a hub or a park — and without one, electric isn't an option. Lorries pay the heavy vehicle fee (LSVA) on diesel, from
  * which electric ones are exempt through 2030. A federal ban on new petrol and diesel cars applies
  * to vans too, not to lorries.
  *
@@ -21,6 +23,7 @@
 
 import type { Building, MunicipalityDataset } from "../data/types";
 import {
+  DEPOT_CHARGER_COST_RP,
   DEPOT_POWER_KW,
   DEPOT_SHARE_BY_CLASS,
   DEPOT_SHARE_OTHER,
@@ -74,6 +77,8 @@ export interface FleetVehicle {
   key: string;
   /** The vehicle's renewal chain, held once it exists (the hot path skips the keyed lookup). */
   entry?: RenewalChainEntry<FleetVehicleId>;
+  /** Its public charger bookings (publicCharging.ts), fetched on first use. */
+  assignments?: ReturnType<typeof publicCharging.assignmentsFor>;
 }
 
 function isMixedUse(b: Building): boolean {
@@ -106,14 +111,23 @@ function publicNeed(vehicleClass: FleetVehicleClass): ChargingNeed {
   return {
     vehicle: vehicleClass,
     kWhPerDay: dailyKWh(electricOf(vehicleClass)),
-    kinds: vehicleClass === "van" ? ["ac", "dc"] : ["dc"],
+    kinds: vehicleClass === "van" ? ["ac", "dc", "fleet"] : ["dc", "fleet"],
   };
 }
 
-type FleetAccess = { kind: "depot" } | { kind: "public"; siteId: string; priceRpPerKWh: number; hassleRp: number } | { kind: "none" };
+/** How an electric vehicle bought now would charge: at the business's own yard (`chargerRp`: the
+ * depot charger still to be installed, 0 if there already is one), at a public site, or nowhere. */
+type FleetAccess =
+  | { kind: "depot"; chargerRp: number }
+  | { kind: "public"; siteId: string; priceRpPerKWh: number; hassleRp: number }
+  | { kind: "none" };
 
 function yearOf(simTimeMs: number): number {
   return new Date(toDateMs(simTimeMs)).getUTCFullYear();
+}
+
+function depotRunningRp(kWhPerYear: number, chargerRp: number, lifetimeYears: number, tariff: Tariff): number {
+  return kWhPerYear * tariff.offPeakPriceRpKWh + chargerRp / lifetimeYears;
 }
 
 function candidatesFor(
@@ -125,14 +139,14 @@ function candidatesFor(
 ): RenewalCandidate<FleetVehicleId>[] {
   // Without a charger to rely on, electric is out — its cost is still worked out as if one were
   // close by, so the decision records whether it was wanted.
-  const hypothetical = publicCharging.hypotheticalOptionCostRp(vehicleClass === "van" ? "ac" : "dc");
+  const hypothetical = publicCharging.hypotheticalOptionCostRp(vehicleClass === "van" ? "ac" : "fleet");
   const lsvaApplies = (electric: boolean) => vehicleClass === "truck" && (!electric || yearOf(atMs) > LSVA_EV_EXEMPT_THROUGH_YEAR);
   return FLEET_CHOICES[vehicleClass].map((id) => {
     const spec = FLEET_CATALOG[id];
     const kWh = (spec.annualKm / 100) * spec.kWhPer100Km;
     let runningRp: number;
     if (!spec.electric) runningRp = (spec.annualKm / 100) * spec.litersPer100Km * tariff.petrolPriceRpPerLiter;
-    else if (access.kind === "depot") runningRp = kWh * tariff.offPeakPriceRpKWh;
+    else if (access.kind === "depot") runningRp = depotRunningRp(kWh, access.chargerRp, spec.lifetimeMeanYears, tariff);
     else {
       const option = access.kind === "public" ? access : hypothetical;
       runningRp = kWh * option.priceRpPerKWh + option.hassleRp;
@@ -220,16 +234,35 @@ class Fleets {
     return (firstRandom(hashSeed(v.key, "fleet-bias")) - 0.5) * 2 * FLEET_BIAS_FRACTION * yearlyRp;
   }
 
-  private accessAt(v: FleetVehicle, b: Building, atMs: number): FleetAccess {
-    if (v.depot) return { kind: "depot" };
+  /** Whether the vehicle relies on a public charger at `simTimeMs`. */
+  private chargesPubliclyAt(v: FleetVehicle, simTimeMs: number): boolean {
+    v.assignments ??= publicCharging.assignmentsFor(v.key);
+    return v.assignments.length > 0 && publicCharging.chargesPubliclyAt(v.assignments, simTimeMs);
+  }
+
+  /** How an electric replacement bought at `atMs` would charge. A business with a yard weighs a
+   * charger of its own (nothing more to install if its outgoing electric vehicle charged there)
+   * against the best public site with room — a lorry charging park can beat a CHF 80,000 depot
+   * charger; one without a yard has only the public sites. */
+  private accessAt(v: FleetVehicle, b: Building, atMs: number, incumbent: FleetVehicleId): FleetAccess {
     const option = publicCharging.bestOption(b.lon, b.lat, atMs, publicNeed(v.vehicleClass));
-    return option ? { kind: "public", siteId: option.site.id, priceRpPerKWh: option.priceRpPerKWh, hassleRp: option.hassleRp } : { kind: "none" };
+    const publicAccess: FleetAccess | null = option
+      ? { kind: "public", siteId: option.site.id, priceRpPerKWh: option.priceRpPerKWh, hassleRp: option.hassleRp }
+      : null;
+    if (!v.depot) return publicAccess ?? { kind: "none" };
+    const hasCharger = FLEET_CATALOG[incumbent].electric && !this.chargesPubliclyAt(v, atMs);
+    const depot: FleetAccess = { kind: "depot", chargerRp: hasCharger ? 0 : DEPOT_CHARGER_COST_RP[v.vehicleClass] };
+    if (!option) return depot;
+    const spec = FLEET_CATALOG[electricOf(v.vehicleClass)];
+    const kWh = (spec.annualKm / 100) * spec.kWhPer100Km;
+    const publicRp = kWh * option.priceRpPerKWh + option.hassleRp;
+    return publicRp < depotRunningRp(kWh, depot.chargerRp, spec.lifetimeMeanYears, tariffStore.get()) ? (publicAccess as FleetAccess) : depot;
   }
 
   /** Whether a vehicle without a depot that just went diesel would have gone electric with a
    * charger of its kind close by — demand a private operator (for vans) may meet. */
   private wouldGoElectricWithCharger(v: FleetVehicle, incumbent: FleetVehicleId, atMs: number): boolean {
-    const kind: ChargingKind = v.vehicleClass === "van" ? "ac" : "dc";
+    const kind: ChargingKind = v.vehicleClass === "van" ? "ac" : "fleet";
     const nearby = publicCharging.hypotheticalOptionCostRp(kind);
     const candidates = candidatesFor(v.vehicleClass, tariffStore.get(), { kind: "public", siteId: "", ...nearby }, atMs, () => {});
     return chooseNext(candidates, incumbent, FLEET_UNCERTAINTY_FRACTION, this.biasRp(v) + policyStore.get().progressiveNudgeRp).chosen !== FLEET_CHOICES[v.vehicleClass][1];
@@ -249,9 +282,9 @@ class Fleets {
       uncertaintyFraction: FLEET_UNCERTAINTY_FRACTION,
       biasStrengthRp: this.biasRp(v),
       lifetimeMeanYearsFor: (id) => FLEET_CATALOG[id].lifetimeMeanYears,
-      candidatesAt: (atMs) => {
+      candidatesAt: (atMs, incumbent) => {
         const b = this.lookupBuilding(v.egid);
-        const access: FleetAccess = b ? this.accessAt(v, b, atMs) : { kind: "depot" };
+        const access: FleetAccess = b ? this.accessAt(v, b, atMs, incumbent) : { kind: "depot", chargerRp: 0 };
         return candidatesFor(v.vehicleClass, tariffStore.get(), access, atMs, (chosenAtMs) => {
           if (access.kind === "public") publicCharging.assign(v.key, null, access.siteId, chosenAtMs, publicNeed(v.vehicleClass));
         });
@@ -261,7 +294,7 @@ class Fleets {
         if (v.depot || FLEET_CATALOG[event.system].electric || event.previousSystem === null) return;
         if (!this.wouldGoElectricWithCharger(v, event.previousSystem, event.installedAtMs)) return;
         const b = this.lookupBuilding(v.egid);
-        if (b) publicCharging.logUnmetDemand(b.lon, b.lat, event.installedAtMs, v.vehicleClass === "van" ? "ac" : "dc");
+        if (b) publicCharging.logUnmetDemand(b.lon, b.lat, event.installedAtMs, v.vehicleClass === "van" ? "ac" : "fleet");
       },
     };
     const events = renewalEventsUpTo(params, uptoMs);
@@ -289,13 +322,15 @@ class Fleets {
   /** Where a vehicle charges at `simTimeMs`: at its depot, at a public site, or not at all (diesel). */
   chargingAt(v: FleetVehicle, simTimeMs: number): { kind: "depot" } | { kind: "public"; siteId: string } | null {
     if (!FLEET_CATALOG[this.typeAt(v, simTimeMs)].electric) return null;
-    if (v.depot) return { kind: "depot" };
     const list = publicCharging.assignmentsFor(v.key);
     for (let i = list.length - 1; i >= 0; i--) {
       const a = list[i];
-      if (a.fromMs <= simTimeMs) return simTimeMs < a.toMs ? { kind: "public", siteId: a.siteId } : null;
+      if (a.fromMs <= simTimeMs) {
+        if (simTimeMs < a.toMs) return { kind: "public", siteId: a.siteId };
+        break;
+      }
     }
-    return null;
+    return v.depot ? { kind: "depot" } : null;
   }
 
   /** A building's electric vehicles charging at its depot at `simTimeMs`. */
@@ -306,7 +341,7 @@ class Fleets {
     for (const v of list) {
       if (!v.depot) continue;
       const id = this.typeAt(v, simTimeMs);
-      if (FLEET_CATALOG[id].electric) total += this.depotSessionW(v, id, simTimeMs);
+      if (FLEET_CATALOG[id].electric && !this.chargesPubliclyAt(v, simTimeMs)) total += this.depotSessionW(v, id, simTimeMs);
     }
     return total;
   }
@@ -342,7 +377,7 @@ class Fleets {
     for (const { v, b } of this.flatten(buildings)) {
       if (!v.depot) continue;
       const id = this.typeAt(v, simTimeMs);
-      if (FLEET_CATALOG[id].electric && existsAt(b, simTimeMs)) total += this.depotSessionW(v, id, simTimeMs);
+      if (FLEET_CATALOG[id].electric && existsAt(b, simTimeMs) && !this.chargesPubliclyAt(v, simTimeMs)) total += this.depotSessionW(v, id, simTimeMs);
     }
     return total;
   }

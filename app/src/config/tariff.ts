@@ -26,7 +26,8 @@ export const DEFAULT_TARIFF: Tariff = {
   // At the municipality's own public chargers (private operators charge their own market prices,
   // config/charging.ts) — ballpark Swiss public AC and fast-charging prices.
   publicChargingAcRpKWh: 45,
-  publicChargingDcRpKWh: 65,
+  publicChargingDcRpKWh: 55,
+  publicChargingFleetRpKWh: 40,
 
   // Both comfortably below the retail tariff above (18-32 Rp/kWh) — the
   // margin-above-cost shape a real utility's rates are built from. Ballpark

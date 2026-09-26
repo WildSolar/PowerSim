@@ -34,6 +34,7 @@ export interface Tariff {
   petrolPriceRpPerLiter: number; // per liter of petrol/diesel burned by an ICE car — see mobility.ts
   publicChargingAcRpKWh: number; // at the municipality's own on-street chargers — see publicCharging.ts
   publicChargingDcRpKWh: number; // at the municipality's own fast-charging hubs
+  publicChargingFleetRpKWh: number; // at the municipality's own lorry charging parks
   wholesalePriceRpKWh: number; // what the DSO pays upstream per net kWh purchased — see finances.ts
   gridMaintenanceRpKWh: number; // the DSO's own wires/upkeep cost per kWh delivered — see finances.ts
 }

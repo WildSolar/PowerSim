@@ -90,6 +90,11 @@ export const DEPOT_SHARE_BY_CLASS: Record<string, number> = {
 export const DEPOT_SHARE_OTHER = 0.3;
 export const DEPOT_SHARE_TRUCK_MIN = 0.85;
 
+// Going electric at the depot needs a charger there first — a wallbox for a van; for a lorry a
+// high-power charger and, usually, a stronger grid connection — CHF, spread over the vehicle's life.
+// What makes a lorry charging park worth it for businesses.
+export const DEPOT_CHARGER_COST_RP: Record<FleetVehicleClass, number> = { van: 3_000_00, truck: 80_000_00 };
+
 // Charging at the depot: overnight, starting after the working day, at this power (kW).
 export const DEPOT_POWER_KW: Record<FleetVehicleClass, number> = { van: 11, truck: 44 };
 

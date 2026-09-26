@@ -36,7 +36,7 @@ export interface ScenarioSpec {
   /** Calendar years to report on (each read as of 1 January). */
   reportYears: number[];
   /** Municipal public chargers to build, and in which calendar year (1 January). */
-  chargers?: { kind: "ac" | "dc"; lon: number; lat: number; year?: number }[];
+  chargers?: { kind: "ac" | "dc" | "fleet"; lon: number; lat: number; year?: number }[];
   /** Tariff changes at the start (e.g. the municipal public charging prices). */
   tariff?: Record<string, number>;
   /** Run the approval model too (votes and game over included). Off by default: the physical effect of

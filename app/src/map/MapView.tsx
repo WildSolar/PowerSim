@@ -69,12 +69,13 @@ const EV_CHARGING_TICK_MS = 3000; // cars booked to chargers, sites opening and 
 
 const CHARGER_SOURCE_ID = "charging-sites";
 const CHARGER_LAYER_ID = "charging-sites-circle";
-const CHARGER_HUB_LAYER_ID = "charging-sites-hub"; // the outer ring marking a fast-charging hub
+const CHARGER_HUB_LAYER_ID = "charging-sites-hub"; // the outer ring marking a fast-charging hub or a lorry charging park
 const CHARGER_REACH_SOURCE_ID = "charging-reach";
 const CHARGER_REACH_FILL_LAYER_ID = "charging-reach-fill";
 const CHARGER_REACH_LINE_LAYER_ID = "charging-reach-line";
 const CHARGER_LAYER_IDS = [CHARGER_REACH_FILL_LAYER_ID, CHARGER_REACH_LINE_LAYER_ID, CHARGER_HUB_LAYER_ID, CHARGER_LAYER_ID];
 const MUNICIPAL_CHARGER_STROKE = "#1a1a1a";
+const LORRY_PARK_RING = "#7a4fd1";
 
 // Metres per screen pixel at zoom 0 at Swiss latitudes (MapLibre's 512-px tiles, cos 47.4°), so a
 // street can be drawn at its real width: covering the painted street, not a hairline on top of it.
@@ -536,13 +537,20 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         id: CHARGER_HUB_LAYER_ID,
         type: "circle",
         source: CHARGER_SOURCE_ID,
-        filter: ["==", ["get", "kind"], "dc"],
+        filter: ["in", ["get", "kind"], ["literal", ["dc", "fleet"]]],
         layout: { visibility: evVisibility },
         paint: {
           "circle-radius": ["+", chargerRadius, 5] as never,
           "circle-color": "rgba(0,0,0,0)",
-          "circle-stroke-color": ["case", ["==", ["get", "municipal"], 1], MUNICIPAL_CHARGER_STROKE, "#ffffff"],
-          "circle-stroke-width": 2.5,
+          "circle-stroke-color": [
+            "case",
+            ["==", ["get", "kind"], "fleet"],
+            LORRY_PARK_RING,
+            ["==", ["get", "municipal"], 1],
+            MUNICIPAL_CHARGER_STROKE,
+            "#ffffff",
+          ],
+          "circle-stroke-width": ["case", ["==", ["get", "kind"], "fleet"], 4, 2.5],
         },
       });
       map.addLayer({
