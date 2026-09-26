@@ -75,6 +75,15 @@ export const BUILD_SPEC: Record<ChargingKind, SiteSpec> = {
   fleet: { label: "Lorry charging park", points: 4, powerKw: 350, costChf: 1_200_000, upkeepChfPerPointYear: 12_000, buildMonths: 12 },
 };
 
+// On-street sites come in three sizes; a bigger one shares the grid connection and the roadworks,
+// so each point costs less. A running site can be enlarged later: the difference in price, plus
+// opening up the street again, and a few months' work.
+export const AC_SIZES = [4, 8, 12];
+export const AC_SIZE_COST_CHF: Record<number, number> = { 4: 60_000, 8: 100_000, 12: 135_000 };
+export const AC_SIZE_BUILD_MONTHS: Record<number, number> = { 4: 4, 8: 5, 12: 6 };
+export const AC_UPGRADE_EXTRA_CHF = 15_000;
+export const AC_UPGRADE_MONTHS = 3;
+
 // --- Private operators ---
 
 // Each New Year, private operators look at last year's unmet demand (households that would have

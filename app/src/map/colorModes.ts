@@ -2,6 +2,7 @@ import type { Building } from "../data/types";
 import { ENERGY_CLASS_CATALOG, ENERGY_CLASS_ORDER } from "../sim/energyClass";
 import { currentHeatingSystemId } from "../sim/heatingRenewal";
 import type { BuildingChargingAccess } from "../sim/publicCharging";
+import type { ChargingKind } from "../config/charging";
 
 export type ColorMode = "none" | "category" | "heating" | "power" | "solar" | "age" | "insulation" | "districtHeat" | "evCharging";
 
@@ -226,6 +227,8 @@ export function evChargingBucket(access: BuildingChargingAccess | undefined): st
 // Charging sites by how full they are: room to spare -> filling up -> full.
 export const CHARGER_USE_RAMP = ["#1baf7a", "#f2b01e", "#d0342c"];
 export const CHARGER_BUILDING_COLOR = "#b6b4ac";
+// The coverage overlays, one per kind of charger.
+export const COVERAGE_COLOR: Record<ChargingKind, string> = { ac: "#2a78d6", dc: "#0e9aa7", fleet: "#7a4fd1" };
 
 export const CONSTRUCTION_COLOR = "#f2b01e";
 

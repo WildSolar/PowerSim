@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Map as MlMap, Marker, NavigationControl, Popup, type GeoJSONSource, type MapMouseEvent } from "maplibre-gl";
+import { Map as MlMap, Marker, NavigationControl, Popup, type GeoJSONSource, type ImageSource, type MapMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
 import { buildingHeightM } from "../sim/buildingGeometry";
@@ -16,7 +16,7 @@ import { districtHeat } from "../sim/districtHeat";
 import { mapNetworkBucketAt } from "../sim/districtHeatStats";
 import { streets } from "../sim/streets";
 import { pointsAt, publicCharging, siteCapacityAt, type ChargingSite } from "../sim/publicCharging";
-import { REACH_M } from "../config/charging";
+import { REACH_M, type ChargingKind } from "../config/charging";
 import {
   AGE_LEGEND,
   buildingAgeBucket,
@@ -27,6 +27,7 @@ import {
   CATEGORY_LEGEND,
   DISTRICT_HEAT_LEGEND,
   CHARGER_USE_RAMP,
+  COVERAGE_COLOR,
   EV_CHARGING_LEGEND,
   evChargingBucket,
   HEATING_LEGEND,
@@ -75,6 +76,14 @@ const CHARGER_REACH_FILL_LAYER_ID = "charging-reach-fill";
 const CHARGER_REACH_LINE_LAYER_ID = "charging-reach-line";
 const CHARGER_LAYER_IDS = [CHARGER_REACH_FILL_LAYER_ID, CHARGER_REACH_LINE_LAYER_ID, CHARGER_HUB_LAYER_ID, CHARGER_LAYER_ID];
 const MUNICIPAL_CHARGER_STROKE = "#1a1a1a";
+const COVERAGE_KINDS: ChargingKind[] = ["ac", "dc", "fleet"];
+const coverageId = (kind: ChargingKind) => `charging-coverage-${kind}`;
+const COVERAGE_METRES_PER_PX = 4;
+const COVERAGE_MAX_PX = 2048;
+const COVERAGE_OUTLINE_PX = 2;
+const COVERAGE_FILL_ALPHA = 0.16;
+const COVERAGE_OUTLINE_ALPHA = 0.85;
+const EMPTY_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 const LORRY_PARK_RING = "#7a4fd1";
 
 // Metres per screen pixel at zoom 0 at Swiss latitudes (MapLibre's 512-px tiles, cos 47.4°), so a
@@ -272,12 +281,76 @@ function chargingReachGeoJSON(preview: { lon: number; lat: number } | null) {
   const placing = publicCharging.getPlacing();
   const selected = publicCharging.getSelectedId();
   const site: Pick<ChargingSite, "lon" | "lat" | "kind"> | undefined =
-    placing && preview ? { ...preview, kind: placing } : selected ? publicCharging.getSite(selected) : undefined;
+    placing && preview ? { ...preview, kind: placing.kind } : selected ? publicCharging.getSite(selected) : undefined;
   return {
     type: "FeatureCollection" as const,
     features: site
       ? [{ type: "Feature" as const, properties: {}, geometry: { type: "Polygon" as const, coordinates: [circleRing(site.lon, site.lat, REACH_M[site.kind])] } }]
       : [],
+  };
+}
+
+type ImageCorners = [[number, number], [number, number], [number, number], [number, number]];
+
+/** Where every charger of a kind reaches, as one image: the union of their reach circles, lightly
+ * shaded with a firmer outline around the whole. Drawing the circles opaque onto a canvas unions
+ * them for free (a map fill would darken wherever two overlap); the outline is what's left of a
+ * ring drawn under a slightly smaller disc — only the outer edge of the union survives. Chargers
+ * being built count too. Null when there's no charger of that kind. */
+function coverageImage(kind: ChargingKind): { url: string; coordinates: ImageCorners } | null {
+  const sites = publicCharging.getSites().filter((s) => s.kind === kind);
+  if (sites.length === 0) return null;
+  const reachM = REACH_M[kind];
+  const lat0 = sites.reduce((sum, s) => sum + s.lat, 0) / sites.length;
+  const mPerDegLat = 111_320;
+  const mPerDegLon = mPerDegLat * Math.cos((lat0 * Math.PI) / 180);
+  const padM = reachM + 20;
+  const west = Math.min(...sites.map((s) => s.lon)) - padM / mPerDegLon;
+  const east = Math.max(...sites.map((s) => s.lon)) + padM / mPerDegLon;
+  const south = Math.min(...sites.map((s) => s.lat)) - padM / mPerDegLat;
+  const north = Math.max(...sites.map((s) => s.lat)) + padM / mPerDegLat;
+  const widthM = (east - west) * mPerDegLon;
+  const heightM = (north - south) * mPerDegLat;
+  const pxM = Math.max(COVERAGE_METRES_PER_PX, widthM / COVERAGE_MAX_PX, heightM / COVERAGE_MAX_PX);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(widthM / pxM);
+  canvas.height = Math.ceil(heightM / pxM);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const disc = (s: ChargingSite, radiusPx: number) => {
+    ctx.beginPath();
+    ctx.arc(((s.lon - west) * mPerDegLon) / pxM, ((north - s.lat) * mPerDegLat) / pxM, radiusPx, 0, 2 * Math.PI);
+    ctx.fill();
+  };
+  ctx.fillStyle = "rgb(255, 0, 0)"; // red: the outline ring
+  for (const s of sites) disc(s, reachM / pxM);
+  ctx.fillStyle = "rgb(0, 255, 0)"; // green: the inside
+  for (const s of sites) disc(s, reachM / pxM - COVERAGE_OUTLINE_PX);
+
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = image.data;
+  const hex = COVERAGE_COLOR[kind];
+  const [cr, cg, cb] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  for (let i = 0; i < d.length; i += 4) {
+    const a = d[i + 3] / 255;
+    if (a === 0) continue;
+    const outline = (d[i] / 255) * a;
+    const inside = (d[i + 1] / 255) * a;
+    d[i] = cr;
+    d[i + 1] = cg;
+    d[i + 2] = cb;
+    d[i + 3] = Math.round(255 * Math.min(1, outline * COVERAGE_OUTLINE_ALPHA + inside * COVERAGE_FILL_ALPHA));
+  }
+  ctx.putImageData(image, 0, 0);
+  return {
+    url: canvas.toDataURL(),
+    coordinates: [
+      [west, north],
+      [east, north],
+      [east, south],
+      [west, south],
+    ],
   };
 }
 
@@ -380,6 +453,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
   const lastPowerMinWRef = useRef(0);
   const lastPowerMaxWRef = useRef(0);
   const maxSolarCapacityKwRef = useRef(0);
+  const coverageKeysRef = useRef(new Map<ChargingKind, string>());
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -482,6 +556,27 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         layout: { visibility: dhVisibility },
         paint: { "circle-radius": 9, "circle-color": PIPE_COLOR, "circle-stroke-color": "#fff", "circle-stroke-width": 2 },
       });
+
+      // Charger coverage (the EV charging layer's toggles): on the ground, under the buildings.
+      for (const kind of COVERAGE_KINDS) {
+        map.addSource(coverageId(kind), {
+          type: "image",
+          url: EMPTY_PNG,
+          coordinates: [
+            [center[0] - 0.001, center[1] + 0.001],
+            [center[0] + 0.001, center[1] + 0.001],
+            [center[0] + 0.001, center[1] - 0.001],
+            [center[0] - 0.001, center[1] - 0.001],
+          ],
+        });
+        map.addLayer({
+          id: coverageId(kind),
+          type: "raster",
+          source: coverageId(kind),
+          layout: { visibility: "none" },
+          paint: { "raster-opacity": 1, "raster-fade-duration": 0, "raster-resampling": "linear" },
+        });
+      }
 
       map.addSource(POLY_SOURCE_ID, { type: "geojson", data: geojson.polygons });
       map.addLayer({
@@ -587,7 +682,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         if (colorModeRef.current === "evCharging") {
           const placing = publicCharging.getPlacing();
           if (placing) {
-            publicCharging.build(placing, e.lngLat.lng, e.lngLat.lat, simClock.getSimTimeMs());
+            publicCharging.build(placing.kind, e.lngLat.lng, e.lngLat.lat, simClock.getSimTimeMs(), placing.points);
             return;
           }
           const { x, y } = e.point;
@@ -864,7 +959,30 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     if (!map || !map.getLayer(CHARGER_LAYER_ID)) return;
     const visible = colorMode === "evCharging";
     for (const id of CHARGER_LAYER_IDS) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
-    if (!visible) return;
+    if (!visible) {
+      for (const kind of COVERAGE_KINDS) if (map.getLayer(coverageId(kind))) map.setLayoutProperty(coverageId(kind), "visibility", "none");
+      return;
+    }
+
+    // Each kind's coverage, redrawn only when its chargers change.
+    const drawCoverage = () => {
+      const shown = publicCharging.getCoverage();
+      for (const kind of COVERAGE_KINDS) {
+        const layer = coverageId(kind);
+        if (!map.getLayer(layer)) continue;
+        const sites = publicCharging.getSites().filter((s) => s.kind === kind);
+        const on = shown.has(kind) && sites.length > 0;
+        if (on) {
+          const key = sites.map((s) => `${s.id}@${s.lon},${s.lat}`).join("|");
+          if (coverageKeysRef.current.get(kind) !== key) {
+            const image = coverageImage(kind);
+            if (image) (map.getSource(layer) as ImageSource | undefined)?.updateImage(image);
+            coverageKeysRef.current.set(kind, key);
+          }
+        }
+        map.setLayoutProperty(layer, "visibility", on ? "visible" : "none");
+      }
+    };
 
     let preview: { lon: number; lat: number } | null = null;
     const drawReach = () => (map.getSource(CHARGER_REACH_SOURCE_ID) as GeoJSONSource | undefined)?.setData(chargingReachGeoJSON(preview));
@@ -873,6 +991,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       const simTimeMs = simClock.getSimTimeMs();
       (map.getSource(CHARGER_SOURCE_ID) as GeoJSONSource | undefined)?.setData(chargingSitesToGeoJSON(simTimeMs));
       drawReach();
+      drawCoverage();
       map.getCanvas().style.cursor = publicCharging.getPlacing() ? "crosshair" : "";
       const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
       const pointSource = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;

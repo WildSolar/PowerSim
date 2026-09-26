@@ -37,7 +37,7 @@ export interface ScenarioSpec {
   /** Calendar years to report on (each read as of 1 January). */
   reportYears: number[];
   /** Municipal public chargers to build, and in which calendar year (1 January). */
-  chargers?: { kind: "ac" | "dc" | "fleet"; lon: number; lat: number; year?: number }[];
+  chargers?: { kind: "ac" | "dc" | "fleet"; lon: number; lat: number; points?: number; year?: number }[];
   /** False: every technology keeps today's price (costTrends.ts), to measure what the trends do. */
   costTrends?: boolean;
   /** Tariff changes at the start (e.g. the municipal public charging prices). */
@@ -155,7 +155,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   const pendingChargers = [...(spec.chargers ?? [])];
   const buildDue = (year: number, atMs: number) => {
     for (const c of pendingChargers.filter((p) => (p.year ?? startYear) <= year)) {
-      publicCharging.build(c.kind, c.lon, c.lat, atMs);
+      publicCharging.build(c.kind, c.lon, c.lat, atMs, c.points);
       pendingChargers.splice(pendingChargers.indexOf(c), 1);
     }
   };

@@ -28,6 +28,11 @@
  */
 
 import {
+  AC_SIZE_BUILD_MONTHS,
+  AC_SIZE_COST_CHF,
+  AC_SIZES,
+  AC_UPGRADE_EXTRA_CHF,
+  AC_UPGRADE_MONTHS,
   BUILD_SPEC,
   CARS_PER_POINT,
   HASSLE_AT_REACH_CHF,
@@ -144,9 +149,33 @@ export interface SiteStats {
 
 const BUILD_COST_TREND: Record<ChargingKind, CostTrendId> = { ac: "chargerAc", dc: "chargerDc", fleet: "chargerFleet" };
 
-/** What building a municipal site of this kind costs at `atMs` (Rp) — chargers get cheaper. */
-export function buildCostRp(kind: ChargingKind, atMs: number): number {
-  return BUILD_SPEC[kind].costChf * 100 * priceFactor(BUILD_COST_TREND[kind], atMs);
+/** Quotes are in whole thousands of francs, as a contractor would give them (Rp). */
+function roundToThousandChfRp(chf: number): number {
+  return Math.round(chf / 1000) * 1000 * 100;
+}
+
+/** What building a municipal site of this kind (and, on-street, this many points) costs at `atMs`
+ * (Rp) — chargers get cheaper over time. */
+export function buildCostRp(kind: ChargingKind, atMs: number, points = BUILD_SPEC[kind].points): number {
+  const chf = kind === "ac" ? (AC_SIZE_COST_CHF[points] ?? BUILD_SPEC.ac.costChf) : BUILD_SPEC[kind].costChf;
+  return roundToThousandChfRp(chf * priceFactor(BUILD_COST_TREND[kind], atMs));
+}
+
+/** Enlarging a municipal on-street site from `fromPoints` to `toPoints` at `atMs` (Rp). */
+export function upgradeCostRp(fromPoints: number, toPoints: number, atMs: number): number {
+  const chf = (AC_SIZE_COST_CHF[toPoints] ?? 0) - (AC_SIZE_COST_CHF[fromPoints] ?? 0) + AC_UPGRADE_EXTRA_CHF;
+  return roundToThousandChfRp(chf * priceFactor(BUILD_COST_TREND.ac, atMs));
+}
+
+/** How long building a municipal site takes (months). */
+export function buildMonthsFor(kind: ChargingKind, points = BUILD_SPEC[kind].points): number {
+  return kind === "ac" ? (AC_SIZE_BUILD_MONTHS[points] ?? BUILD_SPEC.ac.buildMonths) : BUILD_SPEC[kind].buildMonths;
+}
+
+/** What the player is placing: a kind of site and, on-street, its size. */
+export interface Placing {
+  kind: ChargingKind;
+  points: number;
 }
 
 const SITE_NAME_PREFIX: Record<ChargingKind, string> = { ac: "On-street charger", dc: "Fast-charging hub", fleet: "Lorry charging park" };
@@ -191,7 +220,8 @@ class PublicCharging {
 
   // Planning UI state.
   private selectedSiteId: string | null = null;
-  private placing: ChargingKind | null = null;
+  private placing: Placing | null = null;
+  private coverage = new Set<ChargingKind>();
   private readonly listeners = new Set<() => void>();
   private version = 0;
 
@@ -539,12 +569,23 @@ class PublicCharging {
 
   // --- the player builds ---
 
-  getPlacing(): ChargingKind | null {
+  getPlacing(): Placing | null {
     return this.placing;
   }
 
-  startPlacing(kind: ChargingKind | null): void {
-    this.placing = kind;
+  startPlacing(kind: ChargingKind | null, points = kind ? BUILD_SPEC[kind].points : 0): void {
+    this.placing = kind ? { kind, points } : null;
+    this.notify();
+  }
+
+  /** Which kinds' coverage the map shows (the union of their reach). */
+  getCoverage(): ReadonlySet<ChargingKind> {
+    return this.coverage;
+  }
+
+  toggleCoverage(kind: ChargingKind): void {
+    if (this.coverage.has(kind)) this.coverage.delete(kind);
+    else this.coverage.add(kind);
     this.notify();
   }
 
@@ -569,10 +610,12 @@ class PublicCharging {
     for (let n = 2; ; n++) if (!taken.has(`${base} ${main} ${n}`)) return `${base} ${main} ${n}`;
   }
 
-  /** Orders a municipal site at the street nearest to (lon, lat): paid now, open once built. */
-  build(kind: ChargingKind, lon: number, lat: number, atMs: number): ChargingSite | null {
+  /** Orders a municipal site at the street nearest to (lon, lat) — on-street with `points` charge
+   * points (4, 8 or 12): paid now, open once built. */
+  build(kind: ChargingKind, lon: number, lat: number, atMs: number, points = BUILD_SPEC[kind].points): ChargingSite | null {
     const snapped = streets.snapToStreet(lon, lat) ?? { lon, lat, distanceM: 0, street: null };
     const spec = BUILD_SPEC[kind];
+    if (kind !== "ac") points = spec.points;
     const [x, y] = this.projection.toXY(snapped.lon, snapped.lat);
     const site = this.addSite({
       id: `municipal-${this.nextId++}`,
@@ -583,14 +626,28 @@ class PublicCharging {
       kind,
       owner: "municipal",
       powerKw: spec.powerKw,
-      points: spec.points,
-      openedAtMs: atMs + spec.buildMonths * MONTH_MS,
+      points,
+      openedAtMs: atMs + buildMonthsFor(kind, points) * MONTH_MS,
     });
-    treasury.recordPayout("charging", atMs, buildCostRp(kind, atMs), site.id);
+    treasury.recordPayout("charging", atMs, buildCostRp(kind, atMs, points), site.id);
     this.placing = null;
     this.selectedSiteId = site.id;
     this.notify();
     return site;
+  }
+
+  /** Enlarges a municipal on-street site to `toPoints` (8 or 12): paid now, the new points ready a
+   * few months on (or once the site itself opens, if it's still being built). */
+  upgrade(siteId: string, toPoints: number, atMs: number): boolean {
+    const site = this.byId.get(siteId);
+    if (!site || site.owner !== "municipal" || site.kind !== "ac") return false;
+    const planned = this.plannedPoints(site);
+    if (toPoints <= planned || !AC_SIZES.includes(toPoints)) return false;
+    const readyAtMs = Math.max(atMs + AC_UPGRADE_MONTHS * MONTH_MS, site.openedAtMs);
+    site.expansions.push({ atMs: readyAtMs, points: toPoints - planned });
+    treasury.recordPayout("charging", atMs, upgradeCostRp(planned, toPoints, atMs), site.id);
+    this.notify();
+    return true;
   }
 
   getSelectedId(): string | null {
