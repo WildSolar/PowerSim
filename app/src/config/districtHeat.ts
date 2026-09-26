@@ -3,9 +3,10 @@
 
 // Laying pipes in a street: trench, pipes, resurfacing, per metre of street.
 export const DH_PIPE_COST_CHF_PER_M = 2_000;
-// Main roads (trunk/primary/secondary) cost more: traffic management, a crowded utility corridor.
+// Main roads (8-10 m streets, and those drawn as two carriageways) cost more: traffic management,
+// a crowded utility corridor.
 export const DH_MAIN_ROAD_COST_FACTOR = 1.5;
-export const DH_MAIN_ROAD_CLASSES = new Set(["trunk", "trunk_link", "primary", "primary_link", "secondary", "secondary_link"]);
+export const DH_MAIN_ROAD_CLASSES = new Set(["main"]);
 
 // How long an extension takes to build: a fixed planning/permit lead plus progress along the street.
 export const DH_BUILD_MIN_MONTHS = 3;

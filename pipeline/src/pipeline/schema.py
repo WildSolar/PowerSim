@@ -43,10 +43,11 @@ class StreetSegment:
 
     id: int
     name: str | None
-    highway: str  # OSM road class (primary, residential, ...)
+    highway: str  # "main" (8-10 m roads and merged dual carriageways) | "street" | "path"
     a: int  # end node ids, shared by segments meeting at a junction
     b: int
     length_m: float
+    width_m: float  # the carriageway's width (both carriageways and the gap, for a merged street)
     line: list[tuple[float, float]]  # WGS84 (lon, lat)
 
 

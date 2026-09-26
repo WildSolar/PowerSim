@@ -302,10 +302,13 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Every network needs a heat source. In Schlieren it is the Limeco waste-to-energy plant in neighbouring Dietikon, whose heat arrives by trunk line and enters the network at the town's western edge. The municipal utility sells the heat at the district heating price (Control → Prices) and buys it from the source, and it pays for the pipes' upkeep, so a network full of customers earns money and a long pipe past few buildings costs it.",
       ),
       p(
-        "To extend the network, switch the map to the District heat layer and click streets: each click picks one stretch of street between two junctions (click again to drop it). An extension must connect to the network — directly, or through the other streets picked with it. The panel shows its length, cost, build time, and how much heat the buildings it would newly reach use in a year, and per metre of pipe: the figure planners judge an extension by. Ordering it pays the full cost from the treasury at once; the pipes are laid over the following months (a few months of planning, then progress along the street) and buildings along them can connect from the day they're done.",
+        "To extend the network, switch the map to the District heat layer and click streets: each click picks one stretch of street between two junctions (click again to drop it), and the buildings it would newly reach light up in orange. An extension must connect to the network — directly, or through the other streets picked with it. The panel shows its length, cost, build time, and how much heat the buildings it would newly reach use in a year, and per metre of pipe: the figure planners judge an extension by. Ordering it pays the full cost from the treasury at once; the pipes are laid over the following months (a few months of planning, then progress along the street) and buildings along them can connect from the day they're done.",
       ),
       p(
         "The panel also compares the network's load on a cold winter day (every connected building's heat demand) with what the source can deliver.",
+      ),
+      note(
+        "The streets are swisstopo's own road network — the one the map is drawn from. A wide street drawn as two carriageways side by side (Badenerstrasse, Zürcherstrasse) counts as one street here, as do the unnamed side lanes along the big streets; the separately named streets that run alongside some of them (Gaswerkstrasse beside Bernstrasse, say) stay streets of their own.",
       ),
       note(
         "Where the pipes run today isn't public, so the starting network is a reconstruction: every street a district-heated building (according to the building register) fronts on, joined to the source along the shortest streets. It is plausible, not exact.",

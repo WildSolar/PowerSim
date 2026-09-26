@@ -189,11 +189,14 @@ export const INSULATION_LEGEND: LegendEntry[] = ENERGY_CLASS_ORDER.map((id) => (
 export const DISTRICT_HEAT_LEGEND: LegendEntry[] = [
   { bucket: "connected", label: "Connected", color: "#4a3aa7" },
   { bucket: "connectable", label: "On a piped street", color: "#2a78d6" },
+  { bucket: "planned", label: "Reached by the planned extension", color: "#f97316" },
   { bucket: "outOfReach", label: "No pipe in the street", color: UNKNOWN_COLOR },
 ];
 
 // Street lines in the district heating layer.
-export const PIPE_COLOR = "#4a3aa7";
+// Piped streets are drawn opaque at full width, so a lighter tint of district heat's violet keeps them
+// apart from the connected buildings standing along them.
+export const PIPE_COLOR = "#8b80d6";
 export const PIPE_UNDER_CONSTRUCTION_COLOR = "#f2b01e";
 export const PIPE_PLANNED_COLOR = "#f97316";
 export const STREET_UNPIPED_COLOR = "#9e9c95";

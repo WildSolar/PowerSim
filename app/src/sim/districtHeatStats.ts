@@ -21,6 +21,17 @@ export function networkStatusAt(building: Building, atMs: number): NetworkStatus
   return districtHeat.servesAt(building.streetSegments, atMs) ? "connectable" : "outOfReach";
 }
 
+/** networkStatusAt for the map: a building out of reach that the extension being planned would
+ * reach (it fronts on a picked street, and has a heating system that gets replaced) shows as
+ * "planned". */
+export function mapNetworkBucketAt(building: Building, atMs: number): NetworkStatus | "planned" {
+  const status = networkStatusAt(building, atMs);
+  if (status !== "outOfReach") return status;
+  const selection = districtHeat.getSelection();
+  if (selection.size === 0 || !building.streetSegments?.some((id) => selection.has(id))) return status;
+  return currentHeatingSystemId(building, atMs) === null ? status : "planned";
+}
+
 /** A building's heat load on a cold winter day — what the network has to be able to deliver. */
 function designLoadW(building: Building, atMs: number): number {
   return spaceHeatingThermalDemandW(building, DH_DESIGN_OUTDOOR_TEMP_C, DH_DESIGN_OUTDOOR_TEMP_C, atMs);

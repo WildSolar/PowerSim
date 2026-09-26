@@ -140,10 +140,10 @@ def build(bfs_number: int) -> MunicipalityDataset:
     )
     print(f"  {len(development_sites)} development sites")
 
-    print("Fetching the street network (OpenStreetMap)...")
+    print("Fetching the street network (swissTLM3D)...")
     boundary = boundary_source.fetch_boundary(bfs_number)
     boundary_lv95 = [Polygon([coords.lonlat_to_lv95(lon, lat) for lon, lat in polygon[0]]) for polygon in boundary]
-    segments = streets_source.fetch_segments(boundary_lv95, min_lon, min_lat, max_lon, max_lat)
+    segments = streets_source.fetch_segments(boundary_lv95, min_e, min_n, max_e, max_n)
     print(f"  {len(segments)} street segments, {sum(s.length_m for s in segments) / 1000:.1f} km")
     entrances = gwr.fetch_entrances(bfs_number, egids)
     positions = {
@@ -241,6 +241,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
                 a=s.a,
                 b=s.b,
                 length_m=round(s.length_m, 1),
+                width_m=round(s.width_m, 1),
                 line=[tuple(round(v, 6) for v in coords.lv95_to_lonlat(x, y)) for x, y in s.lv95],
             )
             for s in segments

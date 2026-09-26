@@ -13,7 +13,7 @@ import { useMapKeyboard } from "./useMapKeyboard";
 import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { snowDepthCm } from "../sim/snow";
 import { districtHeat } from "../sim/districtHeat";
-import { networkStatusAt } from "../sim/districtHeatStats";
+import { mapNetworkBucketAt } from "../sim/districtHeatStats";
 import { streets } from "../sim/streets";
 import {
   AGE_LEGEND,
@@ -51,6 +51,7 @@ const SOLAR_TICK_MS = 5000; // new adoptions are decided at most once/year per b
 const DISTRICT_HEAT_TICK_MS = 3000; // extensions finishing, buildings connecting
 
 const STREET_SOURCE_ID = "streets";
+const STREET_UNPIPED_LAYER_ID = "streets-unpiped";
 const STREET_LINE_LAYER_ID = "streets-line";
 const STREET_CONSTRUCTION_LAYER_ID = "streets-construction";
 const STREET_HIT_LAYER_ID = "streets-hit"; // wide and invisible: what a click on a street is tested against
@@ -58,6 +59,19 @@ const DH_SOURCE_SOURCE_ID = "district-heat-source";
 const DH_TRUNK_LAYER_ID = "district-heat-trunk";
 const DH_PLANT_LAYER_ID = "district-heat-plant";
 const STREET_CLICK_TOLERANCE_PX = 6;
+
+// Metres per screen pixel at zoom 0 at Swiss latitudes (MapLibre's 512-px tiles, cos 47.4°), so a
+// street can be drawn at its real width: covering the painted street, not a hairline on top of it.
+const METRES_PER_PX_AT_Z0 = (40_075_017 * Math.cos((47.4 * Math.PI) / 180)) / 512;
+
+/** A line width that is `metres` (an expression) wide on the ground at every zoom, but never
+ * thinner than `minPx` on screen. */
+function metresWide(metres: unknown, minPx: number): unknown {
+  const at = (zoom: number) => ["max", minPx, ["*", metres, 2 ** zoom / METRES_PER_PX_AT_Z0]];
+  return ["interpolate", ["exponential", 2], ["zoom"], 12, at(12), 22, at(22)];
+}
+// A piped or planned street is drawn a little wider than its carriageway, so it covers the painted one.
+const STREET_MARGIN_M = 2;
 
 type BuildingProperties = {
   egid: string;
@@ -123,7 +137,7 @@ function buildingsToGeoJSON(
     energyClass: energyClassAt(b, simTimeMs),
     constructing: underConstructionAt(b, simTimeMs) ? 1 : 0,
     heating: buildingHeatingBucketAt(b, simTimeMs),
-    network: networkStatusAt(b, simTimeMs),
+    network: mapNetworkBucketAt(b, simTimeMs),
     powerW: previousPowerW?.get(b.egid) ?? 0,
     solarCapacityKw: solarByEgid.get(b.egid) ?? 0,
   });
@@ -164,7 +178,7 @@ function streetsToGeoJSON(simTimeMs: number) {
     type: "FeatureCollection" as const,
     features: streets.all().map((s) => ({
       type: "Feature" as const,
-      properties: { id: s.id, state: selection.has(s.id) ? "planned" : districtHeat.stateAt(s.id, simTimeMs) },
+      properties: { id: s.id, widthM: s.widthM ?? 6, state: selection.has(s.id) ? "planned" : districtHeat.stateAt(s.id, simTimeMs) },
       geometry: { type: "LineString" as const, coordinates: s.line },
     })),
   };
@@ -336,17 +350,25 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       map.addSource(STREET_SOURCE_ID, {
         type: "geojson",
         data: streetsToGeoJSON(simClock.getSimTimeMs()),
-        attribution: "Streets © OpenStreetMap contributors (ODbL)",
+      });
+      const fullWidth = ["+", ["get", "widthM"], STREET_MARGIN_M];
+      map.addLayer({
+        id: STREET_UNPIPED_LAYER_ID,
+        type: "line",
+        source: STREET_SOURCE_ID,
+        filter: ["==", ["get", "state"], "none"],
+        layout: { visibility: dhVisibility, "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": STREET_UNPIPED_COLOR, "line-width": 2, "line-opacity": 0.8 },
       });
       map.addLayer({
         id: STREET_LINE_LAYER_ID,
         type: "line",
         source: STREET_SOURCE_ID,
-        filter: ["!=", ["get", "state"], "construction"],
+        filter: ["in", ["get", "state"], ["literal", ["piped", "planned"]]],
         layout: { visibility: dhVisibility, "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": ["match", ["get", "state"], "piped", PIPE_COLOR, "planned", PIPE_PLANNED_COLOR, STREET_UNPIPED_COLOR],
-          "line-width": ["match", ["get", "state"], "piped", 5, "planned", 6, 2],
+          "line-color": ["match", ["get", "state"], "planned", PIPE_PLANNED_COLOR, PIPE_COLOR],
+          "line-width": metresWide(fullWidth, 4) as never,
         },
       });
       map.addLayer({
@@ -355,14 +377,18 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         source: STREET_SOURCE_ID,
         filter: ["==", ["get", "state"], "construction"],
         layout: { visibility: dhVisibility, "line-join": "round" },
-        paint: { "line-color": PIPE_UNDER_CONSTRUCTION_COLOR, "line-width": 5, "line-dasharray": [1.5, 1] },
+        paint: {
+          "line-color": PIPE_UNDER_CONSTRUCTION_COLOR,
+          "line-width": metresWide(fullWidth, 4) as never,
+          "line-dasharray": [1.5, 1],
+        },
       });
       map.addLayer({
         id: STREET_HIT_LAYER_ID,
         type: "line",
         source: STREET_SOURCE_ID,
         layout: { visibility: dhVisibility },
-        paint: { "line-color": "#000", "line-width": 16, "line-opacity": 0 },
+        paint: { "line-color": "#000", "line-width": metresWide(fullWidth, 16) as never, "line-opacity": 0 },
       });
       map.addSource(DH_SOURCE_SOURCE_ID, { type: "geojson", data: districtHeatSourceGeoJSON() as never });
       map.addLayer({
@@ -627,8 +653,8 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
   // redraw right away when an extension is picked or ordered.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.getLayer(STREET_LINE_LAYER_ID)) return;
-    const layers = [STREET_LINE_LAYER_ID, STREET_CONSTRUCTION_LAYER_ID, STREET_HIT_LAYER_ID, DH_TRUNK_LAYER_ID, DH_PLANT_LAYER_ID];
+    if (!map || !map.getLayer(STREET_UNPIPED_LAYER_ID)) return;
+    const layers = [STREET_UNPIPED_LAYER_ID, STREET_LINE_LAYER_ID, STREET_CONSTRUCTION_LAYER_ID, STREET_HIT_LAYER_ID, DH_TRUNK_LAYER_ID, DH_PLANT_LAYER_ID];
     const visible = colorMode === "districtHeat";
     for (const id of layers) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
     if (!visible) return;
@@ -652,7 +678,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       const simTimeMs = simClock.getSimTimeMs();
       for (const feature of [...polyData.features, ...pointData.features]) {
         const building = stock.lookup(feature.properties.egid);
-        if (building) feature.properties.network = networkStatusAt(building, simTimeMs);
+        if (building) feature.properties.network = mapNetworkBucketAt(building, simTimeMs);
       }
       polySource.setData(polyData);
       pointSource.setData(pointData);

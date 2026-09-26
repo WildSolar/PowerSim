@@ -101,10 +101,13 @@ export interface MunicipalityDataset {
 export interface StreetSegment {
   id: number;
   name: string | null;
-  highway: string; // OSM road class
+  /** "main" (8-10 m roads, and streets drawn as two carriageways), "street" or "path". */
+  highway: string;
   a: number; // end node ids, shared by segments meeting at a junction
   b: number;
   lengthM: number;
+  /** How wide the street is (both carriageways, for one drawn as two) — for drawing it. */
+  widthM: number;
   line: [number, number][]; // [lon, lat]
 }
 
