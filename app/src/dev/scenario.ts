@@ -140,7 +140,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
       const row = snapshot(dataset, year, t);
       if (spec.withEmissions) {
         onProgress?.(`emissions ${year - 1}`);
-        const e = await computeEmissionsForYear(stock.getAll(), dataset.powerPlants, year - 1, () => false);
+        const e = await computeEmissionsForYear(stock.getAll(), dataset.powerPlants, year - 1);
         row.emissionsKt = Math.round(e.totalKgCO2 / 1000);
         row.emissionsBreakdownKt = {
           electricity: Math.round(e.electricityKgCO2 / 1000),

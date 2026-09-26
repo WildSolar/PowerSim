@@ -98,16 +98,25 @@ export interface RenewalParams<T extends string> {
 
 const MAX_EVENTS_PER_CALL = 1000; // defensive cap against a misconfigured/runaway chain, not a real limit
 
-const chainCache = new Map<string, RenewalEvent<string>[]>();
-// When each chain's next event falls due: until then the cached chain is complete, so a lookup
-// need not rebuild its params or redraw a lifetime (the hot path in municipality-wide sampling).
-const nextDueCache = new Map<string, number>();
+/** One entity's chain, plus when its next event falls due: until then the chain is complete, so a
+ * lookup need not rebuild its params or redraw a lifetime (the hot path in municipality-wide
+ * sampling). The entry keeps its identity for good (it is extended in place), so a hot caller may
+ * hold on to it and skip the keyed lookup altogether — see mobility.ts's slot handles. */
+export interface RenewalChainEntry<T extends string> {
+  events: RenewalEvent<T>[];
+  nextDueMs: number;
+}
+
+const chains = new Map<string, RenewalChainEntry<string>>();
+
+export function renewalChainEntry<T extends string>(entityKey: string): RenewalChainEntry<T> | undefined {
+  return chains.get(entityKey) as RenewalChainEntry<T> | undefined;
+}
 
 /** The cached chain for `entityKey` if it is already complete up to `uptoMs`, else null. */
 export function peekRenewalChain<T extends string>(entityKey: string, uptoMs: number): RenewalEvent<T>[] | null {
-    const due = nextDueCache.get(entityKey);
-    if (due === undefined || uptoMs >= due) return null;
-    return (chainCache.get(entityKey) as RenewalEvent<T>[] | undefined) ?? null;
+  const entry = chains.get(entityKey);
+  return entry && uptoMs < entry.nextDueMs ? (entry.events as RenewalEvent<T>[]) : null;
 }
 
 /** Exported for solarAdoption.ts, which reuses this exact four-factor
@@ -176,13 +185,16 @@ function firstRemainingLifetimeMs(entityKey: string, shape: number, meanYears: n
  * repeatedly with the same or a larger `uptoMs` (the common case — every
  * render just asks "up to right now"). */
 export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, uptoMs: number): RenewalEvent<T>[] {
-  const fresh = peekRenewalChain<T>(params.entityKey, uptoMs);
-  if (fresh) return fresh;
-  let chain = chainCache.get(params.entityKey);
-  if (!chain) {
-    chain = [{ installedAtMs: Number.NEGATIVE_INFINITY, system: params.initialSystem, previousSystem: null, reasonKind: "initial", bestOverallId: null }];
-    chainCache.set(params.entityKey, chain);
+  let entry = chains.get(params.entityKey) as RenewalChainEntry<T> | undefined;
+  if (entry && uptoMs < entry.nextDueMs) return entry.events;
+  if (!entry) {
+    entry = {
+      events: [{ installedAtMs: Number.NEGATIVE_INFINITY, system: params.initialSystem, previousSystem: null, reasonKind: "initial", bestOverallId: null }],
+      nextDueMs: Number.NEGATIVE_INFINITY,
+    };
+    chains.set(params.entityKey, entry as RenewalChainEntry<string>);
   }
+  const chain = entry.events;
 
   let guard = 0;
   for (; guard < MAX_EVENTS_PER_CALL; guard++) {
@@ -195,7 +207,7 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
         : (eventIndex === 1 ? (params.initialInstalledAtMs as number) : last.installedAtMs) +
           nextLifetimeMs(params.entityKey, eventIndex, params.weibullShape, meanYears);
     if (nextInstalledAtMs > uptoMs) {
-      nextDueCache.set(params.entityKey, nextInstalledAtMs);
+      entry.nextDueMs = nextInstalledAtMs;
       break;
     }
 

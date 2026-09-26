@@ -6,16 +6,13 @@ import { stock } from "../sim/stock";
 import type { MunicipalityDataset } from "../data/types";
 import { EMISSIONS_SOURCE_COLOR } from "../sim/emissions";
 import { HEATING_SYSTEM_CATALOG, HEATING_SYSTEM_ORDER, WATER_HEATING_KIND_COLOR } from "../sim/heatingSystems";
-import { sampleMunicipalityCategorySeries } from "../sim/history";
-import { effectivePowerPlants, solarAdoptionTallyForYear } from "../sim/solarAdoption";
+import { solarAdoptionTallyForYear } from "../sim/solarAdoption";
 import { computeRetrofitTally, spaceHeatingKWhFor } from "../sim/yearReport";
 import { PAYOUT_CATEGORIES, PAYOUT_LABEL } from "../sim/treasury";
-import { useTariff } from "../sim/store";
-import { tariffKey } from "../sim/tariff";
 import { CONSUMPTION_CATEGORIES } from "./deviceCategories";
 import { formatCHF, formatCO2 } from "./format";
 import { PieChart, type PieSlice } from "./PieChart";
-import { usePeriodPieEnergy } from "./usePeriodPieEnergy";
+import { useYearCategoryEnergy } from "./useYearCategoryEnergy";
 import { useYearEmissions, BASELINE_YEAR, NET_ZERO_TARGET_YEAR } from "./useYearEmissions";
 import { useYearFinances } from "./useYearFinances";
 import { useYearHeatingReport } from "./useYearHeatingReport";
@@ -31,17 +28,13 @@ export interface ReportCardModalProps {
 }
 
 /** The year-end "report card" — pops up automatically when yearEndWatcher.ts
- * pauses the clock at a calendar year boundary. Reuses PieChart and the
- * already-cached Year-tier energy pie (usePeriodPieEnergy) for the overall
- * total exactly as the Control panel's City stats tab does; the heating
- * technology breakdown and renewal tally are computed fresh for this specific
- * year by useYearHeatingReport. solarAdoptionTallyForYear (unlike emissions/
- * finances) is cheap enough to call directly, synchronously, every render —
- * it only ever reads solarAdoption.ts's own cache, already populated by
- * effectivePowerPlants above. */
+ * pauses the clock at a calendar year boundary. The energy pie, emissions and
+ * finances all read yearReport.ts's one shared sampling of the year; the
+ * heating technology breakdown and renewal tally come from useYearHeatingReport
+ * (the technology pass likewise shared with emissions). solarAdoptionTallyForYear
+ * (unlike emissions/finances) is cheap enough to call directly, synchronously,
+ * every render — it only ever reads solarAdoption.ts's own cache. */
 export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps) {
-  const tariff = useTariff();
-  const plantsThisYear = effectivePowerPlants(dataset.buildings, dataset.powerPlants, year);
   const yearEndMs = toSimTimeMs(Date.UTC(year + 1, 0, 1)) - 1;
   const standing = dataset.buildings.filter((b) => existsAt(b, yearEndMs));
   const development = stock.summaryForYear(year);
@@ -49,12 +42,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
   const retrofits = computeRetrofitTally(dataset.buildings, year);
   const solarTally = solarAdoptionTallyForYear(dataset.buildings, dataset.powerPlants, year);
 
-  const { energy: overallEnergy, loading: overallLoading } = usePeriodPieEnergy(
-    dataset.name,
-    "year",
-    (times) => sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, plantsThisYear),
-    `${tariffKey(tariff)}:${year}`,
-  );
+  const { data: overallEnergy, loading: overallLoading } = useYearCategoryEnergy(dataset, year);
   const overallSlices: PieSlice[] = overallEnergy
     ? CONSUMPTION_CATEGORIES.map((c) => ({ key: c.key, label: c.label, icon: c.icon, color: c.color, valueKWh: overallEnergy[c.key] }))
     : [];

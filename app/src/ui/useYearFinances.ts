@@ -23,7 +23,7 @@ export function useYearFinances(dataset: MunicipalityDataset, year: number): { d
     setLoading(true);
 
     (async () => {
-      const current = await computeMunicipalFinancesForYear(dataset.buildings, dataset.powerPlants, year, () => cancelled);
+      const current = await computeMunicipalFinancesForYear(dataset.buildings, dataset.powerPlants, year);
       if (cancelled) return;
       const balanceRp = await computeCumulativeBalanceRp(dataset.buildings, dataset.powerPlants, year, BASELINE_YEAR, () => cancelled);
       if (cancelled) return;

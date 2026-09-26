@@ -93,7 +93,7 @@ import {
   PANEL_LIFETIME_MEAN_YEARS,
   usableRoofFractionFromDraw,
 } from "./solarSystems";
-import { pvPowerW } from "./pv";
+import { irradianceWm2, PEAK_IRRADIANCE_WM2 } from "./pv";
 import { isOffPeakHour, type Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 import { treasury } from "./treasury";
@@ -179,6 +179,19 @@ function solarBiasStrengthRp(egid: string): number {
   return (u - 0.5) * 2 * SOLAR_BIAS_MAGNITUDE_RP_PER_YEAR;
 }
 
+/** The sample instants of a year's savings estimate and the sunlight a panel would get at each —
+ * the same for every roof in town, so worked out once per year's batch rather than once per
+ * candidate (each instant's snow cover alone is a month of weather lookback). */
+interface YearSunlight {
+  times: number[];
+  irradianceWm2: number[];
+}
+
+function yearSunlight(yearStartMs: number): YearSunlight {
+  const times = historyTimeSteps(yearStartMs + YEAR_MS, YEAR_MS, ANNUAL_SAMPLES);
+  return { times, irradianceWm2: times.map((t) => irradianceWm2(t)) };
+}
+
 /** A candidate installation's annual savings for this specific building —
  * avoided electricity cost for whatever it would self-consume, plus export
  * revenue at the feed-in rate for the rest, both priced the same way a real
@@ -187,25 +200,18 @@ function solarBiasStrengthRp(egid: string): number {
  * useBillSummary.ts's own density (24/month) — coarse enough that the
  * self-consumption/export split is an approximation, not a precise
  * simulation, a known limitation worth being upfront about (see the wiki). */
-function candidateAnnualSavingsRp(building: Building, candidateCapacityKw: number, yearStartMs: number, tariff: Tariff): number {
-  const times = historyTimeSteps(yearStartMs + YEAR_MS, YEAR_MS, ANNUAL_SAMPLES);
+function candidateAnnualSavingsRp(building: Building, candidateCapacityKw: number, sunlight: YearSunlight, tariff: Tariff): number {
+  const { times, irradianceWm2: irradiance } = sunlight;
   const consumptionW = consumptionSeriesW(sampleBuildingCategorySeries(building, times, tariff, []));
-  const candidatePlant: PowerPlant = {
-    plantId: `solar-candidate:${building.egid}`,
-    lon: 0,
-    lat: 0,
-    capacityKw: candidateCapacityKw,
-    technology: "Photovoltaic",
-    commissioningDate: null,
-    egid: building.egid,
-  };
+  // What pv.ts's pvPowerW would give for a panel of this size, as a positive production figure.
+  const productionW = (i: number) => candidateCapacityKw * 1000 * (irradiance[i] / PEAK_IRRADIANCE_WM2);
 
   let avoidedCostRp = 0;
   let exportRevenueRp = 0;
   for (let i = 1; i < times.length; i++) {
     const dtHours = (times[i] - times[i - 1]) / HOUR_MS;
-    const prod0 = -pvPowerW(candidatePlant, times[i - 1]);
-    const prod1 = -pvPowerW(candidatePlant, times[i]);
+    const prod0 = productionW(i - 1);
+    const prod1 = productionW(i);
     const selfCons0 = Math.min(consumptionW[i - 1], prod0);
     const selfCons1 = Math.min(consumptionW[i], prod1);
     const exp0 = prod0 - selfCons0;
@@ -231,6 +237,7 @@ function evaluateAdoption(
   building: Building,
   year: number,
   yearStartMs: number,
+  sunlight: YearSunlight,
   tariff: Tariff,
   policy: Policy,
   hazardContext: HazardContext,
@@ -245,7 +252,7 @@ function evaluateAdoption(
   const municipalRp = Math.max(0, Math.min(capacityKw * policy.solarSubsidyRpPerKwp + policy.solarSubsidyFixedRp, installCostRp - federalRp));
   const subsidyRp = federalRp + municipalRp;
 
-  const annualSavingsRp = candidateAnnualSavingsRp(building, capacityKw, yearStartMs, tariff);
+  const annualSavingsRp = candidateAnnualSavingsRp(building, capacityKw, sunlight, tariff);
 
   const candidates: RenewalCandidate<"none" | "solar">[] = [
     { id: "none", available: true, annualizedCostRp: 0, lifetimeMeanYears: PANEL_LIFETIME_MEAN_YEARS, greenness: 0 },
@@ -338,6 +345,7 @@ function processYear(buildings: Building[], realPlants: PowerPlant[], year: numb
   const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
   installMunicipalSolar(buildings, realPlants, year, yearStartMs);
 
+  let sunlight: YearSunlight | undefined;
   for (const building of buildings) {
     if (adoptionByEgid.has(building.egid)) continue;
     if (!isEligible(building, realPlants, year)) continue;
@@ -351,7 +359,8 @@ function processYear(buildings: Building[], realPlants: PowerPlant[], year: numb
     const draw = mulberry32(hashSeed(building.egid, "solar-hazard", String(year)))();
     if (draw >= hazard) continue;
 
-    const decision = evaluateAdoption(building, year, yearStartMs, tariff, policy, { hazard, draw, neighborAdopters, renewalBoosted });
+    sunlight ??= yearSunlight(yearStartMs);
+    const decision = evaluateAdoption(building, year, yearStartMs, sunlight, tariff, policy, { hazard, draw, neighborAdopters, renewalBoosted });
     if (decision) {
       adoptionByEgid.set(building.egid, decision);
       treasury.recordPayout("solar", decision.installedAtMs, decision.municipalSubsidyRp, building.egid);

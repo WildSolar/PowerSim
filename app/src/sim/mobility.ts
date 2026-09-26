@@ -33,7 +33,7 @@ import {
   VEHICLE_UNCERTAINTY_FRACTION,
   VEHICLE_WEIBULL_SHAPE,
 } from "../config/mobility";
-import { evChargingPowerW, evDailySession, isResponsive, type EvSession } from "./ev";
+import { evChargingPowerW, evChargingPowerWFrom, evDailySession, evSessionSeed, isResponsive, type EvSession } from "./ev";
 import {
   ANNUAL_BIKE_KM,
   ANNUAL_CAR_KM,
@@ -49,12 +49,21 @@ import {
   type MobilityMode,
   type VehicleTypeId,
 } from "./mobilitySystems";
-import { modeAt, modeEventsUpTo, type ModeEvent } from "./modeRenewal";
+import { modeAt, modeChainEntry, modeEventsUpTo, type ModeChainEntry, type ModeEvent } from "./modeRenewal";
 import type { Building } from "../data/types";
 import { policyStore } from "./policy";
 import { municipalVehicleSubsidyRp } from "./subsidies";
 import { hashSeed, mulberry32 } from "./rng";
-import { peekRenewalChain, renewalEventsUpTo, systemAt, type RenewalCandidate, type RenewalEvent, type RenewalParams } from "./renewal";
+import {
+  peekRenewalChain,
+  renewalChainEntry,
+  renewalEventsUpTo,
+  systemAt,
+  type RenewalCandidate,
+  type RenewalChainEntry,
+  type RenewalEvent,
+  type RenewalParams,
+} from "./renewal";
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 
@@ -227,10 +236,9 @@ function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "c
  * so each records its subsidy payout close to when it happened. */
 export function commitVehicleDecisions(building: Building, simTimeMs: number): void {
   for (const dwelling of building.dwellings) {
-    const slots = mobilitySlotCount(building.egid, dwelling);
-    for (let slot = 0; slot < slots; slot++) {
-      vehicleChainFor(building.egid, dwelling.ewid, slot, "car", simTimeMs);
-      vehicleChainFor(building.egid, dwelling.ewid, slot, "bike", simTimeMs);
+    for (const h of slotHandles(building.egid, dwelling)) {
+      handleVehicle(h, "car", simTimeMs);
+      handleVehicle(h, "bike", simTimeMs);
     }
   }
 }
@@ -240,19 +248,79 @@ export function currentVehicleType(egid: string, ewid: string, slotIndex: number
   return systemAt(vehicleChainFor(egid, ewid, slotIndex, mode, simTimeMs), simTimeMs);
 }
 
+// --- slot handles (the municipality-wide hot path) -------------------------------
+
+/** One slot's chain keys, built once, and direct references to its chain entries once they exist.
+ * Municipality-wide sampling asks every slot of every dwelling for its mode and vehicle at every
+ * sample; going through the keyed caches meant building and hashing a long string key per lookup,
+ * which was most of the cost of a sample. A handle resolves a slot with no string work at all as
+ * long as its chains are complete up to the queried instant (the entries say until when). */
+interface SlotHandle {
+  egid: string;
+  ewid: string;
+  slotIndex: number;
+  sessionKey: string; // ev.ts's per-car session key
+  ev?: { seed: number; responsive: boolean }; // ev.ts's session seed and seeded trait, drawn on first use
+  mode?: ModeChainEntry<MobilityMode>;
+  car?: RenewalChainEntry<VehicleTypeId>;
+  bike?: RenewalChainEntry<VehicleTypeId>;
+}
+
+const slotHandleCache = new WeakMap<Dwelling, SlotHandle[]>();
+
+function slotHandles(egid: string, dwelling: Dwelling): SlotHandle[] {
+  let handles = slotHandleCache.get(dwelling);
+  if (!handles || handles[0].egid !== egid) {
+    handles = Array.from({ length: mobilitySlotCount(egid, dwelling) }, (_, slotIndex) => ({
+      egid,
+      ewid: dwelling.ewid,
+      slotIndex,
+      sessionKey: `${dwelling.ewid}:${slotIndex}`,
+    }));
+    slotHandleCache.set(dwelling, handles);
+  }
+  return handles;
+}
+
+function handleMode(h: SlotHandle, simTimeMs: number): MobilityMode {
+  const entry = h.mode;
+  if (entry && simTimeMs < entry.nextDueMs) return modeAt(entry.events, simTimeMs);
+  const events = modeChainFor(h.egid, h.ewid, h.slotIndex, simTimeMs);
+  h.mode = modeChainEntry<MobilityMode>(modeEntityKey(h.egid, h.ewid, h.slotIndex));
+  return modeAt(events, simTimeMs);
+}
+
+function handleVehicle(h: SlotHandle, kind: "car" | "bike", simTimeMs: number): VehicleTypeId {
+  const entry = kind === "car" ? h.car : h.bike;
+  if (entry && simTimeMs < entry.nextDueMs) return systemAt(entry.events, simTimeMs);
+  const events = vehicleChainFor(h.egid, h.ewid, h.slotIndex, kind, simTimeMs);
+  const fresh = renewalChainEntry<VehicleTypeId>(vehicleEntityKey(h.egid, h.ewid, h.slotIndex, kind));
+  if (kind === "car") h.car = fresh;
+  else h.bike = fresh;
+  return systemAt(events, simTimeMs);
+}
+
+/** How many of a dwelling's slots use `vehicle` (in its own mode) at `simTimeMs`. */
+export function slotsWithVehicleAt(egid: string, dwelling: Dwelling, vehicle: VehicleTypeId, simTimeMs: number): number {
+  const kind = vehicle === "carEV" || vehicle === "carICE" ? "car" : "bike";
+  let count = 0;
+  for (const h of slotHandles(egid, dwelling)) {
+    if (handleMode(h, simTimeMs) === kind && handleVehicle(h, kind, simTimeMs) === vehicle) count++;
+  }
+  return count;
+}
+
 // --- charging power ------------------------------------------------------------
 
 /** Every currently-EV car slot's charging session, summed. Bikes draw no
  * modeled power — an e-bike's draw is negligible next to a car's, and
  * wasn't worth the added complexity (see mobilitySystems.ts). */
 export function mobilityChargingPowerW(egid: string, dwelling: Dwelling, simTimeMs: number, tariff: Tariff): number {
-  const slotCount = mobilitySlotCount(egid, dwelling);
   let totalW = 0;
-  for (let slot = 0; slot < slotCount; slot++) {
-    const mode = currentMobilityMode(egid, dwelling.ewid, slot, simTimeMs);
-    if (mode !== "car") continue;
-    if (currentVehicleType(egid, dwelling.ewid, slot, mode, simTimeMs) !== "carEV") continue;
-    totalW += evChargingPowerW(egid, `${dwelling.ewid}:${slot}`, simTimeMs, tariff);
+  for (const h of slotHandles(egid, dwelling)) {
+    if (handleMode(h, simTimeMs) !== "car" || handleVehicle(h, "car", simTimeMs) !== "carEV") continue;
+    h.ev ??= { seed: evSessionSeed(egid, h.sessionKey), responsive: isResponsive(egid, h.sessionKey) };
+    totalW += evChargingPowerWFrom(h.ev.seed, h.ev.responsive, simTimeMs, tariff);
   }
   return totalW;
 }

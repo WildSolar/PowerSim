@@ -22,7 +22,7 @@
  * to the tariff, a naive one just plugs in and charges.
  */
 
-import { hashSeed, mulberry32 } from "./rng";
+import { hashSeed, hashSeedFrom, mulberry32 } from "./rng";
 import type { Tariff } from "./tariff";
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -42,7 +42,16 @@ export interface EvSession {
  * exported for inspection UI that wants to show "tonight's session" rather than just
  * an instantaneous on/off reading. */
 export function evDailySession(egid: string, sessionKey: string, dayIndex: number, responsive: boolean, tariff: Tariff): EvSession {
-  const rng = mulberry32(hashSeed(egid, sessionKey, "ev-session", String(dayIndex)));
+  return evDailySessionFrom(evSessionSeed(egid, sessionKey), dayIndex, responsive, tariff);
+}
+
+/** A car's session seed, for the *From variants — hashed once per car rather than per call. */
+export function evSessionSeed(egid: string, sessionKey: string): number {
+  return hashSeed(egid, sessionKey, "ev-session");
+}
+
+function evDailySessionFrom(seed: number, dayIndex: number, responsive: boolean, tariff: Tariff): EvSession {
+  const rng = mulberry32(hashSeedFrom(seed, String(dayIndex)));
   const plugInHour = 18.5 + (rng() - 0.5) * 3; // arrive home ~17:00-20:00
   const deadlineHour = 7 + (rng() - 0.5) * 1; // need to leave ~06:30-07:30 next morning
   const energyNeededKWh = 6 + rng() * 10; // a day's driving, roughly
@@ -73,10 +82,14 @@ export function evDailySession(egid: string, sessionKey: string, dayIndex: numbe
  * yesterday evening (a session can run past midnight, so a query time can
  * belong to either day's session — check both rather than assuming). */
 export function evChargingPowerW(egid: string, sessionKey: string, simTimeMs: number, tariff: Tariff): number {
-  const responsive = isResponsive(egid, sessionKey);
+  return evChargingPowerWFrom(evSessionSeed(egid, sessionKey), isResponsive(egid, sessionKey), simTimeMs, tariff);
+}
+
+/** The same, for a caller that keeps the car's session seed and (seeded, fixed) responsiveness. */
+export function evChargingPowerWFrom(sessionSeed: number, responsive: boolean, simTimeMs: number, tariff: Tariff): number {
   const dayIndex = Math.floor(simTimeMs / DAY_MS);
-  for (const d of [dayIndex - 1, dayIndex]) {
-    const session = evDailySession(egid, sessionKey, d, responsive, tariff);
+  for (let d = dayIndex - 1; d <= dayIndex; d++) {
+    const session = evDailySessionFrom(sessionSeed, d, responsive, tariff);
     if (simTimeMs >= session.startMs && simTimeMs < session.endMs) {
       return CHARGING_POWER_KW * 1000;
     }

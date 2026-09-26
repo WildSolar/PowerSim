@@ -7,8 +7,8 @@
  * with on-demand per-entity detail.
  */
 
-import { mulberry32, bucketRandom, hashSeed } from "./rng";
-import { valueNoise } from "./valueNoise";
+import { mulberry32, bucketRandom, hashSeed, hashSeedFrom } from "./rng";
+import { noiseChannelSeed, valueNoiseFrom } from "./valueNoise";
 import type { Dwelling } from "../data/types";
 
 export interface FridgeProfile {
@@ -113,7 +113,16 @@ export interface LaundrySession {
  * to daytime hours (08:00-20:00 start, <=2.5h long) so a session never needs to check
  * the neighboring day the way EV's overnight charging does. */
 export function laundryDailySession(egid: string, dwelling: Dwelling, dayIndex: number): LaundrySession | null {
-  const rng = mulberry32(hashSeed(egid, dwelling.ewid, "laundry", String(dayIndex)));
+  return laundrySessionFrom(laundrySeed(egid, dwelling), dayIndex);
+}
+
+/** A dwelling's laundry seed, for laundryPowerWFrom — hashed once per dwelling rather than per call. */
+export function laundrySeed(egid: string, dwelling: Dwelling): number {
+  return hashSeed(egid, dwelling.ewid, "laundry");
+}
+
+function laundrySessionFrom(seed: number, dayIndex: number): LaundrySession | null {
+  const rng = mulberry32(hashSeedFrom(seed, String(dayIndex)));
   if (rng() >= LAUNDRY_DAY_PROBABILITY) return null;
   const startHour = 8 + rng() * 12;
   const durationHours = 1.5 + rng() * 1;
@@ -124,14 +133,18 @@ export function laundryDailySession(egid: string, dwelling: Dwelling, dayIndex: 
 }
 
 export function laundryPowerW(egid: string, dwelling: Dwelling, simTimeMs: number): number {
+  return laundryPowerWFrom(laundrySeed(egid, dwelling), simTimeMs);
+}
+
+export function laundryPowerWFrom(seed: number, simTimeMs: number): number {
   const dayIndex = Math.floor(simTimeMs / LAUNDRY_DAY_MS);
-  const session = laundryDailySession(egid, dwelling, dayIndex);
+  const session = laundrySessionFrom(seed, dayIndex);
   if (session && simTimeMs >= session.startMs && simTimeMs < session.endMs) return session.wattage;
   return 0;
 }
 
 export interface PlugLoadProfile {
-  channel: string;
+  noiseSeed: number; // valueNoise.ts's hashed channel, per dwelling
   baselineW: number;
 }
 
@@ -140,7 +153,7 @@ const PLUG_LOAD_NOISE_PERIOD_MS = 2 * 60 * 60_000; // slow wander, ~2h character
 export function makePlugLoadProfile(egid: string, dwelling: Dwelling): PlugLoadProfile {
   const rng = mulberry32(hashSeed(egid, dwelling.ewid, "plug-load"));
   const baselineW = 40 + rng() * 60; // 40-100 W always-on baseline: routers, standby, chargers
-  return { channel: `plug-${egid}-${dwelling.ewid}`, baselineW };
+  return { noiseSeed: noiseChannelSeed(`plug-${egid}-${dwelling.ewid}`), baselineW };
 }
 
 /** Smooth day/evening-higher, overnight-lower multiplier, textured with slow value
@@ -154,7 +167,7 @@ export function plugLoadPowerW(profile: PlugLoadProfile, simTimeMs: number): num
   const dayMs = 24 * 60 * 60_000;
   const hourOfDay = (((simTimeMs % dayMs) + dayMs) % dayMs) / 60_000 / 60;
   const multiplier = plugLoadDayNightMultiplier(hourOfDay);
-  const noise = valueNoise(profile.channel, simTimeMs, PLUG_LOAD_NOISE_PERIOD_MS);
+  const noise = valueNoiseFrom(profile.noiseSeed, simTimeMs, PLUG_LOAD_NOISE_PERIOD_MS);
   return profile.baselineW * multiplier * (1 + noise * 0.25);
 }
 

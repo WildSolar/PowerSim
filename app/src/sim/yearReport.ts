@@ -8,13 +8,16 @@
  * since neither shape (a technology-keyed breakdown; a same-building-repeated
  * lookup filtered to one year) fits what that module already produces.
  *
- * The technology breakdown is the expensive half (a full year, at municipality
+ * Also home to the year's one municipality-wide electricity pass (yearElectricity), which the
+ * report's energy pie, emissions.ts and finances.ts all read from.
+ *
+ * The sampled passes are the expensive part (a full year, at municipality
  * scale, needs the same per-timestep per-building resolution history.ts's own
- * heat-pump/water-heating sampling already does) — computed one calendar month
- * at a time with a yield in between, the same reasoning historyLong.ts's own
- * chunking uses, rather than one long synchronous pass. The renewal tally is
- * cheap (it only reads each building's already-cached renewal chain) and runs
- * synchronously.
+ * sampling does) — computed one calendar month at a time with a yield in
+ * between, the same reasoning historyLong.ts's own chunking uses, rather than
+ * one long synchronous pass, and each computed once per year. The renewal tally
+ * is cheap (it only reads each building's already-cached renewal chain) and
+ * runs synchronously.
  */
 
 import { existsAt } from "./lifetime";
@@ -22,12 +25,12 @@ import type { EnergyClassId } from "./energyClass";
 import { retrofitsInRange } from "./retrofit";
 import type { Building, PowerPlant } from "../data/types";
 import { toSimTimeMs } from "./calendar";
-import { categoryEnergyFromSeries, energyKWh } from "./energy";
+import { categoryEnergyFromSeries, energyKWh, ZERO_CATEGORY_ENERGY_KWH, type CategoryEnergyKWh } from "./energy";
 import { currentHeatingSystemId, heatingRenewalsInRange } from "./heatingRenewal";
 import type { HeatingSystemId } from "./heatingSystems";
-import { historyTimeSteps, sampleMunicipalityCategorySeries } from "./history";
+import { historyTimeSteps, sampleMunicipalityCategorySeries, type CategorySeries } from "./history";
 import { ANNUAL_CAR_KM, ICE_CAR_L_PER_100KM } from "./mobilitySystems";
-import { currentMobilityMode, currentVehicleType, mobilitySlotCount } from "./mobility";
+import { slotsWithVehicleAt } from "./mobility";
 import { effectivePowerPlants } from "./solarAdoption";
 import { spaceHeatingThermalDemandW } from "./spaceHeating";
 import type { Tariff } from "./tariff";
@@ -36,7 +39,84 @@ import { dwellingWaterHeaterProfile, waterHeaterPowerW, waterHeatingKind, type W
 import { dailyMeanTempC, weatherAt } from "./weather";
 
 const SAMPLES_PER_MONTH = 24; // matches historyLong.ts's own per-period density
-const COARSE_SAMPLES_PER_MONTH = 8; // for quantities that don't need weather-grade resolution — see the two functions below
+const COARSE_SAMPLES_PER_MONTH = 8; // for quantities that don't need weather-grade resolution — see computeMobilityFuelLiters
+
+const yieldToEventLoop = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/** A completed month's samples never change (the same "immutable once finished" principle as
+ * historyLong.ts's periods), so each month of each pass below is computed once and shared — also
+ * while still in flight, since the year-end report's sections (energy pie, emissions, finances) and
+ * the live treasury readout all ask for the same year at the same moment, and yearPassPrefetch.ts
+ * may already be working on it. Each month is one chunk of work after a yield to the event loop.
+ * The computation runs to completion even if every caller has lost interest: it's wanted at the
+ * year-end report anyway. */
+function sharedMonth<T>(results: Map<number, Promise<T>>, year: number, month: number, compute: () => T): Promise<T> {
+  const key = year * 12 + month;
+  let result = results.get(key);
+  if (!result) {
+    result = yieldToEventLoop().then(compute);
+    results.set(key, result);
+    result.catch(() => results.delete(key));
+  }
+  return result;
+}
+
+/** A year's months, one after another (never all at once — each is a chunk of main-thread work). */
+async function eachMonth<T>(monthOf: (month: number) => Promise<T>): Promise<T[]> {
+  const months: T[] = [];
+  for (let month = 0; month < 12; month++) months.push(await monthOf(month));
+  return months;
+}
+
+function monthTimes(year: number, month: number, samples: number): number[] {
+  const monthStartMs = toSimTimeMs(Date.UTC(year, month, 1));
+  const monthEndMs = toSimTimeMs(Date.UTC(year, month + 1, 1));
+  return historyTimeSteps(monthEndMs, monthEndMs - monthStartMs, samples);
+}
+
+export interface YearElectricityMonth {
+  times: number[];
+  series: CategorySeries;
+}
+
+const electricityByMonth = new Map<number, Promise<YearElectricityMonth>>();
+
+function monthElectricity(buildings: Building[], realPlants: PowerPlant[], year: number, month: number): Promise<YearElectricityMonth> {
+  return sharedMonth(electricityByMonth, year, month, () => {
+    const times = monthTimes(year, month, SAMPLES_PER_MONTH);
+    const tariff: Tariff = tariffStore.get();
+    return { times, series: sampleMunicipalityCategorySeries(buildings, times, tariff, effectivePowerPlants(buildings, realPlants, year)) };
+  });
+}
+
+/** Every electricity category, municipality-wide, over one calendar year, month by month — the one
+ * expensive sampling pass the year-end energy pie, emissions (net grid electricity) and finances
+ * (revenue, feed-in, wholesale) all read from, instead of each sampling the year on its own. Solar
+ * uses that year's effective (real + adopted) plants. The tariff only shifts when within a day EVs
+ * charge, never the total; each month uses whichever is current when it's sampled — normally just
+ * after it ended (see yearPassPrefetch.ts). */
+export function yearElectricity(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<YearElectricityMonth[]> {
+  return eachMonth((month) => monthElectricity(buildings, realPlants, year, month));
+}
+
+/** Samples one just-completed month of every year pass ahead of the year-end report, so the report
+ * only has what's left (normally December) to do when it opens. */
+export async function prefetchMonth(buildings: Building[], realPlants: PowerPlant[], year: number, month: number): Promise<void> {
+  await monthElectricity(buildings, realPlants, year, month);
+  await monthHeatingTechnology(buildings, year, month);
+  await monthMobilityFuel(buildings, year, month);
+}
+
+/** The year's energy per category (the report card's "Energy by category" pie). */
+export async function yearCategoryEnergyKWh(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<CategoryEnergyKWh> {
+  const months = await yearElectricity(buildings, realPlants, year);
+  const totals = { ...ZERO_CATEGORY_ENERGY_KWH } as Record<keyof CategoryEnergyKWh, number>;
+  for (const { times, series } of months) {
+    const energy = categoryEnergyFromSeries(times, series);
+    for (const key of Object.keys(totals) as (keyof CategoryEnergyKWh)[]) totals[key] += energy[key];
+  }
+  return totals as CategoryEnergyKWh;
+}
 
 export interface HeatingTechnologyEnergyKWh {
   airHeatPumpSpaceKWh: number;
@@ -72,10 +152,8 @@ interface TechnologySeriesW {
  * at each sample instant (not the device-category split history.ts uses),
  * plus water heating split by heat-pump vs. direct-electric (waterHeating.ts's
  * own distinction) — everything else about the physics is unchanged from the
- * live simulation. `waterProfilesByEgid` is precomputed once per report (not
- * once per sample) purely to avoid re-deriving every dwelling's seeded profile
- * on every one of a year's several hundred samples. */
-function sampleTechnologySeries(buildings: Building[], waterProfilesByEgid: Map<string, WaterHeaterProfile[]>, times: number[]): TechnologySeriesW {
+ * live simulation. */
+function sampleTechnologySeries(buildings: Building[], times: number[]): TechnologySeriesW {
   const out: TechnologySeriesW = {
     airHeatPumpSpaceW: [],
     groundHeatPumpSpaceW: [],
@@ -108,7 +186,7 @@ function sampleTechnologySeries(buildings: Building[], waterProfilesByEgid: Map<
       }
       const kind = waterHeatingKind(building, t);
       if (kind) {
-        const profiles = waterProfilesByEgid.get(building.egid) ?? [];
+        const profiles = waterProfiles(building);
         let buildingWaterW = 0;
         for (const profile of profiles) buildingWaterW += waterHeaterPowerW(profile, t);
         if (kind === "heatPump") hpWater += buildingWaterW;
@@ -126,41 +204,42 @@ function sampleTechnologySeries(buildings: Building[], waterProfilesByEgid: Map<
   return out;
 }
 
-/** Energy delivered per heating technology over the given calendar year,
- * computed one month at a time with a yield back to the event loop between
- * each — municipality-scale, full-year sampling is real work (the same order
- * of cost as historyLong.ts's own municipality-wide tiers), too long to block
- * the main thread in one call. `isCancelled` is checked between months so a
- * dismissed report card (or a fresh one for a later year) doesn't keep a
- * stale computation running. */
-export async function computeHeatingTechnologyBreakdown(
-  buildings: Building[],
-  year: number,
-  isCancelled: () => boolean,
-): Promise<HeatingTechnologyEnergyKWh> {
-  const waterProfilesByEgid = new Map<string, WaterHeaterProfile[]>();
-  for (const building of buildings) {
-    waterProfilesByEgid.set(
-      building.egid,
-      building.dwellings.map((d) => dwellingWaterHeaterProfile(building.egid, d)),
-    );
-  }
+// Every dwelling's seeded water heater profile, derived once rather than on every sample.
+const waterProfileCache = new WeakMap<Building, WaterHeaterProfile[]>();
 
+function waterProfiles(building: Building): WaterHeaterProfile[] {
+  let profiles = waterProfileCache.get(building);
+  if (!profiles) {
+    profiles = building.dwellings.map((d) => dwellingWaterHeaterProfile(building.egid, d));
+    waterProfileCache.set(building, profiles);
+  }
+  return profiles;
+}
+
+const heatingTechnologyByMonth = new Map<number, Promise<HeatingTechnologyEnergyKWh>>();
+
+function monthHeatingTechnology(buildings: Building[], year: number, month: number): Promise<HeatingTechnologyEnergyKWh> {
+  return sharedMonth(heatingTechnologyByMonth, year, month, () => {
+    const times = monthTimes(year, month, SAMPLES_PER_MONTH);
+    const series = sampleTechnologySeries(buildings, times);
+    return {
+      airHeatPumpSpaceKWh: energyKWh(times, series.airHeatPumpSpaceW),
+      groundHeatPumpSpaceKWh: energyKWh(times, series.groundHeatPumpSpaceW),
+      gasBoilerSpaceKWh: energyKWh(times, series.gasBoilerSpaceW),
+      oilBoilerSpaceKWh: energyKWh(times, series.oilBoilerSpaceW),
+      districtHeatingSpaceKWh: energyKWh(times, series.districtHeatingSpaceW),
+      heatPumpWaterKWh: energyKWh(times, series.heatPumpWaterW),
+      directElectricWaterKWh: energyKWh(times, series.directElectricWaterW),
+    };
+  });
+}
+
+/** Energy delivered per heating technology over the given calendar year (the report card's heating
+ * pies, and emissions.ts's fossil fuel burned), month by month — see sharedMonth. */
+export async function computeHeatingTechnologyBreakdown(buildings: Building[], year: number): Promise<HeatingTechnologyEnergyKWh> {
   const totals = { ...ZERO_TECHNOLOGY_ENERGY_KWH };
-  for (let month = 0; month < 12; month++) {
-    if (isCancelled()) return totals;
-    const monthStartMs = toSimTimeMs(Date.UTC(year, month, 1));
-    const monthEndMs = toSimTimeMs(Date.UTC(year, month + 1, 1));
-    const times = historyTimeSteps(monthEndMs, monthEndMs - monthStartMs, SAMPLES_PER_MONTH);
-    const series = sampleTechnologySeries(buildings, waterProfilesByEgid, times);
-    totals.airHeatPumpSpaceKWh += energyKWh(times, series.airHeatPumpSpaceW);
-    totals.groundHeatPumpSpaceKWh += energyKWh(times, series.groundHeatPumpSpaceW);
-    totals.gasBoilerSpaceKWh += energyKWh(times, series.gasBoilerSpaceW);
-    totals.oilBoilerSpaceKWh += energyKWh(times, series.oilBoilerSpaceW);
-    totals.districtHeatingSpaceKWh += energyKWh(times, series.districtHeatingSpaceW);
-    totals.heatPumpWaterKWh += energyKWh(times, series.heatPumpWaterW);
-    totals.directElectricWaterKWh += energyKWh(times, series.directElectricWaterW);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+  for (const month of await eachMonth((m) => monthHeatingTechnology(buildings, year, m))) {
+    for (const key of Object.keys(totals) as (keyof HeatingTechnologyEnergyKWh)[]) totals[key] += month[key];
   }
   return totals;
 }
@@ -210,48 +289,40 @@ export function computeHeatingRenewalTally(buildings: Building[], year: number):
   return [...counts.values()].sort((a, b) => b.count - a.count);
 }
 
-/** Net municipality-wide electricity consumption for the given calendar year
- * — every device category minus solar generation (the same "net" formula
- * ReportCardModal's own overview pie uses, just for an arbitrary past year
- * rather than "the last 12 months as of right now"), for emissions.ts's
- * grid-electricity figure. `tariff` only affects *when within a day* EV
- * charging happens, never the total kWh, so reading whatever's current is
- * fine even when computing a past year. Chunked the same way as the
- * technology breakdown, at a coarser sample density — aggregate electricity
- * demand is smooth at municipality scale (thousands of independent duty
- * cycles), so it doesn't need weather-grade resolution to integrate
- * accurately. */
-export async function computeNetElectricityKWh(
-  buildings: Building[],
-  realPlants: PowerPlant[],
-  year: number,
-  isCancelled: () => boolean,
-): Promise<number> {
-  const tariff: Tariff = tariffStore.get();
-  const plants = effectivePowerPlants(buildings, realPlants, year);
-  let netKWh = 0;
-  for (let month = 0; month < 12; month++) {
-    if (isCancelled()) return netKWh;
-    const monthStartMs = toSimTimeMs(Date.UTC(year, month, 1));
-    const monthEndMs = toSimTimeMs(Date.UTC(year, month + 1, 1));
-    const times = historyTimeSteps(monthEndMs, monthEndMs - monthStartMs, COARSE_SAMPLES_PER_MONTH);
-    const series = sampleMunicipalityCategorySeries(buildings, times, tariff, plants);
-    const energy = categoryEnergyFromSeries(times, series);
-    netKWh +=
-      energy.fridge +
-      energy.lighting +
-      energy.cooking +
-      energy.laundry +
-      energy.plugLoad +
-      energy.ev +
-      energy.heatPump +
-      energy.ac +
-      energy.waterHeating +
-      energy.commercial -
-      energy.solar;
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  }
-  return netKWh;
+/** Net municipality-wide electricity consumption for the given calendar year — every device
+ * category minus solar generation — for emissions.ts's grid-electricity figure, read off the
+ * shared year pass. */
+export async function computeNetElectricityKWh(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<number> {
+  const energy = await yearCategoryEnergyKWh(buildings, realPlants, year);
+  return (
+    energy.fridge +
+    energy.lighting +
+    energy.cooking +
+    energy.laundry +
+    energy.plugLoad +
+    energy.ev +
+    energy.heatPump +
+    energy.ac +
+    energy.waterHeating +
+    energy.commercial -
+    energy.solar
+  );
+}
+
+const mobilityFuelByMonth = new Map<number, Promise<{ iceCarSlotSamples: number; samples: number }>>();
+
+function monthMobilityFuel(buildings: Building[], year: number, month: number): Promise<{ iceCarSlotSamples: number; samples: number }> {
+  return sharedMonth(mobilityFuelByMonth, year, month, () => {
+    let iceCarSlotSamples = 0;
+    const times = monthTimes(year, month, COARSE_SAMPLES_PER_MONTH);
+    for (const t of times) {
+      for (const building of buildings) {
+        if (!existsAt(building, t)) continue;
+        for (const dwelling of building.dwellings) iceCarSlotSamples += slotsWithVehicleAt(building.egid, dwelling, "carICE", t);
+      }
+    }
+    return { iceCarSlotSamples, samples: times.length };
+  });
 }
 
 /** Liters of petrol/diesel burned by every currently-ICE car slot in the
@@ -264,29 +335,12 @@ export async function computeNetElectricityKWh(
  * sampling than the technology breakdown for the same reason — renewal
  * events are rare (years apart per slot), so the underlying quantity barely
  * moves within a month. */
-export async function computeMobilityFuelLiters(buildings: Building[], year: number, isCancelled: () => boolean): Promise<number> {
+export async function computeMobilityFuelLiters(buildings: Building[], year: number): Promise<number> {
   let iceCarSlotSamples = 0;
   let totalSamples = 0;
-  for (let month = 0; month < 12; month++) {
-    if (isCancelled()) break;
-    const monthStartMs = toSimTimeMs(Date.UTC(year, month, 1));
-    const monthEndMs = toSimTimeMs(Date.UTC(year, month + 1, 1));
-    const times = historyTimeSteps(monthEndMs, monthEndMs - monthStartMs, COARSE_SAMPLES_PER_MONTH);
-    for (const t of times) {
-      totalSamples++;
-      for (const building of buildings) {
-        if (!existsAt(building, t)) continue;
-        for (const dwelling of building.dwellings) {
-          const slotCount = mobilitySlotCount(building.egid, dwelling);
-          for (let slot = 0; slot < slotCount; slot++) {
-            const mode = currentMobilityMode(building.egid, dwelling.ewid, slot, t);
-            if (mode !== "car") continue;
-            if (currentVehicleType(building.egid, dwelling.ewid, slot, mode, t) === "carICE") iceCarSlotSamples++;
-          }
-        }
-      }
-    }
-    await new Promise((resolve) => setTimeout(resolve, 0));
+  for (const month of await eachMonth((m) => monthMobilityFuel(buildings, year, m))) {
+    iceCarSlotSamples += month.iceCarSlotSamples;
+    totalSamples += month.samples;
   }
   const avgIceCarCount = totalSamples > 0 ? iceCarSlotSamples / totalSamples : 0;
   return avgIceCarCount * (ANNUAL_CAR_KM / 100) * ICE_CAR_L_PER_100KM;

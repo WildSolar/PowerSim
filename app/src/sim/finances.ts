@@ -40,17 +40,14 @@ import type { Building, PowerPlant } from "../data/types";
 import { consumptionSeriesW, electricityCostRp, flatCostRp } from "./billing";
 import { toSimTimeMs } from "./calendar";
 import { energyKWh } from "./energy";
-import { historyTimeSteps, sampleMunicipalityCategorySeries } from "./history";
 import { allocationApprovalFactor, approval } from "./approval";
 import { GREEN_POWER_PREMIUM_RP_PER_KWH } from "../config/policy";
 import { existsAt } from "./lifetime";
 import { policyStore } from "./policy";
-import { effectivePowerPlants } from "./solarAdoption";
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 import { PAYOUT_CATEGORIES, treasury, type PayoutsByCategory } from "./treasury";
-
-const COARSE_SAMPLES_PER_MONTH = 8; // matches yearReport.ts's own coarse density for smooth municipality-wide electricity quantities
+import { yearElectricity } from "./yearReport";
 
 export interface MunicipalFinances {
   year: number;
@@ -64,56 +61,42 @@ export interface MunicipalFinances {
   netIncomeRp: number; // consumerRevenueRp + governmentAllocationRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - spendingTotalRp
 }
 
-const ZERO_FINANCES: Omit<MunicipalFinances, "year"> = {
-  consumerRevenueRp: 0,
-  feedInPaidRp: 0,
-  wholesaleCostRp: 0,
-  gridMaintenanceCostRp: 0,
-  governmentAllocationRp: 0,
-  spendingRp: { solar: 0, heating: 0, vehicle: 0, retrofit: 0, programs: 0, infrastructure: 0 },
-  spendingTotalRp: 0,
-  netIncomeRp: 0,
-};
 
 const financesCache = new Map<number, MunicipalFinances>();
+const financesInFlight = new Map<number, Promise<MunicipalFinances>>();
 
 /** Every completed calendar year's municipal electricity finances, computed
- * once and cached forever after — see module doc. Chunked monthly with a
- * yield in between, the same pattern (and the same coarse sample density)
- * yearReport.ts's own computeNetElectricityKWh uses, since consumer revenue
- * and net electricity are both smooth municipality-scale quantities.
- * Wholesale cost is priced on *net* electricity (solar directly offsets what
- * must be bought upstream); grid maintenance is priced on *gross* consumption
- * (every consumed kWh moves through the local wires regardless of how much
- * solar also flowed the other way). */
-export async function computeMunicipalFinancesForYear(
-  buildings: Building[],
-  realPlants: PowerPlant[],
-  year: number,
-  isCancelled: () => boolean,
-): Promise<MunicipalFinances> {
+ * once and cached forever after — see module doc. Read off yearReport.ts's
+ * shared per-year electricity pass, and shared while in flight too: the
+ * year-end report and the live treasury readout ask for the same year at
+ * about the same moment. Wholesale cost is priced on *net* electricity (solar
+ * directly offsets what must be bought upstream); grid maintenance is priced
+ * on *gross* consumption (every consumed kWh moves through the local wires
+ * regardless of how much solar also flowed the other way). */
+export function computeMunicipalFinancesForYear(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<MunicipalFinances> {
   const cached = financesCache.get(year);
-  if (cached) return cached;
+  if (cached) return Promise.resolve(cached);
+  let inFlight = financesInFlight.get(year);
+  if (!inFlight) {
+    inFlight = computeFinances(buildings, realPlants, year).finally(() => financesInFlight.delete(year));
+    financesInFlight.set(year, inFlight);
+  }
+  return inFlight;
+}
 
+async function computeFinances(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<MunicipalFinances> {
   const tariff: Tariff = tariffStore.get();
-  const plants = effectivePowerPlants(buildings, realPlants, year);
   let consumerRevenueRp = 0;
   let feedInPaidRp = 0;
   let grossConsumptionKWh = 0;
   let netElectricityKWh = 0;
 
-  for (let month = 0; month < 12; month++) {
-    if (isCancelled()) return { year, ...ZERO_FINANCES };
-    const monthStartMs = toSimTimeMs(Date.UTC(year, month, 1));
-    const monthEndMs = toSimTimeMs(Date.UTC(year, month + 1, 1));
-    const times = historyTimeSteps(monthEndMs, monthEndMs - monthStartMs, COARSE_SAMPLES_PER_MONTH);
-    const series = sampleMunicipalityCategorySeries(buildings, times, tariff, plants);
+  for (const { times, series } of await yearElectricity(buildings, realPlants, year)) {
     const consumptionW = consumptionSeriesW(series);
     consumerRevenueRp += electricityCostRp(times, consumptionW, tariff);
     feedInPaidRp += flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh);
     grossConsumptionKWh += energyKWh(times, consumptionW);
     netElectricityKWh += energyKWh(times, consumptionW) - energyKWh(times, series.solarW);
-    await new Promise((resolve) => setTimeout(resolve, 0));
   }
 
   const greenShare = policyStore.get().greenPowerShare / 100;
@@ -163,7 +146,7 @@ export async function computeCumulativeBalanceRp(
   let balanceRp = treasury.openingBalanceRp();
   for (let year = baselineYear; year <= throughYear; year++) {
     if (isCancelled()) return balanceRp;
-    const finances = await computeMunicipalFinancesForYear(buildings, plants, year, isCancelled);
+    const finances = await computeMunicipalFinancesForYear(buildings, plants, year);
     balanceRp += finances.netIncomeRp;
   }
   return balanceRp;

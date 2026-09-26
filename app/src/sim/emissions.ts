@@ -52,38 +52,21 @@ export const EMISSIONS_SOURCE_COLOR = {
   oil: "#b23a2e",
 } as const;
 
-const ZERO_EMISSIONS: Omit<EmissionsBreakdown, "year"> = {
-  electricityKgCO2: 0,
-  gasKgCO2: 0,
-  oilKgCO2: 0,
-  districtHeatingKgCO2: 0,
-  mobilityKgCO2: 0,
-  totalKgCO2: 0,
-};
-
 const emissionsCache = new Map<number, EmissionsBreakdown>();
 
 /** Every completed calendar year's emissions, computed once and cached
- * forever after. `isCancelled` is checked between each of the three
- * underlying chunked computations — a dismissed report (or a fresh one for
- * a different year) stops the work rather than finishing a result nobody
- * will see; nothing is cached unless the whole computation actually
- * finished. */
-export async function computeEmissionsForYear(
-  buildings: Building[],
-  plants: PowerPlant[],
-  year: number,
-  isCancelled: () => boolean,
-): Promise<EmissionsBreakdown> {
+ * forever after. The expensive inputs (heating technology, net electricity)
+ * are yearReport.ts's shared per-year passes, so asking for emissions while
+ * the report's other sections are computing the same year costs nothing extra. */
+export async function computeEmissionsForYear(buildings: Building[], plants: PowerPlant[], year: number): Promise<EmissionsBreakdown> {
   const cached = emissionsCache.get(year);
   if (cached) return cached;
 
-  const heatingTechnology = await computeHeatingTechnologyBreakdown(buildings, year, isCancelled);
-  if (isCancelled()) return { year, ...ZERO_EMISSIONS };
-  const netElectricityKWh = await computeNetElectricityKWh(buildings, plants, year, isCancelled);
-  if (isCancelled()) return { year, ...ZERO_EMISSIONS };
-  const iceCarLiters = await computeMobilityFuelLiters(buildings, year, isCancelled);
-  if (isCancelled()) return { year, ...ZERO_EMISSIONS };
+  const [heatingTechnology, netElectricityKWh, iceCarLiters] = await Promise.all([
+    computeHeatingTechnologyBreakdown(buildings, year),
+    computeNetElectricityKWh(buildings, plants, year),
+    computeMobilityFuelLiters(buildings, year),
+  ]);
 
   const greenShare = policyStore.get().greenPowerShare / 100;
   const electricityKgCO2 = (netElectricityKWh * gridCarbonIntensityGPerKWh(year) * (1 - GREEN_POWER_MAX_EMISSION_REDUCTION * greenShare)) / 1000;

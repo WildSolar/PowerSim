@@ -15,7 +15,8 @@ import type { Building, Dwelling, PowerPlant } from "../data/types";
 import {
   cookingPowerW,
   fridgePowerW,
-  laundryPowerW,
+  laundryPowerWFrom,
+  laundrySeed,
   lightingPowerW,
   makeCookingProfile,
   makeFridgeProfile,
@@ -47,6 +48,7 @@ interface DwellingProfiles {
   lighting: LightingProfile;
   cooking: CookingProfile;
   plugLoad: PlugLoadProfile;
+  laundrySeed: number;
   waterHeater: WaterHeaterProfile;
 }
 
@@ -76,6 +78,7 @@ function getDwellingProfiles(building: Building, dwelling: Dwelling): DwellingPr
       lighting: makeLightingProfile(hashSeed(building.egid, dwelling.ewid, "lighting")),
       cooking: makeCookingProfile(hashSeed(building.egid, dwelling.ewid, "cooking")),
       plugLoad: makePlugLoadProfile(building.egid, dwelling),
+      laundrySeed: laundrySeed(building.egid, dwelling),
       waterHeater: dwellingWaterHeaterProfile(building.egid, dwelling),
     };
     profileCache.set(key, profiles);
@@ -105,7 +108,7 @@ export function sampleDwellingSeries(building: Building, dwelling: Dwelling, tim
     fridgeW: times.map((t) => fridgePowerW(p.fridge, t)),
     lightingW: times.map((t) => lightingPowerW(p.lighting, t)),
     cookingW: times.map((t) => cookingPowerW(p.cooking, t)),
-    laundryW: times.map((t) => laundryPowerW(p.egid, p.dwelling, t)),
+    laundryW: times.map((t) => laundryPowerWFrom(p.laundrySeed, t)),
     plugLoadW: times.map((t) => plugLoadPowerW(p.plugLoad, t)),
     evW: times.map((t) => mobilityChargingPowerW(p.egid, p.dwelling, t, tariff)),
   };
@@ -143,7 +146,7 @@ function dwellingCategoryTotals(profileSets: DwellingProfiles[], times: number[]
       fridge += fridgePowerW(p.fridge, t);
       lighting += lightingPowerW(p.lighting, t);
       cooking += cookingPowerW(p.cooking, t);
-      laundry += laundryPowerW(p.egid, p.dwelling, t);
+      laundry += laundryPowerWFrom(p.laundrySeed, t);
       plugLoad += plugLoadPowerW(p.plugLoad, t);
       ev += mobilityChargingPowerW(p.egid, p.dwelling, t, tariff);
     }

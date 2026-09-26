@@ -29,7 +29,7 @@ import type { Building } from "../data/types";
 import { dayOfWeek, toDateMs } from "./calendar";
 import { hashSeed, mulberry32 } from "./rng";
 import { businessHoursShape, isWeekday } from "./schedule";
-import { valueNoise } from "./valueNoise";
+import { noiseChannelSeed, valueNoiseFrom } from "./valueNoise";
 
 export type CommercialCategory = "office" | "retail" | "industrial" | "school" | "church" | "sports" | "hospital" | "other";
 
@@ -127,6 +127,7 @@ export interface CommercialProfile {
   category: CommercialCategory;
   areaM2: number;
   intensityMultiplier: number;
+  shiftNoiseSeed: number; // valueNoise.ts's hashed channel for an industrial building's shift pattern
 }
 
 /** +/-30% per-building variation within a category, seeded — two same-category
@@ -142,7 +143,13 @@ export function makeCommercialProfile(building: Building): CommercialProfile | n
   if (!category) return null;
   const areaM2 = totalFloorAreaM2(building);
   if (areaM2 === null) return null;
-  return { egid: building.egid, category, areaM2, intensityMultiplier: intensityMultiplier(building.egid) };
+  return {
+    egid: building.egid,
+    category,
+    areaM2,
+    intensityMultiplier: intensityMultiplier(building.egid),
+    shiftNoiseSeed: noiseChannelSeed(`commercial-shift-${building.egid}`),
+  };
 }
 
 export function commercialPowerWFromProfile(profile: CommercialProfile, simTimeMs: number): number {
@@ -154,7 +161,7 @@ export function commercialPowerWFromProfile(profile: CommercialProfile, simTimeM
   const intensity = p.baselineFraction + (1 - p.baselineFraction) * occupancy;
 
   const dayNoise =
-    profile.category === "industrial" ? 1 + 0.25 * valueNoise(`commercial-shift-${profile.egid}`, dateMs, 3 * DAY_MS) : 1;
+    profile.category === "industrial" ? 1 + 0.25 * valueNoiseFrom(profile.shiftNoiseSeed, dateMs, 3 * DAY_MS) : 1;
 
   return p.peakWPerM2 * profile.areaM2 * intensity * profile.intensityMultiplier * dayNoise;
 }

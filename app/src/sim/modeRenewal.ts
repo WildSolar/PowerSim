@@ -46,7 +46,18 @@ export interface ModeRenewalParams<T extends string> {
   targetShares: () => Record<T, number>;
 }
 
-const chainCache = new Map<string, ModeEvent<string>[]>();
+/** One entity's chain plus when its next event falls due — the same stable, extended-in-place
+ * entry as renewal.ts's RenewalChainEntry, for the same reason. */
+export interface ModeChainEntry<T extends string> {
+  events: ModeEvent<T>[];
+  nextDueMs: number;
+}
+
+const chains = new Map<string, ModeChainEntry<string>>();
+
+export function modeChainEntry<T extends string>(entityKey: string): ModeChainEntry<T> | undefined {
+  return chains.get(entityKey) as ModeChainEntry<T> | undefined;
+}
 
 function weightedPick<T extends string>(shares: Record<T, number>, u: number): T {
   const entries = Object.entries(shares) as [T, number][];
@@ -75,17 +86,19 @@ function firstRemainingLifetimeMs(entityKey: string, shape: number, meanYears: n
 /** Every event for this entity up to and including `uptoMs` — see
  * renewal.ts's renewalEventsUpTo for the identical caching contract. */
 export function modeEventsUpTo<T extends string>(params: ModeRenewalParams<T>, uptoMs: number): ModeEvent<T>[] {
-  let chain = chainCache.get(params.entityKey);
-  if (!chain) {
+  let entry = chains.get(params.entityKey) as ModeChainEntry<T> | undefined;
+  if (entry && uptoMs < entry.nextDueMs) return entry.events;
+  if (!entry) {
     // No per-dwelling real data exists to anchor an "initial" mode to
     // (unlike heating's real GWR snapshot), so the very first choice is
     // itself a weighted-random draw from the same target shares — seeded
     // independently of the lifetime draws below.
     const initialRng = mulberry32(hashSeed(params.entityKey, "mode-initial-choice"));
     const initialChoice = weightedPick(params.targetShares(), initialRng());
-    chain = [{ installedAtMs: Number.NEGATIVE_INFINITY, choice: initialChoice, previousChoice: null }];
-    chainCache.set(params.entityKey, chain);
+    entry = { events: [{ installedAtMs: Number.NEGATIVE_INFINITY, choice: initialChoice, previousChoice: null }], nextDueMs: Number.NEGATIVE_INFINITY };
+    chains.set(params.entityKey, entry as ModeChainEntry<string>);
   }
+  const chain = entry.events;
 
   let guard = 0;
   for (; guard < MAX_EVENTS_PER_CALL; guard++) {
@@ -95,7 +108,10 @@ export function modeEventsUpTo<T extends string>(params: ModeRenewalParams<T>, u
       eventIndex === 1
         ? firstRemainingLifetimeMs(params.entityKey, params.weibullShape, params.lifetimeMeanYears)
         : last.installedAtMs + nextLifetimeMs(params.entityKey, eventIndex, params.weibullShape, params.lifetimeMeanYears);
-    if (nextInstalledAtMs > uptoMs) break;
+    if (nextInstalledAtMs > uptoMs) {
+      entry.nextDueMs = nextInstalledAtMs;
+      break;
+    }
 
     const rng = mulberry32(hashSeed(params.entityKey, "mode-choice", String(eventIndex)));
     const shares = params.targetShares();

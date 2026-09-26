@@ -27,7 +27,7 @@ export function useYearHeatingReport(buildings: Building[], year: number): { dat
     setData(null);
     setLoading(true);
 
-    computeHeatingTechnologyBreakdown(buildings, year, () => cancelled).then((technology) => {
+    computeHeatingTechnologyBreakdown(buildings, year).then((technology) => {
       if (cancelled) return;
       const renewals = computeHeatingRenewalTally(buildings, year);
       setData({ technology, renewals });

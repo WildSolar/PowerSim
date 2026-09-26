@@ -26,6 +26,7 @@ import { measures } from "./sim/measures";
 import { treasury } from "./sim/treasury";
 import type { Difficulty } from "./config/difficulty";
 import { startYearEndWatcher } from "./sim/yearEndWatcher";
+import { startYearPassPrefetch } from "./sim/yearPassPrefetch";
 import "./App.css";
 
 // The simulation's state lives in many module-level singletons and caches (policy,
@@ -41,6 +42,7 @@ function returnToMenu() {
 
 // Dev-only handle for inspecting the simulation from the browser console.
 if (import.meta.env.DEV) import("./dev/scenario").then((m) => Object.assign(window, { __scenario: m.runScenario }));
+if (import.meta.env.DEV) import("./dev/perf").then((m) => Object.assign(window, { __perf: m.runPerf, __perfYearEnd: m.timeYearEndReport, __perfNewYear: m.timeNewYearPieces, __perfMapTick: m.timeMapPowerTick }));
 if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval } });
 
 function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
@@ -75,6 +77,9 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
       })
       .catch((e: Error) => setError(e.message));
   }, [slug, difficulty]);
+
+  // Samples each finished month for the year-end report in the background, so the report opens fast.
+  useEffect(() => (dataset ? startYearPassPrefetch(dataset.powerPlants) : undefined), [dataset]);
 
   // The dataset as it stands now: the base buildings plus everything built since (sim/stock.ts).
   // MapView keeps the original dataset (its mount is keyed on that reference) and reads the stock itself.

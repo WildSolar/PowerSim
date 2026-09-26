@@ -29,10 +29,10 @@ export function useYearEmissions(dataset: MunicipalityDataset, year: number): { 
     setLoading(true);
 
     (async () => {
-      const current = await computeEmissionsForYear(dataset.buildings, dataset.powerPlants, year, () => cancelled);
+      const current = await computeEmissionsForYear(dataset.buildings, dataset.powerPlants, year);
       if (cancelled) return;
       const baseline =
-        year === BASELINE_YEAR ? current : await computeEmissionsForYear(dataset.buildings, dataset.powerPlants, BASELINE_YEAR, () => cancelled);
+        year === BASELINE_YEAR ? current : await computeEmissionsForYear(dataset.buildings, dataset.powerPlants, BASELINE_YEAR);
       if (cancelled) return;
       setData({ current, baseline });
       setLoading(false);
