@@ -3,6 +3,8 @@ import {
   CATEGORY_LEGEND,
   CONSTRUCTION_COLOR,
   DISTRICT_HEAT_LEGEND,
+  EV_CHARGING_LEGEND,
+  CHARGER_USE_RAMP,
   HEATING_LEGEND,
   INSULATION_LEGEND,
   PIPE_COLOR,
@@ -22,6 +24,7 @@ const MODES: { key: ColorMode; label: string }[] = [
   { key: "category", label: "Building type" },
   { key: "heating", label: "Heating" },
   { key: "districtHeat", label: "District heat" },
+  { key: "evCharging", label: "EV charging" },
   { key: "power", label: "Power draw" },
   { key: "solar", label: "Solar" },
   { key: "age", label: "Age" },
@@ -41,6 +44,7 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
     category: CATEGORY_LEGEND,
     heating: HEATING_LEGEND,
     districtHeat: DISTRICT_HEAT_LEGEND,
+    evCharging: EV_CHARGING_LEGEND,
     age: AGE_LEGEND,
     insulation: INSULATION_LEGEND,
   };
@@ -80,6 +84,23 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
               <span>{line.label}</span>
             </div>
           ))}
+        </div>
+      )}
+      {mode === "evCharging" && (
+        <div className="legend power-legend">
+          <div className="power-gradient" style={{ background: `linear-gradient(to right, ${CHARGER_USE_RAMP.join(",")})` }} />
+          <div className="power-gradient-labels">
+            <span>charger with room</span>
+            <span>full</span>
+          </div>
+          <div className="legend-row" style={{ marginTop: 6 }}>
+            <span className="swatch" style={{ background: "#fff", border: "2px solid #1a1a1a", borderRadius: "50%" }} />
+            <span>Municipal charger (dark ring)</span>
+          </div>
+          <div className="legend-row">
+            <span className="swatch" style={{ background: "#fff", boxShadow: "0 0 0 2px #fff, 0 0 0 4px #9a988f", borderRadius: "50%" }} />
+            <span>Fast-charging hub (outer ring)</span>
+          </div>
         </div>
       )}
       <div className="legend" style={{ marginTop: 6 }}>

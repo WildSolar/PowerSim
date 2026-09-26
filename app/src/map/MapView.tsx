@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Map as MlMap, Marker, NavigationControl, type GeoJSONSource, type MapMouseEvent } from "maplibre-gl";
+import { Map as MlMap, Marker, NavigationControl, Popup, type GeoJSONSource, type MapMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
 import { buildingHeightM } from "../sim/buildingGeometry";
@@ -15,6 +15,8 @@ import { snowDepthCm } from "../sim/snow";
 import { districtHeat } from "../sim/districtHeat";
 import { mapNetworkBucketAt } from "../sim/districtHeatStats";
 import { streets } from "../sim/streets";
+import { pointsAt, publicCharging, siteCapacityAt, type ChargingSite } from "../sim/publicCharging";
+import { REACH_M } from "../config/charging";
 import {
   AGE_LEGEND,
   buildingAgeBucket,
@@ -24,6 +26,9 @@ import {
   INSULATION_LEGEND,
   CATEGORY_LEGEND,
   DISTRICT_HEAT_LEGEND,
+  CHARGER_USE_RAMP,
+  EV_CHARGING_LEGEND,
+  evChargingBucket,
   HEATING_LEGEND,
   PIPE_COLOR,
   PIPE_PLANNED_COLOR,
@@ -60,6 +65,16 @@ const DH_SOURCE_SOURCE_ID = "district-heat-source";
 const DH_TRUNK_LAYER_ID = "district-heat-trunk";
 const DH_PLANT_LAYER_ID = "district-heat-plant";
 const STREET_CLICK_TOLERANCE_PX = 6;
+const EV_CHARGING_TICK_MS = 3000; // cars booked to chargers, sites opening and filling up
+
+const CHARGER_SOURCE_ID = "charging-sites";
+const CHARGER_LAYER_ID = "charging-sites-circle";
+const CHARGER_HUB_LAYER_ID = "charging-sites-hub"; // the outer ring marking a fast-charging hub
+const CHARGER_REACH_SOURCE_ID = "charging-reach";
+const CHARGER_REACH_FILL_LAYER_ID = "charging-reach-fill";
+const CHARGER_REACH_LINE_LAYER_ID = "charging-reach-line";
+const CHARGER_LAYER_IDS = [CHARGER_REACH_FILL_LAYER_ID, CHARGER_REACH_LINE_LAYER_ID, CHARGER_HUB_LAYER_ID, CHARGER_LAYER_ID];
+const MUNICIPAL_CHARGER_STROKE = "#1a1a1a";
 
 // Metres per screen pixel at zoom 0 at Swiss latitudes (MapLibre's 512-px tiles, cos 47.4°), so a
 // street can be drawn at its real width: covering the painted street, not a hairline on top of it.
@@ -83,6 +98,7 @@ type BuildingProperties = {
   constructing: number;
   heating: string;
   network: string; // districtHeatStats.ts's NetworkStatus
+  charging: string; // colorModes.ts's evChargingBucket
   powerW: number;
   solarCapacityKw: number;
   heightM?: number;
@@ -131,6 +147,7 @@ function buildingsToGeoJSON(
 ): { polygons: BuildingFeatureCollection; points: BuildingFeatureCollection } {
   const solarByEgid = solarCapacityByEgid(plants);
   const buildings = allBuildings.filter((b) => visibleAt(b, simTimeMs));
+  const chargingAccess = publicCharging.householdAccess(buildings, simTimeMs);
 
   const properties = (b: Building): BuildingProperties => ({
     egid: b.egid,
@@ -140,6 +157,7 @@ function buildingsToGeoJSON(
     constructing: underConstructionAt(b, simTimeMs) ? 1 : 0,
     heating: buildingHeatingBucketAt(b, simTimeMs),
     network: mapNetworkBucketAt(b, simTimeMs),
+    charging: evChargingBucket(chargingAccess.get(b.egid)),
     powerW: previousPowerW?.get(b.egid) ?? 0,
     solarCapacityKw: solarByEgid.get(b.egid) ?? 0,
   });
@@ -213,6 +231,55 @@ function districtHeatSourceGeoJSON() {
   return { type: "FeatureCollection" as const, features };
 }
 
+/** Every public charging site: open ones by how full they are, ones being built as such. */
+function chargingSitesToGeoJSON(simTimeMs: number) {
+  return {
+    type: "FeatureCollection" as const,
+    features: publicCharging.getSites().map((site) => {
+      const capacity = siteCapacityAt(site, simTimeMs);
+      return {
+        type: "Feature" as const,
+        properties: {
+          id: site.id,
+          kind: site.kind,
+          municipal: site.owner === "municipal" ? 1 : 0,
+          points: capacity > 0 ? pointsAt(site, simTimeMs) : site.points,
+          utilization: capacity > 0 ? publicCharging.usersAt(site.id, simTimeMs) / capacity : 0,
+          building: capacity > 0 ? 0 : 1,
+          selected: site.id === publicCharging.getSelectedId() ? 1 : 0,
+        },
+        geometry: { type: "Point" as const, coordinates: [site.lon, site.lat] },
+      };
+    }),
+  };
+}
+
+/** A circle `radiusM` around a point, as a polygon ring — close enough at a town's scale. */
+function circleRing(lon: number, lat: number, radiusM: number): [number, number][] {
+  const mPerDegLat = 111_320;
+  const mPerDegLon = mPerDegLat * Math.cos((lat * Math.PI) / 180);
+  const ring: [number, number][] = [];
+  for (let i = 0; i <= 64; i++) {
+    const a = (i / 64) * 2 * Math.PI;
+    ring.push([lon + (Math.cos(a) * radiusM) / mPerDegLon, lat + (Math.sin(a) * radiusM) / mPerDegLat]);
+  }
+  return ring;
+}
+
+/** The reach of the selected site — or, while placing a new one, of the site at the cursor. */
+function chargingReachGeoJSON(preview: { lon: number; lat: number } | null) {
+  const placing = publicCharging.getPlacing();
+  const selected = publicCharging.getSelectedId();
+  const site: Pick<ChargingSite, "lon" | "lat" | "kind"> | undefined =
+    placing && preview ? { ...preview, kind: placing } : selected ? publicCharging.getSite(selected) : undefined;
+  return {
+    type: "FeatureCollection" as const,
+    features: site
+      ? [{ type: "Feature" as const, properties: {}, geometry: { type: "Polygon" as const, coordinates: [circleRing(site.lon, site.lat, REACH_M[site.kind])] } }]
+      : [],
+  };
+}
+
 /** Hides the basemap's own building layers so only our extruded volumes show —
  * avoids visibly doubled/misaligned outlines between the basemap and our own data,
  * which come from different survey vintages. */
@@ -258,6 +325,7 @@ function colorExpression(mode: ColorMode, selectedEgid: string | null, scales: C
     category: () => legendMatchExpression("category", CATEGORY_LEGEND),
     heating: () => legendMatchExpression("heating", HEATING_LEGEND),
     districtHeat: () => legendMatchExpression("network", DISTRICT_HEAT_LEGEND),
+    evCharging: () => legendMatchExpression("charging", EV_CHARGING_LEGEND),
     age: () => legendMatchExpression("age", AGE_LEGEND),
     insulation: () => legendMatchExpression("energyClass", INSULATION_LEGEND),
     power: () => powerColorExpression(scales.powerMinW, scales.powerMaxW),
@@ -444,11 +512,90 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         },
       });
 
+      // Public charging: every site, and the reach of the selected one — drawn over the buildings
+      // (they sit at street level, easily hidden behind a block), shown only in that layer.
+      const evVisibility = colorModeRef.current === "evCharging" ? "visible" : "none";
+      map.addSource(CHARGER_REACH_SOURCE_ID, { type: "geojson", data: chargingReachGeoJSON(null) });
+      map.addLayer({
+        id: CHARGER_REACH_FILL_LAYER_ID,
+        type: "fill",
+        source: CHARGER_REACH_SOURCE_ID,
+        layout: { visibility: evVisibility },
+        paint: { "fill-color": "#2a78d6", "fill-opacity": 0.1 },
+      });
+      map.addLayer({
+        id: CHARGER_REACH_LINE_LAYER_ID,
+        type: "line",
+        source: CHARGER_REACH_SOURCE_ID,
+        layout: { visibility: evVisibility },
+        paint: { "line-color": "#2a78d6", "line-width": 2.5, "line-opacity": 0.85 },
+      });
+      map.addSource(CHARGER_SOURCE_ID, { type: "geojson", data: chargingSitesToGeoJSON(simClock.getSimTimeMs()) });
+      const chargerRadius: unknown = ["interpolate", ["linear"], ["get", "points"], 1, 6, 12, 12];
+      map.addLayer({
+        id: CHARGER_HUB_LAYER_ID,
+        type: "circle",
+        source: CHARGER_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "dc"],
+        layout: { visibility: evVisibility },
+        paint: {
+          "circle-radius": ["+", chargerRadius, 5] as never,
+          "circle-color": "rgba(0,0,0,0)",
+          "circle-stroke-color": ["case", ["==", ["get", "municipal"], 1], MUNICIPAL_CHARGER_STROKE, "#ffffff"],
+          "circle-stroke-width": 2.5,
+        },
+      });
+      map.addLayer({
+        id: CHARGER_LAYER_ID,
+        type: "circle",
+        source: CHARGER_SOURCE_ID,
+        layout: { visibility: evVisibility },
+        paint: {
+          "circle-radius": chargerRadius as never,
+          "circle-color": [
+            "case",
+            ["==", ["get", "building"], 1],
+            CONSTRUCTION_COLOR,
+            ["interpolate", ["linear"], ["get", "utilization"], 0, CHARGER_USE_RAMP[0], 0.7, CHARGER_USE_RAMP[1], 1, CHARGER_USE_RAMP[2]],
+          ],
+          "circle-opacity": ["case", ["==", ["get", "building"], 1], 0.65, 1],
+          "circle-stroke-color": [
+            "case",
+            ["==", ["get", "selected"], 1],
+            SELECTED_COLOR,
+            ["==", ["get", "municipal"], 1],
+            MUNICIPAL_CHARGER_STROKE,
+            "#ffffff",
+          ],
+          "circle-stroke-width": ["case", ["==", ["get", "selected"], 1], 4, 2.5],
+        },
+      });
+
       if (dataset.boundary) addBoundaryLine(map, dataset.boundary);
 
       // One handler for every click: in the district heating layer a street takes precedence (that
       // layer is where extensions are planned), otherwise whichever building is under the cursor.
       map.on("click", (e: MapMouseEvent) => {
+        if (colorModeRef.current === "evCharging") {
+          const placing = publicCharging.getPlacing();
+          if (placing) {
+            publicCharging.build(placing, e.lngLat.lng, e.lngLat.lat, simClock.getSimTimeMs());
+            return;
+          }
+          const { x, y } = e.point;
+          const r = STREET_CLICK_TOLERANCE_PX;
+          const hit = map.queryRenderedFeatures(
+            [
+              [x - r, y - r],
+              [x + r, y + r],
+            ],
+            { layers: [CHARGER_LAYER_ID] },
+          )[0];
+          if (hit) {
+            publicCharging.select(String(hit.properties?.id));
+            return;
+          }
+        }
         if (colorModeRef.current === "districtHeat") {
           const { x, y } = e.point;
           const r = STREET_CLICK_TOLERANCE_PX;
@@ -468,6 +615,8 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         const egid = building?.properties?.egid as string | undefined;
         if (egid) onSelectBuildingRef.current(egid);
       });
+      map.on("mouseenter", CHARGER_LAYER_ID, () => (map.getCanvas().style.cursor = "pointer"));
+      map.on("mouseleave", CHARGER_LAYER_ID, () => (map.getCanvas().style.cursor = publicCharging.getPlacing() ? "crosshair" : ""));
       map.on("mouseenter", STREET_HIT_LAYER_ID, () => (map.getCanvas().style.cursor = "pointer"));
       map.on("mouseleave", STREET_HIT_LAYER_ID, () => (map.getCanvas().style.cursor = ""));
       map.on("mouseenter", POLY_LAYER_ID, () => (map.getCanvas().style.cursor = "pointer"));
@@ -697,6 +846,81 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       clearInterval(interval);
       unsubscribe();
       label?.remove();
+    };
+  }, [colorMode, dataset]);
+
+  // EV charging layer: the sites (filling up, opening, being ordered), each building's charging
+  // options, the selected site's reach, a hover card per site, and placing a new municipal site.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer(CHARGER_LAYER_ID)) return;
+    const visible = colorMode === "evCharging";
+    for (const id of CHARGER_LAYER_IDS) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+    if (!visible) return;
+
+    let preview: { lon: number; lat: number } | null = null;
+    const drawReach = () => (map.getSource(CHARGER_REACH_SOURCE_ID) as GeoJSONSource | undefined)?.setData(chargingReachGeoJSON(preview));
+
+    const tick = () => {
+      const simTimeMs = simClock.getSimTimeMs();
+      (map.getSource(CHARGER_SOURCE_ID) as GeoJSONSource | undefined)?.setData(chargingSitesToGeoJSON(simTimeMs));
+      drawReach();
+      map.getCanvas().style.cursor = publicCharging.getPlacing() ? "crosshair" : "";
+      const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
+      const pointSource = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
+      const polyData = polygonsRef.current;
+      const pointData = pointsRef.current;
+      if (!polySource || !pointSource || !polyData || !pointData) return;
+      const features = [...polyData.features, ...pointData.features];
+      const shown: Building[] = [];
+      for (const f of features) {
+        const b = stock.lookup(f.properties.egid);
+        if (b) shown.push(b);
+      }
+      const access = publicCharging.householdAccess(shown, simTimeMs);
+      for (const f of features) f.properties.charging = evChargingBucket(access.get(f.properties.egid));
+      polySource.setData(polyData);
+      pointSource.setData(pointData);
+    };
+
+    // While placing: the reach of a site at the street nearest the cursor.
+    const onMove = (e: MapMouseEvent) => {
+      if (!publicCharging.getPlacing()) return;
+      const snapped = streets.snapToStreet(e.lngLat.lng, e.lngLat.lat);
+      preview = snapped ?? { lon: e.lngLat.lng, lat: e.lngLat.lat };
+      drawReach();
+    };
+
+    // A hover card per site: who runs it, and how full it is.
+    const popup = new Popup({ closeButton: false, closeOnClick: false, offset: 14, className: "charger-popup" });
+    const onHover = (e: MapMouseEvent & { features?: { properties: Record<string, unknown> }[] }) => {
+      const site = publicCharging.getSite(String(e.features?.[0]?.properties.id));
+      if (!site) return;
+      const stats = publicCharging.stats(site, simClock.getSimTimeMs());
+      const text =
+        stats.capacity === 0
+          ? `${site.name} — being built`
+          : `${site.name} — ${stats.users} of ${stats.capacity} cars (${Math.round(stats.utilization * 100)}%)`;
+      popup.setLngLat([site.lon, site.lat]).setText(text).addTo(map);
+    };
+    const onLeave = () => popup.remove();
+
+    tick();
+    const interval = setInterval(tick, EV_CHARGING_TICK_MS);
+    const unsubscribe = publicCharging.subscribe(tick);
+    map.on("mousemove", onMove);
+    map.on("mousemove", CHARGER_LAYER_ID, onHover as never);
+    map.on("mouseleave", CHARGER_LAYER_ID, onLeave);
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+      map.off("mousemove", onMove);
+      map.off("mousemove", CHARGER_LAYER_ID, onHover as never);
+      map.off("mouseleave", CHARGER_LAYER_ID, onLeave);
+      popup.remove();
+      map.getCanvas().style.cursor = "";
+      publicCharging.startPlacing(null);
+      publicCharging.select(null);
     };
   }, [colorMode, dataset]);
 

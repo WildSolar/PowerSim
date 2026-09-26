@@ -52,6 +52,7 @@ import { PAYOUT_CATEGORIES, treasury, type PayoutsByCategory } from "./treasury"
 import { computeHeatingTechnologyBreakdown, yearElectricity } from "./yearReport";
 import { DH_NETWORK_UPKEEP_CHF_PER_M_YEAR, DH_SOURCE_HEAT_PRICE_RP_PER_KWH } from "../config/districtHeat";
 import { districtHeat } from "./districtHeat";
+import { publicCharging } from "./publicCharging";
 
 export interface MunicipalFinances {
   year: number;
@@ -62,6 +63,8 @@ export interface MunicipalFinances {
   districtHeatRevenueRp: number; // district heat sold to connected buildings, at the tariff's district heating price
   districtHeatPurchaseRp: number; // that heat, bought from the network's source
   districtHeatUpkeepRp: number; // running the pipes, per metre of piped street
+  publicChargingRevenueRp: number; // sold at the municipality's own public chargers, at the tariff's public charging prices
+  publicChargingUpkeepRp: number; // keeping those chargers running
   governmentAllocationRp: number; // this year's allocation from the overall government (a placeholder framing, see config/treasury.ts)
   spendingRp: PayoutsByCategory; // the municipality's own top-ups, per kind, paid out as decisions happened this year — never the federal/cantonal grants
   spendingTotalRp: number;
@@ -121,6 +124,14 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
   for (let month = 0; month < 12; month++) pipedMetreYears += districtHeat.pipedLengthM(toSimTimeMs(Date.UTC(year, month, 15))) / 12;
   const districtHeatUpkeepRp = pipedMetreYears * DH_NETWORK_UPKEEP_CHF_PER_M_YEAR * 100;
 
+  // The municipality's own public chargers sell at their own price. Their energy is part of the
+  // town's metered consumption above, billed there at the household tariff — taken back out of
+  // that line so it isn't counted twice.
+  const charging = publicCharging.municipalYear(year);
+  consumerRevenueRp -= charging.kWh * ((tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2);
+  const publicChargingRevenueRp = charging.revenueRp;
+  const publicChargingUpkeepRp = charging.upkeepRp;
+
   // Every household decision due this year has to have committed (and paid out) before the year is summed.
   treasury.settleThrough(yearEndMs);
   const spendingRp = treasury.paidOut(yearStartMs, yearEndMs);
@@ -130,12 +141,14 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
   const netIncomeRp =
     consumerRevenueRp +
     districtHeatRevenueRp +
+    publicChargingRevenueRp +
     governmentAllocationRp -
     feedInPaidRp -
     wholesaleCostRp -
     gridMaintenanceCostRp -
     districtHeatPurchaseRp -
     districtHeatUpkeepRp -
+    publicChargingUpkeepRp -
     spendingTotalRp;
 
   const result: MunicipalFinances = {
@@ -147,6 +160,8 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     districtHeatRevenueRp,
     districtHeatPurchaseRp,
     districtHeatUpkeepRp,
+    publicChargingRevenueRp,
+    publicChargingUpkeepRp,
     governmentAllocationRp,
     spendingRp,
     spendingTotalRp,

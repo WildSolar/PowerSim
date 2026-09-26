@@ -26,6 +26,7 @@ from . import coords
 from .schema import Building, Dwelling, MunicipalityDataset, PowerPlant, StreetSegment
 from .sources import footprints as footprints_source
 from .sources import boundary as boundary_source
+from .sources import chargers as chargers_source
 from .sources import district_heat as district_heat_source
 from .sources import streets as streets_source
 from .sources import exclusions as exclusions_source
@@ -167,6 +168,10 @@ def build(bfs_number: int) -> MunicipalityDataset:
         piped_km = sum(segments[s].length_m for s in network["initial_segments"]) / 1000
         print(f"  district heating: {len(dh_egids)} customers, {len(network['initial_segments'])} segments ({piped_km:.1f} km) piped, source: {network['source']['name']}")
 
+    print("Fetching public charging sites (BFE register)...")
+    charging_sites = chargers_source.fetch_sites(boundary_lv95)
+    print(f"  {len(charging_sites)} sites, {sum(s['points'] for s in charging_sites)} charge points ({sum(1 for s in charging_sites if s['kind'] == 'dc')} fast-charging sites)")
+
     dwellings_by_egid: dict[int, list[Dwelling]] = {}
     for _, row in dwellings_df.iterrows():
         egid = int(row[gwr.EGID_COL])
@@ -249,6 +254,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
             for s in segments
         ],
         district_heat=network,
+        charging_sites=charging_sites,
     )
 
 

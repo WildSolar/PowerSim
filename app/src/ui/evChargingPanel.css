@@ -1,0 +1,167 @@
+.ev-bar-fill {
+  height: 100%;
+  background: #1baf7a;
+}
+
+.ev-bar-fill.busy {
+  background: #f2b01e;
+}
+
+.ev-bar-fill.full {
+  background: #d0342c;
+}
+
+.ev-access {
+  margin: 8px 0 4px;
+  padding-top: 6px;
+  border-top: 1px solid #eee;
+}
+
+.ev-site {
+  margin-top: 10px;
+  padding: 8px;
+  border: 1px solid #f97316;
+  border-radius: 8px;
+  background: #fffaf5;
+}
+
+.ev-site-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.ev-site-name {
+  font-weight: 600;
+  flex: 1;
+}
+
+.ev-close {
+  border: none;
+  background: none;
+  color: #898781;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 12px;
+}
+
+.ev-history-title {
+  margin: 10px 0 4px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #898781;
+}
+
+.ev-history {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+.ev-history-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.ev-history-plot {
+  position: relative;
+  width: 100%;
+  height: 44px;
+}
+
+.ev-history-capacity,
+.ev-history-users {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: 3px 3px 0 0;
+}
+
+.ev-history-capacity {
+  background: #eeece8;
+}
+
+.ev-history-users {
+  left: 3px;
+  right: 3px;
+  background: #2a78d6;
+}
+
+.ev-history-year {
+  font-size: 10px;
+  color: #898781;
+  font-variant-numeric: tabular-nums;
+}
+
+.ev-build {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ev-build button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  border: 1px solid #ddd;
+  background: #f8f8f8;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ev-build button:hover {
+  border-color: #2a78d6;
+}
+
+.ev-build-name {
+  font-weight: 600;
+}
+
+.ev-build-detail {
+  font-size: 11px;
+  color: #52514e;
+}
+
+.ev-list-row {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+  align-items: center;
+  border: none;
+  background: none;
+  padding: 3px 4px;
+  margin: 0 -4px 1px;
+  border-radius: 4px;
+  font: inherit;
+  color: #52514e;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ev-list-row:hover,
+.ev-list-row.selected {
+  background: #f3f1ec;
+}
+
+.ev-list-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.charger-popup .maplibregl-popup-content {
+  padding: 4px 8px;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  border-radius: 6px;
+}

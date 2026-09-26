@@ -1,8 +1,9 @@
 import type { Building } from "../data/types";
 import { ENERGY_CLASS_CATALOG, ENERGY_CLASS_ORDER } from "../sim/energyClass";
 import { currentHeatingSystemId } from "../sim/heatingRenewal";
+import type { BuildingChargingAccess } from "../sim/publicCharging";
 
-export type ColorMode = "none" | "category" | "heating" | "power" | "solar" | "age" | "insulation" | "districtHeat";
+export type ColorMode = "none" | "category" | "heating" | "power" | "solar" | "age" | "insulation" | "districtHeat" | "evCharging";
 
 export interface LegendEntry {
   bucket: string;
@@ -204,6 +205,27 @@ export const PIPE_PLANNED_COLOR = "#f97316";
 // Picked, but not connected to the network (so the extension can't be ordered yet).
 export const PIPE_UNCONNECTED_COLOR = "#d0342c";
 export const STREET_UNPIPED_COLOR = "#7a776f";
+
+// The EV charging layer: how a building's households could charge an electric car (the majority
+// of them, for a building of flats).
+export const EV_CHARGING_LEGEND: LegendEntry[] = [
+  { bucket: "home", label: "Can charge at home", color: "#1baf7a" },
+  { bucket: "public", label: "On-street charger with room nearby", color: "#2a78d6" },
+  { bucket: "fastOnly", label: "Only a fast-charging hub", color: "#8fb8e8" },
+  { bucket: "full", label: "Chargers nearby are full", color: "#eb6834" },
+  { bucket: "none", label: "No charger nearby", color: "#b23a2e" },
+  { bucket: "noHouseholds", label: "No households", color: UNKNOWN_COLOR },
+];
+
+/** A building's bucket on the EV charging layer: by what most of its households could do. */
+export function evChargingBucket(access: BuildingChargingAccess | undefined): string {
+  if (!access) return "noHouseholds";
+  return access.atHome * 2 >= access.households ? "home" : access.others;
+}
+
+// Charging sites by how full they are: room to spare -> filling up -> full.
+export const CHARGER_USE_RAMP = ["#1baf7a", "#f2b01e", "#d0342c"];
+export const CHARGER_BUILDING_COLOR = "#b6b4ac";
 
 export const CONSTRUCTION_COLOR = "#f2b01e";
 

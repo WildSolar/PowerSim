@@ -237,6 +237,21 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     referendum: "optional",
   },
   {
+    id: "right-to-charge",
+    category: "law",
+    title: "Right to charge at home",
+    summary:
+      "Landlords and owners' associations may no longer refuse a charging point in the building's car park. Many more flat-dwellers can charge at home — the biggest barrier to an electric car in town — though never all: some buildings have no parking at all. Tenants and drivers like it; property owners bear the installation work.",
+    params: [{ kind: "slider", key: "coverage", label: "Households it reaches", min: 0, max: 80, step: 10, unit: "% of those who can't charge at home", default: 50 }],
+    leadTimeMonths: 12,
+    effects: (p) => ({ homeChargingBoost: num(p, "coverage") / 100 }),
+    approval: (p) => {
+      const c = num(p, "coverage") / 100;
+      return { tenants: 0.1 + 0.3 * c, drivers: 0.1 + 0.2 * c, climate: 0.3, homeowners: -0.1 - 0.3 * c };
+    },
+    referendum: "optional",
+  },
+  {
     id: "green-power",
     category: "law",
     title: "Green electricity as the default",

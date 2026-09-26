@@ -32,6 +32,7 @@ import { acPowerWWithWeather } from "./ac";
 import { commercialPowerWFromProfile, makeCommercialProfile, type CommercialProfile } from "./commercial";
 import { heatPumpPowerWWithWeather } from "./heatPump";
 import { mobilityChargingPowerW } from "./mobility";
+import { publicCharging } from "./publicCharging";
 import { irradianceWm2, pvPowerWAt } from "./pv";
 import { existsAt } from "./lifetime";
 import { hashSeed } from "./rng";
@@ -330,6 +331,8 @@ export function sampleMunicipalityCategorySeries(
   plants: PowerPlant[],
 ): CategorySeries {
   const dwellingTotals = dwellingCategoryTotals(dwellingProfileSets(buildings), times, tariff);
+  // Cars charged at public chargers draw there, not at home — still the town's EV charging.
+  dwellingTotals.evW = dwellingTotals.evW.map((w, i) => w + publicCharging.totalLoadW(times[i]));
   const { heatPumpW, acW } = climateControlCategorySeries(buildings, times);
   const waterHeatingW = waterHeatingCategorySeries(buildings, times);
   const commercialW = commercialCategorySeries(buildings, times);

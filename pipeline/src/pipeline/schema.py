@@ -77,3 +77,6 @@ class MunicipalityDataset:
     # The inferred starting network: {source: {name, kind, lon, lat, node, feed_lon, feed_lat},
     # initial_segments: [ids]}, or None without district heat — see sources/district_heat.py.
     district_heat: dict | None = None
+    # Public charging sites for electric cars, from the federal register — see sources/chargers.py:
+    # {id, name, lon, lat, points, power_kw, kind: "ac" | "dc"}.
+    charging_sites: list = field(default_factory=list)

@@ -98,6 +98,30 @@ class StreetNetwork {
     return this.byNode.get(node) ?? [];
   }
 
+  /** The closest point on any street to (lon, lat), and how far away it is — where something
+   * placed on the map (a charger) actually goes. Null without streets. */
+  snapToStreet(lon: number, lat: number): { lon: number; lat: number; distanceM: number } | null {
+    const p = this.projection.toXY(lon, lat);
+    let best: { x: number; y: number; d: number } | null = null;
+    for (const line of this.linesXY) {
+      for (let i = 1; i < line.length; i++) {
+        const [ax, ay] = line[i - 1];
+        const [bx, by] = line[i];
+        const dx = bx - ax;
+        const dy = by - ay;
+        const len2 = dx * dx + dy * dy;
+        const t = len2 > 0 ? Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - ay) * dy) / len2)) : 0;
+        const x = ax + t * dx;
+        const y = ay + t * dy;
+        const d = Math.hypot(x - p[0], y - p[1]);
+        if (!best || d < best.d) best = { x, y, d };
+      }
+    }
+    if (!best) return null;
+    const [snappedLon, snappedLat] = this.projection.toLonLat(best.x, best.y);
+    return { lon: snappedLon, lat: snappedLat, distanceM: best.d };
+  }
+
   /** The segments a new building at (lon, lat) can be reached from, as the pipeline links the
    * buildings the game starts with: the one it is addressed from (the nearest carrying its
    * address's street name if one is close, else the nearest of any name), plus every other

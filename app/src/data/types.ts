@@ -95,6 +95,19 @@ export interface MunicipalityDataset {
   streets?: StreetSegment[];
   /** The district heating network the game starts with, inferred — see pipeline/sources/district_heat.py. */
   districtHeat?: DistrictHeatData | null;
+  /** Public charging sites for electric cars, from the federal register — see pipeline/sources/chargers.py. */
+  chargingSites?: ChargingSiteData[];
+}
+
+export interface ChargingSiteData {
+  id: string;
+  name: string;
+  lon: number;
+  lat: number;
+  points: number;
+  powerKw: number;
+  /** "dc": a fast-charging site (50 kW and up); "ac": ordinary (on-street) charge points. */
+  kind: "ac" | "dc";
 }
 
 /** A street from one junction to the next — the unit district heating pipes are laid in. */

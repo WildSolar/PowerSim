@@ -36,6 +36,9 @@ export interface RenewalCandidate<T extends string> {
   /** The part of the up-front cost the municipality pays (already netted out of annualizedCostRp).
    * Recorded on the event when this candidate wins, so the treasury can be charged for it then. */
   municipalSubsidyRp?: number;
+  /** Called when this candidate wins and the decision commits (e.g. to book the car to the public
+   * charger it will rely on). */
+  onChosen?: (atMs: number) => void;
   /** Signed "how renewable/progressive this option reads" — positive leans
    * renewable, negative leans fossil/conventional. Scaled by the entity's own
    * bias trait when ranking; never shown to the player. */
@@ -94,6 +97,8 @@ export interface RenewalParams<T extends string> {
    * evaluated against the then-current tariff. Only called when an event is
    * actually about to commit. */
   candidatesAt: (atMs: number, incumbent: T) => RenewalCandidate<T>[];
+  /** Called for every decision as it commits, before the winner's own onChosen. */
+  onCommit?: (event: RenewalEvent<T>) => void;
 }
 
 const MAX_EVENTS_PER_CALL = 1000; // defensive cap against a misconfigured/runaway chain, not a real limit
@@ -215,7 +220,10 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
     const uncertaintyFraction = params.uncertaintyFraction * policyStore.get().uncertaintyMultiplier; // information measures narrow it
     const { chosen, reasonKind, bestOverallId } = chooseNext(candidates, last.system, uncertaintyFraction, params.biasStrengthRp + policyStore.get().progressiveNudgeRp);
     const winner = candidates.find((c) => c.id === chosen);
-    chain.push({ installedAtMs: nextInstalledAtMs, system: chosen, previousSystem: last.system, reasonKind, bestOverallId, municipalSubsidyRp: winner?.municipalSubsidyRp });
+    const event: RenewalEvent<T> = { installedAtMs: nextInstalledAtMs, system: chosen, previousSystem: last.system, reasonKind, bestOverallId, municipalSubsidyRp: winner?.municipalSubsidyRp };
+    chain.push(event);
+    params.onCommit?.(event);
+    winner?.onChosen?.(nextInstalledAtMs);
     // The money leaves the treasury now, when the decision happens — never before, never for an option nobody takes.
     const category = subsidyCategoryForDecision(params.kind);
     if (category && winner?.municipalSubsidyRp) treasury.recordPayout(category, nextInstalledAtMs, winner.municipalSubsidyRp, params.egid);

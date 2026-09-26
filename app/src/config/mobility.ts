@@ -121,6 +121,11 @@ export const EBIKE_KWH_PER_100KM = 1; // a small battery, charged often — runn
 // BFS px-x-1103020100_111 ("Bestand der Strassenfahrzeuge nach Gemeinde"),
 // queried directly for Gemeinde 247, Fahrzeuggruppe "Personenwagen", 2024.
 export const INITIAL_EV_FLEET_SHARE = 0.0808;
+// Today's electric cars belong overwhelmingly to households that can charge at home, so the draw
+// is split by that (sim/publicCharging.ts): with Schlieren's ~38% of households charging at home,
+// 0.38 × 0.17 + 0.62 × 0.025 ≈ the fleet share above.
+export const INITIAL_EV_SHARE_WITH_HOME_CHARGING = 0.17;
+export const INITIAL_EV_SHARE_WITHOUT_HOME_CHARGING = 0.025;
 // No equivalent bike-stock register exists — a judgment call reflecting
 // e-bikes' real, fast-growing but still-minority share of the Swiss fleet.
 export const INITIAL_EBIKE_SHARE = 0.25;

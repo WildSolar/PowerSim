@@ -93,6 +93,30 @@ export function TariffControl() {
         />
         <span className="tariff-unit">Rp/kWh</span>
       </div>
+      <div className="tariff-row" title="At the municipality's own on-street chargers">
+        <span className="tariff-label">Public charging</span>
+        <input
+          type="number"
+          min={0}
+          max={120}
+          step={1}
+          value={tariff.publicChargingAcRpKWh}
+          onChange={(e) => tariffStore.set({ publicChargingAcRpKWh: Number(e.target.value) })}
+        />
+        <span className="tariff-unit">Rp/kWh</span>
+      </div>
+      <div className="tariff-row" title="At the municipality's own fast-charging hubs">
+        <span className="tariff-label">Fast charging</span>
+        <input
+          type="number"
+          min={0}
+          max={150}
+          step={1}
+          value={tariff.publicChargingDcRpKWh}
+          onChange={(e) => tariffStore.set({ publicChargingDcRpKWh: Number(e.target.value) })}
+        />
+        <span className="tariff-unit">Rp/kWh</span>
+      </div>
       <div className="tariff-row">
         <span className="tariff-label">Petrol price</span>
         <input

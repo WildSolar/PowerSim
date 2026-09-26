@@ -108,6 +108,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Cost: a subsidy costs money only when a household actually takes it up; a campaign costs a little every month it runs; infrastructure costs what it costs when it is built. All of it comes out of the treasury.",
         "Information measures narrow the uncertainty investment decisions are made under, so people act on clear savings and stop chasing marginal ones. They cost a running programme budget.",
         "Mobility measures act slowly and diffusely: a bicycle network, better public transport, or tougher parking rules shift a little of everyone's travel each time a household rethinks how it gets around, never all at once. The car always keeps a share.",
+        "Public charging: the municipality can build chargers itself (in the EV charging layer, see \"Public charging\"), and a right-to-charge law lets more tenants install a wallbox at home. Landlords and homeowners dislike the law; tenants and drivers like it.",
         "Green power and clean district heating cut the emissions attributed to the electricity and district heat the town uses; a climate awareness campaign nudges every household a little toward the greener option when the numbers are close.",
         "Laws can slow things down as well as speed them up: a minimum standard for renovations, for instance, discourages owners who would have done a smaller upgrade.",
       ]),
@@ -209,6 +210,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Every mode change and vehicle renewal is logged in plain language on the dwelling's own panel, the same way a heating renewal is on a building's.",
       ),
       p(
+        "An electric car also needs somewhere to charge. A household that can charge at home pays household electricity prices; one that can't (most flats) has to rely on a public charger nearby, pays that charger's price and puts up with the hassle — and with no charger with room in reach, an electric car isn't an option for it at all. See \"Public charging\".",
+      ),
+      p(
         "Responsive EV charging works exactly as before: about 30% of EV-owning slots delay charging until off-peak pricing begins, as long as they can still finish by morning; the rest just plug in and charge immediately. Each session needs 6-16 kWh (a day's typical driving) at a 7.4 kW home wallbox rate.",
       ),
       note(
@@ -216,6 +220,34 @@ export const WIKI_SECTIONS: WikiSection[] = [
       ),
       note(
         "Within a bike slot's own renewal decision, a standard bike currently wins the four-factor comparison almost every time — purchase price dominates, and a bike's electricity cost is too small either way to offset a standard bike's much lower price. A known simplification, since precise e-bike cost data wasn't as readily available as the car and heating figures this is otherwise built on.",
+      ),
+    ],
+  },
+  {
+    id: "public-charging",
+    icon: "🔌",
+    title: "Public charging",
+    blocks: [
+      p(
+        "Whether a household can charge at home (its own parking space, a wallbox allowed) is fixed per dwelling: most house owners can, only about a third of flats can. The rest can only run an electric car if a public charger they can rely on is in reach — an on-street charger within about 300 m (it charges overnight, so it has to be a walk away), or a fast-charging hub within 1.5 km (a weekly errand). Without one, an electric car is ruled out when their car is next replaced.",
+      ),
+      p(
+        "With one, the household weighs the electric car the same way as always (see \"Mobility\"), but its running cost is the charger's price per kWh plus the hassle of charging in public: least at an on-street charger next door, more the further away it is, more still as it fills up, and a lot more for a fast-charging hub. An empty on-street charger next door makes an electric car about as good a deal as a petrol one — so where chargers are, and what they cost, tips many decisions.",
+      ),
+      p(
+        "Chargers have limited room: an on-street charge point serves about 3 cars that rely on it, a fast-charging point about 20. A household buying an electric car is booked to the charger it picked until the car is next replaced, and a full charger takes no new ones. Its cars draw their power there, not at home — on-street chargers mostly in the evening, fast chargers during the day.",
+      ),
+      list([
+        "The town starts with the real public chargers from the federal register, run privately, with the electric cars already on the road that need them booked in.",
+        "Private operators react every New Year: where households wanted an electric car last year but found no charger with room — or only a fast-charging hub — they add points to busy sites and open new on-street sites where enough such households cluster. They charge 45 Rp/kWh on-street and 65 Rp/kWh at fast chargers.",
+        "The municipality can build its own: in the EV charging layer, pick on-street chargers (4 points, CHF 60,000, ready in 4 months) or a fast-charging hub (4 points, CHF 600,000, 12 months) and click where they should go — they're placed at the nearest street, and a blue circle shows who they'd serve. They're paid the day they're ordered; after that the municipality earns what they sell, at the prices set in Control → Prices, and pays their upkeep.",
+        "The right-to-charge law (Control → Measures) obliges landlords to allow wallboxes: some of the households that couldn't charge at home now can.",
+      ]),
+      p(
+        "The EV charging layer shows every charger, coloured from green (room to spare) to red (full), larger for more points, with a dark ring for the municipality's own and an outer ring for a fast-charging hub; buildings are coloured by what most of their households could do. Its panel shows how the town's households stand, how many wanted an electric car in the last year but had no charger, and — for the charger you click — who runs it, its price, how many cars rely on it against its room, how many points are in use right now, the energy it delivers, and its use year by year.",
+      ),
+      note(
+        "Placeholders to balance, not researched figures: the home charging shares, how far people will go to charge, how many cars a point serves, the hassle costs, and the chargers' costs and upkeep. A car's public charging isn't on its dwelling's bill yet, and workplace charging isn't modelled — an electric car already on the road that finds no room at a public charger at the start just isn't counted at one.",
       ),
     ],
   },
@@ -390,7 +422,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Only EV charging currently responds to the electricity tariff (see above) — a responsive household will wait for off-peak pricing to begin if that still gets the car charged in time.",
       ),
       p(
-        "The five flat prices: what exported solar generation earns (feed-in), and what oil, gas, district heating, and petrol cost — oil and petrol per liter (how they're actually sold), the other two per kWh. The first four feed directly into the Bill sections described next; petrol (and every electricity price above) instead feeds mobility's vehicle-type renewal decision (see \"Mobility\") — moving it shifts how attractive an EV looks the next time a car in the municipality wears out, the same way changing oil or gas price shifts heating's own renewal decisions.",
+        "The flat prices: what exported solar generation earns (feed-in), and what oil, gas, district heating, and petrol cost — oil and petrol per liter (how they're actually sold), the other two per kWh — plus what the municipality's own public chargers charge, on-street and fast (see \"Public charging\"); private operators set their own prices. The first four feed directly into the Bill sections described next; petrol (and every electricity price above) instead feeds mobility's vehicle-type renewal decision (see \"Mobility\") — moving it shifts how attractive an EV looks the next time a car in the municipality wears out, the same way changing oil or gas price shifts heating's own renewal decisions.",
       ),
       p(
         "Below those is a second group, \"Municipal utility costs\": the wholesale price the local DSO itself pays for electricity, and what it costs to maintain the local grid. These never appear on a consumer's bill — they're the DSO's own cost side, see \"Municipal finances\" below.",
@@ -432,7 +464,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Money leaves the treasury only when a decision actually happens: the day a household installs a subsidised heat pump, buys a subsidised electric car, upgrades its insulation, or puts up solar panels, the municipal top-up is paid out. A grant nobody takes up costs nothing — but a grant also goes to everyone who would have decided the same way anyway, and finding the level that tips the undecided without overpaying the rest is the whole game of subsidy planning. The grants are set in Control → Measures.",
       ),
       p(
-        "Each completed year, the balance moves by: what consumers paid for grid electricity and district heat, plus the government allocation, minus the solar fed in, the wholesale cost of the net electricity bought in, grid maintenance, the heat bought from the district heating source, the upkeep of the pipes, and every subsidy paid out that year. Extending the district heating network is paid the day it is ordered. The utility costs are set in Control → Prices, under \"Municipal utility costs\".",
+        "Each completed year, the balance moves by: what consumers paid for grid electricity and district heat, plus the government allocation, plus what the municipality's own public chargers sold, minus the solar fed in, the wholesale cost of the net electricity bought in, grid maintenance, the heat bought from the district heating source, the upkeep of the pipes and of the chargers, and every subsidy paid out that year. Extending the district heating network, and building public chargers, is paid the day it is ordered. The utility costs are set in Control → Prices, under \"Municipal utility costs\".",
       ),
       note(
         "The utility side covers electricity and district heating only — gas, oil and petrol/diesel are paid straight to an external supplier, never through the municipal utility. Federal and cantonal grants (the baseline every heat pump, EV and solar installation already gets) are not municipal money; only the municipality's own top-up is.",
@@ -452,6 +484,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Heating — colored by primary heating system, live: a stock-renewal replacement (see \"Stock renewal\") recolors the building within a few seconds, not just at the moment you happen to look at its panel.",
         "Power draw — colored by live net power right now, on a diverging scale from exporting (solar surplus) to importing; recalculates every 1.5 real seconds.",
         "District heat — which buildings are connected to the district heating network, which could be (a pipe runs in their street), and which are out of reach, with the piped streets, extensions being built and the heat source drawn in. This is also where the network is extended — see \"District heating network\".",
+        "EV charging — how each building's households could charge an electric car (at home, at an on-street charger with room, only at a fast-charging hub, only at full chargers, or nowhere nearby), with every public charger coloured by how full it is. Click a charger for its usage; this is also where the municipality builds its own — see \"Public charging\".",
         "Solar — colored by installed solar capacity, from none to the municipality's largest installation; live, the same way Heating is — a new adoption (see \"Solar adoption\") recolors the building within a few seconds.",
       ]),
     ],

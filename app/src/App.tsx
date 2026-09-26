@@ -5,6 +5,7 @@ import { ControlPanel } from "./ui/ControlPanel";
 import { DwellingPanel } from "./ui/DwellingPanel";
 import { ColorModeControl } from "./ui/ColorModeControl";
 import { DistrictHeatPanel } from "./ui/DistrictHeatPanel";
+import { EvChargingPanel } from "./ui/EvChargingPanel";
 import { ReportCardModal } from "./ui/ReportCardModal";
 import { TimeControl } from "./ui/TimeControl";
 import { ApprovalPanel } from "./ui/ApprovalPanel";
@@ -23,6 +24,8 @@ import { useStockBuildings } from "./ui/useStock";
 import { stock } from "./sim/stock";
 import { streets } from "./sim/streets";
 import { districtHeat } from "./sim/districtHeat";
+import { publicCharging } from "./sim/publicCharging";
+import { bookInitialPublicCharging } from "./sim/mobility";
 import { policyStore } from "./sim/policy";
 import { approval } from "./sim/approval";
 import { measures } from "./sim/measures";
@@ -77,7 +80,10 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
         approval.init(difficulty, `approval:${loaded.bfsNumber}`);
         streets.init(loaded); // before the stock: new buildings are linked to their street, and to the district heating network
         districtHeat.init(loaded);
+        publicCharging.init(loaded, 0);
+        publicCharging.setBuildingLookup((egid) => stock.lookup(egid));
         stock.init(loaded);
+        bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building
         setDataset(loaded);
       })
       .catch((e: Error) => setError(e.message));
@@ -125,6 +131,7 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
         <ColorModeControl mode={colorMode} onChange={setColorMode} />
       </div>
       {colorMode === "districtHeat" && <DistrictHeatPanel />}
+      {colorMode === "evCharging" && <EvChargingPanel />}
       <div className="bottom-left-stack">
         <button className="pill-button" onClick={() => setShowControl(true)}>
           ⚙️ {dataset.name} Control

@@ -1,0 +1,310 @@
+import { useMemo, useSyncExternalStore } from "react";
+import { BUILD_SPEC, CARS_PER_POINT, REACH_M, type ChargingKind } from "../config/charging";
+import { formatDate, toDateMs, toSimTimeMs } from "../sim/calendar";
+import { simClock } from "../sim/engine";
+import { existsAt } from "../sim/lifetime";
+import { publicCharging, siteCapacityAt, sitePriceRpPerKWh, type ChargingSite } from "../sim/publicCharging";
+import { useSimDay } from "../sim/store";
+import { formatCHF } from "./format";
+import { useStockBuildings } from "./useStock";
+import "./districtHeatPanel.css";
+import "./evChargingPanel.css";
+
+const YEAR_MS = 365.25 * 24 * 60 * 60_000;
+const QUARTER_HOUR_MS = 15 * 60_000;
+const HISTORY_YEARS = 8;
+
+const KIND_LABEL: Record<ChargingKind, string> = { ac: "On-street", dc: "Fast charging" };
+
+function percent(part: number, total: number): string {
+  return total > 0 ? `${Math.round((part / total) * 100)}%` : "–";
+}
+
+function formatMWh(kWh: number): string {
+  return kWh >= 10_000 ? `${Math.round(kWh / 1000)} MWh` : `${(kWh / 1000).toFixed(1)} MWh`;
+}
+
+function monthYear(simTimeMs: number): string {
+  return formatDate(simTimeMs).replace(/^\d+ /, "");
+}
+
+/** The simulated time to the quarter hour — live enough for "charging right now". */
+function useSimQuarterHour(): number {
+  return useSyncExternalStore(
+    (callback) => simClock.subscribe(callback),
+    () => Math.floor(simClock.getSimTimeMs() / QUARTER_HOUR_MS) * QUARTER_HOUR_MS,
+  );
+}
+
+function UsageBar({ used, capacity }: { used: number; capacity: number }) {
+  const share = capacity > 0 ? used / capacity : 0;
+  const level = share >= 1 ? " full" : share >= 0.7 ? " busy" : "";
+  return (
+    <div className="dh-bar">
+      <div className={`ev-bar-fill${level}`} style={{ width: `${Math.min(100, share * 100)}%` }} />
+    </div>
+  );
+}
+
+/** The cars relying on a site at each of the last New Years, against its room for them then. */
+function UsageHistory({ site, now }: { site: ChargingSite; now: number }) {
+  const year = new Date(toDateMs(now)).getUTCFullYear();
+  const columns = [];
+  for (let y = year - HISTORY_YEARS + 1; y <= year; y++) {
+    const at = y === year ? now : toSimTimeMs(Date.UTC(y + 1, 0, 1)) - 1;
+    if (at < 0 && y !== year) continue; // before the game started
+    columns.push({ year: y, users: publicCharging.usersAt(site.id, at), capacity: siteCapacityAt(site, at) });
+  }
+  const max = Math.max(1, ...columns.map((c) => Math.max(c.users, c.capacity)));
+  return (
+    <div className="ev-history">
+      {columns.map((c) => (
+        <div
+          className="ev-history-col"
+          key={c.year}
+          title={`${c.year === year ? "Now" : `End of ${c.year}`}: ${c.users} cars, room for ${c.capacity}`}
+        >
+          <div className="ev-history-plot">
+            <div className="ev-history-capacity" style={{ height: `${(c.capacity / max) * 100}%` }} />
+            <div className="ev-history-users" style={{ height: `${(c.users / max) * 100}%` }} />
+          </div>
+          <span className="ev-history-year">{String(c.year).slice(2)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
+  const stats = publicCharging.stats(site, now);
+  const building = now < site.openedAtMs;
+  const pending = site.expansions.filter((e) => e.atMs > now);
+  const owner = site.owner === "municipal" ? "The municipality" : site.id.startsWith("real-") ? "Private (in the federal register)" : "Private operator";
+  const inUse = building ? 0 : publicCharging.pointsInUseAt(site, now);
+
+  return (
+    <div className="ev-site">
+      <div className="ev-site-head">
+        <span className="ev-site-name">{site.name}</span>
+        <button className="ev-close" onClick={() => publicCharging.select(null)} title="Deselect">
+          ✕
+        </button>
+      </div>
+      <div className="info-row">
+        <span>Run by</span>
+        <span className="info-value">{owner}</span>
+      </div>
+      <div className="info-row">
+        <span>{KIND_LABEL[site.kind]}</span>
+        <span className="info-value">
+          {building ? site.points : stats.points} × {site.powerKw} kW
+        </span>
+      </div>
+      <div className="info-row">
+        <span>Price</span>
+        <span className="info-value">{sitePriceRpPerKWh(site)} Rp/kWh</span>
+      </div>
+      {building ? (
+        <p className="dh-note">Being built — opens {formatDate(site.openedAtMs)}.</p>
+      ) : (
+        <>
+          <div className="info-row" title={`Each charge point serves about ${CARS_PER_POINT[site.kind]} cars that rely on it. A full site takes no new ones.`}>
+            <span>Cars relying on it</span>
+            <span className="info-value">
+              {stats.users} / {stats.capacity} ({percent(stats.users, stats.capacity)})
+            </span>
+          </div>
+          <UsageBar used={stats.users} capacity={stats.capacity} />
+          <div className="info-row" style={{ marginTop: 6 }}>
+            <span>Charging right now</span>
+            <span className="info-value">
+              {inUse} of {stats.points} points
+            </span>
+          </div>
+          <div className="info-row">
+            <span>Energy per day</span>
+            <span className="info-value">{Math.round(stats.kWhPerDay)} kWh</span>
+          </div>
+          <div className="info-row">
+            <span>Last 12 months</span>
+            <span className="info-value">{formatMWh(stats.kWhLastYear)}</span>
+          </div>
+          {site.owner === "municipal" && (
+            <>
+              <div className="info-row">
+                <span>Sales, last 12 months</span>
+                <span className="info-value">{formatCHF(stats.revenueLastYearRp)}</span>
+              </div>
+              <div className="info-row">
+                <span>Upkeep per year</span>
+                <span className="info-value">{formatCHF(stats.upkeepPerYearRp)}</span>
+              </div>
+            </>
+          )}
+          <h4 className="ev-history-title">Cars relying on it, year by year</h4>
+          <UsageHistory site={site} now={now} />
+        </>
+      )}
+      {pending.map((e) => (
+        <p className="dh-note" key={e.atMs}>
+          The operator is adding {e.points} points — ready {monthYear(e.atMs)}.
+        </p>
+      ))}
+    </div>
+  );
+}
+
+/** The EV charging layer's own panel: how the town's households could charge an electric car,
+ * the public chargers' use, building new municipal ones, and the selected charger's own usage. */
+export function EvChargingPanel() {
+  const version = useSyncExternalStore(
+    (listener) => publicCharging.subscribe(listener),
+    () => publicCharging.getVersion(),
+  );
+  const simDay = useSimDay();
+  const now = useSimQuarterHour();
+  const buildings = useStockBuildings();
+  const placing = publicCharging.getPlacing();
+  const selectedId = publicCharging.getSelectedId();
+  const selected = selectedId ? publicCharging.getSite(selectedId) : undefined;
+
+  const town = useMemo(() => {
+    const standing = buildings.filter((b) => existsAt(b, simDay));
+    let households = 0;
+    const byAccess = { home: 0, public: 0, fastOnly: 0, full: 0, none: 0 };
+    for (const access of publicCharging.householdAccess(standing, simDay).values()) {
+      households += access.households;
+      byAccess.home += access.atHome;
+      byAccess[access.others] += access.households - access.atHome;
+    }
+    return { households, byAccess, usage: publicCharging.townUsage(simDay), unmet: publicCharging.unmetDemandCount(simDay - YEAR_MS, simDay) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buildings, simDay, version]);
+
+  const busiest = useMemo(
+    () =>
+      publicCharging
+        .getSites()
+        .filter((s) => siteCapacityAt(s, simDay) > 0)
+        .map((s) => ({ site: s, users: publicCharging.usersAt(s.id, simDay), capacity: siteCapacityAt(s, simDay) }))
+        .sort((a, b) => b.users / b.capacity - a.users / a.capacity || b.users - a.users)
+        .slice(0, 5),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [simDay, version],
+  );
+  const underConstruction = publicCharging.getSites().filter((s) => s.openedAtMs > simDay);
+
+  return (
+    <div className="district-heat-panel ev-charging-panel">
+      <h3 className="panel-title">EV charging</h3>
+
+      <div className="info-row">
+        <span>Public charging sites</span>
+        <span className="info-value">
+          {town.usage.sites} · {town.usage.points} points
+        </span>
+      </div>
+      <div className="info-row" title="Cars of households without home charging, each booked to the public charger it relies on">
+        <span>Cars charging publicly</span>
+        <span className="info-value">
+          {town.usage.users} / {town.usage.capacity}
+        </span>
+      </div>
+      <UsageBar used={town.usage.users} capacity={town.usage.capacity} />
+
+      <div className="ev-access" title="Of every household in the municipality, whether or not it has an electric car yet">
+        <div className="info-row">
+          <span>Households that can charge at home</span>
+          <span className="info-value">{percent(town.byAccess.home, town.households)}</span>
+        </div>
+        <div className="info-row">
+          <span>…else an on-street charger with room</span>
+          <span className="info-value">{percent(town.byAccess.public, town.households)}</span>
+        </div>
+        <div className="info-row">
+          <span>…only a fast-charging hub</span>
+          <span className="info-value">{percent(town.byAccess.fastOnly, town.households)}</span>
+        </div>
+        <div className="info-row">
+          <span>…only full chargers nearby</span>
+          <span className="info-value">{percent(town.byAccess.full, town.households)}</span>
+        </div>
+        <div className="info-row">
+          <span>…no charger nearby</span>
+          <span className="info-value">{percent(town.byAccess.none, town.households)}</span>
+        </div>
+      </div>
+      <div className="info-row" title="Households that would have bought an electric car in the last 12 months but had no public charger with room in reach. Private operators build where this gathers.">
+        <span>Wanted an EV, no charger (12 mo.)</span>
+        <span className="info-value">{town.unmet}</span>
+      </div>
+
+      {selected ? (
+        <SiteDetails site={selected} now={now} />
+      ) : (
+        <p className="dh-note">Click a charger on the map to see how it's used.</p>
+      )}
+
+      <h4 className="dh-subtitle">Build public chargers</h4>
+      {placing ? (
+        <>
+          <p className="dh-note">
+            Click on the map where the {BUILD_SPEC[placing].label.toLowerCase()} should go — they're placed at the nearest street. The blue circle shows
+            who they'd serve ({REACH_M[placing] >= 1000 ? `${REACH_M[placing] / 1000} km` : `${REACH_M[placing]} m`}).
+          </p>
+          <div className="dh-actions">
+            <button onClick={() => publicCharging.startPlacing(null)}>Cancel</button>
+          </div>
+        </>
+      ) : (
+        <div className="ev-build">
+          {(["ac", "dc"] as ChargingKind[]).map((kind) => {
+            const spec = BUILD_SPEC[kind];
+            return (
+              <button key={kind} onClick={() => publicCharging.startPlacing(kind)}>
+                <span className="ev-build-name">{spec.label}</span>
+                <span className="ev-build-detail">
+                  {spec.points} × {spec.powerKw} kW · {formatCHF(spec.costChf * 100)} · {spec.buildMonths} months
+                </span>
+              </button>
+            );
+          })}
+          <p className="dh-note">
+            The municipality's chargers sell at the prices set in the tariff, and their upkeep is paid from the treasury.
+          </p>
+        </div>
+      )}
+
+      {busiest.length > 0 && (
+        <>
+          <h4 className="dh-subtitle">Busiest chargers</h4>
+          {busiest.map(({ site, users, capacity }) => (
+            <button
+              key={site.id}
+              className={`ev-list-row${site.id === selectedId ? " selected" : ""}`}
+              onClick={() => publicCharging.select(site.id)}
+            >
+              <span className="ev-list-name">
+                {site.kind === "dc" ? "⚡ " : ""}
+                {site.name}
+              </span>
+              <span className="info-value">{percent(users, capacity)}</span>
+            </button>
+          ))}
+        </>
+      )}
+
+      {underConstruction.length > 0 && (
+        <>
+          <h4 className="dh-subtitle">Being built</h4>
+          {underConstruction.map((s) => (
+            <button key={s.id} className={`ev-list-row${s.id === selectedId ? " selected" : ""}`} onClick={() => publicCharging.select(s.id)}>
+              <span className="ev-list-name">{s.name}</span>
+              <span className="info-value">ready {monthYear(s.openedAtMs)}</span>
+            </button>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}

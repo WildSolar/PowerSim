@@ -20,6 +20,8 @@ import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { stock } from "../sim/stock";
 import { streets } from "../sim/streets";
 import { districtHeat } from "../sim/districtHeat";
+import { publicCharging } from "../sim/publicCharging";
+import { bookInitialPublicCharging } from "../sim/mobility";
 import { PAYOUT_CATEGORIES, treasury } from "../sim/treasury";
 import type { Difficulty } from "../config/difficulty";
 
@@ -44,6 +46,9 @@ export interface ScenarioRow {
   heating: Record<string, number>;
   heatPumpShare: number;
   carSlots: { evShare: number };
+  /** Public charging: open sites and points, cars relying on them against their room, sites private
+   * operators opened, and households that wanted an electric car last year but found no charger. */
+  charging: { sites: number; points: number; users: number; capacity: number; operatorSites: number; unmetLastYear: number };
   modeShare: Record<string, number>;
   energyClass: Record<string, number>;
   solarKwp: number;
@@ -96,6 +101,11 @@ function snapshot(dataset: MunicipalityDataset, year: number, atMs: number): Sce
     heating,
     heatPumpShare: Math.round((heatPumps / (buildings.length || 1)) * 1000) / 1000,
     carSlots: { evShare: Math.round((evSlots / (carSlots || 1)) * 1000) / 1000 },
+    charging: {
+      ...(({ sites, points, users, capacity }) => ({ sites, points, users, capacity }))(publicCharging.townUsage(atMs)),
+      operatorSites: publicCharging.getSites().filter((s) => s.id.startsWith("operator-")).length,
+      unmetLastYear: publicCharging.unmetDemandCount(atMs - 12 * MONTH_MS, atMs),
+    },
     modeShare: shares(modes),
     energyClass: classes,
     solarKwp: Math.round(solarKwp),
@@ -113,7 +123,10 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   if (spec.withApproval) approval.init(difficulty, `approval:${dataset.bfsNumber}`);
   streets.init(dataset);
   districtHeat.init(dataset);
+  publicCharging.init(dataset, 0);
+  publicCharging.setBuildingLookup((egid) => stock.lookup(egid));
   stock.init(dataset);
+  bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building
 
   const startYear = new Date(toDateMs(0)).getUTCFullYear();
   const lastYear = Math.max(...spec.reportYears);
@@ -137,6 +150,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     measures.advance(t);
     if (spec.withApproval) approval.advance(t);
     stock.advance(t);
+    publicCharging.advance(t);
     enactDue(year, t);
 
     const newYear = now.getUTCFullYear() !== previous.getUTCFullYear();

@@ -185,6 +185,18 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                     </div>
                   </>
                 )}
+                {finances.current.publicChargingRevenueRp > 0 && (
+                  <div className="renewal-tally-row">
+                    <span className="renewal-tally-label">Public charging sold (municipal chargers)</span>
+                    <span className="finance-value positive">+{formatCHF(finances.current.publicChargingRevenueRp)}</span>
+                  </div>
+                )}
+                {finances.current.publicChargingUpkeepRp > 0 && (
+                  <div className="renewal-tally-row">
+                    <span className="renewal-tally-label">Public charger upkeep</span>
+                    <span className="finance-value negative">−{formatCHF(finances.current.publicChargingUpkeepRp)}</span>
+                  </div>
+                )}
                 {finances.current.districtHeatUpkeepRp > 0 && (
                   <div className="renewal-tally-row">
                     <span className="renewal-tally-label">District heating network upkeep</span>
