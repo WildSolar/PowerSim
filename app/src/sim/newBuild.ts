@@ -7,7 +7,7 @@
  */
 
 import { baseUValueForYear } from "./spaceHeating";
-import { CODE_SOLAR_W_PER_M2_EBF, DISTRICT_HEATING_REACH_M, EBF_FRACTION_OF_GFA, HEATING_CHOICE_TEMPERATURE, NEW_BUILD_QUALITY_FACTOR_RANGE } from "../config/stock";
+import { CODE_SOLAR_W_PER_M2_EBF, EBF_FRACTION_OF_GFA, HEATING_CHOICE_TEMPERATURE, NEW_BUILD_QUALITY_FACTOR_RANGE } from "../config/stock";
 import type { Building } from "../data/types";
 import type { ConstructionRules } from "./constructionRules";
 import { buildingGroup } from "./buildingGroup";
@@ -17,7 +17,7 @@ import type { HeatingSystemId } from "./heatingSystems";
 import { registerNewBuildSolar } from "./solarAdoption";
 
 export { buildingGroup };
-export { CODE_SOLAR_W_PER_M2_EBF, DISTRICT_HEATING_REACH_M };
+export { CODE_SOLAR_W_PER_M2_EBF };
 
 export function gfaOf(building: Building): number {
   return (building.footprintAreaM2 ?? 0) * Math.max(1, building.floorCount ?? 2);
@@ -66,7 +66,8 @@ export interface AttributeContext {
   /** When the permit is decided — tariffs and rules are those of this moment. */
   permitAtMs: number;
   builtAtMs: number;
-  districtHeatingNearby: boolean;
+  /** Whether a street the building fronts on has district heating pipes (districtHeat.ts). */
+  districtHeatingOnStreet: boolean;
   /** Independent uniform(0,1) draws for this building's own random attributes. */
   draws: { quality: number; heating: number; solar: number };
 }
@@ -81,7 +82,7 @@ export function applyNewBuildAttributes(building: Building, ctx: AttributeContex
   const codeUValue = baseUValueForYear(building.constructionYear);
   building.uValueWPerM2K = codeUValue * (qMin + ctx.draws.quality * (qMax - qMin)) * ctx.rules.uValueFactor;
 
-  const isAvailable = (id: HeatingSystemId) => ctx.rules.allowedHeating.has(id) && (id !== "districtHeating" || ctx.districtHeatingNearby);
+  const isAvailable = (id: HeatingSystemId) => ctx.rules.allowedHeating.has(id) && (id !== "districtHeating" || ctx.districtHeatingOnStreet);
   const choice = chooseNewBuildHeating(building, ctx.permitAtMs, isAvailable, ctx.draws.heating, HEATING_CHOICE_TEMPERATURE);
   Object.assign(building, HEATING_STRINGS[choice.chosen]);
 
@@ -103,7 +104,7 @@ export function applyNewBuildAttributes(building: Building, ctx: AttributeContex
       greenness: c.greenness,
     })),
     biasStrengthRp: choice.biasStrengthRp,
-    extra: { districtHeatingNearby: ctx.districtHeatingNearby, uValueWPerM2K: building.uValueWPerM2K, floors: building.floorCount ?? 0, dwellings: building.dwellings.length },
+    extra: { districtHeatingOnStreet: ctx.districtHeatingOnStreet, uValueWPerM2K: building.uValueWPerM2K, floors: building.floorCount ?? 0, dwellings: building.dwellings.length },
   });
 
   registerNewBuildSolar(building, ctx.builtAtMs, ctx.rules, ctx.draws.solar);

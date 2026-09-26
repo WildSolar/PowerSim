@@ -34,6 +34,20 @@ class Building:
     hot_water_generator: str | None
     hot_water_energy_source: str | None
     dwellings: list[Dwelling] = field(default_factory=list)
+    street_segments: list[int] = field(default_factory=list)  # StreetSegment ids this building fronts on (see sources/streets.py)
+
+
+@dataclass
+class StreetSegment:
+    """A street from one junction to the next — the unit district heating pipes are laid in."""
+
+    id: int
+    name: str | None
+    highway: str  # OSM road class (primary, residential, ...)
+    a: int  # end node ids, shared by segments meeting at a junction
+    b: int
+    length_m: float
+    line: list[tuple[float, float]]  # WGS84 (lon, lat)
 
 
 @dataclass
@@ -57,3 +71,7 @@ class MunicipalityDataset:
     development_sites: list  # vacant buildable land — see sources/sites.py
     buildings: list[Building]
     power_plants: list[PowerPlant]
+    streets: list[StreetSegment] = field(default_factory=list)
+    # The inferred starting network: {source: {name, kind, lon, lat, node, feed_lon, feed_lat},
+    # initial_segments: [ids]}, or None without district heat — see sources/district_heat.py.
+    district_heat: dict | None = None

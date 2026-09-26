@@ -20,11 +20,14 @@ import unicodedata
 from pathlib import Path
 
 import pandas as pd
+from shapely.geometry import Polygon
 
 from . import coords
-from .schema import Building, Dwelling, MunicipalityDataset, PowerPlant
+from .schema import Building, Dwelling, MunicipalityDataset, PowerPlant, StreetSegment
 from .sources import footprints as footprints_source
 from .sources import boundary as boundary_source
+from .sources import district_heat as district_heat_source
+from .sources import streets as streets_source
 from .sources import exclusions as exclusions_source
 from .sources import gwr, powerplants, sites as sites_source, statent, stock_history
 
@@ -137,6 +140,32 @@ def build(bfs_number: int) -> MunicipalityDataset:
     )
     print(f"  {len(development_sites)} development sites")
 
+    print("Fetching the street network (OpenStreetMap)...")
+    boundary = boundary_source.fetch_boundary(bfs_number)
+    boundary_lv95 = [Polygon([coords.lonlat_to_lv95(lon, lat) for lon, lat in polygon[0]]) for polygon in boundary]
+    segments = streets_source.fetch_segments(boundary_lv95, min_lon, min_lat, max_lon, max_lat)
+    print(f"  {len(segments)} street segments, {sum(s.length_m for s in segments) / 1000:.1f} km")
+    entrances = gwr.fetch_entrances(bfs_number, egids)
+    positions = {
+        int(row[gwr.EGID_COL]): (float(row["E-Gebaeudekoordinate"]), float(row["N-Gebaeudekoordinate"])) for _, row in buildings_df.iterrows()
+    }
+    segments_by_egid = streets_source.link_buildings(segments, entrances, positions)
+    print(f"  {sum(1 for v in segments_by_egid.values() if v)} / {len(positions)} buildings linked to a street")
+
+    district_heated = buildings_df[
+        buildings_df["Energie-/Waermequelle_Heizung_primaer_Bezeichnung"].fillna("").str.startswith("Fernwärme")
+    ]
+    dh_egids = [int(e) for e in district_heated[gwr.EGID_COL]]
+    network = district_heat_source.infer_network(
+        bfs_number,
+        segments,
+        {sid for egid in dh_egids for sid in segments_by_egid.get(egid, [])},
+        [positions[e] for e in dh_egids],
+    )
+    if network:
+        piped_km = sum(segments[s].length_m for s in network["initial_segments"]) / 1000
+        print(f"  district heating: {len(dh_egids)} customers, {len(network['initial_segments'])} segments ({piped_km:.1f} km) piped, source: {network['source']['name']}")
+
     dwellings_by_egid: dict[int, list[Dwelling]] = {}
     for _, row in dwellings_df.iterrows():
         egid = int(row[gwr.EGID_COL])
@@ -173,6 +202,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
                 hot_water_generator=_clean_str(row.get("Waermeerzeuger_Warmwasser_primaer_Bezeichnung")),
                 hot_water_energy_source=_clean_str(row.get("Energie-/Waermequelle_Warmwasser_primaer_Bezeichnung")),
                 dwellings=dwellings_by_egid.get(egid, []),
+                street_segments=segments_by_egid.get(egid, []),
             )
         )
 
@@ -198,11 +228,24 @@ def build(bfs_number: int) -> MunicipalityDataset:
         bfs_number=bfs_number,
         name=municipality_name,
         employment_by_sector=statent.fetch_employment_by_sector(bfs_number),
-        boundary=boundary_source.fetch_boundary(bfs_number),
+        boundary=boundary,
         stock_history=stock_history.compute_stock_history(gwr.fetch_building_records(bfs_number)),
         development_sites=development_sites,
         buildings=buildings,
         power_plants=plants,
+        streets=[
+            StreetSegment(
+                id=s.id,
+                name=s.name,
+                highway=s.highway,
+                a=s.a,
+                b=s.b,
+                length_m=round(s.length_m, 1),
+                line=[tuple(round(v, 6) for v in coords.lv95_to_lonlat(x, y)) for x, y in s.lv95],
+            )
+            for s in segments
+        ],
+        district_heat=network,
     )
 
 

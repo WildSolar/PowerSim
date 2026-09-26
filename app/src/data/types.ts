@@ -26,6 +26,9 @@ export interface Building {
   hotWaterGenerator: string | null;
   hotWaterEnergySource: string | null;
   dwellings: Dwelling[];
+  /** The street segments (StreetSegment ids) this building fronts on, from its entrances. Absent
+   * in datasets built before streets were added. */
+  streetSegments?: number[];
 
   // Lifecycle, set at runtime by sim/stock.ts (never by the pipeline). All absent on a
   // building that simply existed when the game started.
@@ -88,4 +91,37 @@ export interface MunicipalityDataset {
   developmentSites?: DevelopmentSite[];
   buildings: Building[];
   powerPlants: PowerPlant[];
+  /** The street network, junction to junction — see pipeline/sources/streets.py. */
+  streets?: StreetSegment[];
+  /** The district heating network the game starts with, inferred — see pipeline/sources/district_heat.py. */
+  districtHeat?: DistrictHeatData | null;
+}
+
+/** A street from one junction to the next — the unit district heating pipes are laid in. */
+export interface StreetSegment {
+  id: number;
+  name: string | null;
+  highway: string; // OSM road class
+  a: number; // end node ids, shared by segments meeting at a junction
+  b: number;
+  lengthM: number;
+  line: [number, number][]; // [lon, lat]
+}
+
+export interface DistrictHeatSourceData {
+  name: string;
+  /** "plant": inside the municipality; "import": a trunk line from a plant in a neighbouring one;
+   * "unknown": the pipeline had to guess where the heat comes from. */
+  kind: "plant" | "import" | "unknown";
+  lon: number;
+  lat: number;
+  /** The street junction where the network is fed. */
+  node: number;
+  feedLon: number;
+  feedLat: number;
+}
+
+export interface DistrictHeatData {
+  source: DistrictHeatSourceData;
+  initialSegments: number[];
 }

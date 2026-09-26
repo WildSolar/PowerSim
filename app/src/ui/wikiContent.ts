@@ -154,7 +154,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Growth: new buildings appear at random on vacant building land (zoned for building and still open ground — parks, sports fields, playgrounds, allotments and cemeteries are kept free, as are clearances around roads, rail, forest and water). Each is sized and turned like the buildings around it, apart from the occasional small plot filled with something smaller. The pace is steered toward the municipality's historic growth in floor space. When the vacant land runs out, growth has to come from replacing old buildings with denser ones, so the pace slows.",
       ),
       list([
-        "A new or replacement building is mostly heat pumps (fossil heating is not permitted in new buildings by default); district heating only where a network already runs nearby",
+        "A new or replacement building is mostly heat pumps (fossil heating is not permitted in new buildings by default); district heating only if a pipe runs in its street",
         "It is insulated to today's standard, and carries at least the rooftop solar the building code requires — often the whole roof",
         "Each project takes months to permit and one to two years to build. In between, the site shows as an amber construction site and draws no power",
         "The Age layer shows every building by construction era, with buildings built during the game in green",
@@ -277,7 +277,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Every heating system has a service lifetime, and — like real equipment — it doesn't fail on a fixed schedule: each building's current system has a randomly-drawn lifetime centered on a realistic average for its type (roughly 18-22 years), so some buildings renew within the first few years and others not for decades.",
       ),
       p(
-        "When a system reaches the end of its life, the replacement is decided by the same four things a real building owner would weigh: what's actually available (a building not already on district heating can't just connect to a network that doesn't reach it — a stand-in until real network data exists), which option is cheapest over its own lifetime at today's prices (install cost minus any subsidy, plus running cost), how carefully that comparison is even worth doing (a single house won't chase a marginally cheaper option the way a large apartment block's management might), and a hidden owner-level leaning that nudges a close call toward or away from renewable options.",
+        "When a system reaches the end of its life, the replacement is decided by the same four things a real building owner would weigh: what's actually available (district heating only if a pipe runs in the building's street — see \"District heating network\"), which option is cheapest over its own lifetime at today's prices (install cost minus any subsidy, plus running cost), how carefully that comparison is even worth doing (a single house won't chase a marginally cheaper option the way a large apartment block's management might), and a hidden owner-level leaning that nudges a close call toward or away from renewable options.",
       ),
       p(
         "Every renewal shows up as a \"Heating history\" entry on the building's panel, in plain language — what reached the end of its life, what replaced it, and why (including when the obvious choice wasn't available). Only renewals that have actually happened in the game's timeline appear; nothing about the future is revealed in advance.",
@@ -287,6 +287,34 @@ export const WIKI_SECTIONS: WikiSection[] = [
       ),
       note(
         "Heating and mobility (see \"Mobility\") both renew this way now — mobility's mode tier (car/bike/other) uses a simpler weighted-random choice instead of the four-factor one, since a life event changes what a household needs, not what's cheapest; its nested vehicle-type tier (EV vs. ICE, e-bike vs. standard) uses the identical four-factor process heating does. Solar (see \"Solar adoption\") reuses the same four-factor choice for its own if-to-install decision, but — since a building either has it or doesn't, not choosing between several system types — is triggered differently: an annual chance to reconsider, rather than a fixed service lifetime.",
+      ),
+    ],
+  },
+  {
+    id: "district-heat",
+    icon: "🏭",
+    title: "District heating network",
+    blocks: [
+      p(
+        "District heat reaches a building through pipes under its street, so a building can only switch to district heating if a street it fronts on is piped. It still has to want to: owners connect when their heating system is next replaced, if district heat comes out as the better deal (see \"Stock renewal\"), and new buildings the same way when they are permitted. A building already connected stays connected.",
+      ),
+      p(
+        "Every network needs a heat source. In Schlieren it is the Limeco waste-to-energy plant in neighbouring Dietikon, whose heat arrives by trunk line and enters the network at the town's western edge. The municipal utility sells the heat at the district heating price (Control → Prices) and buys it from the source, and it pays for the pipes' upkeep, so a network full of customers earns money and a long pipe past few buildings costs it.",
+      ),
+      p(
+        "To extend the network, switch the map to the District heat layer and click streets: each click picks one stretch of street between two junctions (click again to drop it). An extension must connect to the network — directly, or through the other streets picked with it. The panel shows its length, cost, build time, and how much heat the buildings it would newly reach use in a year, and per metre of pipe: the figure planners judge an extension by. Ordering it pays the full cost from the treasury at once; the pipes are laid over the following months (a few months of planning, then progress along the street) and buildings along them can connect from the day they're done.",
+      ),
+      p(
+        "The panel also compares the network's load on a cold winter day (every connected building's heat demand) with what the source can deliver.",
+      ),
+      note(
+        "Where the pipes run today isn't public, so the starting network is a reconstruction: every street a district-heated building (according to the building register) fronts on, joined to the source along the shortest streets. It is plausible, not exact.",
+      ),
+      note(
+        "The source's capacity isn't known either — it is set half again above the load at the start of play — and it is only shown, not enforced yet: the network can grow past it. Building a heat source of your own, for a town without a network, isn't possible yet.",
+      ),
+      note(
+        "The costs (CHF 2,000 per metre of street, half again more on main roads; the heat bought at 7 Rp/kWh; CHF 10 per metre a year in upkeep) are placeholders, not researched figures. Connecting a building is part of its own heating installation cost, paid by the owner.",
       ),
     ],
   },
@@ -395,10 +423,10 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Money leaves the treasury only when a decision actually happens: the day a household installs a subsidised heat pump, buys a subsidised electric car, upgrades its insulation, or puts up solar panels, the municipal top-up is paid out. A grant nobody takes up costs nothing — but a grant also goes to everyone who would have decided the same way anyway, and finding the level that tips the undecided without overpaying the rest is the whole game of subsidy planning. The grants are set in Control → Measures.",
       ),
       p(
-        "Each completed year, the balance moves by: what consumers paid for grid electricity, plus the government allocation, minus the solar fed in, the wholesale cost of the net electricity bought in, grid maintenance, and every subsidy paid out that year. The utility costs are set in Control → Prices, under \"Municipal utility costs\".",
+        "Each completed year, the balance moves by: what consumers paid for grid electricity and district heat, plus the government allocation, minus the solar fed in, the wholesale cost of the net electricity bought in, grid maintenance, the heat bought from the district heating source, the upkeep of the pipes, and every subsidy paid out that year. Extending the district heating network is paid the day it is ordered. The utility costs are set in Control → Prices, under \"Municipal utility costs\".",
       ),
       note(
-        "Deliberately electricity only for the utility side — heating fuel and petrol/diesel are paid straight to an external supplier, never through the municipal utility. Federal and cantonal grants (the baseline every heat pump, EV and solar installation already gets) are not municipal money; only the municipality's own top-up is.",
+        "The utility side covers electricity and district heating only — gas, oil and petrol/diesel are paid straight to an external supplier, never through the municipal utility. Federal and cantonal grants (the baseline every heat pump, EV and solar installation already gets) are not municipal money; only the municipality's own top-up is.",
       ),
       note("The government allocation and the starting cash are placeholders while the money model is still being designed. The utility's margin (a few million a year at the default prices) is small next to a serious subsidy programme, so choices about what to fund matter."),
     ],
@@ -414,6 +442,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Building type — colored by GWR's coarse residential/non-residential category.",
         "Heating — colored by primary heating system, live: a stock-renewal replacement (see \"Stock renewal\") recolors the building within a few seconds, not just at the moment you happen to look at its panel.",
         "Power draw — colored by live net power right now, on a diverging scale from exporting (solar surplus) to importing; recalculates every 1.5 real seconds.",
+        "District heat — which buildings are connected to the district heating network, which could be (a pipe runs in their street), and which are out of reach, with the piped streets, extensions being built and the heat source drawn in. This is also where the network is extended — see \"District heating network\".",
         "Solar — colored by installed solar capacity, from none to the municipality's largest installation; live, the same way Heating is — a new adoption (see \"Solar adoption\") recolors the building within a few seconds.",
       ]),
     ],

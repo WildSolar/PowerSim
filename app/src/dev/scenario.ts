@@ -18,6 +18,8 @@ import { currentMobilityMode, currentVehicleType, mobilitySlotCount } from "../s
 import { energyClassAt } from "../sim/retrofit";
 import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { stock } from "../sim/stock";
+import { streets } from "../sim/streets";
+import { districtHeat } from "../sim/districtHeat";
 import { PAYOUT_CATEGORIES, treasury } from "../sim/treasury";
 import type { Difficulty } from "../config/difficulty";
 
@@ -109,6 +111,8 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   const difficulty = spec.difficulty ?? "normal";
   measures.init(difficulty);
   if (spec.withApproval) approval.init(difficulty, `approval:${dataset.bfsNumber}`);
+  streets.init(dataset);
+  districtHeat.init(dataset);
   stock.init(dataset);
 
   const startYear = new Date(toDateMs(0)).getUTCFullYear();

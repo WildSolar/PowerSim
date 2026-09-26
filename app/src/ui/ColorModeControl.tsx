@@ -1,10 +1,25 @@
-import { AGE_LEGEND, CATEGORY_LEGEND, CONSTRUCTION_COLOR, HEATING_LEGEND, INSULATION_LEGEND, POWER_RAMP, EXPORT_RAMP, SOLAR_RAMP, type ColorMode } from "../map/colorModes";
+import {
+  AGE_LEGEND,
+  CATEGORY_LEGEND,
+  CONSTRUCTION_COLOR,
+  DISTRICT_HEAT_LEGEND,
+  HEATING_LEGEND,
+  INSULATION_LEGEND,
+  PIPE_COLOR,
+  PIPE_PLANNED_COLOR,
+  PIPE_UNDER_CONSTRUCTION_COLOR,
+  POWER_RAMP,
+  EXPORT_RAMP,
+  SOLAR_RAMP,
+  type ColorMode,
+} from "../map/colorModes";
 import "./colorModeControl.css";
 
 const MODES: { key: ColorMode; label: string }[] = [
   { key: "none", label: "Default" },
   { key: "category", label: "Building type" },
   { key: "heating", label: "Heating" },
+  { key: "districtHeat", label: "District heat" },
   { key: "power", label: "Power draw" },
   { key: "solar", label: "Solar" },
   { key: "age", label: "Age" },
@@ -20,7 +35,14 @@ export interface ColorModeControlProps {
 }
 
 export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
-  const legend = mode === "category" ? CATEGORY_LEGEND : mode === "heating" ? HEATING_LEGEND : mode === "age" ? AGE_LEGEND : mode === "insulation" ? INSULATION_LEGEND : null;
+  const legends: Partial<Record<ColorMode, typeof CATEGORY_LEGEND>> = {
+    category: CATEGORY_LEGEND,
+    heating: HEATING_LEGEND,
+    districtHeat: DISTRICT_HEAT_LEGEND,
+    age: AGE_LEGEND,
+    insulation: INSULATION_LEGEND,
+  };
+  const legend = legends[mode] ?? null;
 
   return (
     <div className="color-mode-control">
@@ -38,6 +60,20 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
             <div className="legend-row" key={entry.bucket}>
               <span className="swatch" style={{ background: entry.color }} />
               <span>{entry.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {mode === "districtHeat" && (
+        <div className="legend" style={{ marginTop: 6 }}>
+          {[
+            { label: "Piped street", color: PIPE_COLOR },
+            { label: "Pipes being laid", color: PIPE_UNDER_CONSTRUCTION_COLOR },
+            { label: "Planned extension", color: PIPE_PLANNED_COLOR },
+          ].map((line) => (
+            <div className="legend-row" key={line.label}>
+              <span className="swatch line-swatch" style={{ background: line.color }} />
+              <span>{line.label}</span>
             </div>
           ))}
         </div>

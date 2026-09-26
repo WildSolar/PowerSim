@@ -4,6 +4,7 @@ import { BuildingPanel } from "./ui/BuildingPanel";
 import { ControlPanel } from "./ui/ControlPanel";
 import { DwellingPanel } from "./ui/DwellingPanel";
 import { ColorModeControl } from "./ui/ColorModeControl";
+import { DistrictHeatPanel } from "./ui/DistrictHeatPanel";
 import { ReportCardModal } from "./ui/ReportCardModal";
 import { TimeControl } from "./ui/TimeControl";
 import { ApprovalPanel } from "./ui/ApprovalPanel";
@@ -20,6 +21,8 @@ import { useReportCardYear } from "./sim/store";
 import { useTimeKeyboard } from "./ui/useTimeKeyboard";
 import { useStockBuildings } from "./ui/useStock";
 import { stock } from "./sim/stock";
+import { streets } from "./sim/streets";
+import { districtHeat } from "./sim/districtHeat";
 import { policyStore } from "./sim/policy";
 import { approval } from "./sim/approval";
 import { measures } from "./sim/measures";
@@ -72,6 +75,8 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
       .then((loaded) => {
         measures.init(difficulty); // before the stock: it registers the town size the measures' costs scale with
         approval.init(difficulty, `approval:${loaded.bfsNumber}`);
+        streets.init(loaded); // before the stock: new buildings are linked to their street, and to the district heating network
+        districtHeat.init(loaded);
         stock.init(loaded);
         setDataset(loaded);
       })
@@ -119,6 +124,7 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
         <ApprovalPanel />
         <ColorModeControl mode={colorMode} onChange={setColorMode} />
       </div>
+      {colorMode === "districtHeat" && <DistrictHeatPanel />}
       <div className="bottom-left-stack">
         <button className="pill-button" onClick={() => setShowControl(true)}>
           ⚙️ {dataset.name} Control

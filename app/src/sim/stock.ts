@@ -34,7 +34,6 @@ import {
   CONSTRUCTION_MONTHS_BASE,
   CONSTRUCTION_MONTHS_PER_1000_M2_GFA,
   CONSTRUCTION_MONTHS_RANGE,
-  DISTRICT_HEATING_REACH_M,
   FALLBACK_BUILDING_AGE_YEARS,
   GFA_PER_APARTMENT_FALLBACK_M2,
   GROWTH_CORRECTION_MAX,
@@ -75,6 +74,8 @@ import { toDateMs } from "./calendar";
 import { constructionRules, type ConstructionRules } from "./constructionRules";
 import { simClock } from "./engine";
 import { currentHeatingSystemId } from "./heatingRenewal";
+import { districtHeat } from "./districtHeat";
+import { streets } from "./streets";
 import { existsAt } from "./lifetime";
 import {
   boundingRectSides,
@@ -701,12 +702,13 @@ class StockStore {
       hotWaterGenerator: null,
       hotWaterEnergySource: null,
       dwellings: this.sampleDwellings(dwellingCount, rng, areaScale),
+      streetSegments: old.streetSegments,
       origin: "renewal",
       constructionStartMs: startMs,
       builtAtMs,
       replacesEgids: [old.egid],
     };
-    this.finishBuilding(building, atMs, builtAtMs, rules, this.centroidXY.get(old.egid) as XY, rng);
+    this.finishBuilding(building, atMs, builtAtMs, rules, rng);
     // The replacement stands on the old footprint: same outline, same neighbours.
     this.ringXY.set(building.egid, this.ringXY.get(old.egid) as XY[]);
     return building;
@@ -819,12 +821,13 @@ class StockStore {
       else if (group === "houseSingle") dwellingCount = rng() < 0.15 ? 2 : 1;
 
       const { startMs, builtAtMs } = this.constructionTimeline(atMs, gfa, rng);
+      const address = this.newAddress(rect.cx, rect.cy);
       const building: Building = {
         egid: this.newEgid(),
         lon,
         lat,
         footprint: ring,
-        address: this.newAddress(rect.cx, rect.cy),
+        address,
         constructionYear: yearOf(builtAtMs),
         category: template.category,
         buildingClass: template.buildingClass,
@@ -836,11 +839,12 @@ class StockStore {
         hotWaterGenerator: null,
         hotWaterEnergySource: null,
         dwellings: this.sampleDwellings(dwellingCount, rng, 1),
+        streetSegments: streets.segmentsFor(lon, lat, address),
         origin: "new",
         constructionStartMs: startMs,
         builtAtMs,
       };
-      this.finishBuilding(building, atMs, builtAtMs, rules, [rect.cx, rect.cy], rng);
+      this.finishBuilding(building, atMs, builtAtMs, rules, rng);
       this.ringXY.set(building.egid, rectCorners(rect));
       this.register(building, atMs);
       this.gfaTotal += gfa;
@@ -998,14 +1002,6 @@ class StockStore {
     return Math.max(HEIGHT_CAP_MIN_FLOORS, maxFloors + HEIGHT_CAP_EXTRA_FLOORS);
   }
 
-  private districtHeatingNearby(x: number, y: number, atMs: number): boolean {
-    for (const id of this.grid.query(x, y, DISTRICT_HEATING_REACH_M)) {
-      const b = this.byEgid.get(id);
-      if (b && existsAt(b, atMs) && currentHeatingSystemId(b, atMs) === "districtHeating") return true;
-    }
-    return false;
-  }
-
   private sampleDwellings(count: number, rng: () => number, areaScale: number): Dwelling[] {
     const dwellings: Dwelling[] = [];
     for (let i = 0; i < count; i++) {
@@ -1032,12 +1028,12 @@ class StockStore {
   }
 
   /** The attributes decided at permit time: heating, insulation, solar. */
-  private finishBuilding(b: Building, permitAtMs: number, builtAtMs: number, rules: ConstructionRules, at: XY, rng: () => number): void {
+  private finishBuilding(b: Building, permitAtMs: number, builtAtMs: number, rules: ConstructionRules, rng: () => number): void {
     applyNewBuildAttributes(b, {
       rules,
       permitAtMs,
       builtAtMs,
-      districtHeatingNearby: this.districtHeatingNearby(at[0], at[1], permitAtMs),
+      districtHeatingOnStreet: districtHeat.servesAt(b.streetSegments, permitAtMs),
       draws: { quality: rng(), heating: rng(), solar: rng() },
     });
   }

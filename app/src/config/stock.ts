@@ -69,7 +69,6 @@ export const NEW_BUILD_QUALITY_FACTOR_RANGE: [number, number] = [0.9, 1.05]; // 
 export const CODE_SOLAR_W_PER_M2_EBF = 10; // building-code minimum own PV generation
 export const NEW_BUILD_VOLUNTARY_SOLAR_SHARE = 0.55; // chance of a full-roof array beyond the code minimum
 export const HEATING_CHOICE_TEMPERATURE = 0.3; // softmax width, as a fraction of the cheapest system's annual cost
-export const DISTRICT_HEATING_REACH_M = 70; // a new building can only join district heat within this of an existing customer
 export const GFA_PER_APARTMENT_FALLBACK_M2 = 110;
 
 /** Which building groups a new building on a site of each zone can be, with weights. */

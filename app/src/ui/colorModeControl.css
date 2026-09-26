@@ -60,6 +60,11 @@
   flex-shrink: 0;
 }
 
+.swatch.line-swatch {
+  height: 4px;
+  border-radius: 2px;
+}
+
 .power-gradient {
   height: 10px;
   border-radius: 5px;

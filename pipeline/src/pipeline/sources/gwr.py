@@ -180,6 +180,21 @@ def fetch_dwellings(bfs_number: int, egids: set[int]) -> pd.DataFrame:
     return df[df[EGID_COL].isin(egids)].copy()
 
 
+def fetch_entrances(bfs_number: int, egids: set[int]) -> dict[int, list[tuple[str, float, float]]]:
+    """Every entrance of every building in the given set, as (street name, E, N) in
+    LV95 — a corner building addressed from two streets has an entrance on each.
+    Entrances without a street name or coordinates are skipped."""
+    zf = _download_zip(bfs_number)
+    raw = _read_csv(zf, ENTRANCES_CSV)
+    df = raw[raw["EGID"].isin(egids)]
+    entrances: dict[int, list[tuple[str, float, float]]] = {}
+    for _, row in df.iterrows():
+        if pd.isna(row["STRNAME"]) or pd.isna(row["DKODE"]) or pd.isna(row["DKODN"]):
+            continue
+        entrances.setdefault(int(row["EGID"]), []).append((str(row["STRNAME"]), float(row["DKODE"]), float(row["DKODN"])))
+    return entrances
+
+
 def fetch_addresses(bfs_number: int, egids: set[int]) -> dict[int, str]:
     """One street-and-house-number address per EGID in the given set, built from
     GWR's building-entrance records (a building can have more than one entrance,

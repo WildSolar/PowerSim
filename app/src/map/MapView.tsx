@@ -1,11 +1,5 @@
 import { useEffect, useRef } from "react";
-import {
-  Map as MlMap,
-  NavigationControl,
-  type GeoJSONSource,
-  type MapGeoJSONFeature,
-  type MapMouseEvent,
-} from "maplibre-gl";
+import { Map as MlMap, Marker, NavigationControl, type GeoJSONSource, type MapMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
 import { buildingHeightM } from "../sim/buildingGeometry";
@@ -18,6 +12,9 @@ import { addBoundaryLine, addBoundaryMask } from "./boundaryLayers";
 import { useMapKeyboard } from "./useMapKeyboard";
 import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { snowDepthCm } from "../sim/snow";
+import { districtHeat } from "../sim/districtHeat";
+import { networkStatusAt } from "../sim/districtHeatStats";
+import { streets } from "../sim/streets";
 import {
   AGE_LEGEND,
   buildingAgeBucket,
@@ -26,7 +23,12 @@ import {
   buildingHeatingBucketAt,
   INSULATION_LEGEND,
   CATEGORY_LEGEND,
+  DISTRICT_HEAT_LEGEND,
   HEATING_LEGEND,
+  PIPE_COLOR,
+  PIPE_PLANNED_COLOR,
+  PIPE_UNDER_CONSTRUCTION_COLOR,
+  STREET_UNPIPED_COLOR,
   legendMatchExpression,
   powerColorExpression,
   solarColorExpression,
@@ -46,6 +48,16 @@ const SELECTED_COLOR = "#f97316";
 const POWER_TICK_MS = 1500;
 const HEATING_TICK_MS = 5000; // renewals are years apart in simulated time — no need for power's snappy cadence
 const SOLAR_TICK_MS = 5000; // new adoptions are decided at most once/year per building — same cadence as heating
+const DISTRICT_HEAT_TICK_MS = 3000; // extensions finishing, buildings connecting
+
+const STREET_SOURCE_ID = "streets";
+const STREET_LINE_LAYER_ID = "streets-line";
+const STREET_CONSTRUCTION_LAYER_ID = "streets-construction";
+const STREET_HIT_LAYER_ID = "streets-hit"; // wide and invisible: what a click on a street is tested against
+const DH_SOURCE_SOURCE_ID = "district-heat-source";
+const DH_TRUNK_LAYER_ID = "district-heat-trunk";
+const DH_PLANT_LAYER_ID = "district-heat-plant";
+const STREET_CLICK_TOLERANCE_PX = 6;
 
 type BuildingProperties = {
   egid: string;
@@ -54,6 +66,7 @@ type BuildingProperties = {
   energyClass: string;
   constructing: number;
   heating: string;
+  network: string; // districtHeatStats.ts's NetworkStatus
   powerW: number;
   solarCapacityKw: number;
   heightM?: number;
@@ -110,6 +123,7 @@ function buildingsToGeoJSON(
     energyClass: energyClassAt(b, simTimeMs),
     constructing: underConstructionAt(b, simTimeMs) ? 1 : 0,
     heating: buildingHeatingBucketAt(b, simTimeMs),
+    network: networkStatusAt(b, simTimeMs),
     powerW: previousPowerW?.get(b.egid) ?? 0,
     solarCapacityKw: solarByEgid.get(b.egid) ?? 0,
   });
@@ -140,6 +154,44 @@ function buildingsToGeoJSON(
     polygons: { type: "FeatureCollection", features: polygonFeatures },
     points: { type: "FeatureCollection", features: pointFeatures },
   };
+}
+
+/** Every street segment, by where it stands in the district heating network — piped, being
+ * built, picked for the next extension, or without pipes. */
+function streetsToGeoJSON(simTimeMs: number) {
+  const selection = districtHeat.getSelection();
+  return {
+    type: "FeatureCollection" as const,
+    features: streets.all().map((s) => ({
+      type: "Feature" as const,
+      properties: { id: s.id, state: selection.has(s.id) ? "planned" : districtHeat.stateAt(s.id, simTimeMs) },
+      geometry: { type: "LineString" as const, coordinates: s.line },
+    })),
+  };
+}
+
+/** The heat source: where the plant is and, for heat arriving from a neighbouring municipality,
+ * the trunk line from it to where the network is fed. */
+function districtHeatSourceGeoJSON() {
+  const source = districtHeat.getSource();
+  const features: object[] = [];
+  if (source) {
+    features.push({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [source.lon, source.lat] } });
+    if (source.kind === "import") {
+      features.push({
+        type: "Feature",
+        properties: {},
+        geometry: {
+          type: "LineString",
+          coordinates: [
+            [source.lon, source.lat],
+            [source.feedLon, source.feedLat],
+          ],
+        },
+      });
+    }
+  }
+  return { type: "FeatureCollection" as const, features };
 }
 
 /** Hides the basemap's own building layers so only our extruded volumes show —
@@ -182,20 +234,17 @@ interface ColorScales {
 }
 
 function colorExpression(mode: ColorMode, selectedEgid: string | null, scales: ColorScales): MapExpr {
-  const base =
-    mode === "category"
-      ? legendMatchExpression("category", CATEGORY_LEGEND)
-      : mode === "heating"
-        ? legendMatchExpression("heating", HEATING_LEGEND)
-        : mode === "age"
-          ? legendMatchExpression("age", AGE_LEGEND)
-          : mode === "insulation"
-          ? legendMatchExpression("energyClass", INSULATION_LEGEND)
-          : mode === "power"
-            ? powerColorExpression(scales.powerMinW, scales.powerMaxW)
-            : mode === "solar"
-              ? solarColorExpression(scales.maxSolarCapacityKw)
-              : DEFAULT_COLOR;
+  const byMode: Record<ColorMode, () => MapExpr | string> = {
+    none: () => DEFAULT_COLOR,
+    category: () => legendMatchExpression("category", CATEGORY_LEGEND),
+    heating: () => legendMatchExpression("heating", HEATING_LEGEND),
+    districtHeat: () => legendMatchExpression("network", DISTRICT_HEAT_LEGEND),
+    age: () => legendMatchExpression("age", AGE_LEGEND),
+    insulation: () => legendMatchExpression("energyClass", INSULATION_LEGEND),
+    power: () => powerColorExpression(scales.powerMinW, scales.powerMaxW),
+    solar: () => solarColorExpression(scales.maxSolarCapacityKw),
+  };
+  const base = byMode[mode]();
   return [
     "case",
     ["==", ["get", "egid"], selectedEgid ?? "__none__"],
@@ -236,6 +285,8 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
   onSelectBuildingRef.current = onSelectBuilding;
   const selectedEgidRef = useRef(selectedEgid);
   selectedEgidRef.current = selectedEgid;
+  const colorModeRef = useRef(colorMode);
+  colorModeRef.current = colorMode;
   const polygonsRef = useRef<BuildingFeatureCollection | null>(null);
   const pointsRef = useRef<BuildingFeatureCollection | null>(null);
   const lastPowerMinWRef = useRef(0);
@@ -279,6 +330,58 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       hideBasemapLabels(map);
 
       if (dataset.boundary) addBoundaryMask(map, dataset.boundary);
+
+      // District heating: streets and the heat source, under the buildings, shown only in that layer.
+      const dhVisibility = colorModeRef.current === "districtHeat" ? "visible" : "none";
+      map.addSource(STREET_SOURCE_ID, {
+        type: "geojson",
+        data: streetsToGeoJSON(simClock.getSimTimeMs()),
+        attribution: "Streets © OpenStreetMap contributors (ODbL)",
+      });
+      map.addLayer({
+        id: STREET_LINE_LAYER_ID,
+        type: "line",
+        source: STREET_SOURCE_ID,
+        filter: ["!=", ["get", "state"], "construction"],
+        layout: { visibility: dhVisibility, "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": ["match", ["get", "state"], "piped", PIPE_COLOR, "planned", PIPE_PLANNED_COLOR, STREET_UNPIPED_COLOR],
+          "line-width": ["match", ["get", "state"], "piped", 5, "planned", 6, 2],
+        },
+      });
+      map.addLayer({
+        id: STREET_CONSTRUCTION_LAYER_ID,
+        type: "line",
+        source: STREET_SOURCE_ID,
+        filter: ["==", ["get", "state"], "construction"],
+        layout: { visibility: dhVisibility, "line-join": "round" },
+        paint: { "line-color": PIPE_UNDER_CONSTRUCTION_COLOR, "line-width": 5, "line-dasharray": [1.5, 1] },
+      });
+      map.addLayer({
+        id: STREET_HIT_LAYER_ID,
+        type: "line",
+        source: STREET_SOURCE_ID,
+        layout: { visibility: dhVisibility },
+        paint: { "line-color": "#000", "line-width": 16, "line-opacity": 0 },
+      });
+      map.addSource(DH_SOURCE_SOURCE_ID, { type: "geojson", data: districtHeatSourceGeoJSON() as never });
+      map.addLayer({
+        id: DH_TRUNK_LAYER_ID,
+        type: "line",
+        source: DH_SOURCE_SOURCE_ID,
+        filter: ["==", ["geometry-type"], "LineString"],
+        layout: { visibility: dhVisibility },
+        paint: { "line-color": PIPE_COLOR, "line-width": 4, "line-dasharray": [2, 1.5], "line-opacity": 0.8 },
+      });
+      map.addLayer({
+        id: DH_PLANT_LAYER_ID,
+        type: "circle",
+        source: DH_SOURCE_SOURCE_ID,
+        filter: ["==", ["geometry-type"], "Point"],
+        layout: { visibility: dhVisibility },
+        paint: { "circle-radius": 9, "circle-color": PIPE_COLOR, "circle-stroke-color": "#fff", "circle-stroke-width": 2 },
+      });
+
       map.addSource(POLY_SOURCE_ID, { type: "geojson", data: geojson.polygons });
       map.addLayer({
         id: POLY_LAYER_ID,
@@ -311,14 +414,30 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
 
       if (dataset.boundary) addBoundaryLine(map, dataset.boundary);
 
-      const handleClick = (e: MapMouseEvent & { features?: MapGeoJSONFeature[] }) => {
-        const feature = e.features?.[0];
-        const egid = feature?.properties?.egid as string | undefined;
+      // One handler for every click: in the district heating layer a street takes precedence (that
+      // layer is where extensions are planned), otherwise whichever building is under the cursor.
+      map.on("click", (e: MapMouseEvent) => {
+        if (colorModeRef.current === "districtHeat") {
+          const { x, y } = e.point;
+          const r = STREET_CLICK_TOLERANCE_PX;
+          const hit = map.queryRenderedFeatures(
+            [
+              [x - r, y - r],
+              [x + r, y + r],
+            ],
+            { layers: [STREET_HIT_LAYER_ID] },
+          )[0];
+          if (hit) {
+            districtHeat.toggle(Number(hit.properties?.id));
+            return;
+          }
+        }
+        const building = map.queryRenderedFeatures(e.point, { layers: [POLY_LAYER_ID, POINT_LAYER_ID] })[0];
+        const egid = building?.properties?.egid as string | undefined;
         if (egid) onSelectBuildingRef.current(egid);
-      };
-
-      map.on("click", POLY_LAYER_ID, handleClick);
-      map.on("click", POINT_LAYER_ID, handleClick);
+      });
+      map.on("mouseenter", STREET_HIT_LAYER_ID, () => (map.getCanvas().style.cursor = "pointer"));
+      map.on("mouseleave", STREET_HIT_LAYER_ID, () => (map.getCanvas().style.cursor = ""));
       map.on("mouseenter", POLY_LAYER_ID, () => (map.getCanvas().style.cursor = "pointer"));
       map.on("mouseleave", POLY_LAYER_ID, () => (map.getCanvas().style.cursor = ""));
       map.on("mouseenter", POINT_LAYER_ID, () => (map.getCanvas().style.cursor = "pointer"));
@@ -501,6 +620,52 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     tick();
     const interval = setInterval(tick, SOLAR_TICK_MS);
     return () => clearInterval(interval);
+  }, [colorMode, dataset]);
+
+  // District heating layer: show the streets and the source, keep the network state and every
+  // building's standing towards it current (extensions finish, buildings connect over time), and
+  // redraw right away when an extension is picked or ordered.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer(STREET_LINE_LAYER_ID)) return;
+    const layers = [STREET_LINE_LAYER_ID, STREET_CONSTRUCTION_LAYER_ID, STREET_HIT_LAYER_ID, DH_TRUNK_LAYER_ID, DH_PLANT_LAYER_ID];
+    const visible = colorMode === "districtHeat";
+    for (const id of layers) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+    if (!visible) return;
+
+    const source = districtHeat.getSource();
+    let label: Marker | null = null;
+    if (source) {
+      const el = document.createElement("div");
+      el.className = "district-heat-source-label";
+      el.textContent = `🏭 ${source.name}`;
+      label = new Marker({ element: el, anchor: "left", offset: [14, 0] }).setLngLat([source.lon, source.lat]).addTo(map);
+    }
+
+    const tick = () => {
+      (map.getSource(STREET_SOURCE_ID) as GeoJSONSource | undefined)?.setData(streetsToGeoJSON(simClock.getSimTimeMs()));
+      const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
+      const pointSource = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
+      const polyData = polygonsRef.current;
+      const pointData = pointsRef.current;
+      if (!polySource || !pointSource || !polyData || !pointData) return;
+      const simTimeMs = simClock.getSimTimeMs();
+      for (const feature of [...polyData.features, ...pointData.features]) {
+        const building = stock.lookup(feature.properties.egid);
+        if (building) feature.properties.network = networkStatusAt(building, simTimeMs);
+      }
+      polySource.setData(polyData);
+      pointSource.setData(pointData);
+    };
+
+    tick();
+    const interval = setInterval(tick, DISTRICT_HEAT_TICK_MS);
+    const unsubscribe = districtHeat.subscribe(tick);
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+      label?.remove();
+    };
   }, [colorMode, dataset]);
 
   // Selection and non-power color modes update immediately; power mode is kept in

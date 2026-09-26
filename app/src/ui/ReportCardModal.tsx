@@ -173,6 +173,24 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                   <span className="renewal-tally-label">Grid maintenance</span>
                   <span className="finance-value negative">−{formatCHF(finances.current.gridMaintenanceCostRp)}</span>
                 </div>
+                {finances.current.districtHeatRevenueRp > 0 && (
+                  <>
+                    <div className="renewal-tally-row">
+                      <span className="renewal-tally-label">District heat sold</span>
+                      <span className="finance-value positive">+{formatCHF(finances.current.districtHeatRevenueRp)}</span>
+                    </div>
+                    <div className="renewal-tally-row">
+                      <span className="renewal-tally-label">District heat bought from the source</span>
+                      <span className="finance-value negative">−{formatCHF(finances.current.districtHeatPurchaseRp)}</span>
+                    </div>
+                  </>
+                )}
+                {finances.current.districtHeatUpkeepRp > 0 && (
+                  <div className="renewal-tally-row">
+                    <span className="renewal-tally-label">District heating network upkeep</span>
+                    <span className="finance-value negative">−{formatCHF(finances.current.districtHeatUpkeepRp)}</span>
+                  </div>
+                )}
                 {PAYOUT_CATEGORIES.filter((c) => finances.current.spendingRp[c] > 0).map((c) => (
                   <div className="renewal-tally-row" key={c}>
                     <span className="renewal-tally-label">{PAYOUT_LABEL[c]}</span>
@@ -188,8 +206,8 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                 </div>
               </div>
               <p style={{ fontSize: 12, color: "#888", margin: "8px 0 0" }}>
-                Electricity operations settle once a year; heating fuel and petrol/diesel are paid straight to their own suppliers, never through
-                the municipal utility. Subsidies leave the treasury only when a household actually makes the decision — including households
+                Electricity and district heat operations settle once a year; gas, oil and petrol/diesel are paid straight to their own
+                suppliers, never through the municipal utility. Subsidies leave the treasury only when a household actually makes the decision — including households
                 that would have made it anyway. Federal and cantonal grants are not municipal money.
               </p>
             </>

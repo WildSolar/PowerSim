@@ -7,10 +7,9 @@
  * event log.
  *
  * The four decision factors from the design discussion, as implemented here:
- *  - Availability: every system is available except district heating for a
- *    building not already on it — a deliberate stub (no real network-topology
- *    data yet) that grandfathers existing district-heat buildings without
- *    letting new ones adopt it out of nowhere.
+ *  - Availability: every system is available except district heating, which
+ *    needs a pipe in a street the building fronts on (districtHeat.ts) — a
+ *    building already on it keeps its connection either way.
  *  - Financial: annualizedCostRp = (install cost - subsidy) / lifetime +
  *    running cost, a straight-line (no discount rate) comparison — install
  *    costs scale with the building's own envelope area, running costs with its
@@ -34,6 +33,7 @@ import {
   HEATING_WEIBULL_SHAPE,
 } from "../config/heating";
 import { buildingEnvelopeAreaM2 } from "./buildingGeometry";
+import { districtHeat } from "./districtHeat";
 import { policyStore } from "./policy";
 import { municipalHeatingSubsidyRp } from "./subsidies";
 import {
@@ -115,6 +115,11 @@ function annualHeatingEstimate(building: Building, atMs: number, uValueOverride?
   return { thermalKWh, airHeatPumpElectricKWh, groundHeatPumpElectricKWh };
 }
 
+/** A year's space heating demand (kWh of heat) for this building as of `atMs`. */
+export function annualHeatDemandKWh(building: Building, atMs: number): number {
+  return annualHeatingEstimate(building, atMs).thermalKWh;
+}
+
 function sizeScale(building: Building): number {
   const area = buildingEnvelopeAreaM2(building) ?? HEATING_REFERENCE_ENVELOPE_AREA_M2;
   return Math.min(4, Math.max(0.4, area / HEATING_REFERENCE_ENVELOPE_AREA_M2));
@@ -149,7 +154,10 @@ function candidatesAt(
     return {
       id,
       municipalSubsidyRp: municipalRp,
-      available: (id === "districtHeating" ? incumbent === "districtHeating" : true) && !(fossilBanned && (id === "gasBoiler" || id === "oilBoiler")),
+      // District heating needs a pipe in the street; one already connected keeps its connection.
+      available:
+        (id === "districtHeating" ? incumbent === "districtHeating" || districtHeat.servesAt(building.streetSegments, atMs) : true) &&
+        !(fossilBanned && (id === "gasBoiler" || id === "oilBoiler")),
       annualizedCostRp: installCostRp / spec.lifetimeMeanYears + runningCostRpFor(id, estimate, tariff, avgElecRpKWh),
       lifetimeMeanYears: spec.lifetimeMeanYears,
       greenness: spec.greenness,

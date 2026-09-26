@@ -6,10 +6,12 @@
  * tracking toward net zero) — the resource future policy/infrastructure
  * spending will draw down.
  *
- * Deliberately electricity-only: heating fuel (gas/oil/district heat) and
- * mobility fuel (petrol/diesel) are paid straight to their own external
- * suppliers, never through the municipal utility, so they don't appear here
- * even though they're billed to the consumer (see billing.ts). Cantonal
+ * Electricity, plus district heating: the municipal utility also runs the
+ * district heating network (districtHeat.ts) — it sells the heat at the
+ * tariff's district heating price, buys it from the network's source, and
+ * pays for the pipes' upkeep. Gas, oil and petrol/diesel are paid straight to
+ * their own external suppliers, never through the municipal utility, so they
+ * don't appear here even though they're billed to the consumer (see billing.ts). Cantonal
  * heating/EV subsidies (heatingSystems.ts/mobilitySystems.ts) aren't paid by
  * the municipality either — they're an existing, player-uncontrolled program
  * baked into a household's own renewal decision, not (yet) a lever the
@@ -47,7 +49,9 @@ import { policyStore } from "./policy";
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 import { PAYOUT_CATEGORIES, treasury, type PayoutsByCategory } from "./treasury";
-import { yearElectricity } from "./yearReport";
+import { computeHeatingTechnologyBreakdown, yearElectricity } from "./yearReport";
+import { DH_NETWORK_UPKEEP_CHF_PER_M_YEAR, DH_SOURCE_HEAT_PRICE_RP_PER_KWH } from "../config/districtHeat";
+import { districtHeat } from "./districtHeat";
 
 export interface MunicipalFinances {
   year: number;
@@ -55,12 +59,14 @@ export interface MunicipalFinances {
   feedInPaidRp: number; // paid out to solar owners (real or adopted) for exported generation
   wholesaleCostRp: number; // paid upstream for the net electricity actually drawn from the wider grid (consumption minus all local solar)
   gridMaintenanceCostRp: number; // wires/upkeep cost, scaled to gross electricity delivered to consumers
+  districtHeatRevenueRp: number; // district heat sold to connected buildings, at the tariff's district heating price
+  districtHeatPurchaseRp: number; // that heat, bought from the network's source
+  districtHeatUpkeepRp: number; // running the pipes, per metre of piped street
   governmentAllocationRp: number; // this year's allocation from the overall government (a placeholder framing, see config/treasury.ts)
   spendingRp: PayoutsByCategory; // the municipality's own top-ups, per kind, paid out as decisions happened this year — never the federal/cantonal grants
   spendingTotalRp: number;
-  netIncomeRp: number; // consumerRevenueRp + governmentAllocationRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - spendingTotalRp
+  netIncomeRp: number; // every revenue line above (incl. the allocation) less every cost line and spendingTotalRp
 }
-
 
 const financesCache = new Map<number, MunicipalFinances>();
 const financesInFlight = new Map<number, Promise<MunicipalFinances>>();
@@ -103,15 +109,34 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
   const wholesaleCostRp = netElectricityKWh * (tariff.wholesalePriceRpKWh + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare);
   const gridMaintenanceCostRp = grossConsumptionKWh * tariff.gridMaintenanceRpKWh;
 
-  // Every household decision due this year has to have committed (and paid out) before the year is summed.
   const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
   const yearEndMs = toSimTimeMs(Date.UTC(year + 1, 0, 1));
+
+  // District heat: the heat delivered (the report's own heating-technology pass), and the pipes'
+  // upkeep for however much of the year each stretch was in service (sampled monthly).
+  const districtHeatKWh = (await computeHeatingTechnologyBreakdown(buildings, year)).districtHeatingSpaceKWh;
+  const districtHeatRevenueRp = districtHeatKWh * tariff.districtHeatingPriceRpKWh;
+  const districtHeatPurchaseRp = districtHeatKWh * DH_SOURCE_HEAT_PRICE_RP_PER_KWH;
+  let pipedMetreYears = 0;
+  for (let month = 0; month < 12; month++) pipedMetreYears += districtHeat.pipedLengthM(toSimTimeMs(Date.UTC(year, month, 15))) / 12;
+  const districtHeatUpkeepRp = pipedMetreYears * DH_NETWORK_UPKEEP_CHF_PER_M_YEAR * 100;
+
+  // Every household decision due this year has to have committed (and paid out) before the year is summed.
   treasury.settleThrough(yearEndMs);
   const spendingRp = treasury.paidOut(yearStartMs, yearEndMs);
   const spendingTotalRp = PAYOUT_CATEGORIES.reduce((sum, c) => sum + spendingRp[c], 0);
   const dwellingsAtYearStart = buildings.reduce((sum, b) => sum + (existsAt(b, yearStartMs) ? b.dwellings.length : 0), 0);
   const governmentAllocationRp = treasury.allocationRp(dwellingsAtYearStart, allocationApprovalFactor(approval.atYearStart(year)));
-  const netIncomeRp = consumerRevenueRp + governmentAllocationRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - spendingTotalRp;
+  const netIncomeRp =
+    consumerRevenueRp +
+    districtHeatRevenueRp +
+    governmentAllocationRp -
+    feedInPaidRp -
+    wholesaleCostRp -
+    gridMaintenanceCostRp -
+    districtHeatPurchaseRp -
+    districtHeatUpkeepRp -
+    spendingTotalRp;
 
   const result: MunicipalFinances = {
     year,
@@ -119,6 +144,9 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     feedInPaidRp,
     wholesaleCostRp,
     gridMaintenanceCostRp,
+    districtHeatRevenueRp,
+    districtHeatPurchaseRp,
+    districtHeatUpkeepRp,
     governmentAllocationRp,
     spendingRp,
     spendingTotalRp,

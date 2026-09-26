@@ -2,7 +2,7 @@ import type { Building } from "../data/types";
 import { ENERGY_CLASS_CATALOG, ENERGY_CLASS_ORDER } from "../sim/energyClass";
 import { currentHeatingSystemId } from "../sim/heatingRenewal";
 
-export type ColorMode = "none" | "category" | "heating" | "power" | "solar" | "age" | "insulation";
+export type ColorMode = "none" | "category" | "heating" | "power" | "solar" | "age" | "insulation" | "districtHeat";
 
 export interface LegendEntry {
   bucket: string;
@@ -183,6 +183,20 @@ export const INSULATION_LEGEND: LegendEntry[] = ENERGY_CLASS_ORDER.map((id) => (
   label: ENERGY_CLASS_CATALOG[id].label,
   color: ENERGY_CLASS_CATALOG[id].color,
 }));
+
+// The district heating layer: buildings by where they stand relative to the network, from the
+// same validated set as the other legends (violet is district heat's own colour throughout).
+export const DISTRICT_HEAT_LEGEND: LegendEntry[] = [
+  { bucket: "connected", label: "Connected", color: "#4a3aa7" },
+  { bucket: "connectable", label: "On a piped street", color: "#2a78d6" },
+  { bucket: "outOfReach", label: "No pipe in the street", color: UNKNOWN_COLOR },
+];
+
+// Street lines in the district heating layer.
+export const PIPE_COLOR = "#4a3aa7";
+export const PIPE_UNDER_CONSTRUCTION_COLOR = "#f2b01e";
+export const PIPE_PLANNED_COLOR = "#f97316";
+export const STREET_UNPIPED_COLOR = "#9e9c95";
 
 export const CONSTRUCTION_COLOR = "#f2b01e";
 

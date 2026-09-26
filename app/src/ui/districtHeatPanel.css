@@ -1,0 +1,127 @@
+.district-heat-panel {
+  position: absolute;
+  top: 16px;
+  left: 272px;
+  width: 280px;
+  max-height: calc(100% - 90px);
+  overflow-y: auto;
+  background: #ffffffee;
+  backdrop-filter: blur(6px);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  color: #1a1a1a;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+}
+
+.district-heat-panel .panel-title {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #898781;
+}
+
+.district-heat-panel .info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #52514e;
+  margin-bottom: 4px;
+}
+
+.district-heat-panel .info-value {
+  margin-left: auto;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #1a1a1a;
+  white-space: nowrap;
+}
+
+.dh-source {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.dh-note {
+  font-weight: 400;
+  font-size: 11px;
+  color: #898781;
+  margin: 2px 0 6px;
+}
+
+.dh-warning {
+  font-size: 11px;
+  color: #b23a2e;
+  margin: 4px 0;
+}
+
+.dh-subtitle {
+  margin: 12px 0 6px;
+  padding-top: 8px;
+  border-top: 1px solid #eee;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dh-capacity {
+  margin-top: 6px;
+}
+
+.dh-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: #eeece8;
+  overflow: hidden;
+}
+
+.dh-bar-fill {
+  height: 100%;
+  background: #4a3aa7;
+}
+
+.dh-bar-fill.over {
+  background: #b23a2e;
+}
+
+.dh-actions {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+
+.dh-actions button {
+  border: 1px solid #ddd;
+  background: #f8f8f8;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dh-actions button.dh-order {
+  flex: 1;
+  background: #2a78d6;
+  border-color: #2a78d6;
+  color: #fff;
+}
+
+.dh-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.district-heat-source-label {
+  background: #ffffffee;
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a1a1a;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+  pointer-events: none;
+}
