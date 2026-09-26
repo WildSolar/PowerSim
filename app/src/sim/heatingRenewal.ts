@@ -148,7 +148,9 @@ function candidatesAt(
 
   return HEATING_SYSTEM_ORDER.map((id) => {
     const spec = HEATING_SYSTEM_CATALOG[id];
-    const beforeMunicipalRp = Math.max(0, spec.baseInstallCostRp * scale - spec.subsidyRp);
+    // Keeping the same system can be much cheaper than installing it new (see replacementInstallCostRp).
+    const installRp = id === incumbent ? (spec.replacementInstallCostRp ?? spec.baseInstallCostRp) : spec.baseInstallCostRp;
+    const beforeMunicipalRp = Math.max(0, installRp * scale - spec.subsidyRp);
     const municipalRp = withMunicipalSubsidy ? Math.min(municipalHeatingSubsidyRp(id), beforeMunicipalRp) : 0;
     const installCostRp = beforeMunicipalRp - municipalRp;
     return {

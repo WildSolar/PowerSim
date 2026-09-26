@@ -1,8 +1,8 @@
-import { useMemo, useSyncExternalStore } from "react";
+import { Fragment, useMemo, useSyncExternalStore } from "react";
 import { formatDate } from "../sim/calendar";
 import { districtHeat } from "../sim/districtHeat";
 import { simClock } from "../sim/engine";
-import { networkPeakLoadW, networkStatusAt, sourceCapacityW, streetDemand } from "../sim/districtHeatStats";
+import { networkCoverage, networkPeakLoadW, networkStatusAt, sourceCapacityW, streetDemand, type CoverageShare } from "../sim/districtHeatStats";
 import { existsAt } from "../sim/lifetime";
 import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
@@ -14,6 +14,10 @@ const SOURCE_KIND_NOTE = {
   import: "heat arrives by trunk line from a neighbouring municipality",
   unknown: "where the heat comes from isn't known — placed at the network's centre",
 };
+
+function percent(part: number, share: CoverageShare): string {
+  return share.total > 0 ? `${Math.round((part / share.total) * 100)}%` : "–";
+}
 
 function formatMW(w: number): string {
   return `${(w / 1e6).toFixed(1)} MW`;
@@ -53,6 +57,7 @@ export function DistrictHeatPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buildings, simDay, version]);
 
+  const coverage = useMemo(() => networkCoverage(buildings, simDay), [buildings, simDay, version]); // eslint-disable-line react-hooks/exhaustive-deps
   const quote = useMemo(() => districtHeat.quote(), [version]); // eslint-disable-line react-hooks/exhaustive-deps
   const demand = useMemo(() => streetDemand(buildings, quote.segments, simDay), [buildings, quote, simDay]);
   const underConstruction = districtHeat.getOrders().filter((o) => o.completesAtMs > simDay);
@@ -95,6 +100,28 @@ export function DistrictHeatPanel() {
           <span className="info-value">{network.awaiting}</span>
         </div>
       )}
+
+      <div
+        className="dh-coverage"
+        title="Of the heated buildings (garages, sheds and wood-heated buildings aren't counted). Within reach: connected, or on a piped street and free to connect."
+      >
+        <span />
+        <span className="dh-coverage-head">Connected</span>
+        <span className="dh-coverage-head">Within reach</span>
+        {(
+          [
+            ["Buildings", coverage.buildings],
+            ["Floor area", coverage.floorAreaM2],
+            ["Heat demand", coverage.heatDemandKWh],
+          ] as [string, CoverageShare][]
+        ).map(([label, share]) => (
+          <Fragment key={label}>
+            <span>{label}</span>
+            <span className="dh-coverage-value">{percent(share.connected, share)}</span>
+            <span className="dh-coverage-value">{percent(share.withinReach, share)}</span>
+          </Fragment>
+        ))}
+      </div>
 
       <div className="dh-capacity" title="Not a limit yet: the network can grow past it for now">
         <div className="info-row">

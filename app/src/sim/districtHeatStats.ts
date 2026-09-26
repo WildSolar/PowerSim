@@ -12,6 +12,7 @@ import { toDateMs } from "./calendar";
 import { districtHeat } from "./districtHeat";
 import { annualHeatDemandKWh, currentHeatingSystemId, initialHeatingSystemId } from "./heatingRenewal";
 import { existsAt } from "./lifetime";
+import { gfaOf } from "./newBuild";
 import { spaceHeatingThermalDemandW } from "./spaceHeating";
 
 /** "noHeating": no heating system the game replaces — mostly garages, sheds and storage (the
@@ -76,6 +77,43 @@ function cachedAnnualDemandKWh(building: Building, atMs: number): number {
     demandCache.set(key, kWh);
   }
   return kWh;
+}
+
+export interface CoverageShare {
+  total: number;
+  connected: number;
+  /** Connected, or on a piped street and so free to connect. */
+  withinReach: number;
+}
+
+export interface NetworkCoverage {
+  buildings: CoverageShare;
+  floorAreaM2: CoverageShare;
+  heatDemandKWh: CoverageShare;
+}
+
+/** How much of the town's heated building stock the network serves and could serve — by
+ * building count, floor area and yearly heat demand. Buildings with no heating to connect
+ * (garages, sheds, wood heating: "noHeating") are left out of every total. */
+export function networkCoverage(buildings: Building[], atMs: number): NetworkCoverage {
+  const zero = (): CoverageShare => ({ total: 0, connected: 0, withinReach: 0 });
+  const result: NetworkCoverage = { buildings: zero(), floorAreaM2: zero(), heatDemandKWh: zero() };
+  for (const b of buildings) {
+    if (!existsAt(b, atMs)) continue;
+    const status = networkStatusAt(b, atMs);
+    if (status === "noHeating") continue;
+    const amounts: [CoverageShare, number][] = [
+      [result.buildings, 1],
+      [result.floorAreaM2, gfaOf(b)],
+      [result.heatDemandKWh, cachedAnnualDemandKWh(b, atMs)],
+    ];
+    for (const [share, amount] of amounts) {
+      share.total += amount;
+      if (status === "connected") share.connected += amount;
+      if (status !== "outOfReach") share.withinReach += amount;
+    }
+  }
+  return result;
 }
 
 export interface StreetDemand {

@@ -283,6 +283,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Every renewal shows up as a \"Heating history\" entry on the building's panel, in plain language — what reached the end of its life, what replaced it, and why (including when the obvious choice wasn't available). Only renewals that have actually happened in the game's timeline appear; nothing about the future is revealed in advance.",
       ),
       note(
+        "Keeping the system a building already has is cheaper than installing a new one: a first oil heating needs a tank room and a chimney, a first gas heating a gas connection, a first ground heat pump the boreholes, a first district heating connection the pipe to the street — replacing each like for like skips that. So a building changes system only when the other one is clearly better over its lifetime.",
+      ),
+      note(
         "A renewal decision uses whatever tariff and prices are set at the moment it happens, then never changes again — moving a price slider later doesn't rewrite a past decision, only shapes whichever renewal comes next.",
       ),
       note(
@@ -296,7 +299,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "District heating network",
     blocks: [
       p(
-        "District heat reaches a building through pipes under its street, so a building can only switch to district heating if a street it borders is piped — any of them: a building between two streets can be connected from either, and one on a corner from both. It still has to want to: owners connect when their heating system is next replaced, if district heat comes out as the better deal (see \"Stock renewal\"), and new buildings the same way when they are permitted. A building already connected stays connected.",
+        "District heat reaches a building through pipes under its street, so a building can only switch to district heating if a street it borders is piped — any of them: a building between two streets can be connected from either, and one on a corner from both. It still has to want to: owners connect when their heating system is next replaced, if district heat comes out as the better deal (see \"Stock renewal\"), and new buildings the same way when they are permitted. A building already connected stays connected. A first connection is the dear part — laying the house connection and fitting a substation, around CHF 22,000 for a house — while a connected building renewing its substation pays around CHF 9,000, so once on the network, buildings tend to stay.",
       ),
       p(
         "Every network needs a heat source. In Schlieren it is the Limeco waste-to-energy plant in neighbouring Dietikon, whose heat arrives by trunk line and enters the network at the town's western edge. The municipal utility sells the heat at the district heating price (Control → Prices) and buys it from the source, and it pays for the pipes' upkeep, so a network full of customers earns money and a long pipe past few buildings costs it.",
@@ -305,7 +308,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "To extend the network, switch the map to the District heat layer and click streets: each click picks one stretch of street between two junctions (click again to drop it), and the buildings it would newly reach light up in orange. Once ordered, they stay marked (light orange) until the pipes are in and they can connect. An extension must connect to the network — directly, or through the other streets picked with it; picked streets that don't show in red until the gap is closed. Every street the network could run along is shaded grey in this layer. The panel shows its length, cost, build time, and how much heat the buildings it would newly reach use in a year, and per metre of pipe: the figure planners judge an extension by. Ordering it pays the full cost from the treasury at once; the pipes are laid over the following months (a few months of planning, then progress along the street) and buildings along them can connect from the day they're done.",
       ),
       p(
-        "The panel also compares the network's load on a cold winter day (every connected building's heat demand) with what the source can deliver.",
+        "The panel shows how much of the town's heated building stock the network serves and could serve — by number of buildings, floor area and yearly heat demand, connected and within reach (connected, or on a piped street) — and compares the network's load on a cold winter day (every connected building's heat demand) with what the source can deliver.",
       ),
       note(
         "Garages, sheds, storage and other buildings without heating (the building register numbers them like \"Schulstrasse 7.1\") never connect — there is nothing in them to switch — and show in a pale grey of their own. So do buildings heated by wood or by something the register doesn't record.",

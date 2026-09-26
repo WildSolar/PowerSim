@@ -66,6 +66,30 @@
   font-weight: 600;
 }
 
+.dh-coverage {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  column-gap: 12px;
+  row-gap: 3px;
+  margin: 8px 0 4px;
+  padding: 6px 0;
+  border-top: 1px solid #eee;
+  color: #52514e;
+}
+
+.dh-coverage-head {
+  font-size: 11px;
+  color: #898781;
+  text-align: right;
+}
+
+.dh-coverage-value {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #1a1a1a;
+}
+
 .dh-capacity {
   margin-top: 6px;
 }

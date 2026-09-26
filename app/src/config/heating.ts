@@ -19,10 +19,14 @@ export interface HeatingSystemSpec {
   label: string;
   icon: string;
   lifetimeMeanYears: number;
-  /** At a reference building with HEATING_REFERENCE_ENVELOPE_AREA_M2 of
-   * envelope area — heatingRenewal.ts scales this with the actual
-   * building's size. */
+  /** Installing this system in a building that doesn't have it yet, at a reference building
+   * with HEATING_REFERENCE_ENVELOPE_AREA_M2 of envelope area — heatingRenewal.ts scales this
+   * with the actual building's size. */
   baseInstallCostRp: number;
+  /** Replacing the system with another of the same kind, where that costs less than a first
+   * installation (same size scaling). District heating: the building's connection to the
+   * network is already there, only the substation (heat exchanger) is replaced. */
+  replacementInstallCostRp?: number;
   subsidyRp: number; // flat, not size-scaled — mirrors how real cantonal grants are usually a fixed amount
   /** Signed "renewable-ness" used only to nudge the hidden bias trait — never
    * shown to the player. */
@@ -49,7 +53,8 @@ export const HEATING_SYSTEM_CATALOG: Record<HeatingSystemId, HeatingSystemSpec> 
     label: "Ground heat pump",
     icon: "🌍",
     lifetimeMeanYears: 22,
-    baseInstallCostRp: 38_000_00,
+    baseInstallCostRp: 38_000_00, // mostly the boreholes
+    replacementInstallCostRp: 22_000_00, // a new heat pump on the existing boreholes
     subsidyRp: 9_000_00,
     greenness: 1,
     color: "#0f8fc0",
@@ -59,7 +64,8 @@ export const HEATING_SYSTEM_CATALOG: Record<HeatingSystemId, HeatingSystemSpec> 
     label: "District heating",
     icon: "🏭",
     lifetimeMeanYears: 25,
-    baseInstallCostRp: 14_000_00,
+    baseInstallCostRp: 22_000_00, // a first connection: the house connection pipe and a substation
+    replacementInstallCostRp: 9_000_00, // like for like: just a new substation
     subsidyRp: 0,
     greenness: 0.4,
     color: "#4a3aa7",
@@ -69,7 +75,8 @@ export const HEATING_SYSTEM_CATALOG: Record<HeatingSystemId, HeatingSystemSpec> 
     label: "Gas boiler",
     icon: "🔥",
     lifetimeMeanYears: 18,
-    baseInstallCostRp: 16_000_00,
+    baseInstallCostRp: 22_000_00, // a first gas heating: the gas connection and a flue as well
+    replacementInstallCostRp: 16_000_00, // a new boiler in place
     subsidyRp: 0,
     greenness: -1,
     color: "#eb6834",
@@ -79,7 +86,8 @@ export const HEATING_SYSTEM_CATALOG: Record<HeatingSystemId, HeatingSystemSpec> 
     label: "Oil boiler",
     icon: "🛢️",
     lifetimeMeanYears: 20,
-    baseInstallCostRp: 17_000_00,
+    baseInstallCostRp: 28_000_00, // a first oil heating: tank room and chimney as well
+    replacementInstallCostRp: 17_000_00, // a new boiler in place
     subsidyRp: 0,
     greenness: -1.3,
     color: "#b23a2e",

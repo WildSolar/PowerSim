@@ -15,9 +15,10 @@ Pieces meeting end to end at a plain bend (no third street) are then joined back
 they carry the same name (even where the class changes), so a segment is "this street from
 one junction to the next". A stretch too short to pick on the map (under MIN_SEGMENT_M) is
 merged into a neighbour it meets end to end, so a segment may run past a junction; its
-`nodes` lists every junction along it. Only segments whose midpoint lies inside the
-municipality are kept. Motorways, service access roads, ferries and unnamed footpaths are
-left out; named paths stay (buildings are addressed from them).
+`nodes` lists every junction along it. A dead end stopping just short of another street is
+joined to it. Segments with at least MIN_INSIDE_M inside the municipality are kept.
+Motorways, service access roads, ferries and unnamed footpaths are left out; named paths
+stay (buildings are addressed from them).
 
 Buildings are linked to the segment(s) in front of them through GWR's entrance records:
 for each entrance, the nearest segment carrying the entrance's own street name, falling
@@ -82,8 +83,14 @@ NAMED_MATCH_RADIUS_M = 150  # an entrance's own street, if a segment of it is th
 ANY_MATCH_RADIUS_M = 60  # otherwise the nearest street of any name, if this close
 # A building also borders every street whose edge is within this of its footprint (front garden,
 # pavement): a pipe in any of them can reach it, not just in the one it is addressed from.
-BORDER_SETBACK_M = 12.0
+BORDER_SETBACK_M = 20.0
 MAX_HALF_WIDTH_M = 20.0  # the widest merged street's half-width, for the spatial pre-filter
+# A dead end this close to another street is joined to it (a junction on that street): the knot
+# where a merged carriageway or a filtered-out access road left a street hanging just short of
+# the next one.
+GAP_CLOSE_M = 20.0
+# A street is the municipality's if at least this much of it lies inside the boundary.
+MIN_INSIDE_M = 5.0
 
 
 @dataclass
@@ -421,8 +428,7 @@ def fetch_segments(boundary_lv95: list[Polygon], min_e: float, min_n: float, max
         line = road.line
         if line.length < 1:
             continue
-        mid = line.interpolate(0.5, normalized=True)
-        if not any(poly.contains(mid) for poly in inside):
+        if sum(line.intersection(poly).length for poly in inside) < MIN_INSIDE_M:
             continue
         coords = [(x, y) for x, y, *_ in line.coords]
         segments.append(
@@ -437,7 +443,43 @@ def fetch_segments(boundary_lv95: list[Polygon], min_e: float, min_n: float, max
                 width_m=road.width_m,
             )
         )
-    return _merge_short_segments(_contract_knots(segments))
+    return _close_gaps(_merge_short_segments(_contract_knots(segments)))
+
+
+def _close_gaps(segments: list[Segment]) -> list[Segment]:
+    """Joins every dead end (a segment end no other segment shares) that comes within
+    GAP_CLOSE_M of another segment to that segment, as a junction along it — see GAP_CLOSE_M."""
+    lines = [LineString(s.lv95) for s in segments]
+    tree = STRtree(lines)
+    count: dict[int, int] = defaultdict(int)
+    for seg in segments:
+        for n in seg.nodes:
+            count[n] += 1
+    for seg in segments:
+        for node, point in ((seg.a, seg.lv95[0]), (seg.b, seg.lv95[-1])):
+            if count[node] != 1:
+                continue
+            p = Point(point)
+            best = None
+            for k in tree.query(p.buffer(GAP_CLOSE_M)):
+                other = segments[int(k)]
+                if other.id == seg.id or node in other.nodes:
+                    continue
+                d = lines[other.id].distance(p)
+                if d <= GAP_CLOSE_M and (best is None or d < best[1]):
+                    best = (other, d)
+            if best is None:
+                continue
+            other = best[0]
+            # Insert the junction where it falls along the other segment, keeping `nodes` in order.
+            along = lines[other.id].project(p)
+            ends = {n: lines[other.id].project(Point(other.lv95[0] if n == other.a else other.lv95[-1])) for n in (other.a, other.b)}
+            inner = other.nodes[1:-1]
+            positions = [ends[other.a]] + [lines[other.id].length * (i + 1) / (len(inner) + 1) for i in range(len(inner))] + [ends[other.b]]
+            index = next((i for i, pos in enumerate(positions) if pos > along), len(positions) - 1)
+            other.nodes.insert(max(1, index), node)
+            count[node] += 1
+    return segments
 
 
 def _contract_knots(segments: list[Segment]) -> list[Segment]:
@@ -571,8 +613,8 @@ def link_buildings(
     footprint_by_egid: dict[int, list[tuple[float, float]]],
 ) -> tuple[dict[int, list[int]], dict[int, list[int]]]:
     """Per building: every segment it can be reached from — the one(s) it is addressed from
-    (see module doc) plus every other segment its footprint borders (BORDER_SETBACK_M) — and,
-    separately, just the addressed one(s)."""
+    (see module doc), every other segment its footprint borders (BORDER_SETBACK_M), and at least
+    one in the main street network — and, separately, just the addressed one(s)."""
     lines = [LineString(s.lv95) for s in segments]
     tree = STRtree(lines)
     by_name: dict[str, list[int]] = defaultdict(list)
@@ -617,5 +659,44 @@ def link_buildings(
                 if sid not in found and lines[sid].distance(footprint) <= BORDER_SETBACK_M + segments[sid].width_m / 2:
                     found.append(sid)
         links[egid] = found
+
+    # Every building must be reachable from the network: one whose streets are all cut off from
+    # the town's main street network (a stub whose access road was left out) is also linked to
+    # the nearest street that is part of it.
+    main = _main_component(segments)
+    main_lines = [(sid, lines[sid]) for sid in main]
+    for egid, found in links.items():
+        if any(sid in main for sid in found):
+            continue
+        ring = footprint_by_egid.get(egid)
+        shape = Polygon(ring) if ring and len(ring) >= 4 else Point(position_by_egid[egid])
+        nearest = min(main_lines, key=lambda item: item[1].distance(shape), default=None)
+        if nearest is not None:
+            found.append(nearest[0])
     return links, addressed
+
+
+def _main_component(segments: list[Segment]) -> set[int]:
+    """The segment ids of the largest connected part of the street network."""
+    by_node: dict[int, list[int]] = defaultdict(list)
+    for seg in segments:
+        for n in seg.nodes:
+            by_node[n].append(seg.id)
+    seen: set[int] = set()
+    best: set[int] = set()
+    for seg in segments:
+        if seg.id in seen:
+            continue
+        part, stack = set(), [seg.id]
+        while stack:
+            sid = stack.pop()
+            if sid in part:
+                continue
+            part.add(sid)
+            for n in segments[sid].nodes:
+                stack.extend(o for o in by_node[n] if o not in part)
+        seen |= part
+        if len(part) > len(best):
+            best = part
+    return best
 
