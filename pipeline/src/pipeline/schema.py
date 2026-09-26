@@ -80,3 +80,6 @@ class MunicipalityDataset:
     # Public charging sites for electric cars, from the federal register — see sources/chargers.py:
     # {id, name, lon, lat, points, power_kw, kind: "ac" | "dc"}.
     charging_sites: list = field(default_factory=list)
+    # The registered road vehicles — see sources/vehicles.py: {year, cars, cars_electric,
+    # goods_vehicles, goods_vehicles_electric}, or None if the register couldn't be reached.
+    vehicle_register: dict | None = None

@@ -14,12 +14,14 @@ const KIND_LABEL: Record<DecisionLogKind, string> = {
   "mobility-mode": "Mobility (mode)",
   "mobility-vehicle-car": "Mobility (car)",
   "mobility-vehicle-bike": "Mobility (bike)",
+  "fleet-van": "Business van",
+  "fleet-truck": "Business lorry",
   solar: "Solar",
   construction: "New construction",
   retrofit: "Insulation retrofit",
 };
 
-const KIND_FILTERS: (DecisionLogKind | "all")[] = ["all", "heating", "mobility-mode", "mobility-vehicle-car", "mobility-vehicle-bike", "solar", "construction", "retrofit"];
+const KIND_FILTERS: (DecisionLogKind | "all")[] = ["all", "heating", "mobility-mode", "mobility-vehicle-car", "mobility-vehicle-bike", "fleet-van", "fleet-truck", "solar", "construction", "retrofit"];
 
 const DISPLAY_LIMIT = 300;
 

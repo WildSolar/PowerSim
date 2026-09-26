@@ -10,7 +10,10 @@
  * Chargers have limited room: each charge point serves a few cars (CARS_PER_POINT). When a
  * household buys an electric car relying on public charging, the car is booked to its best site
  * with room — an assignment that lasts until the car is next replaced — so a site's usage at any
- * moment is simply the assignments covering it. A full site takes no new cars.
+ * moment is simply the assignments covering it. A full site takes no new cars. Businesses' vans and
+ * trucks without a yard to charge in (fleet.ts) are booked the same way, taking up room by the
+ * energy they need — a van about two cars' worth, a truck about twenty (trucks only at fast
+ * chargers).
  *
  * Sites come from three places: the real ones in the federal register at game start (private),
  * the ones the player orders (municipal: built over a few months, their sales go to the treasury
@@ -43,6 +46,7 @@ import {
   SESSION_DAY_SHARE,
   SESSION_POWER_KW,
   type ChargingKind,
+  type ChargingVehicle,
 } from "../config/charging";
 import { ANNUAL_CAR_KM, EV_CAR_KWH_PER_100KM } from "../config/mobility";
 import type { Building, Dwelling, MunicipalityDataset } from "../data/types";
@@ -77,6 +81,8 @@ export interface ChargingSite {
   openedAtMs: number;
   /** ...and gains more over time (a private operator expanding it). */
   expansions: { atMs: number; points: number }[];
+  /** Sites placed in the game: the street they're on (naming the next one on it). */
+  street?: string;
   x: number;
   y: number;
 }
@@ -84,11 +90,26 @@ export interface ChargingSite {
 interface Assignment {
   siteId: string;
   fromMs: number;
-  toMs: number; // Infinity while the car is still in use
-  /** The household slot (mobility.ts's handle), for asking whether it is actually driving. */
+  toMs: number; // Infinity while the vehicle is still in use
+  /** The household slot (mobility.ts's handle), for asking whether it is actually driving; null
+   * for a business vehicle, always on the road. */
   slot: unknown;
-  seed: number; // the car's charging-session randomness
+  seed: number; // the vehicle's charging-session randomness
+  vehicle: ChargingVehicle;
+  kWhPerDay: number;
+  weight: number; // the room it takes, in cars' worth
 }
+
+/** What a vehicle needs from a charger: how much energy a day, and which kinds it can use. */
+export interface ChargingNeed {
+  vehicle: ChargingVehicle;
+  kWhPerDay: number;
+  kinds: ChargingKind[];
+}
+
+export const CAR_NEED: ChargingNeed = { vehicle: "car", kWhPerDay: CAR_DAILY_KWH, kinds: ["ac", "dc"] };
+
+export type VehicleCounts = Record<ChargingVehicle, number>;
 
 export interface ChargingOption {
   site: ChargingSite;
@@ -107,8 +128,9 @@ export interface BuildingChargingAccess {
 
 export interface SiteStats {
   points: number;
-  capacity: number;
-  users: number;
+  capacity: number; // in cars' worth
+  users: number; // room taken, in cars' worth
+  vehicles: VehicleCounts;
   utilization: number; // users / capacity
   kWhPerDay: number;
   kWhLastYear: number;
@@ -116,6 +138,8 @@ export interface SiteStats {
   revenueLastYearRp: number;
   upkeepPerYearRp: number;
 }
+
+const SITE_NAME_PREFIX: Record<ChargingKind, string> = { ac: "On-street charger", dc: "Fast-charging hub" };
 
 export function pointsAt(site: ChargingSite, atMs: number): number {
   if (atMs < site.openedAtMs) return 0;
@@ -147,7 +171,7 @@ class PublicCharging {
   private byId = new Map<string, ChargingSite>();
   private bySlot = new Map<string, Assignment[]>();
   private bySite = new Map<string, Assignment[]>();
-  private unmet: { atMs: number; x: number; y: number }[] = [];
+  private unmet: { atMs: number; x: number; y: number; kind: ChargingKind }[] = [];
   private lastOperatorYear: number | null = null;
   private projection = new LocalProjection(8.4, 47.4);
   private buildingLookup: (egid: string) => Building | undefined = () => undefined;
@@ -227,31 +251,51 @@ class PublicCharging {
 
   // --- usage ---
 
+  /** How much of a site's room is taken at `atMs`, in cars' worth. */
   usersAt(siteId: string, atMs: number): number {
     let n = 0;
-    for (const a of this.bySite.get(siteId) ?? []) if (a.fromMs <= atMs && atMs < a.toMs) n++;
+    for (const a of this.bySite.get(siteId) ?? []) if (a.fromMs <= atMs && atMs < a.toMs) n += a.weight;
     return n;
+  }
+
+  /** The room a site has promised at or after `atMs`: every booking not yet ended by then, including
+   * ones starting later. Decisions settle building by building each month, not strictly in time
+   * order, so a booking for later in the month may already be made when an earlier one is decided —
+   * the room check has to see it, or the site ends up over full. */
+  private committedAt(siteId: string, atMs: number): number {
+    let n = 0;
+    for (const a of this.bySite.get(siteId) ?? []) if (atMs < a.toMs) n += a.weight;
+    return n;
+  }
+
+  /** The vehicles relying on a site at `atMs`, by kind. */
+  vehiclesAt(siteId: string, atMs: number): VehicleCounts {
+    const counts: VehicleCounts = { car: 0, van: 0, truck: 0 };
+    for (const a of this.bySite.get(siteId) ?? []) if (a.fromMs <= atMs && atMs < a.toMs) counts[a.vehicle]++;
+    return counts;
   }
 
   private hassleRp(site: ChargingSite, distanceM: number, users: number, capacity: number): number {
     const kind = site.kind;
-    const fill = capacity > 0 ? users / capacity : 1;
-    return (HASSLE_BASE_CHF[kind] + HASSLE_AT_REACH_CHF[kind] * (distanceM / REACH_M[kind]) + HASSLE_WHEN_FULL_CHF * fill * fill) * 100;
+    const fill = capacity > 0 ? Math.min(1, users / capacity) : 1;
+    return (HASSLE_BASE_CHF[kind] + HASSLE_AT_REACH_CHF[kind] * (distanceM / REACH_M[kind]) + HASSLE_WHEN_FULL_CHF[kind] * fill * fill) * 100;
   }
 
-  /** The best public charger a household at (lon, lat) could rely on at `atMs` — open, in reach,
-   * with room — by price plus hassle over a year. Null when there is none. */
-  bestOption(lon: number, lat: number, atMs: number): ChargingOption | null {
+  /** The best public charger a vehicle at (lon, lat) could rely on at `atMs` — open, in reach, of a
+   * kind it can use, with room for it — by price plus hassle over a year. Null when there is none. */
+  bestOption(lon: number, lat: number, atMs: number, need: ChargingNeed = CAR_NEED): ChargingOption | null {
     const [x, y] = this.projection.toXY(lon, lat);
-    const annualKWh = CAR_DAILY_KWH * 365;
+    const annualKWh = need.kWhPerDay * 365;
+    const weight = need.kWhPerDay / CAR_DAILY_KWH;
     let best: (ChargingOption & { score: number }) | null = null;
     for (const site of this.sites) {
+      if (!need.kinds.includes(site.kind)) continue;
       const distanceM = Math.hypot(site.x - x, site.y - y);
       if (distanceM > REACH_M[site.kind]) continue;
       const capacity = siteCapacityAt(site, atMs);
       if (capacity === 0) continue;
       const users = this.usersAt(site.id, atMs);
-      if (users >= capacity) continue;
+      if (this.committedAt(site.id, atMs) + weight > capacity) continue;
       const priceRpPerKWh = sitePriceRpPerKWh(site);
       const hassleRp = this.hassleRp(site, distanceM, users, capacity);
       const score = priceRpPerKWh * annualKWh + hassleRp;
@@ -263,13 +307,22 @@ class PublicCharging {
   /** What relying on public charging would cost a household that has no charger in reach, had
    * there been an on-street one close by — so its decision can tell "wanted an electric car but
    * couldn't" apart from "didn't want one". */
-  hypotheticalOptionCostRp(): { priceRpPerKWh: number; hassleRp: number } {
-    return { priceRpPerKWh: PRIVATE_PRICE_RP_PER_KWH.ac, hassleRp: HASSLE_BASE_CHF.ac * 100 };
+  hypotheticalOptionCostRp(kind: ChargingKind = "ac"): { priceRpPerKWh: number; hassleRp: number } {
+    return { priceRpPerKWh: PRIVATE_PRICE_RP_PER_KWH[kind], hassleRp: HASSLE_BASE_CHF[kind] * 100 };
   }
 
-  /** Books a household's new electric car to the site it will rely on. */
-  assign(slotKey: string, slot: unknown, siteId: string, atMs: number): void {
-    const a: Assignment = { siteId, fromMs: atMs, toMs: Number.POSITIVE_INFINITY, slot, seed: hashSeed(slotKey, "public-charging") };
+  /** Books a new electric vehicle to the site it will rely on. */
+  assign(slotKey: string, slot: unknown, siteId: string, atMs: number, need: ChargingNeed = CAR_NEED): void {
+    const a: Assignment = {
+      siteId,
+      fromMs: atMs,
+      toMs: Number.POSITIVE_INFINITY,
+      slot,
+      seed: hashSeed(slotKey, "public-charging"),
+      vehicle: need.vehicle,
+      kWhPerDay: need.kWhPerDay,
+      weight: need.kWhPerDay / CAR_DAILY_KWH,
+    };
     this.assignmentsFor(slotKey).push(a);
     this.bySite.get(siteId)?.push(a);
   }
@@ -300,9 +353,10 @@ class PublicCharging {
     return false;
   }
 
-  logUnmetDemand(lon: number, lat: number, atMs: number): void {
+  /** Someone who would have gone electric with a charger of `kind` close by, but had none with room. */
+  logUnmetDemand(lon: number, lat: number, atMs: number, kind: ChargingKind = "ac"): void {
     const [x, y] = this.projection.toXY(lon, lat);
-    this.unmet.push({ atMs, x, y });
+    this.unmet.push({ atMs, x, y, kind });
   }
 
   /** Households that would have bought an electric car between two instants but had no charger
@@ -318,12 +372,14 @@ class PublicCharging {
   private assignmentLoadW(a: Assignment, kind: ChargingKind, atMs: number): number {
     const day = Math.floor(atMs / DAY_MS);
     const seed = hashSeedFrom(a.seed, String(day));
-    if (firstRandom(seed) >= SESSION_DAY_SHARE[kind]) return 0;
+    const dayShare = SESSION_DAY_SHARE[a.vehicle][kind];
+    if (firstRandom(seed) >= dayShare) return 0;
     const startHour = kind === "ac" ? 17.5 + firstRandom(seed ^ 0x5bd1e995) * 3 : 9 + firstRandom(seed ^ 0x5bd1e995) * 10;
-    const energyKWh = CAR_DAILY_KWH / SESSION_DAY_SHARE[kind];
+    const powerKw = SESSION_POWER_KW[a.vehicle][kind];
+    const energyKWh = a.kWhPerDay / dayShare;
     const startMs = day * DAY_MS + startHour * 3_600_000;
-    const endMs = startMs + (energyKWh / SESSION_POWER_KW[kind]) * 3_600_000;
-    return atMs >= startMs && atMs < endMs ? SESSION_POWER_KW[kind] * 1000 : 0;
+    const endMs = startMs + (energyKWh / powerKw) * 3_600_000;
+    return atMs >= startMs && atMs < endMs ? powerKw * 1000 : 0;
   }
 
   siteLoadW(site: ChargingSite, atMs: number): number {
@@ -346,12 +402,12 @@ class PublicCharging {
 
   /** Energy a site delivered between two instants (kWh), from the cars relying on it. */
   energyKWh(site: ChargingSite, fromMs: number, toMs: number): number {
-    let days = 0;
+    let kWh = 0;
     for (const a of this.bySite.get(site.id) ?? []) {
       const overlap = Math.min(toMs, a.toMs) - Math.max(fromMs, a.fromMs);
-      if (overlap > 0) days += overlap / DAY_MS;
+      if (overlap > 0) kWh += (overlap / DAY_MS) * a.kWhPerDay;
     }
-    return days * CAR_DAILY_KWH;
+    return kWh;
   }
 
   upkeepPerYearRp(site: ChargingSite, atMs: number): number {
@@ -363,12 +419,15 @@ class PublicCharging {
     const capacity = siteCapacityAt(site, atMs);
     const users = this.usersAt(site.id, atMs);
     const kWhLastYear = this.energyKWh(site, atMs - YEAR_MS, atMs);
+    let kWhPerDay = 0;
+    for (const a of this.bySite.get(site.id) ?? []) if (a.fromMs <= atMs && atMs < a.toMs) kWhPerDay += a.kWhPerDay;
     return {
       points,
       capacity,
       users,
+      vehicles: this.vehiclesAt(site.id, atMs),
       utilization: capacity > 0 ? users / capacity : 0,
-      kWhPerDay: users * CAR_DAILY_KWH,
+      kWhPerDay,
       kWhLastYear,
       revenueLastYearRp: site.owner === "municipal" ? kWhLastYear * sitePriceRpPerKWh(site) : 0,
       upkeepPerYearRp: this.upkeepPerYearRp(site, atMs),
@@ -404,7 +463,7 @@ class PublicCharging {
     const open = this.sites
       .map((site) => ({ site, capacity: siteCapacityAt(site, atMs) }))
       .filter((s) => s.capacity > 0)
-      .map((s) => ({ site: s.site, room: this.usersAt(s.site.id, atMs) < s.capacity }));
+      .map((s) => ({ site: s.site, room: this.committedAt(s.site.id, atMs) + 1 <= s.capacity }));
     const result = new Map<string, BuildingChargingAccess>();
     for (const b of buildings) {
       if (b.dwellings.length === 0) continue;
@@ -429,12 +488,14 @@ class PublicCharging {
     return result;
   }
 
-  /** Cars relying on public charging, and room for them, across every open site. */
-  townUsage(atMs: number): { users: number; capacity: number; points: number; sites: number } {
+  /** Vehicles relying on public charging, and the room taken against the room there is (in cars'
+   * worth), across every open site. */
+  townUsage(atMs: number): { users: number; capacity: number; points: number; sites: number; vehicles: VehicleCounts } {
     let users = 0;
     let capacity = 0;
     let points = 0;
     let sites = 0;
+    const vehicles: VehicleCounts = { car: 0, van: 0, truck: 0 };
     for (const site of this.sites) {
       const cap = siteCapacityAt(site, atMs);
       if (cap === 0) continue;
@@ -442,13 +503,22 @@ class PublicCharging {
       capacity += cap;
       points += pointsAt(site, atMs);
       users += this.usersAt(site.id, atMs);
+      const v = this.vehiclesAt(site.id, atMs);
+      vehicles.car += v.car;
+      vehicles.van += v.van;
+      vehicles.truck += v.truck;
     }
-    return { users, capacity, points, sites };
+    return { users, capacity, points, sites, vehicles };
   }
 
   /** Charge points in use right now: the sessions under way, never more than the site has. */
   pointsInUseAt(site: ChargingSite, atMs: number): number {
-    return Math.min(pointsAt(site, atMs), Math.round(this.siteLoadW(site, atMs) / (SESSION_POWER_KW[site.kind] * 1000)));
+    let inUse = 0;
+    for (const a of this.bySite.get(site.id) ?? []) {
+      if (a.fromMs > atMs || atMs >= a.toMs || !this.isDriving(a.slot, atMs)) continue;
+      if (this.assignmentLoadW(a, site.kind, atMs) > 0) inUse++;
+    }
+    return Math.min(pointsAt(site, atMs), inUse);
   }
 
   /** The points a site will have once everything ordered is built. */
@@ -467,13 +537,36 @@ class PublicCharging {
     this.notify();
   }
 
+  /** A name for a new site on the street at (lon, lat): the kind and the street, and — for the
+   * second and later of its kind on the same street — which side of the others it is on. */
+  private nameFor(kind: ChargingKind, street: string | null, x: number, y: number): string {
+    const base = `${SITE_NAME_PREFIX[kind]} ${street ?? "(unnamed street)"}`;
+    const taken = new Set(this.sites.map((s) => s.name));
+    const same = this.sites.filter((s) => s.kind === kind && s.street !== undefined && s.street === (street ?? ""));
+    if (same.length === 0 && !taken.has(base)) return base;
+    const cx = same.length > 0 ? same.reduce((sum, s) => sum + s.x, 0) / same.length : x;
+    const cy = same.length > 0 ? same.reduce((sum, s) => sum + s.y, 0) / same.length : y;
+    const dx = x - cx;
+    const dy = y - cy;
+    const ew = dx >= 0 ? "East" : "West";
+    const ns = dy >= 0 ? "North" : "South";
+    const [main, other] = Math.abs(dx) >= Math.abs(dy) ? [ew, ns] : [ns, ew];
+    for (const qualifier of [main, `${ns}-${ew}`, other]) {
+      const name = `${base} ${qualifier}`;
+      if (!taken.has(name)) return name;
+    }
+    for (let n = 2; ; n++) if (!taken.has(`${base} ${main} ${n}`)) return `${base} ${main} ${n}`;
+  }
+
   /** Orders a municipal site at the street nearest to (lon, lat): paid now, open once built. */
   build(kind: ChargingKind, lon: number, lat: number, atMs: number): ChargingSite | null {
-    const snapped = streets.snapToStreet(lon, lat) ?? { lon, lat, distanceM: 0 };
+    const snapped = streets.snapToStreet(lon, lat) ?? { lon, lat, distanceM: 0, street: null };
     const spec = BUILD_SPEC[kind];
+    const [x, y] = this.projection.toXY(snapped.lon, snapped.lat);
     const site = this.addSite({
       id: `municipal-${this.nextId++}`,
-      name: `${spec.label} (municipal)`,
+      name: this.nameFor(kind, snapped.street, x, y),
+      street: snapped.street ?? "",
       lon: snapped.lon,
       lat: snapped.lat,
       kind,
@@ -515,7 +608,8 @@ class PublicCharging {
   private operatorRound(year: number): boolean {
     const now = yearStartMs(year);
     const opensAt = now + OPERATOR_BUILD_MONTHS * MONTH_MS;
-    let demand = this.unmet.filter((d) => d.atMs >= yearStartMs(year - 1) && d.atMs < now);
+    // Operators build on-street chargers; demand only a fast-charging hub would meet (lorries) is left to the municipality.
+    let demand = this.unmet.filter((d) => d.kind === "ac" && d.atMs >= yearStartMs(year - 1) && d.atMs < now);
     let changed = false;
 
     // Full sites with demand around them grow.
@@ -542,10 +636,12 @@ class PublicCharging {
       const cx = bestGroup.reduce((s, d) => s + d.x, 0) / bestGroup.length;
       const cy = bestGroup.reduce((s, d) => s + d.y, 0) / bestGroup.length;
       const [lon, lat] = this.projection.toLonLat(cx, cy);
-      const snapped = streets.snapToStreet(lon, lat) ?? { lon, lat, distanceM: 0 };
+      const snapped = streets.snapToStreet(lon, lat) ?? { lon, lat, distanceM: 0, street: null };
+      const [sx, sy] = this.projection.toXY(snapped.lon, snapped.lat);
       this.addSite({
         id: `operator-${this.nextId++}`,
-        name: "On-street chargers (private operator)",
+        name: this.nameFor("ac", snapped.street, sx, sy),
+        street: snapped.street ?? "",
         lon: snapped.lon,
         lat: snapped.lat,
         kind: "ac",

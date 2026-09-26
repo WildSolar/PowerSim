@@ -27,6 +27,7 @@ from .schema import Building, Dwelling, MunicipalityDataset, PowerPlant, StreetS
 from .sources import footprints as footprints_source
 from .sources import boundary as boundary_source
 from .sources import chargers as chargers_source
+from .sources import vehicles as vehicles_source
 from .sources import district_heat as district_heat_source
 from .sources import streets as streets_source
 from .sources import exclusions as exclusions_source
@@ -171,6 +172,10 @@ def build(bfs_number: int) -> MunicipalityDataset:
     print("Fetching public charging sites (BFE register)...")
     charging_sites = chargers_source.fetch_sites(boundary_lv95)
     print(f"  {len(charging_sites)} sites, {sum(s['points'] for s in charging_sites)} charge points ({sum(1 for s in charging_sites if s['kind'] == 'dc')} fast-charging sites)")
+    print("Fetching registered vehicles (BFS)...")
+    vehicle_register = vehicles_source.fetch_register(bfs_number)
+    if vehicle_register:
+        print(f"  {vehicle_register['year']}: {vehicle_register['cars']} cars ({vehicle_register['cars_electric']} electric), {vehicle_register['goods_vehicles']} goods vehicles ({vehicle_register['goods_vehicles_electric']} electric)")
 
     dwellings_by_egid: dict[int, list[Dwelling]] = {}
     for _, row in dwellings_df.iterrows():
@@ -255,6 +260,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
         ],
         district_heat=network,
         charging_sites=charging_sites,
+        vehicle_register=vehicle_register,
     )
 
 

@@ -900,7 +900,13 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       const text =
         stats.capacity === 0
           ? `${site.name} — being built`
-          : `${site.name} — ${stats.users} of ${stats.capacity} cars (${Math.round(stats.utilization * 100)}%)`;
+          : `${site.name} — ${Math.round(stats.utilization * 100)}% full (${[
+              stats.vehicles.car && `${stats.vehicles.car} car${stats.vehicles.car === 1 ? "" : "s"}`,
+              stats.vehicles.van && `${stats.vehicles.van} van${stats.vehicles.van === 1 ? "" : "s"}`,
+              stats.vehicles.truck && `${stats.vehicles.truck} ${stats.vehicles.truck === 1 ? "lorry" : "lorries"}`,
+            ]
+              .filter(Boolean)
+              .join(", ") || "no vehicles yet"})`;
       popup.setLngLat([site.lon, site.lat]).setText(text).addTo(map);
     };
     const onLeave = () => popup.remove();

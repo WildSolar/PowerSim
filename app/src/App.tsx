@@ -25,6 +25,7 @@ import { stock } from "./sim/stock";
 import { streets } from "./sim/streets";
 import { districtHeat } from "./sim/districtHeat";
 import { publicCharging } from "./sim/publicCharging";
+import { fleets } from "./sim/fleet";
 import { bookInitialPublicCharging } from "./sim/mobility";
 import { policyStore } from "./sim/policy";
 import { approval } from "./sim/approval";
@@ -82,6 +83,7 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
         districtHeat.init(loaded);
         publicCharging.init(loaded, 0);
         publicCharging.setBuildingLookup((egid) => stock.lookup(egid));
+        fleets.init(loaded, (egid) => stock.lookup(egid)); // before the stock: it commits their decisions
         stock.init(loaded);
         bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building
         setDataset(loaded);

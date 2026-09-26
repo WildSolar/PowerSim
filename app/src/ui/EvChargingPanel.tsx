@@ -3,7 +3,8 @@ import { BUILD_SPEC, CARS_PER_POINT, REACH_M, type ChargingKind } from "../confi
 import { formatDate, toDateMs, toSimTimeMs } from "../sim/calendar";
 import { simClock } from "../sim/engine";
 import { existsAt } from "../sim/lifetime";
-import { publicCharging, siteCapacityAt, sitePriceRpPerKWh, type ChargingSite } from "../sim/publicCharging";
+import { publicCharging, siteCapacityAt, sitePriceRpPerKWh, type ChargingSite, type VehicleCounts } from "../sim/publicCharging";
+import { fleets } from "../sim/fleet";
 import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
 import { useStockBuildings } from "./useStock";
@@ -18,6 +19,15 @@ const KIND_LABEL: Record<ChargingKind, string> = { ac: "On-street", dc: "Fast ch
 
 function percent(part: number, total: number): string {
   return total > 0 ? `${Math.round((part / total) * 100)}%` : "–";
+}
+
+/** "12 cars, 3 vans, 1 lorry" — the kinds present only. */
+function vehicleList(v: VehicleCounts): string {
+  const parts: string[] = [];
+  if (v.car > 0) parts.push(`${v.car} car${v.car === 1 ? "" : "s"}`);
+  if (v.van > 0) parts.push(`${v.van} van${v.van === 1 ? "" : "s"}`);
+  if (v.truck > 0) parts.push(`${v.truck} ${v.truck === 1 ? "lorry" : "lorries"}`);
+  return parts.length > 0 ? parts.join(", ") : "none yet";
 }
 
 function formatMWh(kWh: number): string {
@@ -108,10 +118,17 @@ function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
         <p className="dh-note">Being built — opens {formatDate(site.openedAtMs)}.</p>
       ) : (
         <>
-          <div className="info-row" title={`Each charge point serves about ${CARS_PER_POINT[site.kind]} cars that rely on it. A full site takes no new ones.`}>
-            <span>Cars relying on it</span>
+          <div className="info-row">
+            <span>Relying on it</span>
+            <span className="info-value">{vehicleList(stats.vehicles)}</span>
+          </div>
+          <div
+            className="info-row"
+            title={`Each charge point serves about ${CARS_PER_POINT[site.kind]} cars that rely on it; a van takes about two cars' room, a lorry about twenty. A full site takes no new vehicles.`}
+          >
+            <span>Room taken</span>
             <span className="info-value">
-              {stats.users} / {stats.capacity} ({percent(stats.users, stats.capacity)})
+              {Math.round(stats.users)} / {stats.capacity} cars' worth ({percent(stats.users, stats.capacity)})
             </span>
           </div>
           <UsageBar used={stats.users} capacity={stats.capacity} />
@@ -141,7 +158,7 @@ function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
               </div>
             </>
           )}
-          <h4 className="ev-history-title">Cars relying on it, year by year</h4>
+          <h4 className="ev-history-title">Room taken, year by year (cars' worth)</h4>
           <UsageHistory site={site} now={now} />
         </>
       )}
@@ -177,7 +194,13 @@ export function EvChargingPanel() {
       byAccess.home += access.atHome;
       byAccess[access.others] += access.households - access.atHome;
     }
-    return { households, byAccess, usage: publicCharging.townUsage(simDay), unmet: publicCharging.unmetDemandCount(simDay - YEAR_MS, simDay) };
+    return {
+      households,
+      byAccess,
+      usage: publicCharging.townUsage(simDay),
+      unmet: publicCharging.unmetDemandCount(simDay - YEAR_MS, simDay),
+      fleet: fleets.census(standing, simDay),
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buildings, simDay, version]);
 
@@ -204,10 +227,14 @@ export function EvChargingPanel() {
           {town.usage.sites} · {town.usage.points} points
         </span>
       </div>
-      <div className="info-row" title="Cars of households without home charging, each booked to the public charger it relies on">
-        <span>Cars charging publicly</span>
+      <div className="info-row" title="Electric cars of households without home charging, and businesses' vans and lorries without a yard to charge in, each booked to the public charger it relies on">
+        <span>Charging publicly</span>
+        <span className="info-value">{vehicleList(town.usage.vehicles)}</span>
+      </div>
+      <div className="info-row" title="A van takes about two cars' room at a charger, a lorry about twenty">
+        <span>Room taken (cars' worth)</span>
         <span className="info-value">
-          {town.usage.users} / {town.usage.capacity}
+          {Math.round(town.usage.users)} / {town.usage.capacity}
         </span>
       </div>
       <UsageBar used={town.usage.users} capacity={town.usage.capacity} />
@@ -234,9 +261,23 @@ export function EvChargingPanel() {
           <span className="info-value">{percent(town.byAccess.none, town.households)}</span>
         </div>
       </div>
-      <div className="info-row" title="Households that would have bought an electric car in the last 12 months but had no public charger with room in reach. Private operators build where this gathers.">
+      <div className="info-row" title="Households and businesses that bought a petrol or diesel vehicle in the last 12 months but would have gone electric with a public charger close by. Private operators build on-street chargers where this gathers; lorries need a fast-charging hub, which they leave to the municipality.">
         <span>Wanted an EV, no charger (12 mo.)</span>
         <span className="info-value">{town.unmet}</span>
+      </div>
+      <div className="ev-access" title="Businesses' goods vehicles — the town's total is from the federal vehicle register">
+        <div className="info-row">
+          <span>🚐 Business vans</span>
+          <span className="info-value">
+            {town.fleet.vans} · {percent(town.fleet.vansElectric, town.fleet.vans)} electric
+          </span>
+        </div>
+        <div className="info-row">
+          <span>🚚 Lorries</span>
+          <span className="info-value">
+            {town.fleet.trucks} · {percent(town.fleet.trucksElectric, town.fleet.trucks)} electric
+          </span>
+        </div>
       </div>
 
       {selected ? (

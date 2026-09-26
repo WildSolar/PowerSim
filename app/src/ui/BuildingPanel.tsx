@@ -29,6 +29,7 @@ import { hasElectricWaterHeating, waterHeatingPowerW } from "../sim/waterHeating
 import { BillSection } from "./BillSection";
 import { COMMERCIAL_CATEGORY_ICON, COMMERCIAL_CATEGORY_LABEL } from "./commercialDisplay";
 import { EnergyBreakdown } from "./EnergyBreakdown";
+import { FleetSection } from "./FleetSection";
 import { energySourceLabel } from "./energySourceLabel";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { HistoryChart } from "./HistoryChart";
@@ -199,6 +200,8 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
           </div>
         </>
       )}
+
+      <FleetSection building={building} simTimeMs={simTimeMs} />
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Solar</h2>
       <div className={`device-row${hasSolar ? "" : " inactive"}`}>

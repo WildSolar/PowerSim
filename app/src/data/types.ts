@@ -97,6 +97,16 @@ export interface MunicipalityDataset {
   districtHeat?: DistrictHeatData | null;
   /** Public charging sites for electric cars, from the federal register — see pipeline/sources/chargers.py. */
   chargingSites?: ChargingSiteData[];
+  /** The registered road vehicles (BFS), latest year. Absent in older datasets. */
+  vehicleRegister?: VehicleRegister | null;
+}
+
+export interface VehicleRegister {
+  year: number;
+  cars: number;
+  carsElectric: number;
+  goodsVehicles: number;
+  goodsVehiclesElectric: number;
 }
 
 export interface ChargingSiteData {

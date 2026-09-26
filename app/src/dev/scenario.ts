@@ -21,6 +21,8 @@ import { stock } from "../sim/stock";
 import { streets } from "../sim/streets";
 import { districtHeat } from "../sim/districtHeat";
 import { publicCharging } from "../sim/publicCharging";
+import { fleets } from "../sim/fleet";
+import { tariffStore } from "../sim/tariffStore";
 import { bookInitialPublicCharging } from "../sim/mobility";
 import { PAYOUT_CATEGORIES, treasury } from "../sim/treasury";
 import type { Difficulty } from "../config/difficulty";
@@ -33,6 +35,10 @@ export interface ScenarioSpec {
   enact: { id: string; params?: Record<string, number | boolean | string>; year?: number }[];
   /** Calendar years to report on (each read as of 1 January). */
   reportYears: number[];
+  /** Municipal public chargers to build, and in which calendar year (1 January). */
+  chargers?: { kind: "ac" | "dc"; lon: number; lat: number; year?: number }[];
+  /** Tariff changes at the start (e.g. the municipal public charging prices). */
+  tariff?: Record<string, number>;
   /** Run the approval model too (votes and game over included). Off by default: the physical effect of
    * a measure is easier to judge without a referendum striking it down. */
   withApproval?: boolean;
@@ -48,7 +54,8 @@ export interface ScenarioRow {
   carSlots: { evShare: number };
   /** Public charging: open sites and points, cars relying on them against their room, sites private
    * operators opened, and households that wanted an electric car last year but found no charger. */
-  charging: { sites: number; points: number; users: number; capacity: number; operatorSites: number; unmetLastYear: number };
+  charging: { sites: number; points: number; users: number; capacity: number; operatorSites: number; unmetLastYear: number; vehicles: Record<string, number> };
+  fleet: { vans: number; vansElectric: number; trucks: number; trucksElectric: number };
   modeShare: Record<string, number>;
   energyClass: Record<string, number>;
   solarKwp: number;
@@ -102,10 +109,11 @@ function snapshot(dataset: MunicipalityDataset, year: number, atMs: number): Sce
     heatPumpShare: Math.round((heatPumps / (buildings.length || 1)) * 1000) / 1000,
     carSlots: { evShare: Math.round((evSlots / (carSlots || 1)) * 1000) / 1000 },
     charging: {
-      ...(({ sites, points, users, capacity }) => ({ sites, points, users, capacity }))(publicCharging.townUsage(atMs)),
+      ...(({ sites, points, users, capacity, vehicles }) => ({ sites, points, users: Math.round(users), capacity, vehicles }))(publicCharging.townUsage(atMs)),
       operatorSites: publicCharging.getSites().filter((s) => s.id.startsWith("operator-")).length,
       unmetLastYear: publicCharging.unmetDemandCount(atMs - 12 * MONTH_MS, atMs),
     },
+    fleet: fleets.census(stock.getAll(), atMs),
     modeShare: shares(modes),
     energyClass: classes,
     solarKwp: Math.round(solarKwp),
@@ -125,6 +133,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   districtHeat.init(dataset);
   publicCharging.init(dataset, 0);
   publicCharging.setBuildingLookup((egid) => stock.lookup(egid));
+  fleets.init(dataset, (egid) => stock.lookup(egid)); // before the stock: it commits their decisions
   stock.init(dataset);
   bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building
 
@@ -140,7 +149,16 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
       pending.splice(pending.indexOf(e), 1);
     }
   };
+  const pendingChargers = [...(spec.chargers ?? [])];
+  const buildDue = (year: number, atMs: number) => {
+    for (const c of pendingChargers.filter((p) => (p.year ?? startYear) <= year)) {
+      publicCharging.build(c.kind, c.lon, c.lat, atMs);
+      pendingChargers.splice(pendingChargers.indexOf(c), 1);
+    }
+  };
+  if (spec.tariff) tariffStore.set(spec.tariff);
   enactDue(startYear, 0);
+  buildDue(startYear, 0);
 
   for (;;) {
     const previous = new Date(toDateMs(t));
@@ -152,6 +170,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     stock.advance(t);
     publicCharging.advance(t);
     enactDue(year, t);
+    buildDue(year, t);
 
     const newYear = now.getUTCFullYear() !== previous.getUTCFullYear();
     if (newYear && spec.reportYears.includes(year)) {

@@ -100,10 +100,11 @@ class StreetNetwork {
 
   /** The closest point on any street to (lon, lat), and how far away it is — where something
    * placed on the map (a charger) actually goes. Null without streets. */
-  snapToStreet(lon: number, lat: number): { lon: number; lat: number; distanceM: number } | null {
+  snapToStreet(lon: number, lat: number): { lon: number; lat: number; distanceM: number; street: string | null } | null {
     const p = this.projection.toXY(lon, lat);
-    let best: { x: number; y: number; d: number } | null = null;
-    for (const line of this.linesXY) {
+    let best: { x: number; y: number; d: number; id: number } | null = null;
+    for (let id = 0; id < this.linesXY.length; id++) {
+      const line = this.linesXY[id];
       for (let i = 1; i < line.length; i++) {
         const [ax, ay] = line[i - 1];
         const [bx, by] = line[i];
@@ -114,12 +115,26 @@ class StreetNetwork {
         const x = ax + t * dx;
         const y = ay + t * dy;
         const d = Math.hypot(x - p[0], y - p[1]);
-        if (!best || d < best.d) best = { x, y, d };
+        if (!best || d < best.d) best = { x, y, d, id };
       }
     }
     if (!best) return null;
     const [snappedLon, snappedLat] = this.projection.toLonLat(best.x, best.y);
-    return { lon: snappedLon, lat: snappedLat, distanceM: best.d };
+    return { lon: snappedLon, lat: snappedLat, distanceM: best.d, street: this.nameNear(best.id, best.x, best.y) };
+  }
+
+  /** A segment's street name — or, for an unnamed one (a side lane), the nearest named street's. */
+  private nameNear(id: number, x: number, y: number): string | null {
+    const own = this.segments[id]?.name;
+    if (own) return own;
+    let best: { name: string; d: number } | null = null;
+    for (let i = 0; i < this.linesXY.length; i++) {
+      const name = this.segments[i]?.name;
+      if (!name) continue;
+      const d = distanceToPolylineM([x, y], this.linesXY[i]);
+      if (!best || d < best.d) best = { name, d };
+    }
+    return best && best.d <= 80 ? best.name : null;
   }
 
   /** The segments a new building at (lon, lat) can be reached from, as the pipeline links the

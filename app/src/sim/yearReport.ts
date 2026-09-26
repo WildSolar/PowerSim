@@ -31,6 +31,7 @@ import type { HeatingSystemId } from "./heatingSystems";
 import { historyTimeSteps, sampleMunicipalityCategorySeries, type CategorySeries } from "./history";
 import { ANNUAL_CAR_KM, ICE_CAR_L_PER_100KM } from "./mobilitySystems";
 import { slotsWithVehicleAt } from "./mobility";
+import { fleets } from "./fleet";
 import { effectivePowerPlants } from "./solarAdoption";
 import { spaceHeatingThermalDemandW } from "./spaceHeating";
 import type { Tariff } from "./tariff";
@@ -309,19 +310,21 @@ export async function computeNetElectricityKWh(buildings: Building[], realPlants
   );
 }
 
-const mobilityFuelByMonth = new Map<number, Promise<{ iceCarSlotSamples: number; samples: number }>>();
+const mobilityFuelByMonth = new Map<number, Promise<{ iceCarSlotSamples: number; fleetLitersPerYearSum: number; samples: number }>>();
 
-function monthMobilityFuel(buildings: Building[], year: number, month: number): Promise<{ iceCarSlotSamples: number; samples: number }> {
+function monthMobilityFuel(buildings: Building[], year: number, month: number): Promise<{ iceCarSlotSamples: number; fleetLitersPerYearSum: number; samples: number }> {
   return sharedMonth(mobilityFuelByMonth, year, month, () => {
     let iceCarSlotSamples = 0;
+    let fleetLitersPerYearSum = 0;
     const times = monthTimes(year, month, COARSE_SAMPLES_PER_MONTH);
     for (const t of times) {
       for (const building of buildings) {
         if (!existsAt(building, t)) continue;
         for (const dwelling of building.dwellings) iceCarSlotSamples += slotsWithVehicleAt(building.egid, dwelling, "carICE", t);
       }
+      fleetLitersPerYearSum += fleets.dieselLitersPerYearAt(buildings, t);
     }
-    return { iceCarSlotSamples, samples: times.length };
+    return { iceCarSlotSamples, fleetLitersPerYearSum, samples: times.length };
   });
 }
 
@@ -337,13 +340,17 @@ function monthMobilityFuel(buildings: Building[], year: number, month: number): 
  * moves within a month. */
 export async function computeMobilityFuelLiters(buildings: Building[], year: number): Promise<number> {
   let iceCarSlotSamples = 0;
+  let fleetLitersPerYearSum = 0;
   let totalSamples = 0;
   for (const month of await eachMonth((m) => monthMobilityFuel(buildings, year, m))) {
     iceCarSlotSamples += month.iceCarSlotSamples;
+    fleetLitersPerYearSum += month.fleetLitersPerYearSum;
     totalSamples += month.samples;
   }
-  const avgIceCarCount = totalSamples > 0 ? iceCarSlotSamples / totalSamples : 0;
-  return avgIceCarCount * (ANNUAL_CAR_KM / 100) * ICE_CAR_L_PER_100KM;
+  if (totalSamples === 0) return 0;
+  const avgIceCarCount = iceCarSlotSamples / totalSamples;
+  // Plus businesses' diesel vans and lorries (fleet.ts), at their average yearly rate.
+  return avgIceCarCount * (ANNUAL_CAR_KM / 100) * ICE_CAR_L_PER_100KM + fleetLitersPerYearSum / totalSamples;
 }
 
 export interface RetrofitTallyEntry {

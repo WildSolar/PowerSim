@@ -20,22 +20,40 @@ export type ChargingKind = "ac" | "dc";
 // How far a household will go to its charger: an on-street charger has to be within walking
 // distance (it charges overnight); a fast-charging hub is a weekly errand.
 export const REACH_M: Record<ChargingKind, number> = { ac: 300, dc: 1500 };
-// How many cars relying on public charging one charge point can serve.
-export const CARS_PER_POINT: Record<ChargingKind, number> = { ac: 3, dc: 20 };
+// Who charges in public: households' cars, and businesses' vans and trucks (sim/fleet.ts).
+export type ChargingVehicle = "car" | "van" | "truck";
+
+// How many cars relying on public charging one charge point can serve. A van or truck takes up
+// room by the energy it needs a day, in cars' worth (a van about two cars, a truck about twenty).
+export const CARS_PER_POINT: Record<ChargingKind, number> = { ac: 3, dc: 30 };
 // The nuisance of charging in public rather than at home, CHF a year: a base for having to go at
-// all, more the further away the charger is, and more as it fills up (queues, blocked points).
-// Tuned so an empty on-street charger next door makes an electric car about as good a deal as a
-// petrol one (charging at home is clearly better): where a charger is, and what it costs, tips it.
-export const HASSLE_BASE_CHF: Record<ChargingKind, number> = { ac: 100, dc: 500 };
-export const HASSLE_AT_REACH_CHF: Record<ChargingKind, number> = { ac: 250, dc: 300 };
-export const HASSLE_WHEN_FULL_CHF = 400;
+// all, more the further away the charger is, and more as it fills up. Tuned so an empty on-street
+// charger next door makes an electric car about as good a deal as a petrol one (charging at home is
+// clearly better): where a charger is, and what it costs, tips it. A fast-charging hub is a short
+// weekly stop rather than a nightly hunt for a free spot: dearer per kWh and further away, but it
+// hardly suffers from being busy (a queue there is minutes, not a night without a charge) — so a
+// busy on-street charger loses people to a hub, and a hub alone still makes an electric car a
+// close call for many.
+export const HASSLE_BASE_CHF: Record<ChargingKind, number> = { ac: 100, dc: 150 };
+export const HASSLE_AT_REACH_CHF: Record<ChargingKind, number> = { ac: 250, dc: 250 };
+export const HASSLE_WHEN_FULL_CHF: Record<ChargingKind, number> = { ac: 500, dc: 150 };
 
 // What private operators charge (the municipality's own prices are in the tariff), Rp/kWh.
-export const PRIVATE_PRICE_RP_PER_KWH: Record<ChargingKind, number> = { ac: 45, dc: 65 };
+export const PRIVATE_PRICE_RP_PER_KWH: Record<ChargingKind, number> = { ac: 45, dc: 55 };
 
-// How a publicly charged car uses its charger: on some days only, with a bigger top-up each time.
-export const SESSION_DAY_SHARE: Record<ChargingKind, number> = { ac: 0.4, dc: 0.2 };
-export const SESSION_POWER_KW: Record<ChargingKind, number> = { ac: 11, dc: 100 }; // dc: what a car actually draws on average
+// How a publicly charged vehicle uses its charger: on some days only, with a bigger top-up each
+// time — a truck nearly every day.
+export const SESSION_DAY_SHARE: Record<ChargingVehicle, Record<ChargingKind, number>> = {
+  car: { ac: 0.4, dc: 0.2 },
+  van: { ac: 0.6, dc: 0.4 },
+  truck: { ac: 0.9, dc: 0.9 },
+};
+// What a vehicle actually draws while charging, kW (a fast charger's rated power is rarely reached).
+export const SESSION_POWER_KW: Record<ChargingVehicle, Record<ChargingKind, number>> = {
+  car: { ac: 11, dc: 100 },
+  van: { ac: 11, dc: 80 },
+  truck: { ac: 22, dc: 150 },
+};
 
 // --- Building sites (the municipality) ---
 

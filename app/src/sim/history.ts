@@ -33,6 +33,7 @@ import { commercialPowerWFromProfile, makeCommercialProfile, type CommercialProf
 import { heatPumpPowerWWithWeather } from "./heatPump";
 import { mobilityChargingPowerW } from "./mobility";
 import { publicCharging } from "./publicCharging";
+import { fleets } from "./fleet";
 import { irradianceWm2, pvPowerWAt } from "./pv";
 import { existsAt } from "./lifetime";
 import { hashSeed } from "./rng";
@@ -299,6 +300,7 @@ export function sampleBuildingCategorySeries(building: Building, times: number[]
   const { heatPumpW, acW } = climateControlCategorySeries([building], times);
   const waterHeatingW = waterHeatingCategorySeries([building], times);
   const commercialW = commercialCategorySeries([building], times);
+  dwellingTotals.evW = dwellingTotals.evW.map((w, i) => w + fleets.depotPowerW(building, times[i])); // its businesses' vans and lorries
   const solarW = pvSeries(
     plants.filter((p) => p.egid === building.egid),
     times,
@@ -331,8 +333,9 @@ export function sampleMunicipalityCategorySeries(
   plants: PowerPlant[],
 ): CategorySeries {
   const dwellingTotals = dwellingCategoryTotals(dwellingProfileSets(buildings), times, tariff);
-  // Cars charged at public chargers draw there, not at home — still the town's EV charging.
-  dwellingTotals.evW = dwellingTotals.evW.map((w, i) => w + publicCharging.totalLoadW(times[i]));
+  // Vehicles charged at public chargers draw there, not at home, and businesses' at their depots —
+  // all of it the town's EV charging.
+  dwellingTotals.evW = dwellingTotals.evW.map((w, i) => w + publicCharging.totalLoadW(times[i]) + fleets.totalDepotPowerW(buildings, times[i]));
   const { heatPumpW, acW } = climateControlCategorySeries(buildings, times);
   const waterHeatingW = waterHeatingCategorySeries(buildings, times);
   const commercialW = commercialCategorySeries(buildings, times);

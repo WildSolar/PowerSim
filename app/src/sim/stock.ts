@@ -93,6 +93,7 @@ import {
 import { applyNewBuildAttributes, buildingGroup, gfaOf } from "./newBuild";
 import { policyStore } from "./policy";
 import { commitVehicleDecisions } from "./mobility";
+import { fleets } from "./fleet";
 import { energyClassAt } from "./retrofit";
 import { measures } from "./measures";
 import { treasury } from "./treasury";
@@ -374,6 +375,7 @@ class StockStore {
       energyClassAt(b, nowMs);
       currentHeatingSystemId(b, nowMs);
       commitVehicleDecisions(b, nowMs);
+      fleets.commit(b, nowMs);
     }
   }
 

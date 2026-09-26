@@ -5,13 +5,15 @@ import { commercialPowerW } from "./commercial";
 import { dwellingDevicePowerW } from "./devices";
 import { heatPumpPowerW } from "./heatPump";
 import { mobilityChargingPowerW } from "./mobility";
+import { fleets } from "./fleet";
 import { pvPowerForBuildingW } from "./pv";
 import { snowDepthCm } from "./snow";
 import { tariffStore } from "./tariffStore";
 import { waterHeatingPowerW } from "./waterHeating";
 
 /** Net of every dwelling's live device draw, the building's own heat pump, AC,
- * electric water heating, and non-residential/commercial use (if any), and any
+ * electric water heating, non-residential/commercial use (if any), its businesses' electric vans
+ * and lorries charging at the depot (fleet.ts), and any
  * rooftop solar (negative — a credit), at a point in simulated time. `snowCoverCm`
  * can be precomputed once by a caller scanning many buildings at the same instant
  * (see MapView's power-draw tick) rather than have each one redo the same 30-day
@@ -24,6 +26,7 @@ export function buildingPowerW(building: Building, simTimeMs: number, plants: Po
     acPowerW(building, simTimeMs) +
     waterHeatingPowerW(building, simTimeMs) +
     commercialPowerW(building, simTimeMs) +
+    fleets.depotPowerW(building, simTimeMs) +
     pvPowerForBuildingW(building.egid, plants, simTimeMs, snow);
   const tariff = tariffStore.get();
   for (const dwelling of building.dwellings) {
