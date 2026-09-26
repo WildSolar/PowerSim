@@ -70,6 +70,7 @@ import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 import { publicCharging } from "./publicCharging";
 import { existsAt } from "./lifetime";
+import { priceFactor } from "./costTrends";
 
 // --- slot count --------------------------------------------------------------
 
@@ -168,14 +169,14 @@ function chargingAccessAt(egid: string, ewid: string, atMs: number): { access: C
   };
 }
 
-function carCandidatesAt(tariff: Tariff, incumbent: VehicleTypeId, access: ChargingAccess, onElectricChosen: (atMs: number) => void): RenewalCandidate<VehicleTypeId>[] {
+function carCandidatesAt(tariff: Tariff, atMs: number, incumbent: VehicleTypeId, access: ChargingAccess, onElectricChosen: (atMs: number) => void): RenewalCandidate<VehicleTypeId>[] {
   const annualKWh = (ANNUAL_CAR_KM / 100) * EV_CAR_KWH_PER_100KM;
   // Without a charger to rely on, an electric car is out — but its cost is still worked out as if
   // an on-street charger were close by, so the decision records whether it was wanted.
   const publicCost = access.kind === "public" ? access : access.kind === "none" ? publicCharging.hypotheticalOptionCostRp() : null;
   return CAR_VEHICLE_ORDER.map((id) => {
     const spec = VEHICLE_TYPE_CATALOG[id];
-    const beforeMunicipalRp = Math.max(0, spec.baseInstallCostRp - spec.subsidyRp);
+    const beforeMunicipalRp = Math.max(0, spec.baseInstallCostRp * priceFactor(id, atMs) - spec.subsidyRp);
     const scrappageRp = id === "carEV" && incumbent === "carICE" ? policyStore.get().iceScrappageBonusRp : 0;
     const municipalRp = Math.min(municipalVehicleSubsidyRp(id) + scrappageRp, beforeMunicipalRp);
     const installCostRp = beforeMunicipalRp - municipalRp;
@@ -197,10 +198,10 @@ function carCandidatesAt(tariff: Tariff, incumbent: VehicleTypeId, access: Charg
   });
 }
 
-function bikeCandidatesAt(tariff: Tariff): RenewalCandidate<VehicleTypeId>[] {
+function bikeCandidatesAt(tariff: Tariff, atMs: number): RenewalCandidate<VehicleTypeId>[] {
   return BIKE_VEHICLE_ORDER.map((id) => {
     const spec = VEHICLE_TYPE_CATALOG[id];
-    const installCostRp = Math.max(0, spec.baseInstallCostRp - spec.subsidyRp);
+    const installCostRp = Math.max(0, spec.baseInstallCostRp * priceFactor(id, atMs) - spec.subsidyRp);
     const runningCostRp = id === "bikeElectric" ? (ANNUAL_BIKE_KM / 100) * EBIKE_KWH_PER_100KM * avgElecRpKWh(tariff) : 0;
     return {
       id,
@@ -263,10 +264,10 @@ function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "c
     biasStrengthRp: biasStrengthRp(egid, ewid, slotIndex, kind),
     lifetimeMeanYearsFor: (id) => VEHICLE_TYPE_CATALOG[id].lifetimeMeanYears,
     candidatesAt: (atMs, incumbent) => {
-      if (kind === "bike") return bikeCandidatesAt(tariffStore.get());
+      if (kind === "bike") return bikeCandidatesAt(tariffStore.get(), atMs);
       const where = chargingAccessAt(egid, ewid, atMs);
       const access = where?.access ?? { kind: "home" };
-      return carCandidatesAt(tariffStore.get(), incumbent, access, (chosenAtMs) => {
+      return carCandidatesAt(tariffStore.get(), atMs, incumbent, access, (chosenAtMs) => {
         if (access.kind === "public") publicCharging.assign(key, slotHandleFor(egid, ewid, slotIndex), access.siteId, chosenAtMs);
       });
     },
@@ -277,7 +278,7 @@ function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "c
       kind === "car"
         ? (event) => {
             publicCharging.endAssignment(key, event.installedAtMs);
-            if (event.system !== "carEV" && event.previousSystem !== null && wouldGoElectricWithCharger(egid, ewid, slotIndex, event.previousSystem)) {
+            if (event.system !== "carEV" && event.previousSystem !== null && wouldGoElectricWithCharger(egid, ewid, slotIndex, event.previousSystem, event.installedAtMs)) {
               const building = publicCharging.lookupBuilding(egid);
               if (building) publicCharging.logUnmetDemand(building.lon, building.lat, event.installedAtMs);
             }
@@ -290,12 +291,12 @@ function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "c
 /** Whether a household without home charging that just bought a car other than an electric one
  * would have gone electric with an empty on-street charger close by — the same decision, re-run with
  * that charger (publicCharging.hypotheticalOptionCostRp). */
-function wouldGoElectricWithCharger(egid: string, ewid: string, slotIndex: number, incumbent: VehicleTypeId): boolean {
+function wouldGoElectricWithCharger(egid: string, ewid: string, slotIndex: number, incumbent: VehicleTypeId, atMs: number): boolean {
   const building = publicCharging.lookupBuilding(egid);
   const dwelling = building?.dwellings.find((d) => d.ewid === ewid);
   if (!building || !dwelling || publicCharging.homeChargingAt(building, dwelling)) return false;
   const nearby = publicCharging.hypotheticalOptionCostRp();
-  const candidates = carCandidatesAt(tariffStore.get(), incumbent, { kind: "public", siteId: "", ...nearby }, () => {});
+  const candidates = carCandidatesAt(tariffStore.get(), atMs, incumbent, { kind: "public", siteId: "", ...nearby }, () => {});
   const bias = biasStrengthRp(egid, ewid, slotIndex, "car") + policyStore.get().progressiveNudgeRp;
   return chooseNext(candidates, incumbent, VEHICLE_UNCERTAINTY_FRACTION, bias).chosen === "carEV";
 }

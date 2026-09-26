@@ -50,6 +50,7 @@ import { buildingThermalProfile, copAt, spaceHeatingThermalDemandW } from "./spa
 import { tariffStore } from "./tariffStore";
 import type { Tariff } from "./tariff";
 import { dailyMeanTempC } from "./weather";
+import { priceFactor } from "./costTrends";
 
 const DAY_MS = 24 * 60 * 60_000;
 const ANNUAL_SAMPLE_DAYS = 365;
@@ -149,7 +150,7 @@ function candidatesAt(
   return HEATING_SYSTEM_ORDER.map((id) => {
     const spec = HEATING_SYSTEM_CATALOG[id];
     // Keeping the same system can be much cheaper than installing it new (see replacementInstallCostRp).
-    const installRp = id === incumbent ? (spec.replacementInstallCostRp ?? spec.baseInstallCostRp) : spec.baseInstallCostRp;
+    const installRp = (id === incumbent ? (spec.replacementInstallCostRp ?? spec.baseInstallCostRp) : spec.baseInstallCostRp) * priceFactor(id, atMs);
     const beforeMunicipalRp = Math.max(0, installRp * scale - spec.subsidyRp);
     const municipalRp = withMunicipalSubsidy ? Math.min(municipalHeatingSubsidyRp(id), beforeMunicipalRp) : 0;
     const installCostRp = beforeMunicipalRp - municipalRp;

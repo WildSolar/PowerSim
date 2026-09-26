@@ -45,9 +45,11 @@ export function usableRoofFractionFromDraw(u: number): number {
   return Math.min(MAX_USABLE_FRACTION, Math.max(MIN_USABLE_FRACTION, fraction));
 }
 
-export function installCostRpPerKwp(capacityKw: number): number {
+/** Today's install price per kWp for a system of this size, times `priceFactor` (costTrends.ts)
+ * for another year's prices. */
+export function installCostRpPerKwp(capacityKw: number, priceFactor = 1): number {
   const raw = INSTALL_COST_CURVE_A_RP_PER_KWP * Math.pow(Math.max(capacityKw, 1), -INSTALL_COST_CURVE_EXPONENT);
-  return Math.max(INSTALL_COST_FLOOR_RP_PER_KWP, raw);
+  return Math.max(INSTALL_COST_FLOOR_RP_PER_KWP, raw) * priceFactor;
 }
 
 export function federalSubsidyRp(capacityKw: number): number {

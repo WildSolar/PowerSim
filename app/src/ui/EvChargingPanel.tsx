@@ -3,7 +3,7 @@ import { BUILD_SPEC, CARS_PER_POINT, REACH_M, type ChargingKind } from "../confi
 import { formatDate, toDateMs, toSimTimeMs } from "../sim/calendar";
 import { simClock } from "../sim/engine";
 import { existsAt } from "../sim/lifetime";
-import { publicCharging, siteCapacityAt, sitePriceRpPerKWh, type ChargingSite, type VehicleCounts } from "../sim/publicCharging";
+import { buildCostRp, publicCharging, siteCapacityAt, sitePriceRpPerKWh, type ChargingSite, type VehicleCounts } from "../sim/publicCharging";
 import { fleets } from "../sim/fleet";
 import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
@@ -311,7 +311,7 @@ export function EvChargingPanel() {
               <button key={kind} onClick={() => publicCharging.startPlacing(kind)}>
                 <span className="ev-build-name">{spec.label}</span>
                 <span className="ev-build-detail">
-                  {spec.points} × {spec.powerKw} kW · {formatCHF(spec.costChf * 100)} · {spec.buildMonths} months
+                  {spec.points} × {spec.powerKw} kW · {formatCHF(Math.round(buildCostRp(kind, simDay) / 100_000) * 100_000)} · {spec.buildMonths} months
                 </span>
                 <span className="ev-build-detail">{BUILD_HINT[kind]}</span>
               </button>

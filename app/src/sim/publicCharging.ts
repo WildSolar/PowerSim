@@ -60,6 +60,8 @@ import { firstRandom, hashSeed, hashSeedFrom } from "./rng";
 import { streets } from "./streets";
 import { tariffStore } from "./tariffStore";
 import { treasury } from "./treasury";
+import { priceFactor } from "./costTrends";
+import type { CostTrendId } from "../config/costTrends";
 
 const DAY_MS = 24 * 60 * 60_000;
 const MONTH_MS = (365.25 * DAY_MS) / 12;
@@ -138,6 +140,13 @@ export interface SiteStats {
   /** Municipal sites only: last year's sales, and the upkeep. */
   revenueLastYearRp: number;
   upkeepPerYearRp: number;
+}
+
+const BUILD_COST_TREND: Record<ChargingKind, CostTrendId> = { ac: "chargerAc", dc: "chargerDc", fleet: "chargerFleet" };
+
+/** What building a municipal site of this kind costs at `atMs` (Rp) — chargers get cheaper. */
+export function buildCostRp(kind: ChargingKind, atMs: number): number {
+  return BUILD_SPEC[kind].costChf * 100 * priceFactor(BUILD_COST_TREND[kind], atMs);
 }
 
 const SITE_NAME_PREFIX: Record<ChargingKind, string> = { ac: "On-street charger", dc: "Fast-charging hub", fleet: "Lorry charging park" };
@@ -577,7 +586,7 @@ class PublicCharging {
       points: spec.points,
       openedAtMs: atMs + spec.buildMonths * MONTH_MS,
     });
-    treasury.recordPayout("charging", atMs, spec.costChf * 100, site.id);
+    treasury.recordPayout("charging", atMs, buildCostRp(kind, atMs), site.id);
     this.placing = null;
     this.selectedSiteId = site.id;
     this.notify();

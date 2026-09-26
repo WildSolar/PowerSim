@@ -62,6 +62,7 @@
 import type { Building, PowerPlant } from "../data/types";
 import {
   BASE_ANNUAL_HAZARD,
+  SOLAR_PRICE_HAZARD_ELASTICITY,
   MAX_ANNUAL_HAZARD,
   NEIGHBOR_BOOST_CAP,
   NEIGHBOR_BOOST_PER_ADOPTER,
@@ -97,6 +98,7 @@ import { irradianceWm2, PEAK_IRRADIANCE_WM2 } from "./pv";
 import { isOffPeakHour, type Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 import { treasury } from "./treasury";
+import { priceFactorInYear } from "./costTrends";
 
 const DAY_MS = 24 * 60 * 60_000;
 const YEAR_MS = 365.25 * DAY_MS;
@@ -247,7 +249,7 @@ function evaluateAdoption(
   const capacityKw = (building.footprintAreaM2 ?? 0) * usableFraction * kwpPerM2At(year);
   if (capacityKw <= 0) return null;
 
-  const installCostRp = capacityKw * installCostRpPerKwp(capacityKw);
+  const installCostRp = capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year));
   const federalRp = federalSubsidyRp(capacityKw);
   const municipalRp = Math.max(0, Math.min(capacityKw * policy.solarSubsidyRpPerKwp + policy.solarSubsidyFixedRp, installCostRp - federalRp));
   const subsidyRp = federalRp + municipalRp;
@@ -322,7 +324,7 @@ function installMunicipalSolar(buildings: Building[], realPlants: PowerPlant[], 
     const usable = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
     const capacityKw = (building.footprintAreaM2 ?? 0) * usable * kwpPerM2At(year);
     if (capacityKw <= 0) continue;
-    const installCostRp = capacityKw * installCostRpPerKwp(capacityKw);
+    const installCostRp = capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year));
     const federalRp = federalSubsidyRp(capacityKw);
     const dayOffset = Math.floor(mulberry32(hashSeed(building.egid, "municipal-solar-day", String(year)))() * 365);
     const installedAtMs = yearStartMs + dayOffset * DAY_MS;
@@ -346,6 +348,7 @@ function processYear(buildings: Building[], realPlants: PowerPlant[], year: numb
   installMunicipalSolar(buildings, realPlants, year, yearStartMs);
 
   let sunlight: YearSunlight | undefined;
+  const priceMultiplier = Math.pow(1 / priceFactorInYear("solar", year), SOLAR_PRICE_HAZARD_ELASTICITY);
   for (const building of buildings) {
     if (adoptionByEgid.has(building.egid)) continue;
     if (!isEligible(building, realPlants, year)) continue;
@@ -354,7 +357,7 @@ function processYear(buildings: Building[], realPlants: PowerPlant[], year: numb
     const renewalBoosted = hadRecentHeatingRenewal(building, yearStartMs);
     const renewalBoost = renewalBoosted ? RENEWAL_BOOST_MULTIPLIER : 1;
     const neighborMultiplier = 1 + Math.min(NEIGHBOR_BOOST_CAP - 1, neighborAdopters * NEIGHBOR_BOOST_PER_ADOPTER);
-    const hazard = Math.min(MAX_ANNUAL_HAZARD, BASE_ANNUAL_HAZARD * renewalBoost * neighborMultiplier * outreachHazardMultiplier(policy));
+    const hazard = Math.min(MAX_ANNUAL_HAZARD, BASE_ANNUAL_HAZARD * renewalBoost * neighborMultiplier * outreachHazardMultiplier(policy) * priceMultiplier);
 
     const draw = mulberry32(hashSeed(building.egid, "solar-hazard", String(year)))();
     if (draw >= hazard) continue;
@@ -481,7 +484,7 @@ export function registerNewBuildSolar(building: Building, builtAtMs: number, rul
   adoptionByEgid.set(building.egid, {
     installedAtMs: builtAtMs,
     capacityKw,
-    installCostRp: capacityKw * installCostRpPerKwp(capacityKw),
+    installCostRp: capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year)),
     federalSubsidyRp: federalSubsidyRp(capacityKw),
     municipalSubsidyRp: 0,
     annualSavingsRp: 0,

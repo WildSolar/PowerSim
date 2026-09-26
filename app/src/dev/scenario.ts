@@ -23,6 +23,7 @@ import { districtHeat } from "../sim/districtHeat";
 import { publicCharging } from "../sim/publicCharging";
 import { fleets } from "../sim/fleet";
 import { tariffStore } from "../sim/tariffStore";
+import { setCostTrendsEnabled } from "../sim/costTrends";
 import { bookInitialPublicCharging } from "../sim/mobility";
 import { PAYOUT_CATEGORIES, treasury } from "../sim/treasury";
 import type { Difficulty } from "../config/difficulty";
@@ -37,6 +38,8 @@ export interface ScenarioSpec {
   reportYears: number[];
   /** Municipal public chargers to build, and in which calendar year (1 January). */
   chargers?: { kind: "ac" | "dc" | "fleet"; lon: number; lat: number; year?: number }[];
+  /** False: every technology keeps today's price (costTrends.ts), to measure what the trends do. */
+  costTrends?: boolean;
   /** Tariff changes at the start (e.g. the municipal public charging prices). */
   tariff?: Record<string, number>;
   /** Run the approval model too (votes and game over included). Off by default: the physical effect of
@@ -157,6 +160,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     }
   };
   if (spec.tariff) tariffStore.set(spec.tariff);
+  setCostTrendsEnabled(spec.costTrends ?? true);
   enactDue(startYear, 0);
   buildDue(startYear, 0);
 
@@ -173,6 +177,9 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     buildDue(year, t);
 
     const newYear = now.getUTCFullYear() !== previous.getUTCFullYear();
+    // Solar adoption settles a year's round the first time that year is asked about — in the game the
+    // map and the year-end report ask every year; here nothing would until the next report year.
+    if (newYear) effectivePowerPlantsAt(stock.getAll(), dataset.powerPlants, t);
     if (newYear && spec.reportYears.includes(year)) {
       const row = snapshot(dataset, year, t);
       if (spec.withEmissions) {

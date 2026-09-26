@@ -41,6 +41,7 @@ import { policyStore } from "./policy";
 import { peekRenewalChain, renewalEventsUpTo, systemAt, type RenewalCandidate, type RenewalEvent, type RenewalParams } from "./renewal";
 import { hashSeed, mulberry32 } from "./rng";
 import { originalUValue } from "./spaceHeating";
+import { priceFactor } from "./costTrends";
 
 const initialClassCache = new Map<string, EnergyClassId>();
 
@@ -82,6 +83,7 @@ function candidatesAt(building: Building, atMs: number, incumbent: EnergyClassId
   const incumbentSpec = ENERGY_CLASS_CATALOG[incumbent];
   const incumbentRank = energyClassRank(incumbent);
   const minRank = rules.minClass === null ? 0 : energyClassRank(rules.minClass);
+  const workFactor = priceFactor("insulation", atMs); // building work gets dearer over time
 
   return ENERGY_CLASS_ORDER.map((id) => {
     const spec = ENERGY_CLASS_CATALOG[id];
@@ -90,10 +92,10 @@ function candidatesAt(building: Building, atMs: number, incumbent: EnergyClassId
     // No half-measures once the rules set a minimum: renovate to it, or leave the envelope alone.
     const available = rank >= incumbentRank && (!isUpgrade || rank >= minRank);
 
-    const premiumRp = isUpgrade ? (spec.cumulativeCostRpPerM2 - incumbentSpec.cumulativeCostRpPerM2) * area : 0;
+    const premiumRp = isUpgrade ? (spec.cumulativeCostRpPerM2 - incumbentSpec.cumulativeCostRpPerM2) * area * workFactor : 0;
     const programRp = isUpgrade ? Math.max(0, spec.programSubsidyRpPerM2 - incumbentSpec.programSubsidyRpPerM2) * area : 0;
     const municipalRp = isUpgrade ? Math.min(rules.municipalSubsidyRpPerM2 * area, MAX_MUNICIPAL_SUBSIDY_SHARE * Math.max(0, premiumRp - programRp)) : 0;
-    const upfrontRp = MAINTENANCE_RP_PER_M2 * area + premiumRp - programRp - municipalRp;
+    const upfrontRp = MAINTENANCE_RP_PER_M2 * area * workFactor + premiumRp - programRp - municipalRp;
 
     return {
       id,

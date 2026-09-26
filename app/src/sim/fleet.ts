@@ -66,6 +66,7 @@ import {
 import { firstRandom, hashSeed, hashSeedFrom } from "./rng";
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
+import { priceFactor } from "./costTrends";
 
 const DAY_MS = 24 * 3_600_000;
 
@@ -156,7 +157,7 @@ function candidatesFor(
     return {
       id,
       available,
-      annualizedCostRp: spec.purchaseCostRp / spec.lifetimeMeanYears + runningRp,
+      annualizedCostRp: (spec.purchaseCostRp * priceFactor(id, atMs)) / spec.lifetimeMeanYears + runningRp,
       lifetimeMeanYears: spec.lifetimeMeanYears,
       greenness: spec.greenness,
       onChosen: spec.electric ? onElectricChosen : undefined,
@@ -251,7 +252,7 @@ class Fleets {
       : null;
     if (!v.depot) return publicAccess ?? { kind: "none" };
     const hasCharger = FLEET_CATALOG[incumbent].electric && !this.chargesPubliclyAt(v, atMs);
-    const depot: FleetAccess = { kind: "depot", chargerRp: hasCharger ? 0 : DEPOT_CHARGER_COST_RP[v.vehicleClass] };
+    const depot: FleetAccess = { kind: "depot", chargerRp: hasCharger ? 0 : DEPOT_CHARGER_COST_RP[v.vehicleClass] * priceFactor("depotCharger", atMs) };
     if (!option) return depot;
     const spec = FLEET_CATALOG[electricOf(v.vehicleClass)];
     const kWh = (spec.annualKm / 100) * spec.kWhPer100Km;

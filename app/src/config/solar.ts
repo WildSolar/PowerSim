@@ -79,6 +79,10 @@ export const AGE_EXCLUSION_YEARS = 200; // heritage-protection stand-in — see 
 
 export const BASE_ANNUAL_HAZARD = 0.02; // 2%/year spontaneous "have I thought about this" baseline
 export const MAX_ANNUAL_HAZARD = 0.95; // clamp — never a near-certainty even with every boost stacked
+// Cheaper panels bring more owners to look into solar at all (a shorter payback travels by word of
+// mouth and installers' marketing): the yearly chance scales with (today's price / the price then)
+// to this power — a quarter cheaper, a good half again as many owners considering it. A placeholder.
+export const SOLAR_PRICE_HAZARD_ELASTICITY = 1.5;
 export const RENEWAL_BOOST_MULTIPLIER = 3; // a recent heating renewal roughly triples that year's chance
 export const RENEWAL_BOOST_YEARS = 3;
 export const NEIGHBOR_RADIUS_M = 250;

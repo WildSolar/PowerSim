@@ -339,7 +339,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Every heating system has a service lifetime, and — like real equipment — it doesn't fail on a fixed schedule: each building's current system has a randomly-drawn lifetime centered on a realistic average for its type (roughly 18-22 years), so some buildings renew within the first few years and others not for decades.",
       ),
       p(
-        "When a system reaches the end of its life, the replacement is decided by the same four things a real building owner would weigh: what's actually available (district heating only if a pipe runs in the building's street — see \"District heating network\"), which option is cheapest over its own lifetime at today's prices (install cost minus any subsidy, plus running cost), how carefully that comparison is even worth doing (a single house won't chase a marginally cheaper option the way a large apartment block's management might), and a hidden owner-level leaning that nudges a close call toward or away from renewable options.",
+        "When a system reaches the end of its life, the replacement is decided by the same four things a real building owner would weigh: what's actually available (district heating only if a pipe runs in the building's street — see \"District heating network\"), which option is cheapest over its own lifetime at the prices of the day (install cost minus any subsidy, plus running cost — technology prices move over time, see \"Technology prices over time\"), how carefully that comparison is even worth doing (a single house won't chase a marginally cheaper option the way a large apartment block's management might), and a hidden owner-level leaning that nudges a close call toward or away from renewable options.",
       ),
       p(
         "Every renewal shows up as a \"Heating history\" entry on the building's panel, in plain language — what reached the end of its life, what replaced it, and why (including when the obvious choice wasn't available). Only renewals that have actually happened in the game's timeline appear; nothing about the future is revealed in advance.",
@@ -352,6 +352,27 @@ export const WIKI_SECTIONS: WikiSection[] = [
       ),
       note(
         "Heating and mobility (see \"Mobility\") both renew this way now — mobility's mode tier (car/bike/other) uses a simpler weighted-random choice instead of the four-factor one, since a life event changes what a household needs, not what's cheapest; its nested vehicle-type tier (EV vs. ICE, e-bike vs. standard) uses the identical four-factor process heating does. Solar (see \"Solar adoption\") reuses the same four-factor choice for its own if-to-install decision, but — since a building either has it or doesn't, not choosing between several system types — is triggered differently: an annual chance to reconsider, rather than a fixed service lifetime.",
+      ),
+    ],
+  },
+  {
+    id: "technology-prices",
+    icon: "📉",
+    title: "Technology prices over time",
+    blocks: [
+      p(
+        "Technologies don't cost the same forever. Every price in the game starts at today's, and from then on each technology's price drifts toward its own long-run level — fastest at first, then settling. Every decision is priced at the moment it's made, so a heating system or car replaced in 2040 is chosen at 2040 prices.",
+      ),
+      list([
+        "Getting cheaper: electric vehicles most of all (batteries keep falling in price and are most of the gap) — an electric lorry heads toward half today's price, an electric car and van toward about three quarters; public and depot chargers; rooftop solar (toward 70%); heat pumps less (installation work is much of the price — air heat pumps toward 80%, ground ones toward 88% with the drilling).",
+        "Getting dearer: petrol and diesel vehicles and gas and oil boilers creep up (shrinking markets, tighter emission rules), and so does building work — insulation and district heating pipes — with construction costs.",
+        "Cheaper panels also bring more owners to look into solar at all, not just make it pay better once they do.",
+      ]),
+      p(
+        "Control → Prices shows each technology's price now against the start of the game, and where it's heading ten years out. Subsidies stay the amounts you set, so as a technology gets cheaper the same grant covers more of it — and a grant that tipped decisions early on may become money for people who'd have switched anyway.",
+      ),
+      note(
+        "The trajectories are informed placeholders, not forecasts, and only prices move: efficiencies stay as they are (except solar modules, which already get more efficient over time), and fuel and electricity prices are yours to set.",
       ),
     ],
   },
@@ -408,7 +429,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Solar adoption",
     blocks: [
       p(
-        "Every building without solar already (and younger than 200 years — old enough to be presumed heritage-protected, a simple stand-in for real protection status) gets an annual chance to seriously consider it. That chance starts low, but rises for a few years after the building's own heating system is renewed (see \"Stock renewal\" — a heat-pump switch is a natural moment to think about solar too), rises further the more nearby buildings already have it (a real, observed \"my neighbor got one\" effect), and can be pushed higher still by the municipality's own outreach effort (Control → Measures).",
+        "Every building without solar already (and younger than 200 years — old enough to be presumed heritage-protected, a simple stand-in for real protection status) gets an annual chance to seriously consider it. That chance starts low, but rises for a few years after the building's own heating system is renewed (see \"Stock renewal\" — a heat-pump switch is a natural moment to think about solar too), rises further the more nearby buildings already have it (a real, observed \"my neighbor got one\" effect), can be pushed higher still by the municipality's own outreach effort (Control → Measures), and climbs as panels get cheaper (see \"Technology prices over time\").",
       ),
       p(
         "When a building does seriously consider it, the decision itself works like a heating renewal: candidate size is the building's own roof footprint times a randomly-drawn (but expected-value-plausible) usable-roof fraction, times whatever module efficiency is current that year — panels keep getting more efficient over time, so a later install packs more capacity onto the same roof. That candidate is compared, the same four-factor way as every other stock-renewal decision, against staying without: installation cost (which falls per kWp as the system gets bigger, matching how real Swiss PV pricing works) minus subsidies, against the electricity it would actually save and export at today's prices.",

@@ -58,7 +58,7 @@ export function DistrictHeatPanel() {
   }, [buildings, simDay, version]);
 
   const coverage = useMemo(() => networkCoverage(buildings, simDay), [buildings, simDay, version]); // eslint-disable-line react-hooks/exhaustive-deps
-  const quote = useMemo(() => districtHeat.quote(), [version]); // eslint-disable-line react-hooks/exhaustive-deps
+  const quote = useMemo(() => districtHeat.quote(simDay), [version, simDay]); // eslint-disable-line react-hooks/exhaustive-deps
   const demand = useMemo(() => streetDemand(buildings, quote.segments, simDay), [buildings, quote, simDay]);
   const underConstruction = districtHeat.getOrders().filter((o) => o.completesAtMs > simDay);
 

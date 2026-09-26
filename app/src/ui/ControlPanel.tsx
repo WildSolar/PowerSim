@@ -9,6 +9,7 @@ import { DecisionLogTab } from "./DecisionLogTab";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { MeasuresTab } from "./MeasuresTab";
 import { TariffControl } from "./TariffControl";
+import { TechnologyPrices } from "./TechnologyPrices";
 import "./modal.css";
 
 export interface ControlPanelProps {
@@ -67,7 +68,10 @@ export function ControlPanel({ dataset, onClose }: ControlPanelProps) {
           {tab === "prices" && (
             <>
               <h2>💰 Prices</h2>
-              <TariffControl />
+              <div className="prices-columns">
+                <TariffControl />
+                <TechnologyPrices />
+              </div>
             </>
           )}
           {tab === "measures" && <MeasuresTab />}

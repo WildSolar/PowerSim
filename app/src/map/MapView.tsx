@@ -195,7 +195,7 @@ function buildingsToGeoJSON(
  * built, picked for the next extension (and whether it connects), or without pipes. */
 function streetsToGeoJSON(simTimeMs: number) {
   const selection = districtHeat.getSelection();
-  const unconnected = new Set(districtHeat.quote().unconnected);
+  const unconnected = new Set(districtHeat.quote(simTimeMs).unconnected);
   const stateOf = (id: number) =>
     selection.has(id) ? (unconnected.has(id) ? "plannedUnconnected" : "planned") : districtHeat.stateAt(id, simTimeMs);
   return {

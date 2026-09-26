@@ -24,6 +24,7 @@ import {
 import type { DistrictHeatSourceData, MunicipalityDataset } from "../data/types";
 import { streets } from "./streets";
 import { treasury } from "./treasury";
+import { priceFactor } from "./costTrends";
 
 const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
 
@@ -49,11 +50,12 @@ export interface SelectionQuote {
   unconnected: number[];
 }
 
-export function segmentCostRp(segmentId: number): number {
+/** Piping a street segment at `atMs` (civil works get dearer over time — costTrends.ts). */
+export function segmentCostRp(segmentId: number, atMs: number): number {
   const s = streets.get(segmentId);
   if (!s) return 0;
   const factor = DH_MAIN_ROAD_CLASSES.has(s.highway) ? DH_MAIN_ROAD_COST_FACTOR : 1;
-  return Math.round(s.lengthM * DH_PIPE_COST_CHF_PER_M * factor * 100);
+  return Math.round(s.lengthM * DH_PIPE_COST_CHF_PER_M * factor * priceFactor("districtHeatPipes", atMs) * 100);
 }
 
 export function buildMonths(lengthM: number): number {
@@ -144,14 +146,15 @@ class DistrictHeatNetwork {
     this.notify();
   }
 
-  quote(): SelectionQuote {
+  /** The picked extension as it would be ordered at `atMs`. */
+  quote(atMs: number): SelectionQuote {
     const segments = [...this.selection];
     const unconnected = this.unconnectedOf(segments);
     const lengthM = segments.reduce((sum, id) => sum + (streets.get(id)?.lengthM ?? 0), 0);
     return {
       segments,
       lengthM,
-      costRp: segments.reduce((sum, id) => sum + segmentCostRp(id), 0),
+      costRp: segments.reduce((sum, id) => sum + segmentCostRp(id, atMs), 0),
       months: buildMonths(lengthM),
       connected: segments.length > 0 && unconnected.length === 0,
       unconnected,
@@ -160,7 +163,7 @@ class DistrictHeatNetwork {
 
   /** Orders the planned extension: paid now, piped once built. Null if it doesn't connect. */
   order(atMs: number): NetworkOrder | null {
-    const q = this.quote();
+    const q = this.quote(atMs);
     if (!q.connected) return null;
     const order: NetworkOrder = {
       id: this.orders.length,
