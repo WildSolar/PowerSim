@@ -149,7 +149,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
     positions = {
         int(row[gwr.EGID_COL]): (float(row["E-Gebaeudekoordinate"]), float(row["N-Gebaeudekoordinate"])) for _, row in buildings_df.iterrows()
     }
-    segments_by_egid = streets_source.link_buildings(segments, entrances, positions)
+    segments_by_egid, addressed_segments_by_egid = streets_source.link_buildings(segments, entrances, positions, footprint_by_egid)
     print(f"  {sum(1 for v in segments_by_egid.values() if v)} / {len(positions)} buildings linked to a street")
 
     district_heated = buildings_df[
@@ -159,7 +159,8 @@ def build(bfs_number: int) -> MunicipalityDataset:
     network = district_heat_source.infer_network(
         bfs_number,
         segments,
-        {sid for egid in dh_egids for sid in segments_by_egid.get(egid, [])},
+        # A customer is connected from the street it is addressed from, not every street it borders.
+        {sid for egid in dh_egids for sid in addressed_segments_by_egid.get(egid, [])},
         [positions[e] for e in dh_egids],
     )
     if network:

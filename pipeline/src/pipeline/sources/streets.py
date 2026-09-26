@@ -18,9 +18,9 @@ access roads, ferries and unnamed footpaths are left out; named paths stay (buil
 addressed from them).
 
 Buildings are linked to the segment(s) in front of them through GWR's entrance records:
-for each entrance, the nearest segment carrying the entrance's own street name (so a
-building is tied to the street it is addressed from, not to whatever road happens to
-pass closest behind it), falling back to the nearest segment of any name.
+for each entrance, the nearest segment carrying the entrance's own street name, falling
+back to the nearest segment of any name — and, besides, to every segment their footprint
+borders (a building between two streets can be reached from either).
 """
 
 from __future__ import annotations
@@ -76,6 +76,10 @@ MIN_SEGMENT_M = 8.0
 
 NAMED_MATCH_RADIUS_M = 150  # an entrance's own street, if a segment of it is this close
 ANY_MATCH_RADIUS_M = 60  # otherwise the nearest street of any name, if this close
+# A building also borders every street whose edge is within this of its footprint (front garden,
+# pavement): a pipe in any of them can reach it, not just in the one it is addressed from.
+BORDER_SETBACK_M = 12.0
+MAX_HALF_WIDTH_M = 20.0  # the widest merged street's half-width, for the spatial pre-filter
 
 
 @dataclass
@@ -476,8 +480,11 @@ def link_buildings(
     segments: list[Segment],
     entrances_by_egid: dict[int, list[tuple[str, float, float]]],
     position_by_egid: dict[int, tuple[float, float]],
-) -> dict[int, list[int]]:
-    """The segment ids each building fronts on (see module doc)."""
+    footprint_by_egid: dict[int, list[tuple[float, float]]],
+) -> tuple[dict[int, list[int]], dict[int, list[int]]]:
+    """Per building: every segment it can be reached from — the one(s) it is addressed from
+    (see module doc) plus every other segment its footprint borders (BORDER_SETBACK_M) — and,
+    separately, just the addressed one(s)."""
     lines = [LineString(s.lv95) for s in segments]
     tree = STRtree(lines)
     by_name: dict[str, list[int]] = defaultdict(list)
@@ -499,6 +506,7 @@ def link_buildings(
         return best
 
     links: dict[int, list[int]] = {}
+    addressed: dict[int, list[int]] = {}
     for egid, (x, y) in position_by_egid.items():
         found: list[int] = []
         for street, ex, ey in entrances_by_egid.get(egid, []):
@@ -511,6 +519,15 @@ def link_buildings(
             sid = nearest_any(x, y)
             if sid is not None:
                 found.append(sid)
+        addressed[egid] = list(found)
+        ring = footprint_by_egid.get(egid)
+        if ring and len(ring) >= 4:
+            footprint = Polygon(ring)
+            reach = footprint.buffer(BORDER_SETBACK_M + MAX_HALF_WIDTH_M)
+            for k in tree.query(reach):
+                sid = int(k)
+                if sid not in found and lines[sid].distance(footprint) <= BORDER_SETBACK_M + segments[sid].width_m / 2:
+                    found.append(sid)
         links[egid] = found
-    return links
+    return links, addressed
 

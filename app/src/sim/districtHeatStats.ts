@@ -14,22 +14,27 @@ import { annualHeatDemandKWh, currentHeatingSystemId, initialHeatingSystemId } f
 import { existsAt } from "./lifetime";
 import { spaceHeatingThermalDemandW } from "./spaceHeating";
 
-export type NetworkStatus = "connected" | "connectable" | "outOfReach";
+/** "noHeating": no heating system the game replaces — mostly garages, sheds and storage (the
+ * building register's annexes, numbered like "Schulstrasse 7.1"), also wood or unrecorded
+ * heating — so nothing that could ever switch to district heat. */
+export type NetworkStatus = "connected" | "connectable" | "outOfReach" | "noHeating";
 
 export function networkStatusAt(building: Building, atMs: number): NetworkStatus {
-  if (currentHeatingSystemId(building, atMs) === "districtHeating") return "connected";
+  const system = currentHeatingSystemId(building, atMs);
+  if (system === "districtHeating") return "connected";
+  if (system === null) return "noHeating";
   return districtHeat.servesAt(building.streetSegments, atMs) ? "connectable" : "outOfReach";
 }
 
-/** networkStatusAt for the map: a building out of reach that the extension being planned would
- * reach (it fronts on a picked street, and has a heating system that gets replaced) shows as
- * "planned". */
-export function mapNetworkBucketAt(building: Building, atMs: number): NetworkStatus | "planned" {
+/** networkStatusAt for the map, which also shows what is coming: a building out of reach that an
+ * ordered extension will reach once its pipes are in ("awaitingPipes"), or that the extension
+ * being planned would reach ("planned"). */
+export function mapNetworkBucketAt(building: Building, atMs: number): NetworkStatus | "awaitingPipes" | "planned" {
   const status = networkStatusAt(building, atMs);
   if (status !== "outOfReach") return status;
+  if (districtHeat.buildingAt(building.streetSegments, atMs)) return "awaitingPipes";
   const selection = districtHeat.getSelection();
-  if (selection.size === 0 || !building.streetSegments?.some((id) => selection.has(id))) return status;
-  return currentHeatingSystemId(building, atMs) === null ? status : "planned";
+  return building.streetSegments?.some((id) => selection.has(id)) ? "planned" : status;
 }
 
 /** A building's heat load on a cold winter day — what the network has to be able to deliver. */
@@ -88,8 +93,8 @@ export function streetDemand(buildings: Building[], segmentIds: Iterable<number>
   if (segments.size === 0) return { buildings: 0, annualHeatKWh: 0 };
   for (const b of buildings) {
     if (!b.streetSegments?.some((id) => segments.has(id)) || !existsAt(b, atMs)) continue;
-    if (networkStatusAt(b, atMs) !== "outOfReach") continue;
-    if (currentHeatingSystemId(b, atMs) === null) continue; // wood, unspecified...: not a system we renew
+    if (networkStatusAt(b, atMs) !== "outOfReach") continue; // connected, reachable already, or nothing to connect
+    if (districtHeat.buildingAt(b.streetSegments, atMs)) continue; // an ordered extension reaches it anyway
     count++;
     annualHeatKWh += cachedAnnualDemandKWh(b, atMs);
   }

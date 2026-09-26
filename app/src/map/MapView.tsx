@@ -70,8 +70,9 @@ function metresWide(metres: unknown, minPx: number): unknown {
   const at = (zoom: number) => ["max", minPx, ["*", metres, 2 ** zoom / METRES_PER_PX_AT_Z0]];
   return ["interpolate", ["exponential", 2], ["zoom"], 12, at(12), 22, at(22)];
 }
-// A piped or planned street is drawn a little wider than its carriageway, so it covers the painted one.
-const STREET_MARGIN_M = 2;
+// Piped, planned and building streets are drawn this wide on the ground whatever the street's own
+// width: an even band along the network reads better than one tracing every carriageway.
+const NETWORK_LINE_WIDTH_M = 7;
 
 type BuildingProperties = {
   egid: string;
@@ -178,7 +179,7 @@ function streetsToGeoJSON(simTimeMs: number) {
     type: "FeatureCollection" as const,
     features: streets.all().map((s) => ({
       type: "Feature" as const,
-      properties: { id: s.id, widthM: s.widthM ?? 6, state: selection.has(s.id) ? "planned" : districtHeat.stateAt(s.id, simTimeMs) },
+      properties: { id: s.id, state: selection.has(s.id) ? "planned" : districtHeat.stateAt(s.id, simTimeMs) },
       geometry: { type: "LineString" as const, coordinates: s.line },
     })),
   };
@@ -351,7 +352,6 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         type: "geojson",
         data: streetsToGeoJSON(simClock.getSimTimeMs()),
       });
-      const fullWidth = ["+", ["get", "widthM"], STREET_MARGIN_M];
       map.addLayer({
         id: STREET_UNPIPED_LAYER_ID,
         type: "line",
@@ -368,7 +368,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         layout: { visibility: dhVisibility, "line-cap": "round", "line-join": "round" },
         paint: {
           "line-color": ["match", ["get", "state"], "planned", PIPE_PLANNED_COLOR, PIPE_COLOR],
-          "line-width": metresWide(fullWidth, 4) as never,
+          "line-width": metresWide(NETWORK_LINE_WIDTH_M, 4) as never,
         },
       });
       map.addLayer({
@@ -379,7 +379,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         layout: { visibility: dhVisibility, "line-join": "round" },
         paint: {
           "line-color": PIPE_UNDER_CONSTRUCTION_COLOR,
-          "line-width": metresWide(fullWidth, 4) as never,
+          "line-width": metresWide(NETWORK_LINE_WIDTH_M, 4) as never,
           "line-dasharray": [1.5, 1],
         },
       });
@@ -388,7 +388,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         type: "line",
         source: STREET_SOURCE_ID,
         layout: { visibility: dhVisibility },
-        paint: { "line-color": "#000", "line-width": metresWide(fullWidth, 16) as never, "line-opacity": 0 },
+        paint: { "line-color": "#000", "line-width": metresWide(NETWORK_LINE_WIDTH_M, 16) as never, "line-opacity": 0 },
       });
       map.addSource(DH_SOURCE_SOURCE_ID, { type: "geojson", data: districtHeatSourceGeoJSON() as never });
       map.addLayer({

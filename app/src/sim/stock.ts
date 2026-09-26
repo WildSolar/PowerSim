@@ -839,7 +839,7 @@ class StockStore {
         hotWaterGenerator: null,
         hotWaterEnergySource: null,
         dwellings: this.sampleDwellings(dwellingCount, rng, 1),
-        streetSegments: streets.segmentsFor(lon, lat, address),
+        streetSegments: streets.segmentsFor(lon, lat, address, ring),
         origin: "new",
         constructionStartMs: startMs,
         builtAtMs,

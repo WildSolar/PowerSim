@@ -101,6 +101,16 @@ class DistrictHeatNetwork {
     return false;
   }
 
+  /** Whether any of the given segments has pipes being laid at `atMs` (ordered, not finished). */
+  buildingAt(segmentIds: number[] | undefined, atMs: number): boolean {
+    if (!segmentIds) return false;
+    for (const id of segmentIds) {
+      const built = this.builtAtMs.get(id);
+      if (built !== undefined && built > atMs) return true;
+    }
+    return false;
+  }
+
   pipedLengthM(atMs: number): number {
     let total = 0;
     for (const [id, built] of this.builtAtMs) if (built <= atMs) total += streets.get(id)?.lengthM ?? 0;

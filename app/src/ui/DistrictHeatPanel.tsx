@@ -34,15 +34,18 @@ export function DistrictHeatPanel() {
   const network = useMemo(() => {
     let connected = 0;
     let connectable = 0;
+    let awaiting = 0;
     for (const b of buildings) {
       if (!existsAt(b, simDay)) continue;
       const status = networkStatusAt(b, simDay);
       if (status === "connected") connected++;
       else if (status === "connectable") connectable++;
+      else if (status === "outOfReach" && districtHeat.buildingAt(b.streetSegments, simDay)) awaiting++;
     }
     return {
       connected,
       connectable,
+      awaiting,
       lengthKm: districtHeat.pipedLengthM(simDay) / 1000,
       peakW: networkPeakLoadW(buildings, simDay),
       capacityW: sourceCapacityW(buildings, 0), // judged by the buildings connected at the start of play
@@ -86,6 +89,12 @@ export function DistrictHeatPanel() {
         <span>On a piped street, not connected</span>
         <span className="info-value">{network.connectable}</span>
       </div>
+      {network.awaiting > 0 && (
+        <div className="info-row">
+          <span>Can connect once the pipes are in</span>
+          <span className="info-value">{network.awaiting}</span>
+        </div>
+      )}
 
       <div className="dh-capacity" title="Not a limit yet: the network can grow past it for now">
         <div className="info-row">

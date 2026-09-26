@@ -9,6 +9,7 @@ import { LocalProjection } from "./localGeo";
 
 const NAMED_MATCH_RADIUS_M = 150; // same reach as the pipeline's own entrance-to-street matching
 const ANY_MATCH_RADIUS_M = 60;
+const BORDER_SETBACK_M = 12; // as the pipeline: a building borders every street this close to its footprint
 
 type XY = [number, number];
 
@@ -24,6 +25,31 @@ function distanceToPolylineM(p: XY, line: XY[]): number {
     const cx = ax + t * dx - p[0];
     const cy = ay + t * dy - p[1];
     best = Math.min(best, Math.hypot(cx, cy));
+  }
+  return best;
+}
+
+/** Distance between two line pieces (0 if they cross). */
+function pieceDistanceM(a0: XY, a1: XY, b0: XY, b1: XY): number {
+  const cross = (o: XY, p: XY, q: XY) => (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0]);
+  const d1 = cross(a0, a1, b0);
+  const d2 = cross(a0, a1, b1);
+  const d3 = cross(b0, b1, a0);
+  const d4 = cross(b0, b1, a1);
+  if (d1 * d2 < 0 && d3 * d4 < 0) return 0;
+  return Math.min(
+    distanceToPolylineM(a0, [b0, b1]),
+    distanceToPolylineM(a1, [b0, b1]),
+    distanceToPolylineM(b0, [a0, a1]),
+    distanceToPolylineM(b1, [a0, a1]),
+  );
+}
+
+/** Distance from a footprint's outline to a street's line. */
+function outlineToPolylineM(ring: XY[], line: XY[]): number {
+  let best = Infinity;
+  for (let i = 1; i < ring.length; i++) {
+    for (let j = 1; j < line.length; j++) best = Math.min(best, pieceDistanceM(ring[i - 1], ring[i], line[j - 1], line[j]));
   }
   return best;
 }
@@ -66,10 +92,11 @@ class StreetNetwork {
     return this.byNode.get(node) ?? [];
   }
 
-  /** The segment a new building at (lon, lat) fronts on: the nearest one carrying its address's
-   * street name if one is close, else the nearest of any name — as the pipeline links the
-   * buildings the game starts with. Empty when no street is near. */
-  segmentsFor(lon: number, lat: number, address: string | null): number[] {
+  /** The segments a new building at (lon, lat) can be reached from, as the pipeline links the
+   * buildings the game starts with: the one it is addressed from (the nearest carrying its
+   * address's street name if one is close, else the nearest of any name), plus every other
+   * segment its footprint borders. Empty when no street is near. */
+  segmentsFor(lon: number, lat: number, address: string | null, footprint: [number, number][] | null): number[] {
     if (this.segments.length === 0) return [];
     const p = this.projection.toXY(lon, lat);
     const street = address ? normalizeName(address.replace(/\s+\S+$/, "")) : "";
@@ -80,9 +107,19 @@ class StreetNetwork {
       if (!any || d < any.d) any = { id: s.id, d };
       if (street && normalizeName(s.name) === street && (!named || d < named.d)) named = { id: s.id, d };
     }
-    if (named && named.d <= NAMED_MATCH_RADIUS_M) return [named.id];
-    if (any && any.d <= ANY_MATCH_RADIUS_M) return [any.id];
-    return [];
+    const found: number[] = [];
+    if (named && named.d <= NAMED_MATCH_RADIUS_M) found.push(named.id);
+    else if (any && any.d <= ANY_MATCH_RADIUS_M) found.push(any.id);
+    if (footprint && footprint.length >= 3) {
+      const ring = footprint.map(([x, y]) => this.projection.toXY(x, y));
+      for (const s of this.segments) {
+        if (found.includes(s.id)) continue;
+        const reach = BORDER_SETBACK_M + (s.widthM ?? 6) / 2;
+        if (distanceToPolylineM(p, this.linesXY[s.id]) > reach + 200) continue; // far away: skip the exact test
+        if (outlineToPolylineM(ring, this.linesXY[s.id]) <= reach) found.push(s.id);
+      }
+    }
+    return found;
   }
 }
 

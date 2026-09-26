@@ -189,7 +189,9 @@ export const INSULATION_LEGEND: LegendEntry[] = ENERGY_CLASS_ORDER.map((id) => (
 export const DISTRICT_HEAT_LEGEND: LegendEntry[] = [
   { bucket: "connected", label: "Connected", color: "#4a3aa7" },
   { bucket: "connectable", label: "On a piped street", color: "#2a78d6" },
+  { bucket: "awaitingPipes", label: "Can connect once the pipes are in", color: "#fdba74" },
   { bucket: "planned", label: "Reached by the planned extension", color: "#f97316" },
+  { bucket: "noHeating", label: "No heating to connect (garages, sheds...)", color: "#e4e2dc" },
   { bucket: "outOfReach", label: "No pipe in the street", color: UNKNOWN_COLOR },
 ];
 
