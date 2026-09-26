@@ -18,8 +18,23 @@ const SNOWFALL_CM_PER_SNOW_DAY = 3;
 const MELT_CM_PER_DEGREE_DAY = 0.8;
 const FULL_BLOCK_CM = 2; // snow depth at which panels are considered fully covered
 
+// The walk only depends on the day, so each day's answer is kept (a bounded number of them —
+// callers mostly ask about the last few days and the year being reported on).
+const depthByDay = new Map<number, number>();
+const MAX_CACHED_DAYS = 1000;
+
 export function snowDepthCm(simTimeMs: number): number {
   const nowDay = Math.floor(simTimeMs / DAY_MS);
+  let depth = depthByDay.get(nowDay);
+  if (depth === undefined) {
+    depth = walkSnowDepthCm(nowDay);
+    if (depthByDay.size >= MAX_CACHED_DAYS) depthByDay.clear();
+    depthByDay.set(nowDay, depth);
+  }
+  return depth;
+}
+
+function walkSnowDepthCm(nowDay: number): number {
   let depth = 0;
   for (let d = nowDay - LOOKBACK_DAYS; d <= nowDay; d++) {
     const middayMs = d * DAY_MS + 12 * 60 * 60_000;

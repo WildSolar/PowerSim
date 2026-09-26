@@ -3,14 +3,8 @@ import { useState } from "react";
 import type { MunicipalityDataset } from "../data/types";
 import { simClock } from "../sim/engine";
 import { categoryEnergyFromSeries, type CategoryEnergyKWh } from "../sim/energy";
-import {
-  historyTimeSteps,
-  netTotalFromCategorySeries,
-  sampleMunicipalityCategorySeries,
-  HISTORY_WINDOW_MS,
-  MUNICIPALITY_HISTORY_SAMPLE_COUNT,
-  HISTORY_REFRESH_MS,
-} from "../sim/history";
+import { netTotalFromCategorySeries, sampleMunicipalityCategorySeries, HISTORY_REFRESH_MS } from "../sim/history";
+import { sampleMunicipalityLast24h } from "../sim/rollingHistory";
 import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { useSimDay, useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
@@ -54,8 +48,7 @@ export function CityStatsTab({ dataset }: CityStatsTabProps) {
 
   const history = useHistorySeries(
     () => {
-      const times = historyTimeSteps(simClock.getSimTimeMs(), HISTORY_WINDOW_MS, MUNICIPALITY_HISTORY_SAMPLE_COUNT);
-      const categorySeries = sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, plants);
+      const { times, series: categorySeries } = sampleMunicipalityLast24h(dataset.buildings, dataset.powerPlants, simClock.getSimTimeMs(), tariff);
       return {
         times,
         totalW: netTotalFromCategorySeries(categorySeries),

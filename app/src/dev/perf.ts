@@ -11,6 +11,7 @@ import { stock } from "../sim/stock";
 import { treasury } from "../sim/treasury";
 import { buildingPowerW } from "../sim/buildingPower";
 import { snowDepthCm } from "../sim/snow";
+import { sampleMunicipalityLast24h } from "../sim/rollingHistory";
 import { simClock } from "../sim/engine";
 import { tariffStore } from "../sim/tariffStore";
 import { historyTimeSteps, sampleMunicipalityCategorySeries, type CategorySeries } from "../sim/history";
@@ -150,6 +151,61 @@ export async function timeMapPowerTick(): Promise<Record<string, number>> {
   const ms = await timed(() => buildings.forEach((b) => (sum += buildingPowerW(b, t, livePlants, snow))));
   const ms2 = await timed(() => buildings.forEach((b) => buildingPowerW(b, t, livePlants, snow)));
   return { firstTickMs: ms, tickMs: ms2, plants: livePlants.length, sumW: Math.round(sum * 1000) / 1000 };
+}
+
+/** City stats' rolling 24h chart: one refresh after the clock moves by what each speed covers in a
+ * 3s refresh, against the old full 48-sample pass — and every instant it returns checked against a
+ * fresh, independent sample of that instant. */
+export async function timeRollingChart(): Promise<Record<string, number | string>> {
+  const buildings = stock.getAll();
+  const plants = (await (await fetch("/data/schlieren.json")).json()).powerPlants;
+  const tariff = tariffStore.get();
+  const out: Record<string, number | string> = {};
+  const now0 = simClock.getSimTimeMs();
+  out.oldFullPassMs = await timed(() =>
+    sampleMunicipalityCategorySeries(buildings, historyTimeSteps(now0, 24 * 3_600_000, 48), tariff, effectivePowerPlantsAt(buildings, plants, now0)),
+  );
+  out.coldMs = await timed(() => sampleMunicipalityLast24h(buildings, plants, now0, tariff));
+  const steps: [string, number][] = [
+    ["paused", 0],
+    ["x60 (3 min)", 3 * 60_000],
+    ["x720 (36 min)", 36 * 60_000],
+    ["x3600 (3 h)", 3 * 3_600_000],
+    ["x21600 (18 h)", 18 * 3_600_000],
+  ];
+  let result = sampleMunicipalityLast24h(buildings, plants, now0, tariff);
+  for (const [label, deltaMs] of steps) {
+    simClock.pauseAt(simClock.getSimTimeMs() + deltaMs);
+    const now = simClock.getSimTimeMs();
+    out[`refresh ${label} ms`] = await timed(() => (result = sampleMunicipalityLast24h(buildings, plants, now, tariff)));
+  }
+  const grid = 30 * 60_000;
+  const fresh = (t: number) => sampleMunicipalityCategorySeries(buildings, [t], tariff, effectivePowerPlantsAt(buildings, plants, t));
+  let mismatches = 0;
+  result.times.forEach((t, i) => {
+    let expected: (key: keyof CategorySeries) => number;
+    const gridBefore = Math.floor(t / grid) * grid; // floor, not %: sim time is negative before the game's start
+    if (i === 0 && t !== gridBefore) {
+      // The window's far end is interpolated between its grid neighbours.
+      const before = fresh(gridBefore);
+      const after = fresh(gridBefore + grid);
+      const f = (t - gridBefore) / grid;
+      expected = (key) => before[key][0] + (after[key][0] - before[key][0]) * f;
+    } else {
+      const s = fresh(t);
+      expected = (key) => s[key][0];
+    }
+    for (const key of Object.keys(result.series) as (keyof CategorySeries)[]) {
+      if (Math.abs(expected(key) - result.series[key][i]) > 1e-6) {
+        mismatches++;
+        out[`mismatch ${i} ${key}`] = `${expected(key)} vs ${result.series[key][i]}`;
+      }
+    }
+  });
+  out.points = result.times.length;
+  out.spanHours = (result.times[result.times.length - 1] - result.times[0]) / 3_600_000;
+  out.mismatches = mismatches;
+  return out;
 }
 
 export async function runPerf(year?: number): Promise<Record<string, number>> {

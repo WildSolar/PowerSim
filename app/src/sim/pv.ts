@@ -112,7 +112,14 @@ export function isSunRising(simTimeMs: number): boolean {
 export function pvPowerW(plant: PowerPlant, simTimeMs: number, snowCoverCm?: number): number {
   if (plant.technology !== "Photovoltaic" || !plant.capacityKw) return 0;
   if (plant.activeToMs !== undefined && simTimeMs >= plant.activeToMs) return 0; // its building has been demolished
-  const irradiance = irradianceWm2(simTimeMs, snowCoverCm);
+  return pvPowerWAt(plant, simTimeMs, irradianceWm2(simTimeMs, snowCoverCm));
+}
+
+/** pvPowerW for a caller summing many plants at one instant: the irradiance is the same for
+ * every roof, so it's worked out once (irradianceWm2) and passed in. */
+export function pvPowerWAt(plant: PowerPlant, simTimeMs: number, irradiance: number): number {
+  if (plant.technology !== "Photovoltaic" || !plant.capacityKw) return 0;
+  if (plant.activeToMs !== undefined && simTimeMs >= plant.activeToMs) return 0; // its building has been demolished
   return -(plant.capacityKw * 1000 * (irradiance / PEAK_IRRADIANCE_WM2));
 }
 

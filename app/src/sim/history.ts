@@ -32,7 +32,7 @@ import { acPowerWWithWeather } from "./ac";
 import { commercialPowerWFromProfile, makeCommercialProfile, type CommercialProfile } from "./commercial";
 import { heatPumpPowerWWithWeather } from "./heatPump";
 import { mobilityChargingPowerW } from "./mobility";
-import { pvPowerW } from "./pv";
+import { irradianceWm2, pvPowerWAt } from "./pv";
 import { existsAt } from "./lifetime";
 import { hashSeed } from "./rng";
 import { snowDepthCm } from "./snow";
@@ -55,14 +55,7 @@ interface DwellingProfiles {
 export const HISTORY_WINDOW_MS = 24 * 60 * 60_000;
 export const HISTORY_SAMPLE_COUNT = 96;
 export const HISTORY_REFRESH_MS = 3000;
-
-/** Coarser than HISTORY_SAMPLE_COUNT, for the municipality-wide chart only: that
- * one sums ~11k dwellings per sample rather than a handful, so it's by far the
- * most expensive history query in the app (measured ~1s per refresh at 96 samples
- * on a mid-range machine) — and the aggregate curve is already smooth at that
- * scale (thousands of independent duty cycles average out), so halving the sample
- * count buys back real time without a visible change in the chart's shape. */
-export const MUNICIPALITY_HISTORY_SAMPLE_COUNT = 48;
+// The municipality-wide 24h chart samples on its own half-hour grid instead — see rollingHistory.ts.
 
 const profileCache = new Map<string, DwellingProfiles>();
 
@@ -216,15 +209,42 @@ function getCommercialProfile(building: Building): CommercialProfile | null {
   return profile;
 }
 
+// The profile lists for a whole building array, kept per array (the stock hands out a new one
+// whenever it changes) — so a caller sampling a few instants at a time, like the rolling 24h
+// chart, doesn't pay for walking ~10k dwellings through the keyed caches on every call.
+const municipalityProfileSets = new WeakMap<Building[], DwellingProfiles[]>();
+const municipalityCommercialProfiles = new WeakMap<Building[], { building: Building; profile: CommercialProfile }[]>();
+
+function dwellingProfileSets(buildings: Building[]): DwellingProfiles[] {
+  let sets = municipalityProfileSets.get(buildings);
+  if (!sets) {
+    sets = [];
+    for (const building of buildings) {
+      for (const dwelling of building.dwellings) sets.push(getDwellingProfiles(building, dwelling));
+    }
+    municipalityProfileSets.set(buildings, sets);
+  }
+  return sets;
+}
+
+function commercialProfiles(buildings: Building[]): { building: Building; profile: CommercialProfile }[] {
+  let profiles = municipalityCommercialProfiles.get(buildings);
+  if (!profiles) {
+    profiles = [];
+    for (const building of buildings) {
+      const profile = getCommercialProfile(building);
+      if (profile) profiles.push({ building, profile });
+    }
+    municipalityCommercialProfiles.set(buildings, profiles);
+  }
+  return profiles;
+}
+
 /** Non-residential/commercial load for every recognized-category building, profiles
  * resolved through the cache above rather than rebuilt (the per-building random
  * intensity multiplier) on every one of the 96 samples. */
 function commercialCategorySeries(buildings: Building[], times: number[]): number[] {
-  const profiles: { building: Building; profile: CommercialProfile }[] = [];
-  for (const building of buildings) {
-    const profile = getCommercialProfile(building);
-    if (profile) profiles.push({ building, profile });
-  }
+  const profiles = commercialProfiles(buildings);
   return times.map((t) => profiles.reduce((sum, p) => sum + (existsAt(p.building, t) ? commercialPowerWFromProfile(p.profile, t) : 0), 0));
 }
 
@@ -233,7 +253,10 @@ function commercialCategorySeries(buildings: Building[], times: number[]): numbe
  * nearly the same 30-day lookback 96 times over for almost no accuracy gain. */
 function pvSeries(plants: PowerPlant[], times: number[]): number[] {
   const snowCoverCm = snowDepthCm(times[times.length - 1]);
-  return times.map((t) => plants.reduce((sum, plant) => sum + pvPowerW(plant, t, snowCoverCm), 0));
+  return times.map((t) => {
+    const irradiance = irradianceWm2(t, snowCoverCm); // the same sun on every roof
+    return plants.reduce((sum, plant) => sum + pvPowerWAt(plant, t, irradiance), 0);
+  });
 }
 
 /** Just the PV contribution for one building's own roof — for a dedicated "solar
@@ -306,13 +329,7 @@ export function sampleMunicipalityCategorySeries(
   tariff: Tariff,
   plants: PowerPlant[],
 ): CategorySeries {
-  const profileSets: DwellingProfiles[] = [];
-  for (const building of buildings) {
-    for (const dwelling of building.dwellings) {
-      profileSets.push(getDwellingProfiles(building, dwelling));
-    }
-  }
-  const dwellingTotals = dwellingCategoryTotals(profileSets, times, tariff);
+  const dwellingTotals = dwellingCategoryTotals(dwellingProfileSets(buildings), times, tariff);
   const { heatPumpW, acW } = climateControlCategorySeries(buildings, times);
   const waterHeatingW = waterHeatingCategorySeries(buildings, times);
   const commercialW = commercialCategorySeries(buildings, times);
