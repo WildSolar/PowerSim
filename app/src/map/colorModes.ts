@@ -200,16 +200,11 @@ export function buildingCategoryBucket(building: Building): string {
   return categoryBucket(building.category);
 }
 
-export function buildingHeatingBucket(building: Building): string {
-  return heatingBucket(building.heatingEnergySource);
-}
-
-/** Same legend, but reflecting whatever stock renewal (heatingRenewal.ts) has
- * actually installed by `simTimeMs` rather than only GWR's original snapshot —
- * used by the "Heating" map layer's periodic repaint (see MapView.tsx) so a
- * renewal actually shows up on the map, not just in a building's own panel.
- * Falls back to the static bucket above for a source we don't model/renew at
- * all (wood, unspecified, ...), which never changes anyway. */
+/** The "Heating" legend bucket for whatever stock renewal (heatingRenewal.ts) has
+ * actually installed by `simTimeMs` rather than only GWR's original snapshot, so a
+ * renewal shows up on the map, not just in a building's own panel. Falls back to
+ * GWR's own source for one we don't model/renew at all (wood, unspecified, ...),
+ * which never changes anyway. */
 export function buildingHeatingBucketAt(building: Building, simTimeMs: number): string {
   const id = currentHeatingSystemId(building, simTimeMs);
   if (id === "airHeatPump" || id === "groundHeatPump") return "heatPump";

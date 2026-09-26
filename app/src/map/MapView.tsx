@@ -23,7 +23,6 @@ import {
   buildingAgeBucket,
   buildingCategoryBucket,
   CONSTRUCTION_COLOR,
-  buildingHeatingBucket,
   buildingHeatingBucketAt,
   INSULATION_LEGEND,
   CATEGORY_LEGEND,
@@ -88,28 +87,39 @@ function solarCapacityByEgid(plants: PowerPlant[]): Map<string, number> {
 const CONSTRUCTION_SITE_HEIGHT_M = 4;
 
 /** Every building visible at `simTimeMs`: standing ones, plus construction sites drawn
- * as low amber blocks (they draw no power and house nobody yet). */
+ * as low amber blocks (they draw no power and house nobody yet). Rebuilt from scratch
+ * whenever the stock changes, so every layer's value is filled in as it stands at
+ * `simTimeMs` (installed heating system, energy class) — not the register's original
+ * snapshot — or the layers would flash back to it until their next periodic repaint,
+ * which at high speed, with the stock changing every few seconds, reads as flicker.
+ * Power draw isn't recomputed here (the power layer's own tick does that); each
+ * building keeps its last reading from `previousPowerW` meanwhile. */
 function buildingsToGeoJSON(
   allBuildings: Building[],
   plants: PowerPlant[],
   simTimeMs: number,
+  previousPowerW?: Map<string, number>,
 ): { polygons: BuildingFeatureCollection; points: BuildingFeatureCollection } {
   const solarByEgid = solarCapacityByEgid(plants);
   const buildings = allBuildings.filter((b) => visibleAt(b, simTimeMs));
+
+  const properties = (b: Building): BuildingProperties => ({
+    egid: b.egid,
+    category: buildingCategoryBucket(b),
+    age: buildingAgeBucket(b),
+    energyClass: energyClassAt(b, simTimeMs),
+    constructing: underConstructionAt(b, simTimeMs) ? 1 : 0,
+    heating: buildingHeatingBucketAt(b, simTimeMs),
+    powerW: previousPowerW?.get(b.egid) ?? 0,
+    solarCapacityKw: solarByEgid.get(b.egid) ?? 0,
+  });
 
   const polygonFeatures = buildings
     .filter((b) => b.footprint && b.footprint.length >= 3)
     .map((b) => ({
       type: "Feature" as const,
       properties: {
-        egid: b.egid,
-        category: buildingCategoryBucket(b),
-        age: buildingAgeBucket(b),
-        energyClass: "unrenovated", // live value is filled in by the insulation-layer tick
-        constructing: underConstructionAt(b, simTimeMs) ? 1 : 0,
-        heating: buildingHeatingBucket(b),
-        powerW: 0,
-        solarCapacityKw: solarByEgid.get(b.egid) ?? 0,
+        ...properties(b),
         heightM: underConstructionAt(b, simTimeMs) ? CONSTRUCTION_SITE_HEIGHT_M : buildingHeightM(b),
       },
       geometry: {
@@ -122,16 +132,7 @@ function buildingsToGeoJSON(
     .filter((b) => !b.footprint || b.footprint.length < 3)
     .map((b) => ({
       type: "Feature" as const,
-      properties: {
-        egid: b.egid,
-        category: buildingCategoryBucket(b),
-        age: buildingAgeBucket(b),
-        energyClass: "unrenovated",
-        constructing: underConstructionAt(b, simTimeMs) ? 1 : 0,
-        heating: buildingHeatingBucket(b),
-        powerW: 0,
-        solarCapacityKw: solarByEgid.get(b.egid) ?? 0,
-      },
+      properties: properties(b),
       geometry: { type: "Point" as const, coordinates: [b.lon, b.lat] as [number, number] },
     }));
 
@@ -341,7 +342,9 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       if (!polySource || !pointSource) return;
       const simTimeMs = simClock.getSimTimeMs();
       const plants = effectivePowerPlantsAt(stock.getAll(), dataset.powerPlants, simTimeMs);
-      const fresh = buildingsToGeoJSON(stock.getAll(), plants, simTimeMs);
+      const previousPowerW = new Map<string, number>();
+      for (const f of [...(polygonsRef.current?.features ?? []), ...(pointsRef.current?.features ?? [])]) previousPowerW.set(f.properties.egid, f.properties.powerW);
+      const fresh = buildingsToGeoJSON(stock.getAll(), plants, simTimeMs, previousPowerW);
       polygonsRef.current = fresh.polygons;
       pointsRef.current = fresh.points;
       maxSolarCapacityKwRef.current = Math.max(
