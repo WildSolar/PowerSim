@@ -56,7 +56,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "W A S D — move the map up / left / down / right, relative to the way you're facing",
         "Q / E — rotate the view left / right",
         "R / F — tilt the view toward the horizon / toward straight-down",
-        "Esc — close whatever is on top: the Year in Review, the Wiki or Control window, a charger you're placing, a dwelling (back to its building), a building, a selected charger",
+        "Esc — close whatever is on top: the Year in Review, the Wiki or Control window, a charger you're placing, a dwelling (back to its building), a building, a selected charger, and finally the map layer (back to Default)",
       ]),
       note("Keys are ignored while a panel or window (Control, Wiki, Year in Review) is open, or while you're typing in a text field."),
     ],
