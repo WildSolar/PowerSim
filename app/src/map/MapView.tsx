@@ -108,6 +108,9 @@ const ZONE_DH_LAYER_ID = "zone-parcels-dh-priority";
 const ZONE_STANDARD_LAYER_ID = "zone-parcels-high-standard";
 const ZONE_LINE_LAYER_ID = "zone-parcels-line";
 const ZONE_MARK_LAYER_ID = "zone-parcels-mark"; // picked or with a change on the way
+// The same parcels in the district heating layer: only the district-heat priority zones, under the streets.
+const DH_PRIORITY_FILL_LAYER_ID = "dh-priority-zones-fill";
+const DH_PRIORITY_LINE_LAYER_ID = "dh-priority-zones-line";
 const ZONE_LAYER_IDS = [ZONE_FILL_LAYER_ID, ZONE_DH_LAYER_ID, ZONE_STANDARD_LAYER_ID, ZONE_LINE_LAYER_ID, ZONE_MARK_LAYER_ID];
 const ZONING_TICK_MS = 3000;
 const STRIPE_DH = "zone-stripe-dh";
@@ -724,6 +727,30 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         paint: { "line-color": ["match", ["get", "mark"], "selected", SELECTED_COLOR, ZONING_PENDING_COLOR], "line-width": 3.5 },
       });
 
+      // District-heat priority zones, for the district heating layer: under its streets.
+      map.addLayer(
+        {
+          id: DH_PRIORITY_FILL_LAYER_ID,
+          type: "fill",
+          source: ZONE_SOURCE_ID,
+          filter: ["==", ["get", "dhPriority"], 1],
+          layout: { visibility: dhVisibility },
+          paint: { "fill-pattern": STRIPE_DH, "fill-opacity": 0.7 },
+        },
+        STREET_UNPIPED_LAYER_ID,
+      );
+      map.addLayer(
+        {
+          id: DH_PRIORITY_LINE_LAYER_ID,
+          type: "line",
+          source: ZONE_SOURCE_ID,
+          filter: ["==", ["get", "dhPriority"], 1],
+          layout: { visibility: dhVisibility, "line-join": "round" },
+          paint: { "line-color": DH_PRIORITY_COLOR, "line-width": 2 },
+        },
+        STREET_UNPIPED_LAYER_ID,
+      );
+
       // Charger coverage (the EV charging layer's toggles): on the ground, under the buildings.
       for (const kind of COVERAGE_KINDS) {
         map.addSource(coverageId(kind), {
@@ -1115,7 +1142,16 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.getLayer(STREET_UNPIPED_LAYER_ID)) return;
-    const layers = [STREET_UNPIPED_LAYER_ID, STREET_LINE_LAYER_ID, STREET_CONSTRUCTION_LAYER_ID, STREET_HIT_LAYER_ID, DH_TRUNK_LAYER_ID, DH_PLANT_LAYER_ID];
+    const layers = [
+      STREET_UNPIPED_LAYER_ID,
+      STREET_LINE_LAYER_ID,
+      STREET_CONSTRUCTION_LAYER_ID,
+      STREET_HIT_LAYER_ID,
+      DH_TRUNK_LAYER_ID,
+      DH_PLANT_LAYER_ID,
+      DH_PRIORITY_FILL_LAYER_ID,
+      DH_PRIORITY_LINE_LAYER_ID,
+    ];
     const visible = colorMode === "districtHeat";
     for (const id of layers) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
     if (!visible) return;
@@ -1131,6 +1167,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
 
     const tick = () => {
       (map.getSource(STREET_SOURCE_ID) as GeoJSONSource | undefined)?.setData(streetsToGeoJSON(simClock.getSimTimeMs()));
+      (map.getSource(ZONE_SOURCE_ID) as GeoJSONSource | undefined)?.setData(zoneParcelsGeoJSON(simClock.getSimTimeMs())); // priority zones come into force over time
       const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
       const pointSource = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
       const polyData = polygonsRef.current;

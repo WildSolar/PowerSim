@@ -176,7 +176,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Rezoning a parcel to another use (residential, mixed, centre or work) changes what gets built on its open land, and what its old buildings become once they are replaced: a factory in what is now a residential zone becomes flats — and comes up for replacement sooner, because it no longer fits. Public-use land stays as it is.",
         "Densifying it (one or two more floors than today's plan allows) lets new and replacement buildings go higher and hold more homes, and makes replacing old buildings there pay sooner. Taking the extra floors back is possible too.",
-        "A district-heat priority zone (from municipal energy planning) allows no new oil or gas heating at all; a new building on a street with a district heating pipe must connect, while one replacing its heating may still choose a heat pump.",
+        "A district-heat priority zone (from municipal energy planning) allows no new oil or gas heating at all; a new building on a street with a district heating pipe must connect, while one replacing its heating may still choose a heat pump. The District heat layer shows these zones too (orange stripes), so extensions can follow them.",
         "A high-standard zone requires new and replacement buildings to be built to Minergie-P (U-values about a third below code) with a full roof of solar panels.",
       ]),
       p(

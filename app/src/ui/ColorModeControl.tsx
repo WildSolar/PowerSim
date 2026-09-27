@@ -93,6 +93,10 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
               <span>{line.label}</span>
             </div>
           ))}
+          <div className="legend-row">
+            <span className="swatch" style={{ background: `repeating-linear-gradient(135deg, ${DH_PRIORITY_COLOR} 0 3px, transparent 3px 7px)`, border: `1px solid ${DH_PRIORITY_COLOR}` }} />
+            <span>District-heat priority zone</span>
+          </div>
         </div>
       )}
       {mode === "zoning" && (
