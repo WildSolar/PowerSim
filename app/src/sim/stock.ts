@@ -99,6 +99,7 @@ import { energyClassAt } from "./retrofit";
 import { measures } from "./measures";
 import { treasury } from "./treasury";
 import { hashSeed, mulberry32 } from "./rng";
+import { districtHeatFullAt } from "./gridLimits";
 
 const DAY_MS = 24 * 60 * 60_000;
 const YEAR_MS = 365.25 * DAY_MS;
@@ -1052,7 +1053,8 @@ class StockStore {
 
   /** The attributes decided at permit time: heating, insulation, solar. */
   private finishBuilding(b: Building, permitAtMs: number, builtAtMs: number, rules: ConstructionRules, rng: () => number): void {
-    const districtHeatingOnStreet = districtHeat.servesAt(b.streetSegments, permitAtMs);
+    // A pipe in the street, and room at the source for one more building.
+    const districtHeatingOnStreet = districtHeat.servesAt(b.streetSegments, permitAtMs) && !districtHeatFullAt(permitAtMs);
     applyNewBuildAttributes(b, {
       rules: zoning.localRules(rules, b, permitAtMs, districtHeatingOnStreet), // its parcel's energy zones
       permitAtMs,

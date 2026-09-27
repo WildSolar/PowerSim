@@ -52,7 +52,7 @@ import type { Tariff } from "./tariff";
 import { dailyMeanTempC } from "./weather";
 import { priceFactor } from "./costTrends";
 import { zoning } from "./zoning";
-import { gridDrawBlockedAt } from "./gridLimits";
+import { districtHeatFullAt, gridDrawBlockedAt } from "./gridLimits";
 
 const DAY_MS = 24 * 60 * 60_000;
 const ANNUAL_SAMPLE_DAYS = 365;
@@ -167,7 +167,7 @@ function candidatesAt(
       // District heating needs a pipe in the street; one already connected keeps its connection. A
       // new heat pump needs room on the grid (a building replacing one keeps its connection).
       available:
-        (id === "districtHeating" ? incumbent === "districtHeating" || districtHeat.servesAt(building.streetSegments, atMs) : true) &&
+        (id === "districtHeating" ? incumbent === "districtHeating" || (districtHeat.servesAt(building.streetSegments, atMs) && !districtHeatFullAt(atMs)) : true) &&
         !(fossilBanned && (id === "gasBoiler" || id === "oilBoiler")) &&
         !(isHeatPump(id) && !isHeatPump(incumbent) && gridBlocked),
       annualizedCostRp: installCostRp / spec.lifetimeMeanYears + runningCostRpFor(id, estimate, tariff, avgElecRpKWh),

@@ -22,6 +22,8 @@ import { streets } from "../sim/streets";
 import { districtHeat } from "../sim/districtHeat";
 import { publicCharging } from "../sim/publicCharging";
 import { grid } from "../sim/grid";
+import { setDistrictHeatLimit } from "../sim/gridLimits";
+import { networkFullAt } from "../sim/districtHeatStats";
 import { zoning, type ZoningAction } from "../sim/zoning";
 import { fleets } from "../sim/fleet";
 import { tariffStore } from "../sim/tariffStore";
@@ -167,6 +169,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   stock.init(dataset);
   bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building
   grid.init(dataset, () => stock.getAll()); // last: it reads every building's draw, public chargers included
+  setDistrictHeatLimit((atMs) => networkFullAt(stock.getAll(), atMs));
 
   const startYear = new Date(toDateMs(0)).getUTCFullYear();
   const lastYear = Math.max(...spec.reportYears);

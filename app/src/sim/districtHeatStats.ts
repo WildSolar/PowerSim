@@ -52,11 +52,14 @@ export function networkPeakLoadW(buildings: Building[], atMs: number): number {
   return total;
 }
 
+const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
+
 let capacityW: number | null = null;
 
-/** The source's capacity. No open data says what it is, so for now it is set a margin above
- * the load of the buildings connected when the game starts — see DH_SOURCE_CAPACITY_HEADROOM. */
-export function sourceCapacityW(buildings: Building[], startMs: number): number {
+/** The source's capacity at `atMs`. No open data says what it is, so it is set a margin above the
+ * load of the buildings connected when the game starts (DH_SOURCE_CAPACITY_HEADROOM), plus any
+ * supply the player has added since. */
+export function sourceCapacityW(buildings: Building[], startMs: number, atMs = startMs): number {
   if (capacityW === null) {
     let initial = 0;
     for (const b of buildings) {
@@ -64,7 +67,23 @@ export function sourceCapacityW(buildings: Building[], startMs: number): number 
     }
     capacityW = initial * DH_SOURCE_CAPACITY_HEADROOM;
   }
-  return capacityW;
+  return capacityW + districtHeat.extraSupplyW(atMs);
+}
+
+const fullByMonth = new Map<string, boolean>();
+
+/** Whether the network's winter peak has reached what its source delivers, as of `atMs` — then no
+ * new buildings can connect. Checked once a month (it scans every building). */
+export function networkFullAt(buildings: Building[], atMs: number): boolean {
+  const month = Math.floor(atMs / MONTH_MS);
+  const key = `${month}:${districtHeat.extraSupplyW(atMs)}`;
+  let full = fullByMonth.get(key);
+  if (full === undefined) {
+    const at = month * MONTH_MS;
+    full = networkPeakLoadW(buildings, at) > sourceCapacityW(buildings, 0, at);
+    fullByMonth.set(key, full);
+  }
+  return full;
 }
 
 const demandCache = new Map<string, number>(); // `${egid}:${year}` -> kWh

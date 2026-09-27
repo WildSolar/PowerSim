@@ -29,6 +29,8 @@ import { streets } from "./sim/streets";
 import { districtHeat } from "./sim/districtHeat";
 import { publicCharging } from "./sim/publicCharging";
 import { grid } from "./sim/grid";
+import { setDistrictHeatLimit } from "./sim/gridLimits";
+import { networkFullAt } from "./sim/districtHeatStats";
 import { setMeasureAvailability } from "./sim/measureAvailability";
 import { studies } from "./sim/studies";
 import { municipalSolarCandidates } from "./sim/solarAdoption";
@@ -127,6 +129,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
         );
         bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building
         grid.init(loaded, () => stock.getAll()); // last: it reads every building's draw, public chargers included
+        setDistrictHeatLimit((atMs) => networkFullAt(stock.getAll(), atMs));
         setDataset(loaded);
       })
       .catch((e: Error) => setError(e.message));

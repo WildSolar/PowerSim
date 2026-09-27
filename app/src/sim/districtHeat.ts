@@ -17,6 +17,9 @@
 import {
   DH_BUILD_METRES_PER_MONTH,
   DH_BUILD_MIN_MONTHS,
+  DH_EXTRA_SUPPLY_COST_CHF,
+  DH_EXTRA_SUPPLY_MONTHS,
+  DH_EXTRA_SUPPLY_MW,
   DH_MAIN_ROAD_CLASSES,
   DH_MAIN_ROAD_COST_FACTOR,
   DH_PIPE_COST_CHF_PER_M,
@@ -68,11 +71,13 @@ class DistrictHeatNetwork {
   // an ordered extension (in the future while it is being built).
   private builtAtMs = new Map<number, number>();
   private orders: NetworkOrder[] = [];
+  private extraSupply: { atMs: number; w: number }[] = [];
   private selection = new Set<number>();
   private readonly listeners = new Set<() => void>();
   private version = 0;
 
   init(dataset: MunicipalityDataset): void {
+    this.extraSupply = [];
     this.source = dataset.districtHeat?.source ?? null;
     this.builtAtMs = new Map((dataset.districtHeat?.initialSegments ?? []).map((id) => [id, Number.NEGATIVE_INFINITY]));
     this.orders = [];
@@ -119,6 +124,22 @@ class DistrictHeatNetwork {
     let total = 0;
     for (const [id, built] of this.builtAtMs) if (built <= atMs) total += streets.get(id)?.lengthM ?? 0;
     return total;
+  }
+
+  /** Supply added on top of the source's own (peak boilers, bigger contracts), in service by `atMs` (W). */
+  extraSupplyW(atMs: number): number {
+    return this.extraSupply.reduce((sum, s) => sum + (s.atMs <= atMs ? s.w : 0), 0);
+  }
+
+  pendingSupply(atMs: number): { atMs: number; w: number }[] {
+    return this.extraSupply.filter((s) => s.atMs > atMs);
+  }
+
+  /** Orders more supply for the network: paid now, in service a year on. */
+  addSupply(atMs: number): void {
+    this.extraSupply.push({ atMs: atMs + DH_EXTRA_SUPPLY_MONTHS * MONTH_MS, w: DH_EXTRA_SUPPLY_MW * 1e6 });
+    treasury.recordPayout("districtHeat", atMs, DH_EXTRA_SUPPLY_COST_CHF * 100, "district-heat-supply");
+    this.notify();
   }
 
   getOrders(): NetworkOrder[] {

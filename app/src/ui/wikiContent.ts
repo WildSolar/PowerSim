@@ -488,7 +488,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Where the pipes run today isn't public, so the starting network is a reconstruction: every street a district-heated building (according to the building register) fronts on, joined to the source along the shortest streets. It is plausible, not exact.",
       ),
       note(
-        "The source's capacity isn't known either — it is set half again above the load at the start of play — and it is only shown, not enforced yet: the network can grow past it. Building a heat source of your own, for a town without a network, isn't possible yet.",
+        "The source's capacity isn't known either — it is set half again above the load at the start of play. Once the connected buildings' heat load on a design winter day reaches it, the network is full: no new buildings can connect (those connected keep their heat) until you increase the supply from the district heating panel — 5 MW more, a peak boiler or a bigger contract with the plant, for CHF 2.5 million, ready a year on. Building a heat source of your own, for a town without a network, isn't possible yet.",
       ),
       note(
         "The costs (CHF 2,000 per metre of street, half again more on main roads; the heat bought at 7 Rp/kWh; CHF 10 per metre a year in upkeep) are placeholders, not researched figures. Connecting a building is part of its own heating installation cost, paid by the owner.",

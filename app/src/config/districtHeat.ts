@@ -22,5 +22,10 @@ export const DH_NETWORK_UPKEEP_CHF_PER_M_YEAR = 10;
 // A source's capacity isn't known from any open data; for now it is set this far above the
 // peak load of the buildings connected when the game starts. Shown, not enforced (yet).
 export const DH_SOURCE_CAPACITY_HEADROOM = 1.5;
+// More supply for a full network: a peak boiler at the network, or a bigger contract with the
+// plant — in steps of this size, paid when ordered.
+export const DH_EXTRA_SUPPLY_MW = 5;
+export const DH_EXTRA_SUPPLY_COST_CHF = 2_500_000;
+export const DH_EXTRA_SUPPLY_MONTHS = 12;
 // The outdoor temperature a network's peak load is judged at (a cold winter day).
 export const DH_DESIGN_OUTDOOR_TEMP_C = -8;

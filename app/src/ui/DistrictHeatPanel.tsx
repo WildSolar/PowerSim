@@ -6,6 +6,7 @@ import { networkCoverage, networkPeakLoadW, networkStatusAt, sourceCapacityW, st
 import { existsAt } from "../sim/lifetime";
 import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
+import { DH_EXTRA_SUPPLY_COST_CHF, DH_EXTRA_SUPPLY_MONTHS, DH_EXTRA_SUPPLY_MW } from "../config/districtHeat";
 import { useStockBuildings } from "./useStock";
 import { zoning } from "../sim/zoning";
 import "./districtHeatPanel.css";
@@ -53,7 +54,7 @@ export function DistrictHeatPanel() {
       awaiting,
       lengthKm: districtHeat.pipedLengthM(simDay) / 1000,
       peakW: networkPeakLoadW(buildings, simDay),
-      capacityW: sourceCapacityW(buildings, 0), // judged by the buildings connected at the start of play
+      capacityW: sourceCapacityW(buildings, 0, simDay), // judged by the buildings connected at the start of play, plus supply added since
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buildings, simDay, version]);
@@ -146,7 +147,7 @@ export function DistrictHeatPanel() {
         ))}
       </div>
 
-      <div className="dh-capacity" title="Not a limit yet: the network can grow past it for now">
+      <div className="dh-capacity" title="The connected buildings' heat load on a design winter day, against what the source delivers">
         <div className="info-row">
           <span>Winter peak vs. source</span>
           <span className="info-value">
@@ -155,6 +156,17 @@ export function DistrictHeatPanel() {
         </div>
         <div className="dh-bar">
           <div className={`dh-bar-fill${load > 1 ? " over" : ""}`} style={{ width: `${Math.min(100, load * 100)}%` }} />
+        </div>
+        {load > 1 && <p className="dh-warning">The source is at its limit: no new buildings can connect until the supply is increased.</p>}
+        {districtHeat.pendingSupply(simDay).map((s) => (
+          <p className="dh-note" key={s.atMs}>
+            {formatMW(s.w)} more supply in service {formatDate(s.atMs).replace(/^\w+, \d+ /, "")}.
+          </p>
+        ))}
+        <div className="dh-actions">
+          <button onClick={() => districtHeat.addSupply(simClock.getSimTimeMs())}>
+            Increase supply by {DH_EXTRA_SUPPLY_MW} MW — {formatCHF(DH_EXTRA_SUPPLY_COST_CHF * 100)}, {DH_EXTRA_SUPPLY_MONTHS} months
+          </button>
         </div>
       </div>
 
