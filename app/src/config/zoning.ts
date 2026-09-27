@@ -32,19 +32,19 @@ export const VALUE_LEVY_RATE = 0.25;
 // ballpark). Levied once per plot, on its area — estimated from the building's footprint and a
 // typical site coverage.
 export const LAND_VALUE_CHF_PER_M2_LAND: Record<SiteZone, number> = {
-  residential: 1400,
-  mixed: 1500,
-  centre: 1800,
-  work: 700,
+  residential: 1250,
+  mixed: 1300,
+  centre: 1600,
+  work: 900,
   public: 0,
 };
 export const TYPICAL_SITE_COVERAGE = 0.35; // footprint / plot area
 // Densification adds floor space that can be sold or let: land value per m² of that extra floor space.
 export const LAND_VALUE_CHF_PER_M2_GFA: Record<SiteZone, number> = {
-  residential: 1000,
-  mixed: 1050,
-  centre: 1300,
-  work: 500,
+  residential: 700,
+  mixed: 750,
+  centre: 900,
+  work: 350,
   public: 0,
 };
 
