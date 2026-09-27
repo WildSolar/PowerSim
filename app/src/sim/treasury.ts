@@ -28,7 +28,7 @@ export type PayoutCategory = "solar" | "heating" | "vehicle" | "retrofit" | "pro
 export const PAYOUT_CATEGORIES: PayoutCategory[] = ["solar", "heating", "vehicle", "retrofit", "programs", "infrastructure", "districtHeat", "charging", "zoning", "grid"];
 
 export const PAYOUT_LABEL: Record<PayoutCategory, string> = {
-  solar: "Solar subsidies",
+  solar: "Solar and battery subsidies",
   heating: "Heat pump subsidies",
   vehicle: "Electric vehicle subsidies",
   retrofit: "Insulation retrofit subsidies",

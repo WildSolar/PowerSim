@@ -18,11 +18,13 @@ import { RESIDENTS_PER_DWELLING } from "../config/treasury";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { combineChannels, type Channels } from "./channels";
 import { simClock } from "./engine";
+import { measureUnavailableReason } from "./measureAvailability";
 import { MEASURE_BY_ID } from "./measureCatalog";
 import { defaultParams, sanitizeParams, type MeasureDef, type MeasureParams } from "./measureTypes";
 import { treasury } from "./treasury";
 
 const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
+const DAY_MS = 24 * 60 * 60_000;
 
 interface MeasureState {
   /** In force right now, or null while the first enactment is still in its lead time. */
@@ -37,6 +39,9 @@ interface MeasureState {
 export type MeasureEvent =
   | { kind: "enacted" | "changed"; id: string; def: MeasureDef; params: MeasureParams; previousParams: MeasureParams | null; atMs: number }
   | { kind: "repealed"; id: string; def: MeasureDef; params: MeasureParams; atMs: number }
+  // Wound up by the administration: it had nothing left to do (measureAvailability.ts). Not the
+  // player's decision, so nobody holds it against them.
+  | { kind: "retired"; id: string; def: MeasureDef; params: MeasureParams; atMs: number; reason: string }
   | { kind: "activated"; id: string; def: MeasureDef; params: MeasureParams; atMs: number };
 
 export interface MeasureLogEntry {
@@ -82,6 +87,7 @@ class MeasureEngine {
     this.externalAnnounced = new Set();
     this.history = [];
     this.lastChargedMonth = null;
+    this.lastRetireCheckDay = null;
     this.frozen = false;
     treasury.setDifficulty(DIFFICULTY_SPECS[difficulty]);
     this.recompute();
@@ -269,8 +275,31 @@ class MeasureEngine {
       }
     }
 
+    if (this.retireFinished(nowMs)) changed = true;
     this.chargeRunningCosts(nowMs);
     if (changed) this.recompute();
+  }
+
+  private lastRetireCheckDay: number | null = null;
+
+  /** Winds up measures with nothing left to do (checked once a simulated day, and only for measures
+   * in force or pending): they end without a repeal, so without its cost in approval. Returns
+   * whether any did. */
+  private retireFinished(nowMs: number): boolean {
+    const day = Math.floor(nowMs / DAY_MS);
+    if (this.lastRetireCheckDay === day || this.frozen || this.states.size === 0) return false;
+    this.lastRetireCheckDay = day;
+    let any = false;
+    for (const [id, state] of [...this.states]) {
+      const def = MEASURE_BY_ID.get(id);
+      const reason = measureUnavailableReason(id, nowMs);
+      if (!def || reason === null) continue;
+      this.states.delete(id);
+      this.log(nowMs, `Wound up: ${def.title} — nothing left to do (${reason.replace(/\.$/, "")}).`);
+      this.emit({ kind: "retired", id, def, params: state.pending?.params ?? (state.active as MeasureParams), atMs: nowMs, reason });
+      any = true;
+    }
+    return any;
   }
 
   private chargeRunningCosts(nowMs: number): void {

@@ -128,12 +128,12 @@ function MeasureCard({ def, nowMs }: { def: MeasureDef; nowMs: number }) {
     <div className={`measure-card${unavailable ? " unavailable" : ""}`}>
       <div className="measure-head">
         <span className="measure-title">{def.title}</span>
-        <span className={`measure-status ${status.tone}`}>{unavailable && latest !== null ? "Idle" : status.label}</span>
+        <span className={`measure-status ${status.tone}`}>{unavailable && latest !== null ? "Winding up" : status.label}</span>
       </div>
       {unavailable && (
         <div className="measure-note">
-          Nothing left to do: {unavailable}
-          {latest !== null ? " It costs nothing while idle." : ""}
+          Nothing left to do: {unavailable} A measure in force is wound up automatically once this is so — no
+          repeal, so no cost in approval.
         </div>
       )}
       {state?.pending && state.active && <div className="measure-note">Currently in effect with the earlier settings.</div>}
@@ -193,7 +193,7 @@ function MeasureCard({ def, nowMs }: { def: MeasureDef; nowMs: number }) {
         <button className="measure-enact" disabled={!changed || unavailable !== null} onClick={() => measures.enact(def.id, draft)}>
           {latest === null ? "Enact" : "Apply change"}
         </button>
-        {latest !== null && (
+        {latest !== null && unavailable === null && (
           <button className="measure-repeal" onClick={() => measures.repeal(def.id)}>
             Repeal
           </button>

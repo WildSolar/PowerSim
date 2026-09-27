@@ -547,3 +547,33 @@ export function mobilityRenewalLog(egid: string, dwelling: Dwelling, simTimeMs: 
   entries.sort((a, b) => a.installedAtMs - b.installedAtMs);
   return entries;
 }
+
+// --- census ---------------------------------------------------------------------
+
+export interface MobilityCensus {
+  /** Residents (mobility slots) by main way of getting around, and the vehicle each uses. */
+  byMode: Record<MobilityMode, number>;
+  carsElectric: number;
+  bikesElectric: number;
+}
+
+/** How the municipality's residents get around at `simTimeMs` — what the federal mobility survey
+ * and the vehicle register tell a municipality, counted from each household's own chains. */
+export function mobilityCensus(buildings: Building[], simTimeMs: number): MobilityCensus {
+  const census: MobilityCensus = { byMode: { car: 0, bike: 0, other: 0 }, carsElectric: 0, bikesElectric: 0 };
+  for (const b of buildings) {
+    if (!existsAt(b, simTimeMs)) continue;
+    for (const d of b.dwellings) {
+      const slots = mobilitySlotCount(b.egid, d);
+      for (let s = 0; s < slots; s++) {
+        const mode = currentMobilityMode(b.egid, d.ewid, s, simTimeMs);
+        census.byMode[mode]++;
+        if (mode === "other") continue;
+        const vehicle = currentVehicleType(b.egid, d.ewid, s, mode, simTimeMs);
+        if (vehicle === "carEV") census.carsElectric++;
+        else if (vehicle === "bikeElectric") census.bikesElectric++;
+      }
+    }
+  }
+  return census;
+}

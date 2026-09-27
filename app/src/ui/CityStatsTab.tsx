@@ -10,6 +10,7 @@ import { useSimDay, useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
 import { CONSUMPTION_CATEGORIES } from "./deviceCategories";
 import { HistoryChart } from "./HistoryChart";
+import { ModalSplitSection } from "./ModalSplitSection";
 import { PieChart, type PieSlice } from "./PieChart";
 import { useHistorySeries } from "./useHistorySeries";
 import { usePeriodPieEnergy, type PieGranularity } from "./usePeriodPieEnergy";
@@ -44,6 +45,7 @@ export function CityStatsTab({ dataset }: CityStatsTabProps) {
   const plants = effectivePowerPlantsAt(dataset.buildings, dataset.powerPlants, currentDay);
   const solarPlants = plants.filter((p) => p.technology === "Photovoltaic" && (p.activeToMs === undefined || p.activeToMs > currentDay));
   const standing = dataset.buildings.filter((b) => existsAt(b, currentDay));
+  const batteries = solarPlants.filter((p) => p.battery);
   const [granularity, setGranularity] = useState<PieGranularity>("day");
 
   const history = useHistorySeries(
@@ -79,7 +81,13 @@ export function CityStatsTab({ dataset }: CityStatsTabProps) {
         <dd>
           {solarPlants.length} ({solarPlants.reduce((sum, p) => sum + (p.capacityKw ?? 0), 0).toFixed(0)} kWp total)
         </dd>
+        <dt>Home batteries</dt>
+        <dd>
+          {batteries.length} ({batteries.reduce((sum, p) => sum + (p.battery?.kwh ?? 0), 0).toFixed(0)} kWh total)
+        </dd>
       </dl>
+
+      <ModalSplitSection buildings={dataset.buildings} simDayMs={currentDay} />
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Energy breakdown</h2>
       <div className="tier-buttons">

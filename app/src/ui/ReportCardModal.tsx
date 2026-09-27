@@ -307,7 +307,9 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
           ) : (
             <p>
               {solarTally.count} building{solarTally.count === 1 ? "" : "s"} installed solar this year, totaling{" "}
-              {solarTally.totalCapacityKw.toFixed(0)} kWp.
+              {solarTally.totalCapacityKw.toFixed(0)} kWp
+              {solarTally.batteriesWithSolar > 0 ? ` — ${solarTally.batteriesWithSolar} with a home battery` : ""}.
+              {solarTally.batteriesAdded > 0 ? ` ${solarTally.batteriesAdded} existing system${solarTally.batteriesAdded === 1 ? "" : "s"} added a battery.` : ""}
             </p>
           )}
 

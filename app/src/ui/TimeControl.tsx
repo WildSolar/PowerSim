@@ -1,4 +1,4 @@
-import { PAUSE_SPEED, RUNNING_SPEEDS, setSpeed } from "../sim/timeControls";
+import { PAUSE_LABEL, PAUSE_SPEED, RUNNING_SPEEDS, setSpeed } from "../sim/timeControls";
 import { ghiWm2 } from "../sim/pv";
 import { useSimTime, useSimSpeed } from "../sim/store";
 import { formatDate, formatTime, formatWeekday } from "../sim/calendar";
@@ -7,7 +7,7 @@ import { dayNightStatus } from "./dayNightDisplay";
 import { CONDITION_ICON, CONDITION_LABEL } from "./weatherDisplay";
 import "./timeControl.css";
 
-const SPEEDS = [{ label: "II", value: PAUSE_SPEED }, ...RUNNING_SPEEDS];
+const SPEEDS = [{ label: PAUSE_LABEL, name: "Pause", hint: "Space pauses and resumes", value: PAUSE_SPEED }, ...RUNNING_SPEEDS];
 
 export function TimeControl() {
   const simTimeMs = useSimTime();
@@ -40,7 +40,8 @@ export function TimeControl() {
         {SPEEDS.map((s) => (
           <button
             key={s.value}
-            title={s.value === PAUSE_SPEED ? "Pause / resume (Space)" : "Cycle speed (Tab)"}
+            title={s.value === PAUSE_SPEED ? `${s.name} (${s.hint})` : `${s.name}: ${s.hint} (Tab cycles the speeds)`}
+            aria-label={s.name}
             className={s.value === speed ? "active" : ""}
             onClick={() => setSpeed(s.value)}
           >

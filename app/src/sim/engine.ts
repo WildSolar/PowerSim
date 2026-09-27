@@ -6,7 +6,7 @@
  * loop just advances simTime by realDelta * 0.
  */
 
-const DEFAULT_MULTIPLIER = 720; // 1 real second = 12 simulated minutes (~2 real minutes per simulated day)
+const DEFAULT_MULTIPLIER = 3600; // "Medium": 1 real second = 1 simulated hour (see timeControls.ts)
 
 // A generous but hard ceiling on simulated time, well inside JS's own Date
 // range (+-~273,790 years from the epoch) rather than right up against it —

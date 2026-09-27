@@ -8,7 +8,7 @@
  * error margin a real study would have. Transparency mode shows the decisions themselves.
  */
 
-export type SubsidyCategory = "solar" | "heating" | "vehicle" | "retrofit";
+export type SubsidyCategory = "solar" | "battery" | "heating" | "vehicle" | "retrofit";
 
 export interface SubsidisedDecision {
   atMs: number;

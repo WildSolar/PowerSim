@@ -57,6 +57,8 @@
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   min-width: 28px;
+  flex: 1;
+  letter-spacing: -0.12em;
 }
 
 .time-control .speed-buttons button.active {

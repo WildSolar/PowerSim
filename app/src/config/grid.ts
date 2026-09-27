@@ -31,8 +31,13 @@ export const REINFORCE_BASE_CHF = 80_000;
 export const REINFORCE_CHF_PER_KVA = 150;
 export const REINFORCE_MONTHS = 9;
 
-// A neighbourhood battery: it covers this much of an area's peak, in either direction.
-export const BATTERY_KW = 250;
-export const BATTERY_KWH = 500;
-export const BATTERY_COST_CHF = 350_000;
+// Neighbourhood batteries at a station: each covers its power of the area's peak, in either
+// direction, and stores two hours of it. Today's installed prices (container, inverter, connection
+// and site work — cells are well under half), with some economy of scale; they then fall along the
+// "gridBattery" price trajectory (config/costTrends.ts).
+export const GRID_BATTERY_SIZES: { kw: number; kwh: number; costChf: number }[] = [
+  { kw: 250, kwh: 500, costChf: 350_000 },
+  { kw: 500, kwh: 1000, costChf: 600_000 },
+  { kw: 1000, kwh: 2000, costChf: 1_050_000 },
+];
 export const BATTERY_MONTHS = 6;

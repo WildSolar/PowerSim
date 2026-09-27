@@ -122,8 +122,10 @@ export function pvPowerWAt(plant: PowerPlant, simTimeMs: number, irradiance: num
   if (plant.technology !== "Photovoltaic" || !plant.capacityKw) return 0;
   if (plant.activeToMs !== undefined && simTimeMs >= plant.activeToMs) return 0; // its building has been demolished
   // A solar feed-in limit (the law) caps what the system delivers at a share of its rating — taken
-  // on generation rather than on the net feed-in, a slightly conservative simplification.
-  const limit = policyStore.get().feedInLimitPct / 100;
+  // on generation rather than on the net feed-in, a slightly conservative simplification. A system
+  // with a battery generates in full: the battery takes what's over the limit, and homeBattery.ts
+  // curtails the rest of the feed-in.
+  const limit = plant.battery ? 1 : policyStore.get().feedInLimitPct / 100;
   return -(plant.capacityKw * 1000 * Math.min(irradiance / PEAK_IRRADIANCE_WM2, limit));
 }
 

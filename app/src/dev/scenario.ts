@@ -75,6 +75,7 @@ export interface ScenarioRow {
   modeShare: Record<string, number>;
   energyClass: Record<string, number>;
   solarKwp: number;
+  batteries: { systems: number; withBattery: number; gridFriendly: number; kwh: number };
   spentChf: Record<string, number>;
   spentTotalChf: number;
   approval?: number;
@@ -147,6 +148,11 @@ function snapshot(dataset: MunicipalityDataset, year: number, atMs: number): Sce
     modeShare: shares(modes),
     energyClass: classes,
     solarKwp: Math.round(solarKwp),
+    batteries: (() => {
+      const pv = plants.filter((p) => p.technology === "Photovoltaic" && (p.activeToMs === undefined || p.activeToMs > atMs));
+      const withB = pv.filter((p) => p.battery);
+      return { systems: pv.length, withBattery: withB.length, gridFriendly: withB.filter((p) => p.battery?.feedInCap !== null).length, kwh: Math.round(withB.reduce((sum, p) => sum + (p.battery?.kwh ?? 0), 0)) };
+    })(),
     spentChf,
     spentTotalChf: Object.values(spentChf).reduce((a, b) => a + b, 0),
     approval: approval.getGameOver() || undefined ? undefined : Math.round(approval.getApproval() * 10) / 10,

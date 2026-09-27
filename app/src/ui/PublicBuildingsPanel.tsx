@@ -10,7 +10,6 @@ import { buildCostRp, buildMonthsFor, pointsAt, publicCharging, sizesFor } from 
 import { installMunicipalSolarNow, municipalSolarQuote } from "../sim/solarAdoption";
 import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
-import { gridFeedInBlockedAt } from "../sim/gridLimits";
 import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
 
@@ -60,13 +59,15 @@ function SelectedBuilding({ building, realPlants, now, onOrdered }: { building: 
               onOrdered();
             }}
           >
-            Put {solarQuote.capacityKw.toFixed(0)} kWp on its roof for {formatCHF(solarQuote.costRp)}
+            Put {solarQuote.capacityKw.toFixed(0)} kWp on its roof{solarQuote.batteryKwh !== null ? ` with a ${solarQuote.batteryKwh} kWh grid-friendly battery` : ""} for{" "}
+            {formatCHF(solarQuote.costRp)}
           </button>
         </div>
       )}
-      {!solar && !solarQuote && (
-        <p className="dh-note">{gridFeedInBlockedAt(building, now) ? "The grid here can't take more solar feed-in until it's reinforced (Grid layer)." : "No roof to put panels on."}</p>
+      {solarQuote?.batteryKwh != null && (
+        <p className="dh-note">The grid here is full at summer middays: the array can only connect with a battery that keeps its feed-in to half its rating.</p>
       )}
+      {!solar && !solarQuote && <p className="dh-note">No roof to put panels on.</p>}
 
       <div className="info-row" style={{ marginTop: 6 }}>
         <span>🔌 Chargers</span>

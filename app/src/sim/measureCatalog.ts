@@ -31,6 +31,30 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     approval: () => ({ homeowners: 0.5, tenants: 0.1, business: 0.2, climate: 0.6 }),
   },
   {
+    id: "home-battery-subsidy",
+    category: "subsidy",
+    subsidyCategory: "battery",
+    title: "Home battery subsidy",
+    summary:
+      "A municipal subsidy per kWh for a battery bought with rooftop solar, or added to an existing system. It can be tied to grid-friendly operation: the battery then charges from the top of the midday peak, so the system never feeds in more than half its rating — easing the summer load on the transformer stations, at some cost in yield to the owner.",
+    params: [
+      { kind: "slider", key: "perKwh", label: "Per kWh", min: 0, max: 1000, step: 50, unit: "CHF/kWh", default: 300 },
+      {
+        kind: "choice",
+        key: "condition",
+        label: "Condition",
+        options: [
+          { value: "grid", label: "Grid-friendly (feed-in ≤ 50%)" },
+          { value: "none", label: "None" },
+        ],
+        default: "grid",
+      },
+    ],
+    leadTimeMonths: 1,
+    effects: (p) => ({ homeBatterySubsidyRpPerKwh: num(p, "perKwh") * CHF, homeBatterySubsidyGridFriendly: p.condition !== "none" }),
+    approval: (p) => ({ homeowners: p.condition === "none" ? 0.4 : 0.3, business: 0.1, climate: 0.4 }),
+  },
+  {
     id: "heat-pump-grant",
     category: "subsidy",
     subsidyCategory: "heating",

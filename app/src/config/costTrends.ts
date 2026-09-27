@@ -31,7 +31,9 @@ export type CostTrendId =
   | "chargerAc"
   | "chargerDc"
   | "chargerFleet"
-  | "depotCharger";
+  | "depotCharger"
+  | "gridBattery"
+  | "homeBattery";
 
 export interface CostTrend {
   label: string;
@@ -60,4 +62,8 @@ export const COST_TRENDS: Record<CostTrendId, CostTrend> = {
   chargerDc: { label: "Fast-charging hub", level: 0.6, years: 8 },
   chargerFleet: { label: "Lorry charging park", level: 0.55, years: 8 },
   depotCharger: { label: "Depot charger", level: 0.6, years: 8 },
+  // Cells keep getting cheaper, but inverters, installation and (for a station) the site and grid
+  // connection are much of the price — so batteries fall, but not dramatically.
+  gridBattery: { label: "Neighbourhood battery", level: 0.7, years: 10 },
+  homeBattery: { label: "Home battery", level: 0.7, years: 10 },
 };

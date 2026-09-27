@@ -5,16 +5,16 @@ import { simClock } from "./engine";
 // there's no fixed-size "tick" whose cost scales with speed, so these top out where
 // they do only because nobody had asked to go faster yet, not because of a cost model.
 export const PAUSE_SPEED = 0;
-export const RUNNING_SPEEDS: { label: string; value: number }[] = [
-  { label: "×1", value: 1 },
-  { label: "×60", value: 60 },
-  { label: "×720", value: 720 },
-  { label: "×3600", value: 3600 },
-  { label: "×21600", value: 21600 },
-  { label: "×86400", value: 86400 },
+// Glyphs with the text variation selector (U+FE0E), so they take the button's colour rather than
+// rendering as coloured emoji tiles.
+export const RUNNING_SPEEDS: { label: string; name: string; hint: string; value: number }[] = [
+  { label: "\u25B6\uFE0E", name: "Slow", hint: "a minute a second", value: 60 },
+  { label: "\u25B6\uFE0E\u25B6\uFE0E", name: "Medium", hint: "an hour a second", value: 3600 },
+  { label: "\u25B6\uFE0E\u25B6\uFE0E\u25B6\uFE0E", name: "Fast", hint: "a day a second", value: 86400 },
 ];
+export const PAUSE_LABEL = "\u23F8\uFE0E";
 
-const DEFAULT_RUNNING_SPEED = 720;
+export const DEFAULT_RUNNING_SPEED = 3600;
 
 // The speed to resume at after a pause, whether the pause came from the button, the
 // spacebar, or the year-end watcher. Tracked here rather than read back from the
@@ -37,7 +37,7 @@ export function togglePause(): void {
   }
 }
 
-/** Steps to the next running speed, wrapping from the fastest back to ×1. While
+/** Steps to the next running speed, wrapping from the fastest back to the slowest. While
  * paused this resumes at the speed after the one that was running before the pause. */
 export function cycleSpeed(): void {
   if (approval.getGameOver()) return;

@@ -1,16 +1,22 @@
 import { useMemo, useSyncExternalStore } from "react";
-import { BATTERY_COST_CHF, BATTERY_KW, BATTERY_MONTHS, REINFORCE_MONTHS } from "../config/grid";
+import { BATTERY_MONTHS, GRID_BATTERY_SIZES, REINFORCE_MONTHS } from "../config/grid";
 import { GRID_LEGEND } from "../map/colorModes";
 import { mapFocus } from "../map/mapFocus";
 import { formatDate } from "../sim/calendar";
 import { simClock } from "../sim/engine";
-import { grid, reinforceCostRp, type GridArea } from "../sim/grid";
+import { grid, gridBatteryCostRp, reinforceCostRp, type GridArea } from "../sim/grid";
 import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
 import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
 
 const BUCKET_COLOR = Object.fromEntries(GRID_LEGEND.map((l) => [l.bucket, l.color]));
+
+/** "CHF 350k", "CHF 1.05M" — for the narrow battery buttons. */
+function compactCHF(rp: number): string {
+  const chf = rp / 100;
+  return chf >= 1e6 ? `CHF ${(chf / 1e6).toFixed(2).replace(/0$/, "")}M` : `CHF ${Math.round(chf / 1000)}k`;
+}
 
 function monthYear(simTimeMs: number): string {
   return formatDate(simTimeMs).replace(/^\d+ /, "");
@@ -93,12 +99,18 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
             {formatCHF(reinforceCostRp(planned))} · {REINFORCE_MONTHS} months
           </span>
         </button>
-        <button onClick={() => grid.addBattery(area.id, simClock.getSimTimeMs())}>
-          <span className="ev-build-name">Add a {BATTERY_KW} kW battery</span>
-          <span className="ev-build-detail">
-            {formatCHF(BATTERY_COST_CHF * 100)} · {BATTERY_MONTHS} months
-          </span>
-        </button>
+      </div>
+      <div className="dh-note" style={{ marginTop: 6 }} title="A battery covers its power of the area's peak — the winter evening draw and the summer midday feed-in alike — and stores two hours of it">
+        Add a neighbourhood battery ({BATTERY_MONTHS} months):
+      </div>
+      <div className="ev-sizes">
+        {GRID_BATTERY_SIZES.map((size, i) => (
+          <button key={size.kw} title={formatCHF(gridBatteryCostRp(i, now))} onClick={() => grid.addBattery(area.id, simClock.getSimTimeMs(), i)}>
+            <span className="ev-build-name">{size.kwh >= 1000 ? `${size.kwh / 1000} MWh` : `${size.kwh} kWh`}</span>
+            <span className="ev-build-detail">{size.kw >= 1000 ? `${size.kw / 1000} MW` : `${size.kw} kW`}</span>
+            <span className="ev-build-detail">{compactCHF(gridBatteryCostRp(i, now))}</span>
+          </button>
+        ))}
       </div>
     </div>
   );

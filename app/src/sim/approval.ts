@@ -344,6 +344,9 @@ class ApprovalEngine {
       for (const b of BLOC_ORDER) this.shift(b, -(stances[b] ?? 0) * ENACT_SHOCK_POINTS * sens * REPEAL_RECOVERY_FRACTION);
       this.shiftAll(-REPEAL_PENALTY_POINTS * sens);
       this.votes.delete(event.id);
+    } else if (event.kind === "retired") {
+      // It finished its work: no reaction either way, and nothing left to vote on.
+      if (this.votes.delete(event.id)) this.addLog(event.atMs, `The vote on ${event.def.title} is called off: the measure has been wound up.`);
     }
     this.bump();
   }

@@ -20,7 +20,8 @@ import {
   HISTORY_SAMPLE_COUNT,
   HISTORY_REFRESH_MS,
 } from "../sim/history";
-import { pvPowerForBuildingW } from "../sim/pv";
+import { buildingLoadW } from "../sim/buildingPower";
+import { solarAndBatteryAt } from "../sim/homeBattery";
 import { solarAdoptionLog } from "../sim/solarAdoption";
 import { snowDepthCm } from "../sim/snow";
 import { useSimTime, useTariff } from "../sim/store";
@@ -68,7 +69,9 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
   const buildingPlants = plants.filter((p) => p.egid === building.egid && p.technology === "Photovoltaic");
   const hasSolar = buildingPlants.length > 0;
   const snowCoverCm = hasSolar ? snowDepthCm(simTimeMs) : 0;
-  const solarGenerationW = hasSolar ? -pvPowerForBuildingW(building.egid, plants, simTimeMs, snowCoverCm) : 0;
+  const solarState = hasSolar ? solarAndBatteryAt(building.egid, plants, simTimeMs, buildingLoadW(building, simTimeMs), snowCoverCm) : null;
+  const solarGenerationW = solarState?.generationW ?? 0;
+  const battery = solarState?.battery ?? null;
   const solarCapacityKw = buildingPlants.reduce((sum, p) => sum + (p.capacityKw ?? 0), 0);
   const solarLog = solarAdoptionLog(building, simTimeMs);
 
@@ -216,6 +219,23 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
           <span className="device-status">Not installed</span>
         )}
       </div>
+      {battery && solarState && (
+        <div className="device-row" title="Charges from the solar surplus, and covers the building's own use from the late afternoon for as long as the day's charge lasts">
+          <span className="device-name">
+            🔋 Battery
+            <span className="ev-badge responsive">{battery.kwh.toFixed(0)} kWh</span>
+            {battery.feedInCap !== null && <span className="ev-badge">grid-friendly · feed-in ≤ {Math.round(battery.feedInCap * 100)}%</span>}
+          </span>
+          <span className={`device-watts${solarState.batteryW === 0 ? " off" : ""}`}>
+            {solarState.batteryW > 0 ? `charging ${formatWatts(solarState.batteryW)}` : solarState.batteryW < 0 ? `supplying ${formatWatts(-solarState.batteryW)}` : "idle"}
+          </span>
+        </div>
+      )}
+      {solarState && solarState.curtailedW > 0 && (
+        <p className="dh-note" style={{ margin: "2px 0 0" }}>
+          {formatWatts(solarState.curtailedW)} curtailed to keep the feed-in under its cap.
+        </p>
+      )}
       <RenewalLogSection title="Solar history" entries={solarLog} />
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Daily energy — last 24h</h2>

@@ -52,7 +52,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     blocks: [
       list([
         "Space — pause / resume the simulation (resumes at the speed you paused from)",
-        "Tab — step to the next speed (×1 → ×60 → ×720 → … → ×86400, then back to ×1); while paused, resumes at the next speed",
+        "Tab — step to the next speed (Slow → Medium → Fast, then back to Slow); while paused, resumes at the next speed",
         "W A S D — move the map up / left / down / right, relative to the way you're facing",
         "Q / E — rotate the view left / right",
         "R / F — tilt the view toward the horizon / toward straight-down",
@@ -67,7 +67,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Time, weather & sun",
     blocks: [
       p(
-        "The game clock starts at today's real date and runs forward. Use the speed buttons in the Info panel to pause, run at real-time, or fast-forward — up to a simulated day passing in about a second. Every device's power draw is a pure function of the exact simulated moment, so jumping speeds never breaks anything: nothing is \"remembered\" between ticks.",
+        "The game clock starts at today's real date and runs forward. Use the speed buttons in the Info panel to pause or pick a speed: Slow (a simulated minute a second — to watch devices switch on and off), Medium (an hour a second) or Fast (a day a second). Every device's power draw is a pure function of the exact simulated moment, so jumping speeds never breaks anything: nothing is \"remembered\" between ticks.",
       ),
       note(
         "The clock automatically pauses the instant it crosses into a new calendar year and opens that year's \"Year in Review\" report — see below — so a long fast-forward never blows straight past it.",
@@ -221,10 +221,10 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Twice a year the utility reads its meters: after the winter (the highest draw on the coldest January and February evenings, when heat pumps, cooking and cars plugging in all come together) and after the summer (the highest feed-in on the sunniest middays, when rooftop solar pushes power back up the line). The Grid map layer colours every building by how loaded its area's station was at the last reading, marks the stations and outlines the zone each one serves (within the municipal boundary); selecting a station (or any building) highlights its whole area; its panel ranks the areas and shows each one's peaks against its capacity.",
       ),
       p(
-        "An area whose peak exceeds its station's capacity — either way — is overloaded, and new connections there have to wait until the next reading shows room again. Over its winter peak: no new heat pumps (a building replacing one keeps its connection), no new wallboxes (households charge in public instead, if they can; replacing an electric car keeps its wallbox), no new depot chargers for businesses. Over its summer feed-in: no solar arrays over 30 kWp — household systems still connect, and new buildings still get what the building code requires. New buildings are always connected. Reinforcing it (the next transformer size up, and the cables with it, ready after nine months) or adding a neighbourhood battery (250 kW, covering that much of the peak in either direction) is up to you, paid from the treasury.",
+        "An area whose peak exceeds its station's capacity — either way — is overloaded, and new connections there have to wait until the next reading shows room again. Over its winter peak: no new heat pumps (a building replacing one keeps its connection), no new wallboxes (households charge in public instead, if they can; replacing an electric car keeps its wallbox), no new depot chargers for businesses. Over its summer feed-in: an array over 30 kWp connects only with a grid-friendly home battery that keeps its feed-in to half its rating (see \"Home batteries\") — household systems still connect as they are, and new buildings still get what the building code requires. New buildings are always connected. Reinforcing it (the next transformer size up, and the cables with it, ready after nine months) or adding a neighbourhood battery (250 kW, 500 kW or 1 MW, each storing two hours and covering its power of the peak in either direction; ready after six months, and getting cheaper over the years) is up to you, paid from the treasury.",
       ),
       p(
-        "Reinforcing everywhere is expensive, so three measures (Control → Measures) buy time by taking the edge off the peaks instead: heat pump load control lets the utility switch enrolled heat pumps off in turns at peak times (at any one peak moment half of them are off — a short spell each, hardly noticed); a smart charging programme signs households up to let their electric car charge off-peak rather than as soon as they plug in; and a solar feed-in limit caps what panels deliver at 70% (or less) of their rating, which costs little energy but shaves the sunny-midday peak. They slow the overloading down; they don't replace reinforcement in the long run.",
+        "Reinforcing everywhere is expensive, so three measures (Control → Measures) buy time by taking the edge off the peaks instead: heat pump load control lets the utility switch enrolled heat pumps off in turns at peak times (at any one peak moment half of them are off — a short spell each, hardly noticed); a smart charging programme signs households up to let their electric car charge off-peak rather than as soon as they plug in; and a solar feed-in limit caps what panels deliver at 70% (or less) of their rating, which costs little energy but shaves the sunny-midday peak. A home battery subsidy tied to grid-friendly operation does the same for the systems it pays for. They slow the overloading down; they don't replace reinforcement in the long run.",
       ),
       note(
         "Placeholders: the area sizes, the stations' starting headroom, and the costs of reinforcing and batteries. The readings are a handful of design moments, not a full load flow; voltage, cables and reactive power aren't modelled. The feed-in limit caps generation rather than the net feed-in after a building's own use, which is slightly conservative, and load control only counts at the readings (the heat a building needs is still delivered, just shifted).",
@@ -242,7 +242,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Solar: the full usable roof, ordered directly from the panel, paid by the treasury (less the federal payment every installation gets) and generating from a few months on. Or automatically, a few buildings a year, with the \"Solar on public buildings\" measure.",
         "Chargers: a public charging site in the building's car park, in any of the on-street sizes (4, 8 or 12 points), ordered directly. Or automatically with the \"Chargers at public buildings\" measure, which picks the buildings with the most unmet charging demand around them first. Either way they're municipal chargers like any other (see \"Public charging\").",
-        "Once every public building the programmes could reach has solar (or chargers), the matching measure has nothing left to do: it's greyed out in Control → Measures, and one already enacted sits idle at no cost.",
+        "Once every public building the programmes could reach has solar (or chargers), the matching measure has nothing left to do: it's greyed out in Control → Measures, and one already enacted is wound up automatically. That isn't a repeal: it costs no approval, and a pending vote on it is called off.",
       ]),
       note(
         "The building register doesn't say who owns a building, so every public-use building counts as the municipality's — churches (owned by the church communities) and the hospital included.",
@@ -449,7 +449,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Technologies don't cost the same forever. Every price in the game starts at today's, and from then on each technology's price drifts toward its own long-run level — fastest at first, then settling. Every decision is priced at the moment it's made, so a heating system or car replaced in 2040 is chosen at 2040 prices.",
       ),
       list([
-        "Getting cheaper: electric vehicles most of all (batteries keep falling in price and are most of the gap) — an electric lorry heads toward half today's price, an electric car and van toward about three quarters; public and depot chargers; rooftop solar (toward 70%); heat pumps less (installation work is much of the price — air heat pumps toward 80%, ground ones toward 88% with the drilling).",
+        "Getting cheaper: electric vehicles most of all (batteries keep falling in price and are most of the gap) — an electric lorry heads toward half today's price, an electric car and van toward about three quarters; public and depot chargers; rooftop solar (toward 70%); home and neighbourhood batteries (toward 70% — cells keep getting cheaper, but inverters, installation and connection are much of the price); heat pumps less (installation work is much of the price — air heat pumps toward 80%, ground ones toward 88% with the drilling).",
         "Getting dearer: petrol and diesel vehicles and gas and oil boilers creep up (shrinking markets, tighter emission rules), and so does building work — insulation and district heating pipes — with construction costs.",
         "Cheaper panels also bring more owners to look into solar at all, not just make it pay better once they do.",
       ]),
@@ -527,6 +527,28 @@ export const WIKI_SECTIONS: WikiSection[] = [
       ),
       note(
         "A building only ever adopts once — panels last decades, close to the whole game's own horizon, so end-of-life replacement isn't modeled yet.",
+      ),
+    ],
+  },
+  {
+    id: "home-batteries",
+    icon: "🔋",
+    title: "Home batteries",
+    blocks: [
+      p(
+        "Many new rooftop systems come with a battery, sized at about 1 kWh per kWp of panels. It charges from the building's solar surplus during the day and covers the building's own use from the late afternoon into the night, for as long as the day's charge lasts — so less goes up the line at midday and less is drawn on the evening peak, most of all in summer (in winter there's little surplus to store).",
+      ),
+      list([
+        "Who has one: registered systems get one by chance, likelier the more recent they are (the register doesn't record storage). An owner installing solar weighs panels alone against panels with a battery — the battery earns the full electricity price on what it shifts into the evening instead of the lower feed-in price, but costs about CHF 9,000 for 10 kWh today (getting cheaper), and owners value independence from the grid beyond the money. About half of new home systems take one. Owners of existing systems without one look into adding one now and then; about half of new buildings' voluntary arrays come with one.",
+        "Grid-friendly operation: the battery charges from the top of the midday peak until the early afternoon, then tops up for the evening, and the system never feeds in more than half its rating — anything left once the battery is full is curtailed. It's the condition for connecting an array over 30 kWp in an area whose summer feed-in is over capacity (\"The electricity grid\"), public buildings included, and it can be the condition of the municipality's battery subsidy.",
+        "The home battery subsidy (Control → Measures) pays per kWh, for batteries bought with new panels or added to existing ones — tied to grid-friendly operation or not. Its evaluation works like any subsidy's.",
+        "With a solar feed-in limit in force, a battery takes some of what the limit would otherwise curtail.",
+      ]),
+      p(
+        "The building panel shows a battery's size, whether it runs grid-friendly, and what it's doing right now; City stats counts them.",
+      ),
+      note(
+        "A simplification: a battery's charge through the day is worked out from the day's sunshine and a typical building's use, not tracked kilowatt-hour by kilowatt-hour, and bills don't net the battery's shifted energy (they credit all solar at the feed-in price, as before) — the battery's value shows up in the owner's decision to buy one, and its effect on the grid in the readings.",
       ),
     ],
   },
@@ -637,6 +659,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
       ),
       p(
         "The Control panel's City stats tab shows the same idea municipality-wide as a pair of donut charts instead — one of every category, one with commercial/business use excluded (it's usually the biggest slice by far, so the second chart is where the residential categories' own relative sizes actually show up). Switch the period with Day/Week/Month/Year: Day is a live rolling last-24h reading like the building/dwelling panels; Week and Month show the most recently completed calendar week/month; Year sums the last 12 completed months.",
+      ),
+      p(
+        "City stats also shows how residents get around: each resident's main way of getting around (car, bicycle, public transit and walking), with the share of cars and bikes that are electric, at the start of the game and now — plus the cars, business vans and lorries in town. A municipality knows these from the federal mobility survey and the vehicle register, so they're free. The split moves as households rethink how they get around, which the mobility measures push on.",
       ),
       p(
         "Further down (or, for the municipality, the Control panel's separate History tab) is \"Historical energy\": beyond the last 24 hours, switch between Day (last 7 days), Week (last 13 weeks), or Month (last 12 months), and pick Total, a stacked breakdown of every category, or any single category (e.g. just EV charging) from the dropdown.",

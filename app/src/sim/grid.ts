@@ -15,9 +15,8 @@
  */
 
 import {
-  BATTERY_COST_CHF,
-  BATTERY_KW,
   BATTERY_MONTHS,
+  GRID_BATTERY_SIZES,
   GRID_FULL_SHARE,
   LOAD_CONTROL_OFF_SHARE_AT_PEAK,
   GRID_TIGHT_SHARE,
@@ -55,6 +54,7 @@ import { snowDepthCm } from "./snow";
 import { effectivePowerPlantsAt } from "./solarAdoption";
 import { streets } from "./streets";
 import { treasury } from "./treasury";
+import { priceFactor } from "./costTrends";
 import { dailyMeanTempC } from "./weather";
 import { setGridLimits } from "./gridLimits";
 import { heatPumpPowerW } from "./heatPump";
@@ -107,6 +107,11 @@ export function reinforceCostRp(fromKw: number): number {
 export interface GridZone {
   fill: [number, number][][][];
   edges: [number, number][][];
+}
+
+/** What a neighbourhood battery of GRID_BATTERY_SIZES[sizeIndex] costs if ordered at `atMs`. */
+export function gridBatteryCostRp(sizeIndex: number, atMs: number): number {
+  return Math.round((GRID_BATTERY_SIZES[sizeIndex].costChf * priceFactor("gridBattery", atMs)) / 1000) * 1000 * 100;
 }
 
 class Grid {
@@ -503,12 +508,13 @@ class Grid {
     this.notify();
   }
 
-  /** Orders a neighbourhood battery for an area. */
-  addBattery(areaId: number, atMs: number): void {
+  /** Orders a neighbourhood battery for an area — one of GRID_BATTERY_SIZES. */
+  addBattery(areaId: number, atMs: number, sizeIndex = 0): void {
     const area = this.areas[areaId];
-    if (!area) return;
-    area.batteries.push({ atMs: atMs + BATTERY_MONTHS * MONTH_MS, kw: BATTERY_KW });
-    treasury.recordPayout("grid", atMs, BATTERY_COST_CHF * 100, `grid-battery-${areaId}`);
+    const size = GRID_BATTERY_SIZES[sizeIndex];
+    if (!area || !size) return;
+    area.batteries.push({ atMs: atMs + BATTERY_MONTHS * MONTH_MS, kw: size.kw });
+    treasury.recordPayout("grid", atMs, gridBatteryCostRp(sizeIndex, atMs), `grid-battery-${areaId}`);
     this.notify();
   }
 

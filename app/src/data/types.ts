@@ -55,6 +55,8 @@ export interface PowerPlant {
   egid: string | null;
   /** Set by solarAdoption.ts on a copy of a real plant whose building is (to be) demolished. */
   activeToMs?: number;
+  /** A home battery with this system (sim/homeBattery.ts) — set by solarAdoption.ts. */
+  battery?: { kwh: number; kw: number; feedInCap: number | null };
 }
 
 export interface StockHistory {

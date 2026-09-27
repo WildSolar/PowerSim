@@ -1,0 +1,55 @@
+.modal-split-note {
+  font-size: 11px;
+  color: #6b6a66;
+  margin: 0 0 6px;
+}
+
+.modal-split-bar {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.modal-split-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.modal-split-table th {
+  font-weight: 600;
+  color: #6b6a66;
+  text-align: right;
+  padding: 2px 4px;
+}
+
+.modal-split-table td {
+  padding: 2px 4px;
+  text-align: right;
+  color: #1a1a1a;
+}
+
+.modal-split-table td:first-child {
+  text-align: left;
+}
+
+.modal-split-table tr.sub td {
+  color: #6b6a66;
+  font-size: 11px;
+}
+
+.modal-split-table tr.sub td:first-child {
+  padding-left: 20px;
+}
+
+.modal-split-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 6px;
+}

@@ -17,6 +17,8 @@ export interface Channels {
   solarOutreachLevel: number; // 0-100: how hard the municipality promotes solar (raises the adoption hazard)
   solarSubsidyRpPerKwp: number; // municipal top-up per kWp
   solarSubsidyFixedRp: number; // municipal top-up per installation
+  homeBatterySubsidyRpPerKwh: number; // municipal subsidy per kWh of home battery
+  homeBatterySubsidyGridFriendly: boolean; // ...paid only for batteries run grid-friendly
   municipalSolarBuildingsPerYear: number; // public buildings the municipality itself puts solar on each year
 
   // Heating, mobility, retrofits
@@ -58,6 +60,8 @@ export const CHANNEL_DEFAULTS: Channels = {
   solarOutreachLevel: 0,
   solarSubsidyRpPerKwp: 0,
   solarSubsidyFixedRp: 0,
+  homeBatterySubsidyRpPerKwh: 0,
+  homeBatterySubsidyGridFriendly: false,
   municipalSolarBuildingsPerYear: 0,
   heatPumpSubsidyRp: 0,
   evSubsidyRp: 0,
@@ -101,6 +105,8 @@ const COMBINERS: { [K in keyof Channels]: Combiner<Channels[K]> } = {
   solarOutreachLevel: max,
   solarSubsidyRpPerKwp: sum,
   solarSubsidyFixedRp: sum,
+  homeBatterySubsidyRpPerKwh: sum,
+  homeBatterySubsidyGridFriendly: any,
   municipalSolarBuildingsPerYear: sum,
   heatPumpSubsidyRp: sum,
   evSubsidyRp: sum,

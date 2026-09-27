@@ -101,6 +101,23 @@ import { treasury } from "./treasury";
 import { priceFactorInYear } from "./costTrends";
 import { recordSubsidisedDecision } from "./additionality";
 import { gridFeedInBlockedAt, SMALL_SOLAR_KWP } from "./gridLimits";
+import {
+  BATTERY_RETROFIT_ANNUAL_HAZARD,
+  GRID_FRIENDLY_FEED_IN_CAP,
+  HOME_BATTERY_CHF_PER_KWH,
+  HOME_BATTERY_CYCLES_PER_YEAR,
+  HOME_BATTERY_FIXED_CHF,
+  HOME_BATTERY_KW_PER_KWH,
+  HOME_BATTERY_KWH_PER_KWP,
+  HOME_BATTERY_LIFETIME_YEARS,
+  HOME_BATTERY_PREFERENCE_CHF_PER_YEAR,
+  HOME_BATTERY_PREFERENCE_SPREAD_CHF_PER_YEAR,
+  HOME_BATTERY_ROUND_TRIP,
+  NEW_BUILD_BATTERY_SHARE,
+  REGISTERED_SYSTEM_BATTERY_SHARE,
+} from "../config/homeBattery";
+import { interpolateCurve } from "../config/curve";
+import { priceFactor } from "./costTrends";
 
 const DAY_MS = 24 * 60 * 60_000;
 const YEAR_MS = 365.25 * DAY_MS;
@@ -119,6 +136,61 @@ export interface SolarAdoptionRecord {
 }
 
 const adoptionByEgid = new Map<string, SolarAdoptionRecord>();
+
+/** A home battery bought (or added) by a building's owner, or put in by the municipality — the
+ * registered systems' seeded batteries aren't in here (registeredBattery). */
+export interface BatteryRecord {
+  installedAtMs: number;
+  kwh: number;
+  kw: number;
+  /** Grid-friendly operation (sim/homeBattery.ts), or null. */
+  feedInCap: number | null;
+  costRp: number;
+  municipalSubsidyRp: number;
+  origin: "with-solar" | "retrofit" | "new-build" | "municipal";
+  /** Its array could only connect with it: the area's summer feed-in was over capacity. */
+  gridCondition: boolean;
+}
+
+const batteryByEgid = new Map<string, BatteryRecord>();
+
+/** A home battery sized for an array (config/homeBattery.ts). */
+function batteryFor(capacityKw: number, feedInCap: number | null): { kwh: number; kw: number; feedInCap: number | null } {
+  const kwh = Math.max(5, Math.round(capacityKw * HOME_BATTERY_KWH_PER_KWP));
+  return { kwh, kw: kwh * HOME_BATTERY_KW_PER_KWH, feedInCap };
+}
+
+/** What a home battery of `kwh` costs installed at `atMs`. */
+export function homeBatteryCostRp(kwh: number, atMs: number): number {
+  return (HOME_BATTERY_FIXED_CHF + HOME_BATTERY_CHF_PER_KWH * kwh) * 100 * priceFactor("homeBattery", atMs);
+}
+
+/** A registered system's battery: the register doesn't record storage, so small systems get one by
+ * chance, likelier the more recently they were commissioned (config/homeBattery.ts). */
+const registeredBatteryCache = new WeakMap<PowerPlant, { kwh: number; kw: number; feedInCap: null } | null>();
+
+function registeredBattery(plant: PowerPlant): { kwh: number; kw: number; feedInCap: null } | null {
+  let battery = registeredBatteryCache.get(plant);
+  if (battery === undefined) {
+    battery = drawRegisteredBattery(plant);
+    registeredBatteryCache.set(plant, battery);
+  }
+  return battery;
+}
+
+function drawRegisteredBattery(plant: PowerPlant): { kwh: number; kw: number; feedInCap: null } | null {
+  if (plant.technology !== "Photovoltaic" || !plant.capacityKw || plant.capacityKw > SMALL_SOLAR_KWP) return null;
+  const year = plant.commissioningDate ? Number(plant.commissioningDate.slice(0, 4)) : NaN;
+  if (!Number.isFinite(year)) return null;
+  if (mulberry32(hashSeed(plant.plantId, "registered-battery"))() >= interpolateCurve(REGISTERED_SYSTEM_BATTERY_SHARE, year)) return null;
+  return { ...batteryFor(plant.capacityKw, null), feedInCap: null };
+}
+
+/** An owner's leaning towards a battery, beyond its savings (Rp a year). */
+function batteryPreferenceRp(egid: string): number {
+  const u = mulberry32(hashSeed(egid, "battery-preference"))();
+  return (HOME_BATTERY_PREFERENCE_CHF_PER_YEAR + HOME_BATTERY_PREFERENCE_SPREAD_CHF_PER_YEAR * (2 * u - 1)) * 100;
+}
 let watermarkYear: number | null = null;
 let neighborListCache: Map<string, string[]> | null = null;
 let realPvEgidsCache: Set<string> | null = null;
@@ -204,30 +276,71 @@ function yearSunlight(yearStartMs: number): YearSunlight {
  * useBillSummary.ts's own density (24/month) — coarse enough that the
  * self-consumption/export split is an approximation, not a precise
  * simulation, a known limitation worth being upfront about (see the wiki). */
-function candidateAnnualSavingsRp(building: Building, candidateCapacityKw: number, sunlight: YearSunlight, tariff: Tariff): number {
+function candidateEconomics(building: Building, candidateCapacityKw: number, sunlight: YearSunlight, tariff: Tariff): SolarEconomics {
   const { times, irradianceWm2: irradiance } = sunlight;
   const consumptionW = consumptionSeriesW(sampleBuildingCategorySeries(building, times, tariff, []));
   // What pv.ts's pvPowerW would give for a panel of this size, as a positive production figure.
-  const productionW = (i: number) => candidateCapacityKw * 1000 * (irradiance[i] / PEAK_IRRADIANCE_WM2);
+  const ratedW = candidateCapacityKw * 1000;
+  const productionW = (i: number) => ratedW * (irradiance[i] / PEAK_IRRADIANCE_WM2);
+  const law = policyStore.get().feedInLimitPct / 100;
+  const gridCap = Math.min(law, GRID_FRIENDLY_FEED_IN_CAP);
 
-  let avoidedCostRp = 0;
-  let exportRevenueRp = 0;
+  const e: SolarEconomics = {
+    selfUseRp: 0,
+    exportKWh: 0,
+    overGenLawKWh: 0,
+    overFeedLawKWh: 0,
+    overFeedGridKWh: 0,
+    peakRpKWh: tariff.peakPriceRpKWh,
+    feedInRpKWh: tariff.feedInPriceRpKWh,
+  };
+  const mean = (f: (j: number) => number, i: number, dtHours: number) => ((f(i - 1) + f(i)) / 2) * (dtHours / 1000);
+  const selfUse = (j: number) => Math.min(consumptionW[j], productionW(j));
+  const exported = (j: number) => productionW(j) - selfUse(j);
   for (let i = 1; i < times.length; i++) {
     const dtHours = (times[i] - times[i - 1]) / HOUR_MS;
-    const prod0 = productionW(i - 1);
-    const prod1 = productionW(i);
-    const selfCons0 = Math.min(consumptionW[i - 1], prod0);
-    const selfCons1 = Math.min(consumptionW[i], prod1);
-    const exp0 = prod0 - selfCons0;
-    const exp1 = prod1 - selfCons1;
-    const avgSelfConsKWh = ((selfCons0 + selfCons1) / 2) * (dtHours / 1000);
-    const avgExportKWh = ((exp0 + exp1) / 2) * (dtHours / 1000);
     const midMs = (times[i] + times[i - 1]) / 2;
     const rate = isOffPeakHour(tariff, hourOfDayAt(midMs)) ? tariff.offPeakPriceRpKWh : tariff.peakPriceRpKWh;
-    avoidedCostRp += avgSelfConsKWh * rate;
-    exportRevenueRp += avgExportKWh * tariff.feedInPriceRpKWh;
+    e.selfUseRp += mean(selfUse, i, dtHours) * rate;
+    e.exportKWh += mean(exported, i, dtHours);
+    e.overGenLawKWh += mean((j) => Math.max(0, productionW(j) - law * ratedW), i, dtHours);
+    e.overFeedLawKWh += mean((j) => Math.max(0, exported(j) - law * ratedW), i, dtHours);
+    e.overFeedGridKWh += mean((j) => Math.max(0, exported(j) - gridCap * ratedW), i, dtHours);
   }
-  return avoidedCostRp + exportRevenueRp;
+  return e;
+}
+
+/** A year of an array's output, sorted by where it goes — what each way of running it earns
+ * (annualValueRp). The export and the energy over each feed-in cap are before any battery. */
+interface SolarEconomics {
+  selfUseRp: number;
+  exportKWh: number;
+  /** Generation over the law's feed-in limit — curtailed without a battery. */
+  overGenLawKWh: number;
+  /** Feed-in over the law's limit, and over the grid-friendly cap. */
+  overFeedLawKWh: number;
+  overFeedGridKWh: number;
+  peakRpKWh: number;
+  feedInRpKWh: number;
+}
+
+type SolarOption = "solar" | "battery" | "batteryGrid";
+
+/** What an array earns a year (Rp): the electricity it saves buying plus what it sells. A battery
+ * moves some of the surplus into the evening — worth the full price rather than the feed-in price —
+ * as many full cycles as it gets in a year allow; run grid-friendly it takes the midday peak first,
+ * and some of that is curtailed on the sunniest days. */
+function annualValueRp(e: SolarEconomics, option: SolarOption, batteryKwh: number): number {
+  if (option === "solar") return e.selfUseRp + Math.max(0, e.exportKWh - e.overGenLawKWh) * e.feedInRpKWh;
+  const stored = Math.min(batteryKwh * HOME_BATTERY_CYCLES_PER_YEAR, 0.6 * e.exportKWh);
+  const curtailed = option === "battery" ? e.overFeedLawKWh : 0.35 * e.overFeedGridKWh;
+  return e.selfUseRp + stored * HOME_BATTERY_ROUND_TRIP * e.peakRpKWh + Math.max(0, e.exportKWh - stored - curtailed) * e.feedInRpKWh;
+}
+
+/** What the municipality pays towards a battery of `kwh` costing `costRp`, run grid-friendly or not. */
+function batterySubsidyRp(policy: Policy, kwh: number, costRp: number, gridFriendly: boolean): number {
+  if (policy.homeBatterySubsidyGridFriendly && !gridFriendly) return 0;
+  return Math.min(costRp, kwh * policy.homeBatterySubsidyRpPerKwh);
 }
 
 interface HazardContext {
@@ -250,38 +363,61 @@ function evaluateAdoption(
   const usableFraction = usableRoofFractionFromDraw(usableDraw);
   const capacityKw = (building.footprintAreaM2 ?? 0) * usableFraction * kwpPerM2At(year);
   if (capacityKw <= 0) return null;
-  // A large array waits while its area's summer feed-in is over the grid's capacity.
-  if (capacityKw > SMALL_SOLAR_KWP && gridFeedInBlockedAt(building, yearStartMs)) return null;
+  // A large array can't connect plainly while its area's summer feed-in is over the grid's capacity —
+  // only with a battery run grid-friendly, which keeps its feed-in to half its rating.
+  const gridBlocked = capacityKw > SMALL_SOLAR_KWP && gridFeedInBlockedAt(building, yearStartMs);
 
   const installCostRp = capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year));
   const federalRp = federalSubsidyRp(capacityKw);
   const municipalRp = Math.max(0, Math.min(capacityKw * policy.solarSubsidyRpPerKwp + policy.solarSubsidyFixedRp, installCostRp - federalRp));
   const subsidyRp = federalRp + municipalRp;
 
-  const annualSavingsRp = candidateAnnualSavingsRp(building, capacityKw, sunlight, tariff);
+  const economics = candidateEconomics(building, capacityKw, sunlight, tariff);
+  const battery = batteryFor(capacityKw, null);
+  const batteryCostRp = homeBatteryCostRp(battery.kwh, toSimTimeMs(Date.UTC(year, 6, 1)));
+  const batterySubsidy = { battery: batterySubsidyRp(policy, battery.kwh, batteryCostRp, false), batteryGrid: batterySubsidyRp(policy, battery.kwh, batteryCostRp, true) };
+  // Grid-friendly operation is on offer when the grid requires it, or the subsidy pays only for it.
+  const offerGridFriendly = gridBlocked || (policy.homeBatterySubsidyGridFriendly && policy.homeBatterySubsidyRpPerKwh > 0);
+  const preferenceRp = batteryPreferenceRp(building.egid);
+  const panelsRp = (installCostRp - subsidyRp) / PANEL_LIFETIME_MEAN_YEARS;
 
-  const candidates: RenewalCandidate<"none" | "solar">[] = [
-    { id: "none", available: true, annualizedCostRp: 0, lifetimeMeanYears: PANEL_LIFETIME_MEAN_YEARS, greenness: 0 },
-    {
-      id: "solar",
-      available: true,
-      annualizedCostRp: (installCostRp - subsidyRp) / PANEL_LIFETIME_MEAN_YEARS - annualSavingsRp,
+  type Choice = "none" | SolarOption;
+  const option = (id: SolarOption, available: boolean): RenewalCandidate<Choice> => {
+    const withBattery = id !== "solar";
+    const batteryRp = withBattery ? (batteryCostRp - batterySubsidy[id]) / HOME_BATTERY_LIFETIME_YEARS - preferenceRp : 0;
+    return {
+      id,
+      available,
+      annualizedCostRp: panelsRp + batteryRp - annualValueRp(economics, id, battery.kwh),
       lifetimeMeanYears: PANEL_LIFETIME_MEAN_YEARS,
       greenness: 1,
-    },
+    };
+  };
+  const candidates: RenewalCandidate<Choice>[] = [
+    { id: "none", available: true, annualizedCostRp: 0, lifetimeMeanYears: PANEL_LIFETIME_MEAN_YEARS, greenness: 0 },
+    option("solar", !gridBlocked),
+    option("battery", !gridBlocked),
+    ...(offerGridFriendly ? [option("batteryGrid", true)] : []),
   ];
   const biasRp = solarBiasStrengthRp(building.egid);
   const uncertainty = SOLAR_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier;
-  const { chosen } = chooseNext(candidates, "none", uncertainty, biasRp + policy.progressiveNudgeRp);
-  // The ground truth for evaluation studies: the same decision without the municipal top-up.
+  const choose = (cs: RenewalCandidate<Choice>[]) => chooseNext(cs, "none", uncertainty, biasRp + policy.progressiveNudgeRp).chosen;
+  const chosen = choose(candidates);
+  const chosenBatterySubsidyRp = chosen === "battery" || chosen === "batteryGrid" ? batterySubsidy[chosen] : 0;
+  // The ground truth for evaluation studies: the same decision without each municipal payment.
   const additional =
-    chosen === "solar" && municipalRp > 0
-      ? chooseNext(
-          candidates.map((c) => (c.id === "solar" ? { ...c, annualizedCostRp: c.annualizedCostRp + municipalRp / PANEL_LIFETIME_MEAN_YEARS } : c)),
-          "none",
-          uncertainty,
-          biasRp + policy.progressiveNudgeRp,
-        ).chosen !== "solar"
+    chosen !== "none" && municipalRp > 0
+      ? choose(candidates.map((c) => (c.id === "none" ? c : { ...c, annualizedCostRp: c.annualizedCostRp + municipalRp / PANEL_LIFETIME_MEAN_YEARS }))) === "none"
+      : false;
+  const batteryAdditional =
+    chosenBatterySubsidyRp > 0
+      ? !["battery", "batteryGrid"].includes(
+          choose(
+            candidates.map((c) =>
+              c.id === "battery" || c.id === "batteryGrid" ? { ...c, annualizedCostRp: c.annualizedCostRp + batterySubsidy[c.id] / HOME_BATTERY_LIFETIME_YEARS } : c,
+            ),
+          ),
+        )
       : false;
 
   logCandidateDecision({
@@ -291,8 +427,8 @@ function evaluateAdoption(
     entityKey: `${building.egid}:solar`,
     incumbent: "none",
     chosen,
-    reasonKind: chosen === "solar" ? "financial" : "inKind",
-    candidates: candidateLogEntries(candidates, biasRp, (id) => (id === "solar" ? "Install solar" : "Stay without")),
+    reasonKind: chosen === "none" ? "inKind" : gridBlocked && chosen === "batteryGrid" ? "forcedByAvailability" : "financial",
+    candidates: candidateLogEntries(candidates, biasRp, (id) => SOLAR_OPTION_LABEL[id]),
     uncertaintyFraction: SOLAR_UNCERTAINTY_FRACTION,
     biasStrengthRp: biasRp,
     extra: {
@@ -304,15 +440,104 @@ function evaluateAdoption(
       installCostRp,
       federalSubsidyRp: federalRp,
       municipalSubsidyRp: municipalRp,
-      annualSavingsRp,
+      batteryKwh: battery.kwh,
+      batteryCostRp,
+      batteryPreferenceRp: preferenceRp,
+      gridBlocked,
     },
   });
 
-  if (chosen !== "solar") return null;
+  if (chosen === "none") return null;
 
   const dayOffset = Math.floor(mulberry32(hashSeed(building.egid, "solar-install-day", String(year)))() * 365);
-  if (municipalRp > 0) recordSubsidisedDecision({ atMs: yearStartMs + dayOffset * DAY_MS, category: "solar", subsidyRp: municipalRp, additional });
-  return { installedAtMs: yearStartMs + dayOffset * DAY_MS, capacityKw, installCostRp, federalSubsidyRp: federalRp, municipalSubsidyRp: municipalRp, annualSavingsRp };
+  const installedAtMs = yearStartMs + dayOffset * DAY_MS;
+  if (municipalRp > 0) recordSubsidisedDecision({ atMs: installedAtMs, category: "solar", subsidyRp: municipalRp, additional });
+  if (chosen !== "solar") {
+    batteryByEgid.set(building.egid, {
+      installedAtMs,
+      ...batteryFor(capacityKw, chosen === "batteryGrid" ? GRID_FRIENDLY_FEED_IN_CAP : null),
+      costRp: batteryCostRp,
+      municipalSubsidyRp: chosenBatterySubsidyRp,
+      origin: "with-solar",
+      gridCondition: gridBlocked,
+    });
+    if (chosenBatterySubsidyRp > 0) {
+      treasury.recordPayout("solar", installedAtMs, chosenBatterySubsidyRp, building.egid);
+      recordSubsidisedDecision({ atMs: installedAtMs, category: "battery", subsidyRp: chosenBatterySubsidyRp, additional: batteryAdditional });
+    }
+  }
+  return {
+    installedAtMs,
+    capacityKw,
+    installCostRp,
+    federalSubsidyRp: federalRp,
+    municipalSubsidyRp: municipalRp,
+    annualSavingsRp: annualValueRp(economics, chosen, battery.kwh),
+  };
+}
+
+const SOLAR_OPTION_LABEL: Record<"none" | SolarOption, string> = {
+  none: "Stay without",
+  solar: "Install solar",
+  battery: "Solar with a battery",
+  batteryGrid: "Solar with a grid-friendly battery",
+};
+
+/** An owner with solar and no battery looks into adding one (a few a year): worth it against the
+ * extra evening use of the array's own electricity, the price, any subsidy and their leaning. */
+function considerBatteryRetrofit(building: Building, capacityKw: number, year: number, yearStartMs: number, sunlight: YearSunlight, tariff: Tariff, policy: Policy): void {
+  const economics = candidateEconomics(building, capacityKw, sunlight, tariff);
+  const battery = batteryFor(capacityKw, null);
+  const costRp = homeBatteryCostRp(battery.kwh, toSimTimeMs(Date.UTC(year, 6, 1)));
+  const subsidy = { battery: batterySubsidyRp(policy, battery.kwh, costRp, false), batteryGrid: batterySubsidyRp(policy, battery.kwh, costRp, true) };
+  const preferenceRp = batteryPreferenceRp(building.egid);
+  const withoutRp = annualValueRp(economics, "solar", battery.kwh);
+  type Choice = "none" | "battery" | "batteryGrid";
+  const option = (id: "battery" | "batteryGrid"): RenewalCandidate<Choice> => ({
+    id,
+    available: true,
+    annualizedCostRp: (costRp - subsidy[id]) / HOME_BATTERY_LIFETIME_YEARS - preferenceRp - (annualValueRp(economics, id, battery.kwh) - withoutRp),
+    lifetimeMeanYears: HOME_BATTERY_LIFETIME_YEARS,
+    greenness: 0.5,
+  });
+  const candidates: RenewalCandidate<Choice>[] = [
+    { id: "none", available: true, annualizedCostRp: 0, lifetimeMeanYears: HOME_BATTERY_LIFETIME_YEARS, greenness: 0 },
+    option("battery"),
+    ...(policy.homeBatterySubsidyGridFriendly && policy.homeBatterySubsidyRpPerKwh > 0 ? [option("batteryGrid")] : []),
+  ];
+  const biasRp = solarBiasStrengthRp(building.egid);
+  const uncertainty = SOLAR_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier;
+  const choose = (cs: RenewalCandidate<Choice>[]) => chooseNext(cs, "none", uncertainty, biasRp + policy.progressiveNudgeRp).chosen;
+  const chosen = choose(candidates);
+  logCandidateDecision({
+    atMs: yearStartMs,
+    kind: "solar",
+    egid: building.egid,
+    entityKey: `${building.egid}:battery`,
+    incumbent: "none",
+    chosen,
+    reasonKind: chosen === "none" ? "inKind" : "financial",
+    candidates: candidateLogEntries(candidates, biasRp, (id) => (id === "none" ? "Stay without a battery" : id === "battery" ? "Add a battery" : "Add a grid-friendly battery")),
+    uncertaintyFraction: SOLAR_UNCERTAINTY_FRACTION,
+    biasStrengthRp: biasRp,
+    extra: { capacityKw, batteryKwh: battery.kwh, batteryCostRp: costRp, batteryPreferenceRp: preferenceRp },
+  });
+  if (chosen === "none") return;
+  const installedAtMs = yearStartMs + Math.floor(mulberry32(hashSeed(building.egid, "battery-install-day", String(year)))() * 365) * DAY_MS;
+  const subsidyRp = subsidy[chosen];
+  batteryByEgid.set(building.egid, {
+    installedAtMs,
+    ...batteryFor(capacityKw, chosen === "batteryGrid" ? GRID_FRIENDLY_FEED_IN_CAP : null),
+    costRp,
+    municipalSubsidyRp: subsidyRp,
+    origin: "retrofit",
+    gridCondition: false,
+  });
+  if (subsidyRp > 0) {
+    treasury.recordPayout("solar", installedAtMs, subsidyRp, building.egid);
+    const additional = choose(candidates.map((c) => (c.id === "none" ? c : { ...c, annualizedCostRp: c.annualizedCostRp + subsidy[c.id] / HOME_BATTERY_LIFETIME_YEARS }))) === "none";
+    recordSubsidisedDecision({ atMs: installedAtMs, category: "battery", subsidyRp, additional });
+  }
 }
 
 const MUNICIPAL_SOLAR_MIN_FOOTPRINT_M2 = 200;
@@ -327,9 +552,14 @@ export function municipalSolarCandidates(buildings: Building[], realPlants: Powe
       (b.footprintAreaM2 ?? 0) >= MUNICIPAL_SOLAR_MIN_FOOTPRINT_M2 &&
       existsAt(b, atMs) &&
       !adoptionByEgid.has(b.egid) &&
-      !realEgids.has(b.egid) &&
-      !gridFeedInBlockedAt(b, atMs),
+      !realEgids.has(b.egid),
   );
+}
+
+/** The battery the municipality's array on `building` needs: a grid-friendly one when the area's
+ * summer feed-in is over capacity and the array is large, otherwise none. */
+function municipalBatteryFor(building: Building, capacityKw: number, atMs: number): { kwh: number; kw: number; feedInCap: number | null } | null {
+  return capacityKw > SMALL_SOLAR_KWP && gridFeedInBlockedAt(building, atMs) ? batteryFor(capacityKw, GRID_FRIENDLY_FEED_IN_CAP) : null;
 }
 
 /** The municipality puts solar on some of its own (public) buildings this year — a measure, not an
@@ -351,6 +581,12 @@ function installMunicipalSolar(buildings: Building[], realPlants: PowerPlant[], 
     const federalRp = federalSubsidyRp(capacityKw);
     const dayOffset = Math.floor(mulberry32(hashSeed(building.egid, "municipal-solar-day", String(year)))() * 365);
     const installedAtMs = yearStartMs + dayOffset * DAY_MS;
+    const battery = municipalBatteryFor(building, capacityKw, yearStartMs);
+    if (battery) {
+      const costRp = homeBatteryCostRp(battery.kwh, installedAtMs);
+      batteryByEgid.set(building.egid, { installedAtMs, ...battery, costRp, municipalSubsidyRp: 0, origin: "municipal", gridCondition: true });
+      treasury.recordPayout("infrastructure", installedAtMs, costRp, building.egid);
+    }
     adoptionByEgid.set(building.egid, {
       installedAtMs,
       capacityKw,
@@ -369,15 +605,17 @@ const MUNICIPAL_SOLAR_INSTALL_MONTHS = 3;
 /** What putting solar on one public building at `atMs` would mean: its full usable roof, and what
  * the treasury pays for it (the price less the federal payment). Null if it has solar already (or
  * has it coming) or no roof to speak of. */
-export function municipalSolarQuote(building: Building, realPlants: PowerPlant[], atMs: number): { capacityKw: number; costRp: number } | null {
+export function municipalSolarQuote(building: Building, realPlants: PowerPlant[], atMs: number): { capacityKw: number; costRp: number; batteryKwh: number | null } | null {
   if (adoptionByEgid.has(building.egid) || realPvEgids(realPlants).has(building.egid)) return null;
   const year = new Date(toDateMs(atMs)).getUTCFullYear();
   const usable = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
   const capacityKw = (building.footprintAreaM2 ?? 0) * usable * kwpPerM2At(year);
   if (capacityKw <= 0) return null;
-  if (capacityKw > SMALL_SOLAR_KWP && gridFeedInBlockedAt(building, atMs)) return null; // waits for room on the grid
   const installCostRp = capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year));
-  return { capacityKw, costRp: Math.max(0, installCostRp - federalSubsidyRp(capacityKw)) };
+  // In a full area, a large array connects only with a grid-friendly battery.
+  const battery = municipalBatteryFor(building, capacityKw, atMs);
+  const batteryRp = battery ? homeBatteryCostRp(battery.kwh, atMs) : 0;
+  return { capacityKw, costRp: Math.max(0, installCostRp - federalSubsidyRp(capacityKw)) + batteryRp, batteryKwh: battery?.kwh ?? null };
 }
 
 /** The municipality orders solar for one of its buildings now (the Public buildings layer): paid
@@ -387,8 +625,13 @@ export function installMunicipalSolarNow(building: Building, realPlants: PowerPl
   if (!quote) return false;
   const year = new Date(toDateMs(atMs)).getUTCFullYear();
   const installCostRp = quote.capacityKw * installCostRpPerKwp(quote.capacityKw, priceFactorInYear("solar", year));
+  const installedAtMs = atMs + MUNICIPAL_SOLAR_INSTALL_MONTHS * (YEAR_MS / 12);
+  const battery = municipalBatteryFor(building, quote.capacityKw, atMs);
+  if (battery) {
+    batteryByEgid.set(building.egid, { installedAtMs, ...battery, costRp: homeBatteryCostRp(battery.kwh, atMs), municipalSubsidyRp: 0, origin: "municipal", gridCondition: true });
+  }
   adoptionByEgid.set(building.egid, {
-    installedAtMs: atMs + MUNICIPAL_SOLAR_INSTALL_MONTHS * (YEAR_MS / 12),
+    installedAtMs,
     capacityKw: quote.capacityKw,
     installCostRp,
     federalSubsidyRp: federalSubsidyRp(quote.capacityKw),
@@ -439,6 +682,37 @@ function processYear(buildings: Building[], realPlants: PowerPlant[], year: numb
       treasury.recordPayout("solar", decision.installedAtMs, decision.municipalSubsidyRp, building.egid);
     }
   }
+
+  // Owners of a system without a battery who look into adding one.
+  const registered = registeredCapacityByEgid(realPlants);
+  for (const building of buildings) {
+    if (batteryByEgid.has(building.egid) || !existsAt(building, yearStartMs)) continue;
+    const adopted = adoptionByEgid.get(building.egid);
+    const capacityKw = adopted && adopted.installedAtMs < yearStartMs ? adopted.capacityKw : (registered.get(building.egid)?.kw ?? 0);
+    if (capacityKw <= 0 || registered.get(building.egid)?.hasBattery) continue;
+    const draw = mulberry32(hashSeed(building.egid, "battery-retrofit", String(year)))();
+    if (draw >= BATTERY_RETROFIT_ANNUAL_HAZARD * outreachHazardMultiplier(policy)) continue;
+    sunlight ??= yearSunlight(yearStartMs);
+    considerBatteryRetrofit(building, capacityKw, year, yearStartMs, sunlight, tariff, policy);
+  }
+}
+
+let registeredCapacityCache: { plants: PowerPlant[]; byEgid: Map<string, { kw: number; hasBattery: boolean }> } | null = null;
+
+/** Each building's registered solar capacity, and whether it has a battery by the register's seeded
+ * share. */
+function registeredCapacityByEgid(realPlants: PowerPlant[]): Map<string, { kw: number; hasBattery: boolean }> {
+  if (registeredCapacityCache?.plants === realPlants) return registeredCapacityCache.byEgid;
+  const byEgid = new Map<string, { kw: number; hasBattery: boolean }>();
+  for (const p of realPlants) {
+    if (p.technology !== "Photovoltaic" || !p.egid || !p.capacityKw) continue;
+    const entry = byEgid.get(p.egid) ?? { kw: 0, hasBattery: false };
+    entry.kw += p.capacityKw;
+    entry.hasBattery ||= registeredBattery(p) !== null;
+    byEgid.set(p.egid, entry);
+  }
+  registeredCapacityCache = { plants: realPlants, byEgid };
+  return byEgid;
 }
 
 function ensureAdvancedThrough(buildings: Building[], realPlants: PowerPlant[], targetYear: number): void {
@@ -461,13 +735,24 @@ function buildingLookup(buildings: Building[]): Map<string, Building> {
 }
 
 /** Real registry plants, each closed off at its building demolition (a plant is
- * a physical thing on that roof: it goes when the roof does). Only the few plants
- * of demolished buildings are copied. */
-function realPlantsWithDemolitions(buildings: Building[], realPlants: PowerPlant[]): PowerPlant[] {
+ * a physical thing on that roof: it goes when the roof does), and with its battery — the register's
+ * seeded one, or one added since (in service before `cutoffMs`), on the building's first plant.
+ * Only the plants that need either are copied. */
+function realPlantsWithDemolitions(buildings: Building[], realPlants: PowerPlant[], cutoffMs: number): PowerPlant[] {
   const lookup = buildingLookup(buildings);
+  const batteryPlaced = new Set<string>();
   return realPlants.map((plant) => {
     const demolishedAtMs = plant.egid ? lookup.get(plant.egid)?.demolishedAtMs : undefined;
-    return demolishedAtMs === undefined ? plant : { ...plant, activeToMs: demolishedAtMs };
+    let battery: PowerPlant["battery"] | null = registeredBattery(plant);
+    if (!battery && plant.egid && plant.technology === "Photovoltaic" && !batteryPlaced.has(plant.egid)) {
+      const record = batteryByEgid.get(plant.egid);
+      if (record && record.installedAtMs < cutoffMs) {
+        battery = { kwh: record.kwh, kw: record.kw, feedInCap: record.feedInCap };
+        batteryPlaced.add(plant.egid);
+      }
+    }
+    if (demolishedAtMs === undefined && !battery) return plant;
+    return { ...plant, ...(demolishedAtMs !== undefined ? { activeToMs: demolishedAtMs } : {}), ...(battery ? { battery } : {}) };
   });
 }
 
@@ -476,7 +761,9 @@ function synthesizedPlants(buildings: Building[], cutoffMs: number): PowerPlant[
   const synthesized: PowerPlant[] = [];
   for (const [egid, record] of adoptionByEgid) {
     if (record.installedAtMs >= cutoffMs) continue;
+    const battery = batteryByEgid.get(egid);
     synthesized.push({
+      ...(battery && battery.installedAtMs < cutoffMs ? { battery: { kwh: battery.kwh, kw: battery.kw, feedInCap: battery.feedInCap } } : {}),
       plantId: `solar-adopted:${egid}`,
       // Position is unused: generation (pv.ts) keys off capacity/technology only,
       // and the map keys solar coloring off egid, not a plant's own lon/lat.
@@ -502,7 +789,7 @@ function synthesizedPlants(buildings: Building[], cutoffMs: number): PowerPlant[
 export function effectivePowerPlants(buildings: Building[], realPlants: PowerPlant[], year: number): PowerPlant[] {
   ensureAdvancedThrough(buildings, realPlants, year);
   const cutoffMs = toSimTimeMs(Date.UTC(year + 1, 0, 1));
-  return [...realPlantsWithDemolitions(buildings, realPlants), ...synthesizedPlants(buildings, cutoffMs)];
+  return [...realPlantsWithDemolitions(buildings, realPlants, cutoffMs), ...synthesizedPlants(buildings, cutoffMs)];
 }
 
 /** Real Pronovo plants plus every adoption already reached as of the exact
@@ -518,7 +805,7 @@ export function effectivePowerPlants(buildings: Building[], realPlants: PowerPla
 export function effectivePowerPlantsAt(buildings: Building[], realPlants: PowerPlant[], simTimeMs: number): PowerPlant[] {
   const year = new Date(toDateMs(simTimeMs)).getUTCFullYear();
   ensureAdvancedThrough(buildings, realPlants, year);
-  return [...realPlantsWithDemolitions(buildings, realPlants), ...synthesizedPlants(buildings, simTimeMs)];
+  return [...realPlantsWithDemolitions(buildings, realPlants, simTimeMs), ...synthesizedPlants(buildings, simTimeMs)];
 }
 
 /** A new or replacement building rooftop array, decided at permit time: the
@@ -536,9 +823,16 @@ export function registerNewBuildSolar(building: Building, builtAtMs: number, rul
   const mandatedFraction = (building.footprintAreaM2 ?? 0) >= rules.solarMandateMinFootprintM2 ? rules.solarMandateFraction : 0;
   const requiredKw = Math.min(usableCapacityKw, Math.max(codeKw, mandatedFraction * usableCapacityKw));
   const voluntary = voluntaryDraw < NEW_BUILD_VOLUNTARY_SOLAR_SHARE;
-  // Beyond what the building code requires, a large voluntary array waits for room on the grid.
-  const capacityKw =
-    voluntary && usableCapacityKw > SMALL_SOLAR_KWP && gridFeedInBlockedAt(building, builtAtMs) ? Math.max(requiredKw, SMALL_SOLAR_KWP) : voluntary ? usableCapacityKw : requiredKw;
+  // A voluntary array comes with a battery by chance; a large one in a full area takes a
+  // grid-friendly battery (the price of connecting the whole roof, on a new building's budget). What
+  // the building code requires always connects.
+  const capacityKw = voluntary ? usableCapacityKw : requiredKw;
+  const gridBlocked = voluntary && capacityKw > SMALL_SOLAR_KWP && gridFeedInBlockedAt(building, builtAtMs);
+  const withBattery = gridBlocked || (voluntary && mulberry32(hashSeed(building.egid, "new-build-battery"))() < NEW_BUILD_BATTERY_SHARE);
+  if (capacityKw > 0 && withBattery) {
+    const battery = batteryFor(capacityKw, gridBlocked ? GRID_FRIENDLY_FEED_IN_CAP : null);
+    batteryByEgid.set(building.egid, { installedAtMs: builtAtMs, ...battery, costRp: homeBatteryCostRp(battery.kwh, builtAtMs), municipalSubsidyRp: 0, origin: "new-build", gridCondition: gridBlocked });
+  }
 
   logCandidateDecision({
     atMs: builtAtMs,
@@ -576,6 +870,24 @@ export interface SolarAdoptionLogEntry {
  * forever after that one entry (no panel end-of-life renewal modeled yet —
  * a panel's ~28yr life is close to the whole game horizon). */
 export function solarAdoptionLog(building: Building, simTimeMs: number): SolarAdoptionLogEntry[] {
+  const entries = solarOnlyLog(building, simTimeMs);
+  const battery = batteryByEgid.get(building.egid);
+  if (battery && battery.installedAtMs <= simTimeMs) entries.push({ installedAtMs: battery.installedAtMs, note: batteryNote(battery) });
+  return entries.sort((a, b) => a.installedAtMs - b.installedAtMs);
+}
+
+function batteryNote(b: BatteryRecord): string {
+  const size = `${b.kwh.toFixed(0)} kWh`;
+  const run = b.feedInCap !== null ? `, run grid-friendly (feed-in held to ${Math.round(b.feedInCap * 100)}% of the panels' rating)` : "";
+  const subsidy = b.municipalSubsidyRp > 0 ? ", with the municipality's battery subsidy" : "";
+  if (b.origin === "municipal") return `The municipality added a ${size} battery${run}: without it the grid here couldn't take the array's feed-in.`;
+  if (b.gridCondition) return `A ${size} battery came with the panels${run} — the grid operator's condition for connecting the array in a full area${subsidy}.`;
+  if (b.origin === "retrofit") return `A ${size} battery was added to the solar system${run}${subsidy}.`;
+  if (b.origin === "new-build") return `A ${size} battery came with the new building's panels${run}.`;
+  return `A ${size} battery came with the panels${run}${subsidy}.`;
+}
+
+function solarOnlyLog(building: Building, simTimeMs: number): SolarAdoptionLogEntry[] {
   const record = adoptionByEgid.get(building.egid);
   if (!record || record.installedAtMs > simTimeMs) return [];
   if (record.origin === "municipal") {
@@ -601,6 +913,9 @@ function subsidyNoteFragment(record: SolarAdoptionRecord): string {
 export interface SolarAdoptionYearTally {
   count: number;
   totalCapacityKw: number;
+  /** Home batteries put in this year: with new systems, and added to existing ones. */
+  batteriesWithSolar: number;
+  batteriesAdded: number;
 }
 
 /** How many buildings adopted solar, and how much capacity, within the
@@ -617,5 +932,12 @@ export function solarAdoptionTallyForYear(buildings: Building[], realPlants: Pow
       totalCapacityKw += record.capacityKw;
     }
   }
-  return { count, totalCapacityKw };
+  let batteriesWithSolar = 0;
+  let batteriesAdded = 0;
+  for (const b of batteryByEgid.values()) {
+    if (b.installedAtMs < yearStartMs || b.installedAtMs >= yearEndMs) continue;
+    if (b.origin === "retrofit") batteriesAdded++;
+    else batteriesWithSolar++;
+  }
+  return { count, totalCapacityKw, batteriesWithSolar, batteriesAdded };
 }
