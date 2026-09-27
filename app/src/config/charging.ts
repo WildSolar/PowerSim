@@ -75,10 +75,10 @@ export const BUILD_SPEC: Record<ChargingKind, SiteSpec> = {
   fleet: { label: "Lorry charging park", points: 4, powerKw: 350, costChf: 1_200_000, upkeepChfPerPointYear: 12_000, buildMonths: 12 },
 };
 
-// On-street sites and fast-charging hubs come in several sizes; a bigger one shares the grid
-// connection (for a hub, the transformer) and the civil works, so each point costs less. A running
-// municipal site can be enlarged later: the difference in price, plus opening the site up again,
-// and some months' work. Lorry charging parks come in one size for now.
+// Every kind of municipal site comes in several sizes; a bigger one shares the grid connection
+// (for a hub or a lorry park, the transformer) and the civil works, so each point costs less. A
+// running municipal site can be enlarged later: the difference in price, plus opening the site up
+// again, and some months' work.
 export interface SiteSize {
   points: number;
   costChf: number;
@@ -94,9 +94,13 @@ export const SITE_SIZES: Partial<Record<ChargingKind, SiteSize[]>> = {
     { points: 4, costChf: 600_000, buildMonths: 12 },
     { points: 8, costChf: 1_050_000, buildMonths: 14 },
   ],
+  fleet: [
+    { points: 4, costChf: 1_200_000, buildMonths: 12 },
+    { points: 8, costChf: 2_100_000, buildMonths: 15 },
+  ],
 };
-export const UPGRADE_EXTRA_CHF: Partial<Record<ChargingKind, number>> = { ac: 15_000, dc: 80_000 };
-export const UPGRADE_MONTHS: Partial<Record<ChargingKind, number>> = { ac: 3, dc: 6 };
+export const UPGRADE_EXTRA_CHF: Partial<Record<ChargingKind, number>> = { ac: 15_000, dc: 80_000, fleet: 150_000 };
+export const UPGRADE_MONTHS: Partial<Record<ChargingKind, number>> = { ac: 3, dc: 6, fleet: 6 };
 
 // --- Private operators ---
 
