@@ -151,6 +151,8 @@ class Zoning {
   private parcelOfSite = new Map<string, string | null>();
   private levies: { atMs: number; amountRp: number; egid: string }[] = [];
   private sites: DevelopmentSite[] = [];
+  private lotByEgid = new Map<string, string>();
+  private chargedValueByLot = new Map<string, number>(); // land value per m² a lot's rezoning gain has been levied up to
   private nextId = 1;
 
   // Planning UI state.
@@ -175,6 +177,8 @@ class Zoning {
     this.parcelOfSite = new Map();
     this.levies = [];
     this.sites = dataset.developmentSites ?? [];
+    this.lotByEgid = new Map();
+    this.chargedValueByLot = new Map();
     this.nextId = 1;
     this.selection = new Set();
     this.notify();
@@ -309,9 +313,21 @@ class Zoning {
     return this.stateForBuilding(b, atMs)?.dhPriority ?? false;
   }
 
+  /** The piece of land a building stands on: a replacement stands on its predecessor's, a new
+   * building on its own. */
+  private lotOf(b: Building): string {
+    const predecessor = b.replacesEgids?.[0];
+    const lot = predecessor ? (this.lotByEgid.get(predecessor) ?? predecessor) : b.egid;
+    this.lotByEgid.set(b.egid, lot);
+    return lot;
+  }
+
   /** The value-capture levy on a project that gained from a zoning change, recorded as a treasury
-   * receipt at its permit: on the extra floor space densification allows, and on the rest of its
-   * floor space if its parcel was rezoned to a more valuable use. */
+   * receipt at its permit: on the extra floor space densification allows, and — once per piece of
+   * land — on the rest of its floor space if its parcel was rezoned to a more valuable use. The gain
+   * from a rezoning belongs to the land, so the first project on it pays; a later replacement on the
+   * same lot pays again only if the land has since been rezoned to something more valuable still,
+   * and then only for the difference. */
   chargeLevy(b: Building, gfaM2: number, atMs: number): number {
     const id = this.parcelIdOfBuilding(b);
     const parcel = id ? this.byId.get(id) : undefined;
@@ -319,7 +335,10 @@ class Zoning {
     if (!parcel || !state) return 0;
     const extraGfa = Math.min(gfaM2, (b.footprintAreaM2 ?? 0) * state.extraFloors);
     const valueNow = LAND_VALUE_CHF_PER_M2_GFA[state.zone];
-    const gain = Math.max(0, valueNow - LAND_VALUE_CHF_PER_M2_GFA[parcel.zone]);
+    const lot = this.lotOf(b);
+    const alreadyCharged = Math.max(LAND_VALUE_CHF_PER_M2_GFA[parcel.zone], this.chargedValueByLot.get(lot) ?? 0);
+    const gain = Math.max(0, valueNow - alreadyCharged);
+    if (gain > 0) this.chargedValueByLot.set(lot, valueNow);
     const levyRp = Math.round(VALUE_LEVY_RATE * (extraGfa * valueNow + gain * (gfaM2 - extraGfa)) * 100);
     if (levyRp > 0) {
       treasury.recordReceipt(atMs, levyRp, b.egid);
