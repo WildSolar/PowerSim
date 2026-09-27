@@ -122,6 +122,24 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "information",
+    icon: "🔍",
+    title: "What you know — and what it takes to find out",
+    blocks: [
+      p(
+        "The town itself is open to you: every building and dwelling, its devices, its bills, what it heats with and when that changed, every charger and how full it is, and the town-wide figures in City stats, History and the Year in Review. What isn't open is why things happen — the part a real municipality has to work out.",
+      ),
+      list([
+        "How much a subsidy actually changes: each subsidy measure shows its uptake (how many households took it, and what it cost) — the treasury pays it, so that's known. But many of them would have done the same without the money. An evaluation study (Control → Measures, on the subsidy's card) estimates how many were changed by it, looking at the last three years: it takes a few months, costs money, and gives its answer with a margin — it interviews a sample, and its method isn't perfect.",
+        "What people think: approval is one number. How each group feels (homeowners, tenants, drivers, businesses, the climate-minded) takes an opinion survey — a snapshot as of its fieldwork, with a margin of a few points, and it ages.",
+        "Why a household or owner chose what it did: the building and dwelling panels say what happened and, briefly, why. The options each one weighed, what they cost and how each leans are in the decision log — open only in transparency mode, chosen when you start a game.",
+      ]),
+      note(
+        "The estimates are grounded in the game's own truth: every time a household takes a municipal subsidy, the game also works out whether it would have chosen the same without it. A study samples that, with its errors; transparency mode lets you look at the decisions themselves.",
+      ),
+    ],
+  },
+  {
     id: "approval",
     icon: "🗳️",
     title: "Public approval",

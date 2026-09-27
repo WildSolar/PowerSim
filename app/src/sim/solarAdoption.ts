@@ -99,6 +99,7 @@ import { isOffPeakHour, type Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 import { treasury } from "./treasury";
 import { priceFactorInYear } from "./costTrends";
+import { recordSubsidisedDecision } from "./additionality";
 
 const DAY_MS = 24 * 60 * 60_000;
 const YEAR_MS = 365.25 * DAY_MS;
@@ -267,7 +268,18 @@ function evaluateAdoption(
     },
   ];
   const biasRp = solarBiasStrengthRp(building.egid);
-  const { chosen } = chooseNext(candidates, "none", SOLAR_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier, biasRp + policy.progressiveNudgeRp);
+  const uncertainty = SOLAR_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier;
+  const { chosen } = chooseNext(candidates, "none", uncertainty, biasRp + policy.progressiveNudgeRp);
+  // The ground truth for evaluation studies: the same decision without the municipal top-up.
+  const additional =
+    chosen === "solar" && municipalRp > 0
+      ? chooseNext(
+          candidates.map((c) => (c.id === "solar" ? { ...c, annualizedCostRp: c.annualizedCostRp + municipalRp / PANEL_LIFETIME_MEAN_YEARS } : c)),
+          "none",
+          uncertainty,
+          biasRp + policy.progressiveNudgeRp,
+        ).chosen !== "solar"
+      : false;
 
   logCandidateDecision({
     atMs: yearStartMs,
@@ -296,6 +308,7 @@ function evaluateAdoption(
   if (chosen !== "solar") return null;
 
   const dayOffset = Math.floor(mulberry32(hashSeed(building.egid, "solar-install-day", String(year)))() * 365);
+  if (municipalRp > 0) recordSubsidisedDecision({ atMs: yearStartMs + dayOffset * DAY_MS, category: "solar", subsidyRp: municipalRp, additional });
   return { installedAtMs: yearStartMs + dayOffset * DAY_MS, capacityKw, installCostRp, federalSubsidyRp: federalRp, municipalSubsidyRp: municipalRp, annualSavingsRp };
 }
 

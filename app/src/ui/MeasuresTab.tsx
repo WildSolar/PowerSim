@@ -5,12 +5,99 @@ import { defaultParams, MEASURE_CATEGORY_LABEL, type MeasureCategory, type Measu
 import { approval } from "../sim/approval";
 import { measures } from "../sim/measures";
 import { measureUnavailableReason } from "../sim/measureAvailability";
+import { subsidisedDecisions, type SubsidyCategory } from "../sim/additionality";
+import { studies } from "../sim/studies";
+import { simClock } from "../sim/engine";
+import { BLOC_LABEL, BLOC_ORDER } from "../config/approval";
+import { EVALUATION_COST_CHF, EVALUATION_LOOKBACK_YEARS, EVALUATION_MONTHS, SURVEY_COST_CHF, SURVEY_MONTHS } from "../config/studies";
 import { useSimDay } from "../sim/store";
 import { treasury } from "../sim/treasury";
 import { formatCHF } from "./format";
 import "./measures.css";
 
 const CATEGORY_ORDER: MeasureCategory[] = ["subsidy", "infrastructure", "information", "law"];
+const DAY_MS = 24 * 60 * 60_000;
+const YEAR_MS = 365.25 * DAY_MS;
+
+function monthYear(simTimeMs: number): string {
+  return formatDate(simTimeMs).replace(/^\d+ /, "");
+}
+
+function percent(x: number): string {
+  return `${Math.round(x * 100)}%`;
+}
+
+const SHARED_NOTE: Partial<Record<SubsidyCategory, string>> = {
+  vehicle: "All vehicle grants together (electric vehicle grant and scrappage bonus).",
+};
+
+/** What a subsidy programme is known to have done: its uptake, always (the treasury pays it, so the
+ * municipality knows), and — if it paid for an evaluation — how much of that the money actually
+ * changed. */
+function SubsidyEvidence({ category, nowMs }: { category: SubsidyCategory; nowMs: number }) {
+  const lastYear = subsidisedDecisions(category, nowMs - YEAR_MS, nowMs + DAY_MS);
+  const ever = subsidisedDecisions(category, Number.NEGATIVE_INFINITY, nowMs + DAY_MS);
+  const lastYearRp = lastYear.reduce((sum, d) => sum + d.subsidyRp, 0);
+  const study = studies.latestEvaluation(category);
+  const result = study?.result ?? null;
+  const additional = result ? result.paid * result.additionalShare : 0;
+  return (
+    <div className="measure-evidence">
+      <div>
+        Taken up by <strong>{lastYear.length}</strong> in the last 12 months ({formatCHF(lastYearRp)}) · {ever.length} since the start.
+      </div>
+      {SHARED_NOTE[category] && <div className="measure-note">{SHARED_NOTE[category]}</div>}
+      {study && !result && <div className="measure-note">Evaluation under way — results in {monthYear(study.readyAtMs)}.</div>}
+      {result && result.paid === 0 && <div className="measure-note">The evaluation of {monthYear(study!.readyAtMs)} found no one paid in the period it looked at.</div>}
+      {result && result.paid > 0 && (
+        <div className="measure-evaluation">
+          <strong>Evaluation, {monthYear(study!.readyAtMs)}</strong> — of the {result.paid} households paid in the {EVALUATION_LOOKBACK_YEARS} years before, an estimated{" "}
+          <strong>
+            {percent(result.additionalShare)} (± {percent(result.margin)})
+          </strong>{" "}
+          would not have acted without the money: about {Math.round(additional)} changed decisions,{" "}
+          {additional >= 1 ? `${formatCHF(result.paidRp / additional)} each` : "too few to price"}. The rest would have done the same anyway.
+        </div>
+      )}
+      <button className="measure-study" disabled={!!study && !result} onClick={() => studies.commissionEvaluation(category, simClock.getSimTimeMs())}>
+        Commission {result ? "a new" : "an"} evaluation — {formatCHF(EVALUATION_COST_CHF * 100)}, {EVALUATION_MONTHS} months
+      </button>
+    </div>
+  );
+}
+
+/** Public opinion: the one number everyone sees, and what the latest paid survey found about each group. */
+function PublicOpinion({ nowMs }: { nowMs: number }) {
+  const latest = studies.latestSurvey();
+  const result = studies.latestSurveyResult();
+  return (
+    <section className="measures-section">
+      <h3>Public opinion</h3>
+      <p className="measure-note">
+        Approval stands at {Math.round(approval.getApproval())}%. How each group feels takes a survey — a snapshot as of its fieldwork, with a margin.
+      </p>
+      {result?.result && (
+        <div className="survey-result">
+          <div className="survey-head">Survey, {monthYear(result.readyAtMs)} (± {result.result.margin} points)</div>
+          {BLOC_ORDER.map((b) => (
+            <div className="survey-row" key={b}>
+              <span>{BLOC_LABEL[b]}</span>
+              <span className="survey-bar">
+                <span style={{ width: `${result.result!.levels[b]}%` }} />
+              </span>
+              <span className="survey-value">{Math.round(result.result!.levels[b])}%</span>
+            </div>
+          ))}
+          {nowMs - result.readyAtMs > YEAR_MS && <div className="measure-note">Over a year old — opinion may have moved since.</div>}
+        </div>
+      )}
+      {latest && !latest.result && <p className="measure-note">A survey is in the field — results in {monthYear(latest.readyAtMs)}.</p>}
+      <button className="measure-study" disabled={!!latest && !latest.result} onClick={() => studies.commissionSurvey(simClock.getSimTimeMs())}>
+        Commission an opinion survey — {formatCHF(SURVEY_COST_CHF * 100)}, {SURVEY_MONTHS} months
+      </button>
+    </section>
+  );
+}
 
 function sameParams(a: MeasureParams, b: MeasureParams): boolean {
   return Object.keys(a).every((k) => a[k] === b[k]);
@@ -95,6 +182,7 @@ function MeasureCard({ def, nowMs }: { def: MeasureDef; nowMs: number }) {
         {def.referendum === "mandatory" && <span>Goes to a public vote</span>}
         {def.referendum === "optional" && <span>May go to a public vote if contested</span>}
       </div>
+      {def.subsidyCategory && <SubsidyEvidence category={def.subsidyCategory} nowMs={nowMs} />}
       {vote && (
         <div className="measure-vote">
           Public vote in {formatDate(vote.atMs).replace(/^\w+, \d+ /, "")} — latest poll: {Math.round(vote.pollYes)}% in favour
@@ -126,6 +214,10 @@ export function MeasuresTab() {
     (listener) => approval.subscribe(listener),
     () => approval.getVersion(),
   );
+  useSyncExternalStore(
+    (listener) => studies.subscribe(listener),
+    () => studies.getVersion(),
+  );
   const nowMs = useSimDay();
   const outlook = measures.externalOutlook(nowMs);
   const YEAR_MS = 365.25 * 24 * 60 * 60_000;
@@ -144,6 +236,8 @@ export function MeasuresTab() {
         Spent over the last 12 months: {formatCHF(spentRp)}, against a yearly government allocation of {formatCHF(budgetRp)}. Spending well beyond the
         allocation costs you approval with taxpayers.
       </p>
+
+      <PublicOpinion nowMs={nowMs} />
 
       <section className="measures-section">
         <h3>Outlook: canton and federal government</h3>

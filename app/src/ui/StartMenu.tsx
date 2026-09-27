@@ -12,7 +12,7 @@ function normalize(text: string): string {
 }
 
 interface Props {
-  onStart: (slug: string, difficulty: Difficulty) => void;
+  onStart: (slug: string, difficulty: Difficulty, transparency: boolean) => void;
 }
 
 export function StartMenu({ onStart }: Props) {
@@ -20,6 +20,7 @@ export function StartMenu({ onStart }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY);
+  const [transparency, setTransparency] = useState(false);
 
   useEffect(() => {
     loadMunicipalityIndex()
@@ -49,6 +50,13 @@ export function StartMenu({ onStart }: Props) {
           </div>
           <p>{DIFFICULTY_SPECS[difficulty].description}</p>
         </div>
+        <label className="start-menu-transparency">
+          <input type="checkbox" checked={transparency} onChange={(e) => setTransparency(e.target.checked)} />
+          <span>
+            <strong>Transparency mode</strong> — open the decision log: every choice households, owners and businesses make, with the options and costs
+            they weighed and the leanings behind them. Otherwise you only see what they did, not why.
+          </span>
+        </label>
         {error && <p className="start-menu-error">{error}</p>}
         {!error && !municipalities && <p className="start-menu-status">Loading municipalities…</p>}
         {municipalities && municipalities.length === 0 && (
@@ -63,14 +71,14 @@ export function StartMenu({ onStart }: Props) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && filtered.length > 0) onStart(filtered[0].slug, difficulty);
+                if (e.key === "Enter" && filtered.length > 0) onStart(filtered[0].slug, difficulty, transparency);
               }}
               autoFocus
             />
             <ul className="start-menu-list">
               {filtered.map((m) => (
                 <li key={m.slug}>
-                  <button className="start-menu-item" onClick={() => onStart(m.slug, difficulty)}>
+                  <button className="start-menu-item" onClick={() => onStart(m.slug, difficulty, transparency)}>
                     <span className="start-menu-name">{m.name}</span>
                     <span className="start-menu-meta">{m.buildingCount.toLocaleString("de-CH")} buildings</span>
                   </button>

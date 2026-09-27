@@ -28,6 +28,7 @@ import { streets } from "./sim/streets";
 import { districtHeat } from "./sim/districtHeat";
 import { publicCharging } from "./sim/publicCharging";
 import { setMeasureAvailability } from "./sim/measureAvailability";
+import { studies } from "./sim/studies";
 import { municipalSolarCandidates } from "./sim/solarAdoption";
 import { zoning } from "./sim/zoning";
 import { fleets } from "./sim/fleet";
@@ -57,7 +58,7 @@ if (import.meta.env.DEV) import("./dev/scenario").then((m) => Object.assign(wind
 if (import.meta.env.DEV) import("./dev/perf").then((m) => Object.assign(window, { __perf: m.runPerf, __perfYearEnd: m.timeYearEndReport, __perfNewYear: m.timeNewYearPieces, __perfMapTick: m.timeMapPowerTick, __perfRolling: m.timeRollingChart }));
 if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval } });
 
-function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
+function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Difficulty; transparency: boolean }) {
   const [dataset, setDataset] = useState<MunicipalityDataset | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedEgid, setSelectedEgid] = useState<string | null>(null);
@@ -106,6 +107,7 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
       .then((loaded) => {
         measures.init(difficulty); // before the stock: it registers the town size the measures' costs scale with
         approval.init(difficulty, `approval:${loaded.bfsNumber}`);
+        studies.init(`studies:${loaded.bfsNumber}`);
         streets.init(loaded); // before the stock: new buildings are linked to their street, and to the district heating network
         districtHeat.init(loaded);
         zoning.init(loaded); // before the stock: new buildings ask their parcel what it allows
@@ -194,7 +196,7 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
         </button>
       </div>
       <GameOverModal />
-      {showControl && <ControlPanel dataset={liveDataset ?? dataset} onClose={() => setShowControl(false)} />}
+      {showControl && <ControlPanel dataset={liveDataset ?? dataset} transparency={transparency} onClose={() => setShowControl(false)} />}
       {showWiki && <WikiPanel onClose={() => setShowWiki(false)} />}
       {reportCardYear !== null && (
         <ReportCardModal dataset={liveDataset ?? dataset} year={reportCardYear} onClose={() => reportCardStore.dismiss()} />
@@ -225,6 +227,10 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
 }
 
 export default function App() {
-  const [choice, setChoice] = useState<{ slug: string; difficulty: Difficulty } | null>(null);
-  return choice ? <Game slug={choice.slug} difficulty={choice.difficulty} /> : <StartMenu onStart={(slug, difficulty) => setChoice({ slug, difficulty })} />;
+  const [choice, setChoice] = useState<{ slug: string; difficulty: Difficulty; transparency: boolean } | null>(null);
+  return choice ? (
+    <Game slug={choice.slug} difficulty={choice.difficulty} transparency={choice.transparency} />
+  ) : (
+    <StartMenu onStart={(slug, difficulty, transparency) => setChoice({ slug, difficulty, transparency })} />
+  );
 }

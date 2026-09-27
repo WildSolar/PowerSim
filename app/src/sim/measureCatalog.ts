@@ -18,6 +18,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "solar-subsidy",
     category: "subsidy",
+    subsidyCategory: "solar",
     title: "Solar subsidy",
     summary:
       "A municipal top-up on the federal one-off payment every installation already gets: per kWp installed, plus an optional fixed bonus per installation. Paid when a building actually adopts.",
@@ -32,6 +33,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "heat-pump-grant",
     category: "subsidy",
+    subsidyCategory: "heating",
     title: "Heat pump grant",
     summary: "A flat municipal grant, on top of the cantonal one, whenever a building replaces its heating with a heat pump.",
     params: [{ kind: "slider", key: "amount", label: "Grant", min: 0, max: 20000, step: 500, unit: "CHF each", default: 5000 }],
@@ -42,6 +44,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "ev-grant",
     category: "subsidy",
+    subsidyCategory: "vehicle",
     title: "Electric car grant",
     summary: "A flat municipal grant whenever a household buys an electric car.",
     params: [{ kind: "slider", key: "amount", label: "Grant", min: 0, max: 10000, step: 500, unit: "CHF each", default: 3000 }],
@@ -52,6 +55,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "retrofit-topup",
     category: "subsidy",
+    subsidyCategory: "retrofit",
     title: "Insulation retrofit top-up",
     summary: "A municipal top-up, per m² of building envelope, on the federal building-program grant when an owner upgrades the insulation.",
     params: [{ kind: "slider", key: "perM2", label: "Top-up", min: 0, max: 200, step: 5, unit: "CHF/m²", default: 40 }],
@@ -208,6 +212,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "ice-scrappage",
     category: "subsidy",
+    subsidyCategory: "vehicle",
     title: "Scrappage bonus for petrol and diesel cars",
     summary: "An extra grant when a household replaces a petrol or diesel car with an electric one — on top of the ordinary electric car grant. It aims at exactly the switch you want, though it also pays households that would have gone electric anyway.",
     params: [{ kind: "slider", key: "amount", label: "Bonus", min: 0, max: 10000, step: 500, unit: "CHF each", default: 2000 }],

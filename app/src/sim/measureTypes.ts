@@ -9,6 +9,7 @@
 import type { Bloc } from "../config/approval";
 import type { Channels } from "./channels";
 import type { PayoutCategory } from "./treasury";
+import type { SubsidyCategory } from "./additionality";
 
 export type MeasureCategory = "subsidy" | "infrastructure" | "information" | "law";
 
@@ -52,6 +53,9 @@ export interface MeasureDef {
   /** How each voter bloc feels about the measure at these settings, -1 (bitterly opposed) to +1 (delighted).
    * Blocs not listed don't care. Hidden from the player. */
   approval?(params: MeasureParams): Partial<Record<Bloc, number>>;
+  /** A subsidy programme: which kind of household decision it pays for — what its uptake counts
+   * and an evaluation study looks at (studies.ts). */
+  subsidyCategory?: SubsidyCategory;
   /** Whether the measure goes to a public vote: always, or only when contested. Laws only. */
   referendum?: "mandatory" | "optional";
 }

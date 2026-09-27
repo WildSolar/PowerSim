@@ -27,6 +27,7 @@ import { subsidyCategoryForDecision, treasury } from "./treasury";
 import { logCandidateDecision, type DecisionCandidateLog, type DecisionLogKind } from "./decisionLog";
 import { hashSeed, mulberry32 } from "./rng";
 import { weibullAgedRemainder, weibullConditionalRemainder, weibullSample } from "./weibull";
+import { recordSubsidisedDecision } from "./additionality";
 
 export interface RenewalCandidate<T extends string> {
   id: T;
@@ -218,7 +219,8 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
 
     const candidates = params.candidatesAt(nextInstalledAtMs, last.system);
     const uncertaintyFraction = params.uncertaintyFraction * policyStore.get().uncertaintyMultiplier; // information measures narrow it
-    const { chosen, reasonKind, bestOverallId } = chooseNext(candidates, last.system, uncertaintyFraction, params.biasStrengthRp + policyStore.get().progressiveNudgeRp);
+    const bias = params.biasStrengthRp + policyStore.get().progressiveNudgeRp;
+    const { chosen, reasonKind, bestOverallId } = chooseNext(candidates, last.system, uncertaintyFraction, bias);
     const winner = candidates.find((c) => c.id === chosen);
     const event: RenewalEvent<T> = { installedAtMs: nextInstalledAtMs, system: chosen, previousSystem: last.system, reasonKind, bestOverallId, municipalSubsidyRp: winner?.municipalSubsidyRp };
     chain.push(event);
@@ -226,7 +228,15 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
     winner?.onChosen?.(nextInstalledAtMs);
     // The money leaves the treasury now, when the decision happens — never before, never for an option nobody takes.
     const category = subsidyCategoryForDecision(params.kind);
-    if (category && winner?.municipalSubsidyRp) treasury.recordPayout(category, nextInstalledAtMs, winner.municipalSubsidyRp, params.egid);
+    if (category && winner?.municipalSubsidyRp) {
+      treasury.recordPayout(category, nextInstalledAtMs, winner.municipalSubsidyRp, params.egid);
+      // The ground truth for evaluation studies: the same decision without the municipality's money.
+      const without = candidates.map((c) => ({ ...c, annualizedCostRp: c.annualizedCostRp + (c.municipalSubsidyRp ?? 0) / c.lifetimeMeanYears }));
+      const counterfactual = chooseNext(without, last.system, uncertaintyFraction, bias).chosen;
+      if (category === "heating" || category === "vehicle" || category === "retrofit" || category === "solar") {
+        recordSubsidisedDecision({ atMs: nextInstalledAtMs, category, subsidyRp: winner.municipalSubsidyRp, additional: counterfactual !== chosen });
+      }
+    }
     logCandidateDecision({
       atMs: nextInstalledAtMs,
       kind: params.kind,

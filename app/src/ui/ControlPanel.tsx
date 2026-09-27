@@ -14,6 +14,8 @@ import "./modal.css";
 
 export interface ControlPanelProps {
   dataset: MunicipalityDataset;
+  /** Transparency mode (start menu): the decision log is open to the player. */
+  transparency: boolean;
   onClose: () => void;
 }
 
@@ -24,7 +26,7 @@ const TABS: { id: ControlTab; icon: string; title: string }[] = [
   { id: "measures", icon: "🏛️", title: "Measures" },
   { id: "stats", icon: "📊", title: "City stats" },
   { id: "history", icon: "📈", title: "History" },
-  { id: "debug", icon: "🐛", title: "Debug" },
+  { id: "debug", icon: "🔎", title: "Decision log" },
 ];
 
 /** The central "run the municipality" panel — a Wiki-style modal (no need to
@@ -33,7 +35,8 @@ const TABS: { id: ControlTab; icon: string; title: string }[] = [
  * be a permanently-visible box that had started overlapping the building/
  * dwelling panel as it grew; City stats and History used to be
  * MunicipalityPanel, which this replaces outright. */
-export function ControlPanel({ dataset, onClose }: ControlPanelProps) {
+export function ControlPanel({ dataset, transparency, onClose }: ControlPanelProps) {
+  const tabs = TABS.filter((t) => t.id !== "debug" || transparency);
   const [tab, setTab] = useState<ControlTab>("prices");
   const tariff = useTariff();
   const currentDay = useSimDay();
@@ -54,7 +57,7 @@ export function ControlPanel({ dataset, onClose }: ControlPanelProps) {
         <nav className="modal-nav">
           <h2>{dataset.name}</h2>
           <ul>
-            {TABS.map((t) => (
+            {tabs.map((t) => (
               <li key={t.id}>
                 <button className={t.id === tab ? "active" : ""} onClick={() => setTab(t.id)}>
                   <span className="modal-nav-icon">{t.icon}</span>
