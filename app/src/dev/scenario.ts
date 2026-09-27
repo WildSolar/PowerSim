@@ -59,6 +59,7 @@ export interface ScenarioRow {
   dwellings: number;
   gfaM2: number;
   zoningLevyChf: number;
+  zoningLevyFromRezoningChf: number;
   heating: Record<string, number>;
   heatPumpShare: number;
   carSlots: { evShare: number };
@@ -118,6 +119,7 @@ function snapshot(dataset: MunicipalityDataset, year: number, atMs: number): Sce
     dwellings: buildings.reduce((sum, b) => sum + b.dwellings.length, 0),
     gfaM2: Math.round(buildings.reduce((sum, b) => sum + (b.footprintAreaM2 ?? 0) * Math.max(1, b.floorCount ?? 2), 0)),
     zoningLevyChf: Math.round(zoning.leviesTotalRp(atMs) / 100),
+    zoningLevyFromRezoningChf: Math.round(zoning.rezoningLeviesRp(atMs) / 100),
     heating,
     heatPumpShare: Math.round((heatPumps / (buildings.length || 1)) * 1000) / 1000,
     carSlots: { evShare: Math.round((evSlots / (carSlots || 1)) * 1000) / 1000 },

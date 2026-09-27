@@ -28,6 +28,8 @@ import {
   HIGH_STANDARD_STANCES,
   HIGH_STANDARD_U_VALUE_FACTOR,
   LAND_VALUE_CHF_PER_M2_GFA,
+  LAND_VALUE_CHF_PER_M2_LAND,
+  TYPICAL_SITE_COVERAGE,
   LIFT_STANCE_FACTOR,
   LOST_WORK_ZONE_STANCE,
   MISFIT_RENEWAL_BOOST,
@@ -149,7 +151,7 @@ class Zoning {
   private changesByParcel = new Map<string, ZoningChange[]>();
   private parcelOfBuilding = new Map<string, string | null>();
   private parcelOfSite = new Map<string, string | null>();
-  private levies: { atMs: number; amountRp: number; egid: string }[] = [];
+  private levies: { atMs: number; amountRp: number; egid: string; rezoningRp: number }[] = [];
   private sites: DevelopmentSite[] = [];
   private lotByEgid = new Map<string, string>();
   private chargedValueByLot = new Map<string, number>(); // land value per m² a lot's rezoning gain has been levied up to
@@ -324,31 +326,39 @@ class Zoning {
 
   /** The value-capture levy on a project that gained from a zoning change, recorded as a treasury
    * receipt at its permit: on the extra floor space densification allows, and — once per piece of
-   * land — on the rest of its floor space if its parcel was rezoned to a more valuable use. The gain
-   * from a rezoning belongs to the land, so the first project on it pays; a later replacement on the
-   * same lot pays again only if the land has since been rezoned to something more valuable still,
-   * and then only for the difference. */
+   * land — on its plot's rise in land value if its parcel was rezoned to a more valuable use. The
+   * gain from a rezoning belongs to the land, so the first project on it pays, by plot area (not by
+   * how much it builds there); a later replacement on the same plot pays again only if the land has
+   * since been rezoned to something more valuable still, and then only for the difference. */
   chargeLevy(b: Building, gfaM2: number, atMs: number): number {
     const id = this.parcelIdOfBuilding(b);
     const parcel = id ? this.byId.get(id) : undefined;
     const state = id ? this.stateAt(id, atMs) : null;
     if (!parcel || !state) return 0;
     const extraGfa = Math.min(gfaM2, (b.footprintAreaM2 ?? 0) * state.extraFloors);
-    const valueNow = LAND_VALUE_CHF_PER_M2_GFA[state.zone];
+    const densificationChf = extraGfa * LAND_VALUE_CHF_PER_M2_GFA[state.zone];
+    const landValueNow = LAND_VALUE_CHF_PER_M2_LAND[state.zone];
     const lot = this.lotOf(b);
-    const alreadyCharged = Math.max(LAND_VALUE_CHF_PER_M2_GFA[parcel.zone], this.chargedValueByLot.get(lot) ?? 0);
-    const gain = Math.max(0, valueNow - alreadyCharged);
-    if (gain > 0) this.chargedValueByLot.set(lot, valueNow);
-    const levyRp = Math.round(VALUE_LEVY_RATE * (extraGfa * valueNow + gain * (gfaM2 - extraGfa)) * 100);
+    const alreadyCharged = Math.max(LAND_VALUE_CHF_PER_M2_LAND[parcel.zone], this.chargedValueByLot.get(lot) ?? 0);
+    const gainPerM2 = Math.max(0, landValueNow - alreadyCharged);
+    if (gainPerM2 > 0) this.chargedValueByLot.set(lot, landValueNow);
+    const plotM2 = (b.footprintAreaM2 ?? 0) / TYPICAL_SITE_COVERAGE;
+    const rezoningRp = Math.round(VALUE_LEVY_RATE * gainPerM2 * plotM2 * 100);
+    const levyRp = Math.round(VALUE_LEVY_RATE * densificationChf * 100) + rezoningRp;
     if (levyRp > 0) {
       treasury.recordReceipt(atMs, levyRp, b.egid);
-      this.levies.push({ atMs, amountRp: levyRp, egid: b.egid });
+      this.levies.push({ atMs, amountRp: levyRp, egid: b.egid, rezoningRp });
     }
     return levyRp;
   }
 
   leviesTotalRp(toMs: number): number {
     return this.levies.reduce((sum, l) => sum + (l.atMs < toMs ? l.amountRp : 0), 0);
+  }
+
+  /** The part of the levies collected before `toMs` that came from rezonings (the rest: densification). */
+  rezoningLeviesRp(toMs: number): number {
+    return this.levies.reduce((sum, l) => sum + (l.atMs < toMs ? l.rezoningRp : 0), 0);
   }
 
   // --- planning ---

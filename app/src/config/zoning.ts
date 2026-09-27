@@ -26,10 +26,20 @@ export const DENSIFY_RENEWAL_BOOST_PER_FLOOR = 0.5;
 export const MISFIT_RENEWAL_BOOST = 2;
 
 // Value capture (Mehrwertausgleich): canton Zürich lets a municipality levy up to 40% of the land
-// value a zoning change creates. Charged when a project using the gain gets its permit: on the extra
-// floor space densification allows, and on a rezoning to a more valuable use. Land value per m² of
-// floor space, by zone.
+// value a zoning change creates. Charged when a project using the gain gets its permit.
 export const VALUE_LEVY_RATE = 0.25;
+// A rezoning raises the value of the land itself: land value per m² of land, by zone (Limmattal
+// ballpark). Levied once per plot, on its area — estimated from the building's footprint and a
+// typical site coverage.
+export const LAND_VALUE_CHF_PER_M2_LAND: Record<SiteZone, number> = {
+  residential: 1400,
+  mixed: 1500,
+  centre: 1800,
+  work: 700,
+  public: 0,
+};
+export const TYPICAL_SITE_COVERAGE = 0.35; // footprint / plot area
+// Densification adds floor space that can be sold or let: land value per m² of that extra floor space.
 export const LAND_VALUE_CHF_PER_M2_GFA: Record<SiteZone, number> = {
   residential: 1000,
   mixed: 1050,
