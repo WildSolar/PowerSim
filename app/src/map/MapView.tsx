@@ -117,6 +117,11 @@ const ZONE_LAYER_IDS = [ZONE_FILL_LAYER_ID, ZONE_DH_LAYER_ID, ZONE_STANDARD_LAYE
 const ZONING_TICK_MS = 3000;
 const STATION_SOURCE_ID = "grid-stations";
 const STATION_LAYER_ID = "grid-stations-circle";
+const GRID_ZONE_SOURCE_ID = "grid-zones";
+const GRID_ZONE_FILL_LAYER_ID = "grid-zones-fill";
+const GRID_ZONE_LINE_LAYER_ID = "grid-zones-line";
+const GRID_ZONE_SELECTED_LAYER_ID = "grid-zones-selected";
+const GRID_DIMMED_COLOR = "#e0ded8"; // buildings outside the selected area
 const STRIPE_DH = "zone-stripe-dh";
 const STRIPE_STANDARD = "zone-stripe-standard";
 
@@ -429,6 +434,23 @@ function stationsGeoJSON(simTimeMs: number) {
   };
 }
 
+/** Each station's zone, by how loaded it was at the last reading — for the grid layer. */
+function gridZonesGeoJSON(simTimeMs: number) {
+  const selected = grid.getSelectedId();
+  const zones = grid.zonePolygons();
+  return {
+    type: "FeatureCollection" as const,
+    features: grid
+      .getAreas()
+      .filter((a) => (zones[a.id]?.length ?? 0) >= 4)
+      .map((a) => ({
+        type: "Feature" as const,
+        properties: { id: a.id, bucket: grid.bucket(a, simTimeMs), selected: a.id === selected ? 1 : 0 },
+        geometry: { type: "Polygon" as const, coordinates: [zones[a.id]] },
+      })),
+  };
+}
+
 type ImageCorners = [[number, number], [number, number], [number, number], [number, number]];
 
 /** Where every charger of a kind reaches, as one image: the union of their reach circles, lightly
@@ -541,7 +563,8 @@ function colorExpression(mode: ColorMode, selectedEgid: string | null, scales: C
     evCharging: () => legendMatchExpression("charging", EV_CHARGING_LEGEND),
     zoning: () => ZONING_BUILDING_COLOR,
     publicBuildings: () => legendMatchExpression("publicStatus", PUBLIC_BUILDINGS_LEGEND),
-    grid: () => legendMatchExpression("gridStatus", GRID_LEGEND),
+    // With an area selected, buildings elsewhere fade so its own stand out.
+    grid: () => ["case", ["==", ["get", "gridStatus"], "dimmed"], GRID_DIMMED_COLOR, legendMatchExpression("gridStatus", GRID_LEGEND)],
     age: () => legendMatchExpression("age", AGE_LEGEND),
     insulation: () => legendMatchExpression("energyClass", INSULATION_LEGEND),
     power: () => powerColorExpression(scales.powerMinW, scales.powerMaxW),
@@ -770,6 +793,32 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         },
         STREET_UNPIPED_LAYER_ID,
       );
+
+      // Grid: each station's zone, on the ground under the buildings, shown only in that layer.
+      const gridVisibility = colorModeRef.current === "grid" ? "visible" : "none";
+      map.addSource(GRID_ZONE_SOURCE_ID, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      map.addLayer({
+        id: GRID_ZONE_FILL_LAYER_ID,
+        type: "fill",
+        source: GRID_ZONE_SOURCE_ID,
+        layout: { visibility: gridVisibility },
+        paint: { "fill-color": ml(legendMatchExpression("bucket", GRID_LEGEND)), "fill-opacity": ["case", ["==", ["get", "selected"], 1], 0.3, 0.14] },
+      });
+      map.addLayer({
+        id: GRID_ZONE_LINE_LAYER_ID,
+        type: "line",
+        source: GRID_ZONE_SOURCE_ID,
+        layout: { visibility: gridVisibility, "line-join": "round" },
+        paint: { "line-color": "#52514e", "line-width": 1.2, "line-opacity": 0.7 },
+      });
+      map.addLayer({
+        id: GRID_ZONE_SELECTED_LAYER_ID,
+        type: "line",
+        source: GRID_ZONE_SOURCE_ID,
+        filter: ["==", ["get", "selected"], 1],
+        layout: { visibility: gridVisibility, "line-join": "round" },
+        paint: { "line-color": SELECTED_COLOR, "line-width": 3.5 },
+      });
 
       // Charger coverage (the EV charging layer's toggles): on the ground, under the buildings.
       for (const kind of COVERAGE_KINDS) {
@@ -1302,20 +1351,26 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     const map = mapRef.current;
     if (!map || !map.getLayer(STATION_LAYER_ID)) return;
     const visible = colorMode === "grid";
-    map.setLayoutProperty(STATION_LAYER_ID, "visibility", visible ? "visible" : "none");
+    for (const id of [STATION_LAYER_ID, GRID_ZONE_FILL_LAYER_ID, GRID_ZONE_LINE_LAYER_ID, GRID_ZONE_SELECTED_LAYER_ID]) {
+      map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+    }
     if (!visible) return;
     const tick = () => {
       const simTimeMs = simClock.getSimTimeMs();
       (map.getSource(STATION_SOURCE_ID) as GeoJSONSource | undefined)?.setData(stationsGeoJSON(simTimeMs));
+      (map.getSource(GRID_ZONE_SOURCE_ID) as GeoJSONSource | undefined)?.setData(gridZonesGeoJSON(simTimeMs));
       const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
       const pointSource = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
       const polyData = polygonsRef.current;
       const pointData = pointsRef.current;
       if (!polySource || !pointSource || !polyData || !pointData) return;
       const buckets = grid.getAreas().map((a) => grid.bucket(a, simTimeMs));
+      const selected = grid.getSelectedId();
       for (const f of [...polyData.features, ...pointData.features]) {
         const b = stock.lookup(f.properties.egid);
-        if (b) f.properties.gridStatus = buckets[grid.areaIdOf(b)] ?? "ok";
+        if (!b) continue;
+        const areaId = grid.areaIdOf(b);
+        f.properties.gridStatus = selected !== null && areaId !== selected ? "dimmed" : (buckets[areaId] ?? "ok");
       }
       polySource.setData(polyData);
       pointSource.setData(pointData);

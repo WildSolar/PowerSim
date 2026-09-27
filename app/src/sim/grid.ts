@@ -98,6 +98,7 @@ export function reinforceCostRp(fromKw: number): number {
 
 class Grid {
   private areas: GridArea[] = [];
+  private zones: [number, number][][] | null = null;
   private areaOfEgid = new Map<string, number>();
   private projection = new LocalProjection(8.4, 47.4);
   private realPlants: PowerPlant[] = [];
@@ -117,6 +118,7 @@ class Grid {
     this.realPlants = dataset.powerPlants;
     this.buildingsProvider = buildingsProvider;
     this.areaOfEgid = new Map();
+    this.zones = null;
     this.selectedId = null;
     const startYear = yearOf(0);
 
@@ -192,6 +194,20 @@ class Grid {
         return sw > 0 ? { x: sx / sw, y: sy / sw } : c;
       });
     }
+    // A last pass against the final stations, so every building is in its nearest station's area —
+    // the areas are then exactly the zones drawn on the map (zonePolygons).
+    points.forEach((p, i) => {
+      let best = 0;
+      let bestD = Infinity;
+      centres.forEach((c, j) => {
+        const d = (c.x - p.x) ** 2 + (c.y - p.y) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          best = j;
+        }
+      });
+      assignment[i] = best;
+    });
     const used = [...new Set(assignment)].sort((a, c) => a - c);
     const names = new Map<string, number>();
     return used.map((j, id) => {
@@ -240,6 +256,53 @@ class Grid {
       this.areaOfEgid.set(b.egid, id);
     }
     return id;
+  }
+
+  /** The zone each station serves: the part of the map closer to it than to any other station —
+   * which is exactly where its buildings are (each joins its nearest station). Drawn within the
+   * buildings' extent plus a margin. [lon, lat] rings, by area id; computed once. */
+  zonePolygons(): [number, number][][] {
+    if (this.zones) return this.zones;
+    const all = this.buildingsProvider();
+    const xy = all.map((b) => this.projection.toXY(b.lon, b.lat));
+    const margin = 300;
+    const minX = Math.min(...xy.map((p) => p[0])) - margin;
+    const maxX = Math.max(...xy.map((p) => p[0])) + margin;
+    const minY = Math.min(...xy.map((p) => p[1])) - margin;
+    const maxY = Math.max(...xy.map((p) => p[1])) + margin;
+    this.zones = this.areas.map((a) => {
+      let poly: [number, number][] = [
+        [minX, minY],
+        [maxX, minY],
+        [maxX, maxY],
+        [minX, maxY],
+      ];
+      for (const o of this.areas) {
+        if (o.id === a.id || poly.length === 0) continue;
+        // Keep the side of the midline between the two stations that is closer to this one.
+        const mx = (a.x + o.x) / 2;
+        const my = (a.y + o.y) / 2;
+        const nx = o.x - a.x;
+        const ny = o.y - a.y;
+        const side = (p: [number, number]) => (p[0] - mx) * nx + (p[1] - my) * ny;
+        const clipped: [number, number][] = [];
+        for (let i = 0; i < poly.length; i++) {
+          const p = poly[i];
+          const q = poly[(i + 1) % poly.length];
+          const dp = side(p);
+          const dq = side(q);
+          if (dp <= 0) clipped.push(p);
+          if (dp <= 0 !== dq <= 0) {
+            const t = dp / (dp - dq);
+            clipped.push([p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])]);
+          }
+        }
+        poly = clipped;
+      }
+      const ring = poly.map(([x, y]) => this.projection.toLonLat(x, y) as [number, number]);
+      return ring.length > 0 ? [...ring, ring[0]] : ring;
+    });
+    return this.zones;
   }
 
   getAreas(): GridArea[] {
