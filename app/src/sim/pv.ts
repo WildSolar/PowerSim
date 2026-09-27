@@ -29,6 +29,7 @@ import { toDateMs, dayOfYear } from "./calendar";
 import { snowDepthCm, snowPvBlockingFactor } from "./snow";
 import { valueNoise } from "./valueNoise";
 import { weatherAt } from "./weather";
+import { policyStore } from "./policy";
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
@@ -120,7 +121,10 @@ export function pvPowerW(plant: PowerPlant, simTimeMs: number, snowCoverCm?: num
 export function pvPowerWAt(plant: PowerPlant, simTimeMs: number, irradiance: number): number {
   if (plant.technology !== "Photovoltaic" || !plant.capacityKw) return 0;
   if (plant.activeToMs !== undefined && simTimeMs >= plant.activeToMs) return 0; // its building has been demolished
-  return -(plant.capacityKw * 1000 * (irradiance / PEAK_IRRADIANCE_WM2));
+  // A solar feed-in limit (the law) caps what the system delivers at a share of its rating — taken
+  // on generation rather than on the net feed-in, a slightly conservative simplification.
+  const limit = policyStore.get().feedInLimitPct / 100;
+  return -(plant.capacityKw * 1000 * Math.min(irradiance / PEAK_IRRADIANCE_WM2, limit));
 }
 
 /** Sum of every plant on a given building's roof (almost always 0 or 1 plant). */

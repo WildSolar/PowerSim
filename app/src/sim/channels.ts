@@ -37,6 +37,9 @@ export interface Channels {
   homeChargingBoost: number; // 0-1: share of the households who couldn't charge at home who now can (right to charge)
   publicBuildingChargerSitesPerYear: number; // charging sites the municipality puts at its own buildings each year
   publicBuildingChargerPoints: number; // how many points each of those gets
+  heatPumpLoadControlShare: number; // 0-1: heat pumps the utility may switch off in turns at peaks
+  smartChargingShare: number; // 0-1: of the households who don't already, the share who let their EV charge off-peak
+  feedInLimitPct: number; // solar feeds in at most this % of its rated power (100: no limit)
 
   // Electricity supply
   greenPowerShare: number; // 0-100: share of the utility's supply covered by certified renewable power
@@ -70,6 +73,9 @@ export const CHANNEL_DEFAULTS: Channels = {
   homeChargingBoost: 0,
   publicBuildingChargerSitesPerYear: 0,
   publicBuildingChargerPoints: 4,
+  heatPumpLoadControlShare: 0,
+  smartChargingShare: 0,
+  feedInLimitPct: 100,
   greenPowerShare: 0,
   districtHeatCleanShare: 0,
   newBuildSolarMandatePct: 0,
@@ -84,6 +90,7 @@ type Combiner<T> = (values: T[]) => T;
 
 const sum: Combiner<number> = (v) => v.reduce((a, b) => a + b, 0);
 const max: Combiner<number> = (v) => Math.max(...v);
+const min: Combiner<number> = (v) => Math.min(...v);
 const product: Combiner<number> = (v) => v.reduce((a, b) => a * b, 1);
 const latest = <T>(v: T[]): T => v[v.length - 1];
 const any: Combiner<boolean> = (v) => v.some(Boolean);
@@ -109,6 +116,9 @@ const COMBINERS: { [K in keyof Channels]: Combiner<Channels[K]> } = {
   homeChargingBoost: max,
   publicBuildingChargerSitesPerYear: sum,
   publicBuildingChargerPoints: max,
+  heatPumpLoadControlShare: max,
+  smartChargingShare: max,
+  feedInLimitPct: min,
   greenPowerShare: max,
   districtHeatCleanShare: max,
   newBuildSolarMandatePct: max,

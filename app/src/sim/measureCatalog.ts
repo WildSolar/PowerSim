@@ -92,6 +92,31 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     approval: () => ({ climate: 0.4, drivers: 0.2, tenants: 0.15 }),
   },
 
+  {
+    id: "heat-pump-load-control",
+    category: "infrastructure",
+    title: "Heat pump load control",
+    summary:
+      "The utility may switch enrolled heat pumps off for short spells when the grid peaks (ripple control, long practice in Switzerland) — in turns, so a house hardly cools down. It cuts the winter evening peak on every transformer station. A running cost for the control equipment; owners grumble a little.",
+    params: [{ kind: "slider", key: "share", label: "Heat pumps enrolled", min: 0, max: 100, step: 10, unit: "%", default: 60 }],
+    leadTimeMonths: 12,
+    effects: (p) => ({ heatPumpLoadControlShare: num(p, "share") / 100 }),
+    annualCostRp: (p) => (num(p, "share") / 100) * 60_000 * CHF,
+    approval: (p) => ({ homeowners: -0.15 * (num(p, "share") / 100), climate: 0.1 }),
+  },
+  {
+    id: "smart-charging",
+    category: "infrastructure",
+    title: "Smart charging programme",
+    summary:
+      "Wallbox controls and a bonus for households that let the utility charge their electric car off-peak instead of as soon as they plug in. Moves evening charging into the night — the evening peak falls. A running cost for the programme.",
+    params: [{ kind: "slider", key: "share", label: "Households signing up", min: 0, max: 100, step: 10, unit: "% of the rest", default: 50 }],
+    leadTimeMonths: 6,
+    effects: (p) => ({ smartChargingShare: num(p, "share") / 100 }),
+    annualCostRp: (p) => (num(p, "share") / 100) * 80_000 * CHF,
+    approval: (p) => ({ climate: 0.15, drivers: -0.05 * (num(p, "share") / 100) }),
+  },
+
   // --- Information ----------------------------------------------------------------------------
   {
     id: "solar-outreach",
@@ -254,6 +279,30 @@ export const MEASURE_CATALOG: MeasureDef[] = [
       const s = num(p, "strictness") / 100;
       return { drivers: -0.2 - 0.5 * s, business: -0.05 - 0.25 * s, climate: 0.15 + 0.25 * s, homeowners: -0.05 * s };
     },
+    referendum: "optional",
+  },
+  {
+    id: "feed-in-limit",
+    category: "law",
+    title: "Solar feed-in limit",
+    summary:
+      "Solar systems may feed at most a share of their rated power into the grid. A panel rarely produces more than about 70% of its rating anyway, so little energy is lost — but the sunny-midday peak on every transformer station drops. Owners of existing and new systems lose a little yield.",
+    params: [
+      {
+        kind: "choice",
+        key: "limit",
+        label: "Feed-in at most",
+        options: [
+          { value: "70", label: "70% of rated power" },
+          { value: "60", label: "60% of rated power" },
+          { value: "50", label: "50% of rated power" },
+        ],
+        default: "70",
+      },
+    ],
+    leadTimeMonths: 12,
+    effects: (p) => ({ feedInLimitPct: Number(p.limit ?? 70) }),
+    approval: (p) => ({ homeowners: -0.1 - (70 - Number(p.limit ?? 70)) * 0.01, business: -0.05, climate: -0.05 }),
     referendum: "optional",
   },
   {

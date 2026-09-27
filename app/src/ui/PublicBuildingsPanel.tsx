@@ -10,6 +10,7 @@ import { buildCostRp, buildMonthsFor, pointsAt, publicCharging, sizesFor } from 
 import { installMunicipalSolarNow, municipalSolarQuote } from "../sim/solarAdoption";
 import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
+import { gridFeedInBlockedAt } from "../sim/gridLimits";
 import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
 
@@ -63,7 +64,9 @@ function SelectedBuilding({ building, realPlants, now, onOrdered }: { building: 
           </button>
         </div>
       )}
-      {!solar && !solarQuote && <p className="dh-note">No roof to put panels on.</p>}
+      {!solar && !solarQuote && (
+        <p className="dh-note">{gridFeedInBlockedAt(building, now) ? "The grid here can't take more solar feed-in until it's reinforced (Grid layer)." : "No roof to put panels on."}</p>
+      )}
 
       <div className="info-row" style={{ marginTop: 6 }}>
         <span>🔌 Chargers</span>

@@ -67,6 +67,7 @@ import { firstRandom, hashSeed, hashSeedFrom } from "./rng";
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 import { priceFactor } from "./costTrends";
+import { gridDrawBlockedAt } from "./gridLimits";
 
 const DAY_MS = 24 * 3_600_000;
 
@@ -252,6 +253,8 @@ class Fleets {
       : null;
     if (!v.depot) return publicAccess ?? { kind: "none" };
     const hasCharger = FLEET_CATALOG[incumbent].electric && !this.chargesPubliclyAt(v, atMs);
+    // A new depot charger needs room on the grid.
+    if (!hasCharger && gridDrawBlockedAt(b, atMs)) return publicAccess ?? { kind: "none" };
     const depot: FleetAccess = { kind: "depot", chargerRp: hasCharger ? 0 : DEPOT_CHARGER_COST_RP[v.vehicleClass] * priceFactor("depotCharger", atMs) };
     if (!option) return depot;
     const spec = FLEET_CATALOG[electricOf(v.vehicleClass)];

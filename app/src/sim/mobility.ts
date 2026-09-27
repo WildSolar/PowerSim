@@ -33,7 +33,7 @@ import {
   VEHICLE_UNCERTAINTY_FRACTION,
   VEHICLE_WEIBULL_SHAPE,
 } from "../config/mobility";
-import { evChargingPowerW, evChargingPowerWFrom, evDailySession, evSessionSeed, isResponsive, type EvSession } from "./ev";
+import { evChargingPowerW, evChargingPowerWFrom, evDailySession, evSessionSeed, isResponsive, responsiveDraw, responsiveShare, type EvSession } from "./ev";
 import {
   ANNUAL_BIKE_KM,
   ANNUAL_CAR_KM,
@@ -71,6 +71,7 @@ import { tariffStore } from "./tariffStore";
 import { publicCharging } from "./publicCharging";
 import { existsAt } from "./lifetime";
 import { priceFactor } from "./costTrends";
+import { gridDrawBlockedAt } from "./gridLimits";
 
 // --- slot count --------------------------------------------------------------
 
@@ -156,11 +157,13 @@ function avgElecRpKWh(tariff: Tariff): number {
  * it could rely on (see publicCharging.ts), or not at all. */
 type ChargingAccess = { kind: "home" } | { kind: "public"; siteId: string; priceRpPerKWh: number; hassleRp: number } | { kind: "none" };
 
-function chargingAccessAt(egid: string, ewid: string, atMs: number): { access: ChargingAccess; lon: number; lat: number } | null {
+function chargingAccessAt(egid: string, ewid: string, atMs: number, incumbent: VehicleTypeId): { access: ChargingAccess; lon: number; lat: number } | null {
   const building = publicCharging.lookupBuilding(egid);
   const dwelling = building?.dwellings.find((d) => d.ewid === ewid);
   if (!building || !dwelling) return null;
-  if (publicCharging.homeChargingAt(building, dwelling)) return { access: { kind: "home" }, lon: building.lon, lat: building.lat };
+  // A new wallbox needs room on the grid; a household replacing an electric car keeps its own.
+  const wallboxAllowed = incumbent === "carEV" || !gridDrawBlockedAt(building, atMs);
+  if (wallboxAllowed && publicCharging.homeChargingAt(building, dwelling)) return { access: { kind: "home" }, lon: building.lon, lat: building.lat };
   const option = publicCharging.bestOption(building.lon, building.lat, atMs);
   return {
     access: option ? { kind: "public", siteId: option.site.id, priceRpPerKWh: option.priceRpPerKWh, hassleRp: option.hassleRp } : { kind: "none" },
@@ -265,7 +268,7 @@ function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "c
     lifetimeMeanYearsFor: (id) => VEHICLE_TYPE_CATALOG[id].lifetimeMeanYears,
     candidatesAt: (atMs, incumbent) => {
       if (kind === "bike") return bikeCandidatesAt(tariffStore.get(), atMs);
-      const where = chargingAccessAt(egid, ewid, atMs);
+      const where = chargingAccessAt(egid, ewid, atMs, incumbent);
       const access = where?.access ?? { kind: "home" };
       return carCandidatesAt(tariffStore.get(), atMs, incumbent, access, (chosenAtMs) => {
         if (access.kind === "public") publicCharging.assign(key, slotHandleFor(egid, ewid, slotIndex), access.siteId, chosenAtMs);
@@ -330,7 +333,7 @@ interface SlotHandle {
   ewid: string;
   slotIndex: number;
   sessionKey: string; // ev.ts's per-car session key
-  ev?: { seed: number; responsive: boolean }; // ev.ts's session seed and seeded trait, drawn on first use
+  ev?: { seed: number; responsiveDraw: number }; // ev.ts's session seed and seeded draw against the off-peak share, on first use
   mode?: ModeChainEntry<MobilityMode>;
   car?: RenewalChainEntry<VehicleTypeId>;
   bike?: RenewalChainEntry<VehicleTypeId>;
@@ -422,8 +425,8 @@ export function mobilityChargingPowerW(egid: string, dwelling: Dwelling, simTime
     // A car relying on a public charger draws its power there, not at home (publicCharging.ts).
     h.publicCharging ??= publicCharging.assignmentsFor(vehicleEntityKey(egid, h.ewid, h.slotIndex, "car"));
     if (h.publicCharging.length > 0 && publicCharging.chargesPubliclyAt(h.publicCharging, simTimeMs)) continue;
-    h.ev ??= { seed: evSessionSeed(egid, h.sessionKey), responsive: isResponsive(egid, h.sessionKey) };
-    totalW += evChargingPowerWFrom(h.ev.seed, h.ev.responsive, simTimeMs, tariff);
+    h.ev ??= { seed: evSessionSeed(egid, h.sessionKey), responsiveDraw: responsiveDraw(egid, h.sessionKey) };
+    totalW += evChargingPowerWFrom(h.ev.seed, h.ev.responsiveDraw < responsiveShare(), simTimeMs, tariff);
   }
   return totalW;
 }

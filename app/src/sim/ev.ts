@@ -24,13 +24,25 @@
 
 import { hashSeed, hashSeedFrom, mulberry32 } from "./rng";
 import type { Tariff } from "./tariff";
+import { policyStore } from "./policy";
 
 const DAY_MS = 24 * 60 * 60_000;
 export const CHARGING_POWER_KW = 7.4; // typical home wallbox
 export const RESPONSIVE_FRACTION = 0.3;
 
+/** A car's fixed draw against the share of households who charge off-peak. */
+export function responsiveDraw(egid: string, sessionKey: string): number {
+  return mulberry32(hashSeed(egid, sessionKey, "ev-responsive"))();
+}
+
+/** The share of households who charge off-peak: some always do, and a smart charging programme
+ * signs up a share of the rest. */
+export function responsiveShare(): number {
+  return RESPONSIVE_FRACTION + policyStore.get().smartChargingShare * (1 - RESPONSIVE_FRACTION);
+}
+
 export function isResponsive(egid: string, sessionKey: string): boolean {
-  return mulberry32(hashSeed(egid, sessionKey, "ev-responsive"))() < RESPONSIVE_FRACTION;
+  return responsiveDraw(egid, sessionKey) < responsiveShare();
 }
 
 export interface EvSession {

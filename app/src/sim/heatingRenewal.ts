@@ -52,6 +52,7 @@ import type { Tariff } from "./tariff";
 import { dailyMeanTempC } from "./weather";
 import { priceFactor } from "./costTrends";
 import { zoning } from "./zoning";
+import { gridDrawBlockedAt } from "./gridLimits";
 
 const DAY_MS = 24 * 60 * 60_000;
 const ANNUAL_SAMPLE_DAYS = 365;
@@ -136,6 +137,10 @@ function runningCostRpFor(id: HeatingSystemId, estimate: AnnualHeatingEstimate, 
   return consumedKWh * tariff.districtHeatingPriceRpKWh;
 }
 
+function isHeatPump(id: HeatingSystemId): boolean {
+  return id === "airHeatPump" || id === "groundHeatPump";
+}
+
 function candidatesAt(
   building: Building,
   atMs: number,
@@ -146,6 +151,7 @@ function candidatesAt(
   const estimate = annualHeatingEstimate(building, atMs);
   const scale = sizeScale(building);
   const fossilBanned = policyStore.get().fossilHeatingInstallBanned || zoning.fossilHeatingBannedAt(building, atMs);
+  const gridBlocked = gridDrawBlockedAt(building, atMs);
   const avgElecRpKWh = (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2;
 
   return HEATING_SYSTEM_ORDER.map((id) => {
@@ -158,10 +164,12 @@ function candidatesAt(
     return {
       id,
       municipalSubsidyRp: municipalRp,
-      // District heating needs a pipe in the street; one already connected keeps its connection.
+      // District heating needs a pipe in the street; one already connected keeps its connection. A
+      // new heat pump needs room on the grid (a building replacing one keeps its connection).
       available:
         (id === "districtHeating" ? incumbent === "districtHeating" || districtHeat.servesAt(building.streetSegments, atMs) : true) &&
-        !(fossilBanned && (id === "gasBoiler" || id === "oilBoiler")),
+        !(fossilBanned && (id === "gasBoiler" || id === "oilBoiler")) &&
+        !(isHeatPump(id) && !isHeatPump(incumbent) && gridBlocked),
       annualizedCostRp: installCostRp / spec.lifetimeMeanYears + runningCostRpFor(id, estimate, tariff, avgElecRpKWh),
       lifetimeMeanYears: spec.lifetimeMeanYears,
       greenness: spec.greenness,

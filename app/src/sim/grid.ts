@@ -19,6 +19,7 @@ import {
   BATTERY_KW,
   BATTERY_MONTHS,
   GRID_FULL_SHARE,
+  LOAD_CONTROL_OFF_SHARE_AT_PEAK,
   GRID_TIGHT_SHARE,
   MULTI_TRANSFORMER_STEP_KVA,
   REINFORCE_BASE_CHF,
@@ -48,6 +49,9 @@ import { effectivePowerPlantsAt } from "./solarAdoption";
 import { streets } from "./streets";
 import { treasury } from "./treasury";
 import { dailyMeanTempC } from "./weather";
+import { setGridLimits } from "./gridLimits";
+import { heatPumpPowerW } from "./heatPump";
+import { policyStore } from "./policy";
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
@@ -141,6 +145,10 @@ class Grid {
 
     this.unsubscribeClock?.();
     this.unsubscribeClock = simClock.subscribe(() => this.advance(simClock.getSimTimeMs()));
+    setGridLimits(
+      (b, atMs) => this.drawBlockedAt(b, atMs),
+      (b, atMs) => this.feedInBlockedAt(b, atMs),
+    );
     this.notify();
   }
 
@@ -323,9 +331,11 @@ class Grid {
       const sums = new Array<number>(this.areas.length).fill(0);
       const plants = effectivePowerPlantsAt(all, this.realPlants, t);
       const snow = snowDepthCm(t);
+      // Heat pumps under load control: at a winter peak, part of them are switched off in turns.
+      const controlled = season === "winter" ? policyStore.get().heatPumpLoadControlShare * LOAD_CONTROL_OFF_SHARE_AT_PEAK : 0;
       for (const b of all) {
         if (!existsAt(b, t)) continue;
-        sums[this.areaIdOf(b)] += buildingPowerW(b, t, plants, snow);
+        sums[this.areaIdOf(b)] += buildingPowerW(b, t, plants, snow) - (controlled > 0 ? controlled * heatPumpPowerW(b, t) : 0);
       }
       for (const site of publicCharging.getSites()) sums[this.nearestAreaId(site.lon, site.lat)] += publicCharging.siteLoadW(site, t);
       sums.forEach((w, i) => {

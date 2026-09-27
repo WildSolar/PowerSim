@@ -215,16 +215,19 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "The electricity grid",
     blocks: [
       p(
-        "Power reaches every building through a transformer station serving its neighbourhood, and each station can carry only so much. Where the real stations stand isn't public, so the game draws the areas from the buildings themselves — grouped by location, each serving about half a megawatt on a cold evening — and gives each a standard-size station with some headroom over the peak it served when the game starts. The primary substation feeding the whole town is where OpenStreetMap has it.",
+        "Power reaches every building through a transformer station serving its neighbourhood, and each station can carry only so much. Where the real stations stand isn't public, so the game draws the areas from the buildings themselves — grouped by location, each serving about half a megawatt on a cold evening — and gives each a standard-size station with some headroom over the peak it served when the game starts.",
       ),
       p(
         "Twice a year the utility reads its meters: after the winter (the highest draw on the coldest January and February evenings, when heat pumps, cooking and cars plugging in all come together) and after the summer (the highest feed-in on the sunniest middays, when rooftop solar pushes power back up the line). The Grid map layer colours every building by how loaded its area's station was at the last reading, and marks the stations; its panel ranks the areas and shows each one's peaks against its capacity.",
       ),
       p(
-        "An area whose peak exceeds its station's capacity — either way — is overloaded, and new connections there have to wait: no new heat pumps or wallboxes if it's the winter peak, no large solar arrays if it's the summer feed-in, until the next reading shows room again. Reinforcing it (the next transformer size up, and the cables with it, ready after nine months) or adding a neighbourhood battery (250 kW, covering that much of the peak in either direction) is up to you, paid from the treasury.",
+        "An area whose peak exceeds its station's capacity — either way — is overloaded, and new connections there have to wait until the next reading shows room again. Over its winter peak: no new heat pumps (a building replacing one keeps its connection), no new wallboxes (households charge in public instead, if they can; replacing an electric car keeps its wallbox), no new depot chargers for businesses. Over its summer feed-in: no solar arrays over 30 kWp — household systems still connect, and new buildings still get what the building code requires. New buildings are always connected. Reinforcing it (the next transformer size up, and the cables with it, ready after nine months) or adding a neighbourhood battery (250 kW, covering that much of the peak in either direction) is up to you, paid from the treasury.",
+      ),
+      p(
+        "Reinforcing everywhere is expensive, so three measures (Control → Measures) buy time by taking the edge off the peaks instead: heat pump load control lets the utility switch enrolled heat pumps off in turns at peak times (at any one peak moment half of them are off — a short spell each, hardly noticed); a smart charging programme signs households up to let their electric car charge off-peak rather than as soon as they plug in; and a solar feed-in limit caps what panels deliver at 70% (or less) of their rating, which costs little energy but shaves the sunny-midday peak. They slow the overloading down; they don't replace reinforcement in the long run.",
       ),
       note(
-        "Placeholders: the area sizes, the stations' starting headroom, and the costs of reinforcing and batteries. The readings are a handful of design moments, not a full load flow; voltage, cables and reactive power aren't modelled.",
+        "Placeholders: the area sizes, the stations' starting headroom, and the costs of reinforcing and batteries. The readings are a handful of design moments, not a full load flow; voltage, cables and reactive power aren't modelled. The feed-in limit caps generation rather than the net feed-in after a building's own use, which is slightly conservative, and load control only counts at the readings (the heat a building needs is still delivered, just shifted).",
       ),
     ],
   },

@@ -8,7 +8,7 @@ export const TARGET_AREA_PEAK_KW = 500;
 export const TRANSFORMER_SIZES_KVA = [250, 400, 630, 800, 1000, 1250, 1600];
 export const MULTI_TRANSFORMER_STEP_KVA = 1000;
 // When the network was built, each station was sized with some headroom over the peak it served.
-export const START_HEADROOM_RANGE: [number, number] = [1.2, 1.7];
+export const START_HEADROOM_RANGE: [number, number] = [1.4, 2.0];
 
 // When the utility measures peaks: after each winter and after each summer.
 export const WINTER_MEASURED_MONTH = 2; // March 1 (0-based month): January and February's coldest evenings
@@ -17,6 +17,10 @@ export const WINTER_PEAK_DAYS = 3;
 export const WINTER_PEAK_HOURS = [18.5, 19.5];
 export const SUMMER_PEAK_DAYS = 3;
 export const SUMMER_PEAK_HOUR = 13;
+
+// Heat pump load control: at a peak moment, this share of the enrolled heat pumps is off (they're
+// switched off in turns, so each is off only for short spells).
+export const LOAD_CONTROL_OFF_SHARE_AT_PEAK = 0.5;
 
 // Load bands for the map and panel (share of capacity).
 export const GRID_TIGHT_SHARE = 0.75;

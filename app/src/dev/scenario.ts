@@ -60,6 +60,8 @@ export interface ScenarioRow {
   dwellings: number;
   gfaM2: number;
   zoningLevyChf: number;
+  /** Transformer areas by load band at the last readings, and how many can't take more draw / feed-in. */
+  grid: Record<string, number>;
   zoningLevyFromRezoningChf: number;
   heating: Record<string, number>;
   heatPumpShare: number;
@@ -120,6 +122,16 @@ function snapshot(dataset: MunicipalityDataset, year: number, atMs: number): Sce
     dwellings: buildings.reduce((sum, b) => sum + b.dwellings.length, 0),
     gfaM2: Math.round(buildings.reduce((sum, b) => sum + (b.footprintAreaM2 ?? 0) * Math.max(1, b.floorCount ?? 2), 0)),
     zoningLevyChf: Math.round(zoning.leviesTotalRp(atMs) / 100),
+    grid: grid.getAreas().reduce(
+      (counts, a) => {
+        counts[grid.bucket(a, atMs)] = (counts[grid.bucket(a, atMs)] ?? 0) + 1;
+        const { drawKw, feedInKw } = grid.effectivePeaks(a, atMs);
+        if (drawKw > grid.capacityAt(a, atMs)) counts.drawBlocked = (counts.drawBlocked ?? 0) + 1;
+        if (feedInKw > grid.capacityAt(a, atMs)) counts.feedInBlocked = (counts.feedInBlocked ?? 0) + 1;
+        return counts;
+      },
+      {} as Record<string, number>,
+    ),
     zoningLevyFromRezoningChf: Math.round(zoning.rezoningLeviesRp(atMs) / 100),
     heating,
     heatPumpShare: Math.round((heatPumps / (buildings.length || 1)) * 1000) / 1000,
@@ -199,6 +211,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     if (spec.withApproval) approval.advance(t);
     stock.advance(t);
     publicCharging.advance(t);
+    grid.advance(t);
     enactDue(year, t);
     buildDue(year, t);
     zoneDue(year, t);

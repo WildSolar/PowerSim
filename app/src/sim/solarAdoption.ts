@@ -100,6 +100,7 @@ import { tariffStore } from "./tariffStore";
 import { treasury } from "./treasury";
 import { priceFactorInYear } from "./costTrends";
 import { recordSubsidisedDecision } from "./additionality";
+import { gridFeedInBlockedAt, SMALL_SOLAR_KWP } from "./gridLimits";
 
 const DAY_MS = 24 * 60 * 60_000;
 const YEAR_MS = 365.25 * DAY_MS;
@@ -249,6 +250,8 @@ function evaluateAdoption(
   const usableFraction = usableRoofFractionFromDraw(usableDraw);
   const capacityKw = (building.footprintAreaM2 ?? 0) * usableFraction * kwpPerM2At(year);
   if (capacityKw <= 0) return null;
+  // A large array waits while its area's summer feed-in is over the grid's capacity.
+  if (capacityKw > SMALL_SOLAR_KWP && gridFeedInBlockedAt(building, yearStartMs)) return null;
 
   const installCostRp = capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year));
   const federalRp = federalSubsidyRp(capacityKw);
@@ -324,7 +327,8 @@ export function municipalSolarCandidates(buildings: Building[], realPlants: Powe
       (b.footprintAreaM2 ?? 0) >= MUNICIPAL_SOLAR_MIN_FOOTPRINT_M2 &&
       existsAt(b, atMs) &&
       !adoptionByEgid.has(b.egid) &&
-      !realEgids.has(b.egid),
+      !realEgids.has(b.egid) &&
+      !gridFeedInBlockedAt(b, atMs),
   );
 }
 
@@ -371,6 +375,7 @@ export function municipalSolarQuote(building: Building, realPlants: PowerPlant[]
   const usable = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
   const capacityKw = (building.footprintAreaM2 ?? 0) * usable * kwpPerM2At(year);
   if (capacityKw <= 0) return null;
+  if (capacityKw > SMALL_SOLAR_KWP && gridFeedInBlockedAt(building, atMs)) return null; // waits for room on the grid
   const installCostRp = capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year));
   return { capacityKw, costRp: Math.max(0, installCostRp - federalSubsidyRp(capacityKw)) };
 }
@@ -531,7 +536,9 @@ export function registerNewBuildSolar(building: Building, builtAtMs: number, rul
   const mandatedFraction = (building.footprintAreaM2 ?? 0) >= rules.solarMandateMinFootprintM2 ? rules.solarMandateFraction : 0;
   const requiredKw = Math.min(usableCapacityKw, Math.max(codeKw, mandatedFraction * usableCapacityKw));
   const voluntary = voluntaryDraw < NEW_BUILD_VOLUNTARY_SOLAR_SHARE;
-  const capacityKw = voluntary ? usableCapacityKw : requiredKw;
+  // Beyond what the building code requires, a large voluntary array waits for room on the grid.
+  const capacityKw =
+    voluntary && usableCapacityKw > SMALL_SOLAR_KWP && gridFeedInBlockedAt(building, builtAtMs) ? Math.max(requiredKw, SMALL_SOLAR_KWP) : voluntary ? usableCapacityKw : requiredKw;
 
   logCandidateDecision({
     atMs: builtAtMs,
