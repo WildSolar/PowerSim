@@ -55,11 +55,12 @@ import {
 } from "../config/charging";
 import { ANNUAL_CAR_KM, EV_CAR_KWH_PER_100KM } from "../config/mobility";
 import type { Building, Dwelling, MunicipalityDataset } from "../data/types";
-import { buildingGroup } from "./buildingGroup";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { simClock } from "./engine";
 import { LocalProjection } from "./localGeo";
 import { policyStore } from "./policy";
+import { buildingGroup } from "./buildingGroup";
+import { existsAt } from "./lifetime";
 import { firstRandom, hashSeed, hashSeedFrom } from "./rng";
 import { streets } from "./streets";
 import { tariffStore } from "./tariffStore";
@@ -90,6 +91,8 @@ export interface ChargingSite {
   expansions: { atMs: number; points: number }[];
   /** Sites placed in the game: the street they're on (naming the next one on it). */
   street?: string;
+  /** A municipal site in the car park of one of its public buildings. */
+  atBuildingEgid?: string;
   x: number;
   y: number;
 }
@@ -187,6 +190,15 @@ export interface Placing {
   points: number;
 }
 
+// Public buildings closer together than this are one campus, sharing one charging site.
+const PUBLIC_BUILDING_CAMPUS_M = 120;
+
+/** A building's address without its sub-number or letter ("Hofackerstrasse 2.3" -> "Hofackerstrasse 2"). */
+function campusAddress(address: string | null): string | null {
+  if (!address) return null;
+  return /^(.*?\s\d+)/.exec(address.trim())?.[1] ?? address.trim();
+}
+
 const SITE_NAME_PREFIX: Record<ChargingKind, string> = { ac: "On-street charger", dc: "Fast-charging hub", fleet: "Lorry charging park" };
 
 export function pointsAt(site: ChargingSite, atMs: number): number {
@@ -224,6 +236,7 @@ class PublicCharging {
   private projection = new LocalProjection(8.4, 47.4);
   private buildingLookup: (egid: string) => Building | undefined = () => undefined;
   private isDriving: (slot: unknown, atMs: number) => boolean = () => true;
+  private buildingsProvider: () => Building[] = () => [];
   private nextId = 0;
   private unsubscribeClock: (() => void) | null = null;
 
@@ -263,6 +276,12 @@ class PublicCharging {
    * cars that are in use). */
   setDrivingCheck(check: (slot: unknown, atMs: number) => boolean): void {
     this.isDriving = check;
+  }
+
+  /** Every building the stock knows (App wires this to the stock, like the lookup) — for picking
+   * the public buildings chargers go to. */
+  setBuildingsProvider(provider: () => Building[]): void {
+    this.buildingsProvider = provider;
   }
 
   lookupBuilding(egid: string): Building | undefined {
@@ -679,8 +698,78 @@ class PublicCharging {
     while (this.lastOperatorYear < year) {
       this.lastOperatorYear++;
       changed = this.operatorRound(this.lastOperatorYear) || changed;
+      changed = this.publicBuildingRound(this.lastOperatorYear) || changed;
     }
     if (changed) this.notify();
+  }
+
+  // --- chargers at public buildings ---
+
+  /** The municipal sites at a public building. */
+  sitesAtBuilding(egid: string): ChargingSite[] {
+    return this.sites.filter((s) => s.atBuildingEgid === egid);
+  }
+
+  /** Orders a municipal charging site in the car park of a public building: an on-street-type site
+   * (same sizes, prices and upkeep), paid now, open once built. */
+  buildAtBuilding(building: Building, points: number, atMs: number, { select = true } = {}): ChargingSite {
+    points = sizeOf("ac", points).points;
+    const street = streets.snapToStreet(building.lon, building.lat)?.street ?? "";
+    const site = this.addSite({
+      id: `municipal-${this.nextId++}`,
+      name: `Chargers at ${campusAddress(building.address) ?? "a public building"}`,
+      street,
+      atBuildingEgid: building.egid,
+      lon: building.lon,
+      lat: building.lat,
+      kind: "ac",
+      owner: "municipal",
+      powerKw: BUILD_SPEC.ac.powerKw,
+      points,
+      openedAtMs: atMs + buildMonthsFor("ac", points) * MONTH_MS,
+    });
+    treasury.recordPayout("charging", atMs, buildCostRp("ac", atMs, points), site.id);
+    if (select) this.selectedSiteId = site.id;
+    this.notify();
+    return site;
+  }
+
+  /** The "Chargers at public buildings" measure's yearly round: this year's number of sites (a
+   * fractional rate rounds by chance), each at the public building without chargers that has the
+   * most unmet demand around it last year (households that wanted an electric car but found no
+   * charger), then the biggest. */
+  private publicBuildingRound(year: number): boolean {
+    const channels = policyStore.get();
+    const perYear = channels.publicBuildingChargerSitesPerYear;
+    if (perYear <= 0) return false;
+    const now = yearStartMs(year);
+    const whole = Math.floor(perYear);
+    const count = whole + (firstRandom(hashSeed("public-building-chargers", String(year))) < perYear - whole ? 1 : 0);
+    const demand = this.unmet.filter((d) => d.kind === "ac" && d.atMs >= yearStartMs(year - 1) && d.atMs < now);
+    const candidates = this.buildingsProvider()
+      .filter((b) => buildingGroup(b) === "public" && existsAt(b, now) && this.sitesAtBuilding(b.egid).length === 0)
+      .map((b) => {
+        const [x, y] = this.projection.toXY(b.lon, b.lat);
+        return { b, demand: demand.filter((d) => Math.hypot(d.x - x, d.y - y) <= REACH_M.ac).length };
+      })
+      .sort((a, c) => c.demand - a.demand || (c.b.footprintAreaM2 ?? 0) - (a.b.footprintAreaM2 ?? 0));
+    // One site per campus: a school's several buildings share a car park. The register numbers them
+    // as sub-addresses of one address (Hofackerstrasse 2.1, 2.3), and they stand close together.
+    const atPublic = this.sites.filter((s) => s.atBuildingEgid !== undefined);
+    const taken = atPublic.map((s) => [s.x, s.y] as [number, number]);
+    const takenAddresses = new Set(atPublic.map((s) => campusAddress(this.buildingLookup(s.atBuildingEgid as string)?.address ?? null)).filter(Boolean));
+    let placed = 0;
+    for (const { b } of candidates) {
+      if (placed >= count) break;
+      const [x, y] = this.projection.toXY(b.lon, b.lat);
+      const address = campusAddress(b.address);
+      if (taken.some(([tx, ty]) => Math.hypot(tx - x, ty - y) < PUBLIC_BUILDING_CAMPUS_M) || (address && takenAddresses.has(address))) continue;
+      const site = this.buildAtBuilding(b, channels.publicBuildingChargerPoints, now, { select: false });
+      taken.push([site.x, site.y]);
+      if (address) takenAddresses.add(address);
+      placed++;
+    }
+    return placed > 0;
   }
 
   private operatorRound(year: number): boolean {

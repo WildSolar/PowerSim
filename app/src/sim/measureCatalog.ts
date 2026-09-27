@@ -73,6 +73,21 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     approval: () => ({ climate: 0.6, tenants: 0.1, homeowners: 0.1, business: -0.1 }),
   },
 
+  {
+    id: "public-building-chargers",
+    category: "infrastructure",
+    title: "Chargers at public buildings",
+    summary:
+      "The municipality puts public chargers in the car parks of its schools, halls and other public buildings, a few sites each year — first where most households nearby want an electric car but have no charger. They're municipal chargers like any other: bought by the treasury, selling at your public charging price.",
+    params: [
+      { kind: "slider", key: "perYear", label: "Sites per year", min: 0, max: 10, step: 1, unit: "per year", default: 2 },
+      { kind: "choice", key: "points", label: "Charge points per site", options: [{ value: "4", label: "4" }, { value: "8", label: "8" }, { value: "12", label: "12" }], default: "4" },
+    ],
+    leadTimeMonths: 6,
+    effects: (p) => ({ publicBuildingChargerSitesPerYear: num(p, "perYear"), publicBuildingChargerPoints: Number(p.points ?? 4) }),
+    approval: () => ({ climate: 0.4, drivers: 0.2, tenants: 0.15 }),
+  },
+
   // --- Information ----------------------------------------------------------------------------
   {
     id: "solar-outreach",

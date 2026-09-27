@@ -18,6 +18,8 @@ import { streets } from "../sim/streets";
 import { pointsAt, publicCharging, siteCapacityAt, type ChargingSite } from "../sim/publicCharging";
 import { REACH_M, type ChargingKind } from "../config/charging";
 import { zoning } from "../sim/zoning";
+import { mapFocus } from "./mapFocus";
+import { publicBuildingBucket } from "../sim/publicBuildings";
 import {
   AGE_LEGEND,
   buildingAgeBucket,
@@ -33,6 +35,7 @@ import {
   HIGH_STANDARD_COLOR,
   ZONING_BUILDING_COLOR,
   ZONING_LEGEND,
+  PUBLIC_BUILDINGS_LEGEND,
   ZONING_PENDING_COLOR,
   EV_CHARGING_LEGEND,
   evChargingBucket,
@@ -138,6 +141,7 @@ type BuildingProperties = {
   heating: string;
   network: string; // districtHeatStats.ts's NetworkStatus
   charging: string; // colorModes.ts's evChargingBucket
+  publicStatus: string; // publicBuildings.ts's publicBuildingBucket
   powerW: number;
   solarCapacityKw: number;
   heightM?: number;
@@ -197,6 +201,7 @@ function buildingsToGeoJSON(
     heating: buildingHeatingBucketAt(b, simTimeMs),
     network: mapNetworkBucketAt(b, simTimeMs),
     charging: evChargingBucket(chargingAccess.get(b.egid)),
+    publicStatus: publicBuildingBucket(b, plants),
     powerW: previousPowerW?.get(b.egid) ?? 0,
     solarCapacityKw: solarByEgid.get(b.egid) ?? 0,
   });
@@ -513,6 +518,7 @@ function colorExpression(mode: ColorMode, selectedEgid: string | null, scales: C
     districtHeat: () => legendMatchExpression("network", DISTRICT_HEAT_LEGEND),
     evCharging: () => legendMatchExpression("charging", EV_CHARGING_LEGEND),
     zoning: () => ZONING_BUILDING_COLOR,
+    publicBuildings: () => legendMatchExpression("publicStatus", PUBLIC_BUILDINGS_LEGEND),
     age: () => legendMatchExpression("age", AGE_LEGEND),
     insulation: () => legendMatchExpression("energyClass", INSULATION_LEGEND),
     power: () => powerColorExpression(scales.powerMinW, scales.powerMaxW),
@@ -1146,6 +1152,56 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       clearInterval(interval);
       unsubscribe();
       label?.remove();
+    };
+  }, [colorMode, dataset]);
+
+  // A panel asked the map to look somewhere (a charger or a building picked from a list).
+  useEffect(
+    () =>
+      mapFocus.subscribe(({ lon, lat, minZoom = 16 }) => {
+        const map = mapRef.current;
+        if (!map) return;
+        // Land in the middle of the part of the map not covered by panels (the stacks and layer
+        // panels on the left, a building or dwelling panel on the right).
+        const box = map.getContainer().getBoundingClientRect();
+        const middle = box.left + box.width / 2;
+        let left = 0;
+        let right = 0;
+        for (const el of document.querySelectorAll(".top-left-stack, .district-heat-panel, .panel")) {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0) continue;
+          if (r.left < middle && r.right < box.right - 40) left = Math.max(left, r.right - box.left);
+          else if (r.left > middle) right = Math.max(right, box.right - r.left);
+        }
+        map.easeTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), minZoom), offset: [(left - right) / 2, 0], duration: 700 });
+      }),
+    [],
+  );
+
+  // Public buildings layer: what the municipality has put on its own buildings, kept current as
+  // solar and chargers are ordered and built.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || colorMode !== "publicBuildings") return;
+    const tick = () => {
+      const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
+      const pointSource = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
+      const polyData = polygonsRef.current;
+      const pointData = pointsRef.current;
+      if (!polySource || !pointSource || !polyData || !pointData) return;
+      for (const f of [...polyData.features, ...pointData.features]) {
+        const b = stock.lookup(f.properties.egid);
+        if (b) f.properties.publicStatus = publicBuildingBucket(b, dataset.powerPlants);
+      }
+      polySource.setData(polyData);
+      pointSource.setData(pointData);
+    };
+    tick();
+    const interval = setInterval(tick, SOLAR_TICK_MS);
+    const unsubscribe = publicCharging.subscribe(tick);
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
     };
   }, [colorMode, dataset]);
 

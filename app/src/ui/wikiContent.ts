@@ -191,6 +191,23 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "public-buildings",
+    icon: "🏫",
+    title: "Public buildings",
+    blocks: [
+      p(
+        "The municipality owns buildings of its own — schools, sports halls and the like — and can lead by example on them. The Public buildings map layer shows every one of them, coloured by what it carries: solar, chargers, both or neither yet. Its panel counts them up and lists them; clicking one (in the list or on the map) brings it into view and shows what it has.",
+      ),
+      list([
+        "Solar: the full usable roof, ordered directly from the panel, paid by the treasury (less the federal payment every installation gets) and generating from a few months on. Or automatically, a few buildings a year, with the \"Solar on public buildings\" measure.",
+        "Chargers: a public charging site in the building's car park, in any of the on-street sizes (4, 8 or 12 points), ordered directly. Or automatically with the \"Chargers at public buildings\" measure, which picks the buildings with the most unmet charging demand around them first. Either way they're municipal chargers like any other (see \"Public charging\").",
+      ]),
+      note(
+        "The building register doesn't say who owns a building, so every public-use building counts as the municipality's — churches (owned by the church communities) and the hospital included.",
+      ),
+    ],
+  },
+  {
     id: "home-electronics",
     icon: "🧊",
     title: "Fridge, lighting & other plug loads",
@@ -272,10 +289,11 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "The town starts with the real public chargers from the federal register, run privately, with the electric cars already on the road that need them booked in.",
         "Private operators react every New Year: where households (and businesses' vans) would have gone electric last year with an on-street charger close by but had none with room, they add points to busy sites and open new on-street sites where enough of them cluster. They charge 45 Rp/kWh on-street and 55 Rp/kWh at fast chargers. They don't build fast-charging hubs — that is up to you.",
         "The municipality can build its own: in the EV charging layer, pick on-street chargers in one of three sizes (4 points for CHF 60,000, 8 for CHF 100,000 or 12 for CHF 135,000 — bigger sites share the grid connection and the roadworks — ready in 4 to 6 months), a fast-charging hub in one of two sizes (4 points for CHF 600,000, 12 months; 8 for CHF 1.05 million, 14 months) or a lorry charging park in one of two sizes (4 high-power bays for CHF 1.2 million, 12 months; 8 for CHF 2.1 million, 15 months) and click where they should go — they're placed at the nearest street, and a blue circle shows who they'd serve. They're paid the day they're ordered; after that the municipality earns what they sell, at the prices set in Control → Prices, and pays their upkeep. Each is named after its street (\"On-street charger Freiestrasse\"), with the side of town added for a second one on the same street. A municipal on-street site can be enlarged later, to 8 or 12 points, from its panel: the difference in price plus CHF 15,000 for opening up the street again, ready three months on. A municipal hub can be enlarged to 8 points the same way (the difference plus CHF 80,000, ready six months on), and so can a lorry charging park (the difference plus CHF 150,000, six months). Either way building big from the start is cheaper, if the demand is there. Build costs follow the technology prices (see \"Technology prices over time\").",
+        "The municipality can also put chargers in the car parks of its own buildings — schools, halls — one at a time from the Public buildings layer, or a few sites a year with the \"Chargers at public buildings\" measure, which goes first where most households nearby wanted an electric car but found no charger (one site per school campus). They're municipal on-street chargers like any other.",
         "The right-to-charge law (Control → Measures) obliges landlords to allow wallboxes: some of the households that couldn't charge at home now can.",
       ]),
       p(
-        "The EV charging layer shows every charger, coloured from green (room to spare) to red (full), larger for more points: the municipality's own as circles, private ones as squares, with a black outer ring (or frame) around a fast-charging hub and a violet one around a lorry charging park; buildings are coloured by what most of their households could do. The Coverage toggles at the top of its panel shade where on-street chargers, fast-charging hubs or lorry charging parks reach — all of them together, with one outline around the whole area — so the gaps are easy to spot (sites being built count too). The panel shows how the town's households stand, how many wanted an electric car in the last year but had no charger, and — for the charger you click — who runs it, its price, the cars, vans and lorries relying on it and the room they take, how many points are in use right now, the energy it delivers, and its use year by year. The list of the busiest chargers can be narrowed to the municipality's own or the private ones, and to one kind. It also counts the town's business vans and lorries and how many are electric.",
+        "The EV charging layer shows every charger, coloured from green (room to spare) to red (full), larger for more points: the municipality's own as circles, private ones as squares, with a black outer ring (or frame) around a fast-charging hub and a violet one around a lorry charging park; buildings are coloured by what most of their households could do. The Coverage toggles at the top of its panel shade where on-street chargers, fast-charging hubs or lorry charging parks reach — all of them together, with one outline around the whole area — so the gaps are easy to spot (sites being built count too). The panel shows how the town's households stand, how many wanted an electric car in the last year but had no charger, and — for the charger you click — who runs it, its price, the cars, vans and lorries relying on it and the room they take, how many points are in use right now, the energy it delivers, and its use year by year. The list of the busiest chargers can be narrowed to the municipality's own or the private ones, and to one kind; clicking a charger in a list brings it into view on the map. It also counts the town's business vans and lorries and how many are electric.",
       ),
       note(
         "Placeholders to balance, not researched figures: the home charging shares, how far people will go to charge, how many cars a point serves, the hassle costs, and the chargers' costs and upkeep. A car's public charging isn't on its dwelling's bill yet, and workplace charging isn't modelled — an electric car already on the road that finds no room at a public charger at the start just isn't counted at one.",
@@ -560,6 +578,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Heating — colored by primary heating system, live: a stock-renewal replacement (see \"Stock renewal\") recolors the building within a few seconds, not just at the moment you happen to look at its panel.",
         "Power draw — colored by live net power right now, on a diverging scale from exporting (solar surplus) to importing; recalculates every 1.5 real seconds.",
         "District heat — which buildings are connected to the district heating network, which could be (a pipe runs in their street), and which are out of reach, with the piped streets, extensions being built and the heat source drawn in. This is also where the network is extended — see \"District heating network\".",
+        "Public buildings — the municipality's own buildings (schools, sports halls, churches, hospitals, museums and cultural buildings), by whether they carry solar, chargers, both or neither. Its panel lists them all; pick one (there or on the map) to put solar on its roof or chargers in its car park directly — see \"Public buildings\".",
         "Zoning — the zoning plan, parcel by parcel, as it stands (and changes over time): zone types, densified parcels, energy zones, and changes on the way. This is where the plan is changed — see \"Zoning\".",
         "EV charging — how each building's households could charge an electric car (at home, at an on-street charger with room, only at a fast-charging hub, only at full chargers, or nowhere nearby), with every public charger coloured by how full it is (for households' cars as well as businesses' vans and lorries). Click a charger for its usage; this is also where the municipality builds its own — see \"Public charging\".",
         "Solar — colored by installed solar capacity, from none to the municipality's largest installation; live, the same way Heating is — a new adoption (see \"Solar adoption\") recolors the building within a few seconds.",

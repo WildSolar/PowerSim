@@ -4,7 +4,7 @@ import { currentHeatingSystemId } from "../sim/heatingRenewal";
 import type { BuildingChargingAccess } from "../sim/publicCharging";
 import type { ChargingKind } from "../config/charging";
 
-export type ColorMode = "none" | "category" | "heating" | "power" | "solar" | "age" | "insulation" | "districtHeat" | "evCharging" | "zoning";
+export type ColorMode = "none" | "category" | "heating" | "power" | "solar" | "age" | "insulation" | "districtHeat" | "evCharging" | "zoning" | "publicBuildings";
 
 export interface LegendEntry {
   bucket: string;
@@ -209,6 +209,15 @@ export const STREET_UNPIPED_COLOR = "#7a776f";
 
 // The EV charging layer: how a building's households could charge an electric car (the majority
 // of them, for a building of flats).
+// The public buildings layer: the municipality's own buildings by what it has put on them.
+export const PUBLIC_BUILDINGS_LEGEND: LegendEntry[] = [
+  { bucket: "both", label: "Solar and chargers", color: "#0d7a52" },
+  { bucket: "solar", label: "Solar", color: "#eda100" },
+  { bucket: "chargers", label: "Chargers", color: "#2a78d6" },
+  { bucket: "none", label: "Neither yet", color: "#6f6d66" },
+  { bucket: "other", label: "Not a public building", color: "#e4e2dc" },
+];
+
 // The zoning layer: parcels by zone type, in the colours Swiss zoning plans use (yellow homes,
 // orange mixed, red centre, violet industry and trade, blue public use).
 export const ZONING_LEGEND: LegendEntry[] = [

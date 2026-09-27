@@ -6,6 +6,7 @@ import { simClock } from "../sim/engine";
 import { existsAt } from "../sim/lifetime";
 import { buildCostRp, buildMonthsFor, sizesFor, upgradeCostRp, publicCharging, siteCapacityAt, sitePriceRpPerKWh, type ChargingSite, type VehicleCounts } from "../sim/publicCharging";
 import { fleets } from "../sim/fleet";
+import { mapFocus } from "../map/mapFocus";
 import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
 import { useStockBuildings } from "./useStock";
@@ -35,6 +36,12 @@ function vehicleList(v: VehicleCounts): string {
   if (v.van > 0) parts.push(`${v.van} van${v.van === 1 ? "" : "s"}`);
   if (v.truck > 0) parts.push(`${v.truck} ${v.truck === 1 ? "lorry" : "lorries"}`);
   return parts.length > 0 ? parts.join(", ") : "none yet";
+}
+
+/** Selects a charger picked from a list and brings it into view on the map. */
+function focusSite(site: ChargingSite): void {
+  publicCharging.select(site.id);
+  mapFocus.request({ lon: site.lon, lat: site.lat });
 }
 
 /** A price rounded to the franc thousand, for build buttons. */
@@ -432,7 +439,7 @@ export function EvChargingPanel() {
             <button
               key={site.id}
               className={`ev-list-row${site.id === selectedId ? " selected" : ""}`}
-              onClick={() => publicCharging.select(site.id)}
+              onClick={() => focusSite(site)}
             >
               <span className="ev-list-name">
                 {KIND_ICON[site.kind]}
@@ -448,7 +455,7 @@ export function EvChargingPanel() {
         <>
           <h4 className="dh-subtitle">Being built</h4>
           {underConstruction.map((s) => (
-            <button key={s.id} className={`ev-list-row${s.id === selectedId ? " selected" : ""}`} onClick={() => publicCharging.select(s.id)}>
+            <button key={s.id} className={`ev-list-row${s.id === selectedId ? " selected" : ""}`} onClick={() => focusSite(s)}>
               <span className="ev-list-name">{s.name}</span>
               <span className="info-value">ready {monthYear(s.openedAtMs)}</span>
             </button>

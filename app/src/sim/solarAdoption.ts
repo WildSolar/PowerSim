@@ -341,6 +341,52 @@ function installMunicipalSolar(buildings: Building[], realPlants: PowerPlant[], 
   }
 }
 
+const MUNICIPAL_SOLAR_INSTALL_MONTHS = 3;
+
+/** What putting solar on one public building at `atMs` would mean: its full usable roof, and what
+ * the treasury pays for it (the price less the federal payment). Null if it has solar already (or
+ * has it coming) or no roof to speak of. */
+export function municipalSolarQuote(building: Building, realPlants: PowerPlant[], atMs: number): { capacityKw: number; costRp: number } | null {
+  if (adoptionByEgid.has(building.egid) || realPvEgids(realPlants).has(building.egid)) return null;
+  const year = new Date(toDateMs(atMs)).getUTCFullYear();
+  const usable = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
+  const capacityKw = (building.footprintAreaM2 ?? 0) * usable * kwpPerM2At(year);
+  if (capacityKw <= 0) return null;
+  const installCostRp = capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year));
+  return { capacityKw, costRp: Math.max(0, installCostRp - federalSubsidyRp(capacityKw)) };
+}
+
+/** The municipality orders solar for one of its buildings now (the Public buildings layer): paid
+ * today, generating once installed a few months on — the same as the measure does, but chosen. */
+export function installMunicipalSolarNow(building: Building, realPlants: PowerPlant[], atMs: number): boolean {
+  const quote = municipalSolarQuote(building, realPlants, atMs);
+  if (!quote) return false;
+  const year = new Date(toDateMs(atMs)).getUTCFullYear();
+  const installCostRp = quote.capacityKw * installCostRpPerKwp(quote.capacityKw, priceFactorInYear("solar", year));
+  adoptionByEgid.set(building.egid, {
+    installedAtMs: atMs + MUNICIPAL_SOLAR_INSTALL_MONTHS * (YEAR_MS / 12),
+    capacityKw: quote.capacityKw,
+    installCostRp,
+    federalSubsidyRp: federalSubsidyRp(quote.capacityKw),
+    municipalSubsidyRp: 0,
+    annualSavingsRp: 0,
+    origin: "municipal",
+  });
+  treasury.recordPayout("infrastructure", atMs, quote.costRp, building.egid);
+  return true;
+}
+
+/** A building's solar: its capacity, and when it was or will be installed (a register plant has
+ * been there all along). Null without. */
+export function solarStatusOf(building: Building, realPlants: PowerPlant[]): { capacityKw: number; installedAtMs: number } | null {
+  if (realPvEgids(realPlants).has(building.egid)) {
+    const kw = realPlants.filter((p) => p.egid === building.egid && p.technology === "Photovoltaic").reduce((sum, p) => sum + (p.capacityKw ?? 0), 0);
+    return { capacityKw: kw, installedAtMs: Number.NEGATIVE_INFINITY };
+  }
+  const record = adoptionByEgid.get(building.egid);
+  return record ? { capacityKw: record.capacityKw, installedAtMs: record.installedAtMs } : null;
+}
+
 function processYear(buildings: Building[], realPlants: PowerPlant[], year: number): void {
   const policy = policyStore.get();
   const tariff = tariffStore.get();

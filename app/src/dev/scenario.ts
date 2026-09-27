@@ -149,6 +149,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   zoning.init(dataset); // before the stock: new buildings ask their parcel what it allows
   publicCharging.init(dataset, 0);
   publicCharging.setBuildingLookup((egid) => stock.lookup(egid));
+  publicCharging.setBuildingsProvider(() => stock.getAll());
   fleets.init(dataset, (egid) => stock.lookup(egid)); // before the stock: it commits their decisions
   stock.init(dataset);
   bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building

@@ -35,6 +35,8 @@ export interface Channels {
   uncertaintyMultiplier: number; // scales the indifference band of every investment decision (information campaigns shrink it)
   progressiveNudgeRp: number; // Rp/year added to every household's progressive lean (climate-awareness campaigns)
   homeChargingBoost: number; // 0-1: share of the households who couldn't charge at home who now can (right to charge)
+  publicBuildingChargerSitesPerYear: number; // charging sites the municipality puts at its own buildings each year
+  publicBuildingChargerPoints: number; // how many points each of those gets
 
   // Electricity supply
   greenPowerShare: number; // 0-100: share of the utility's supply covered by certified renewable power
@@ -66,6 +68,8 @@ export const CHANNEL_DEFAULTS: Channels = {
   uncertaintyMultiplier: 1,
   progressiveNudgeRp: 0,
   homeChargingBoost: 0,
+  publicBuildingChargerSitesPerYear: 0,
+  publicBuildingChargerPoints: 4,
   greenPowerShare: 0,
   districtHeatCleanShare: 0,
   newBuildSolarMandatePct: 0,
@@ -103,6 +107,8 @@ const COMBINERS: { [K in keyof Channels]: Combiner<Channels[K]> } = {
   uncertaintyMultiplier: product,
   progressiveNudgeRp: sum,
   homeChargingBoost: max,
+  publicBuildingChargerSitesPerYear: sum,
+  publicBuildingChargerPoints: max,
   greenPowerShare: max,
   districtHeatCleanShare: max,
   newBuildSolarMandatePct: max,

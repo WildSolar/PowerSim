@@ -7,6 +7,7 @@ import { ColorModeControl } from "./ui/ColorModeControl";
 import { DistrictHeatPanel } from "./ui/DistrictHeatPanel";
 import { EvChargingPanel } from "./ui/EvChargingPanel";
 import { ZoningPanel } from "./ui/ZoningPanel";
+import { PublicBuildingsPanel } from "./ui/PublicBuildingsPanel";
 import { ReportCardModal } from "./ui/ReportCardModal";
 import { TimeControl } from "./ui/TimeControl";
 import { ApprovalPanel } from "./ui/ApprovalPanel";
@@ -86,6 +87,7 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
         zoning.init(loaded); // before the stock: new buildings ask their parcel what it allows
         publicCharging.init(loaded, 0);
         publicCharging.setBuildingLookup((egid) => stock.lookup(egid));
+        publicCharging.setBuildingsProvider(() => stock.getAll());
         fleets.init(loaded, (egid) => stock.lookup(egid)); // before the stock: it commits their decisions
         stock.init(loaded);
         bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building
@@ -138,6 +140,17 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
       {colorMode === "districtHeat" && <DistrictHeatPanel />}
       {colorMode === "evCharging" && <EvChargingPanel />}
       {colorMode === "zoning" && <ZoningPanel />}
+      {colorMode === "publicBuildings" && (
+        <PublicBuildingsPanel
+          buildings={stockBuildings}
+          realPlants={dataset.powerPlants}
+          selectedEgid={selectedEgid}
+          onSelectBuilding={(egid) => {
+            setSelectedEgid(egid);
+            setSelectedEwid(null);
+          }}
+        />
+      )}
       <div className="bottom-left-stack">
         <button className="pill-button" onClick={() => setShowControl(true)}>
           ⚙️ {dataset.name} Control
