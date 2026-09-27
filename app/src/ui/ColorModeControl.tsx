@@ -94,11 +94,15 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
             <span>full</span>
           </div>
           <div className="legend-row" style={{ marginTop: 6 }}>
-            <span className="swatch" style={{ background: "#fff", border: "2px solid #1a1a1a", borderRadius: "50%" }} />
-            <span>Municipal charger (dark ring)</span>
+            <span className="swatch" style={{ background: "#1baf7a", border: "2px solid #1a1a1a", borderRadius: "50%" }} />
+            <span>Municipal charger (circle)</span>
           </div>
           <div className="legend-row">
-            <span className="swatch" style={{ background: "#fff", boxShadow: "0 0 0 2px #fff, 0 0 0 4px #9a988f", borderRadius: "50%" }} />
+            <span className="swatch" style={{ background: "#1baf7a", border: "1px solid #52514e", borderRadius: 1 }} />
+            <span>Private charger (square)</span>
+          </div>
+          <div className="legend-row">
+            <span className="swatch" style={{ background: "#fff", boxShadow: "0 0 0 2px #fff, 0 0 0 4px #1a1a1a", borderRadius: "50%" }} />
             <span>Fast-charging hub (outer ring)</span>
           </div>
           <div className="legend-row">

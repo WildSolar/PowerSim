@@ -251,3 +251,27 @@
   opacity: 0.45;
   cursor: default;
 }
+
+.ev-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-bottom: 4px;
+}
+
+.ev-filter {
+  border: 1px solid #ddd;
+  background: #f8f8f8;
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 11px;
+  color: #52514e;
+  cursor: pointer;
+}
+
+.ev-filter.on {
+  border-color: #1a1a1a;
+  background: #fff;
+  color: #1a1a1a;
+  font-weight: 600;
+}

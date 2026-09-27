@@ -69,12 +69,22 @@ const STREET_CLICK_TOLERANCE_PX = 6;
 const EV_CHARGING_TICK_MS = 3000; // cars booked to chargers, sites opening and filling up
 
 const CHARGER_SOURCE_ID = "charging-sites";
+// Municipal sites are circles, private ones squares; a fast-charging hub or lorry charging park
+// has an outer ring (or square frame) too.
 const CHARGER_LAYER_ID = "charging-sites-circle";
-const CHARGER_HUB_LAYER_ID = "charging-sites-hub"; // the outer ring marking a fast-charging hub or a lorry charging park
+const CHARGER_HUB_LAYER_ID = "charging-sites-hub";
+const CHARGER_SQUARE_LAYER_ID = "charging-sites-square";
+const CHARGER_SQUARE_HUB_LAYER_ID = "charging-sites-square-hub";
+const CHARGER_HIT_LAYER_IDS = [CHARGER_LAYER_ID, CHARGER_SQUARE_LAYER_ID];
+const SQUARE_ICON = "charger-square";
+const SQUARE_FRAME_ICON = "charger-square-frame";
+const HUB_RING_GAP_PX = 8; // between a site's marker and its hub ring
+const HUB_RING_WIDTH_PX = 4;
+const LORRY_RING_WIDTH_PX = 5;
 const CHARGER_REACH_SOURCE_ID = "charging-reach";
 const CHARGER_REACH_FILL_LAYER_ID = "charging-reach-fill";
 const CHARGER_REACH_LINE_LAYER_ID = "charging-reach-line";
-const CHARGER_LAYER_IDS = [CHARGER_REACH_FILL_LAYER_ID, CHARGER_REACH_LINE_LAYER_ID, CHARGER_HUB_LAYER_ID, CHARGER_LAYER_ID];
+const CHARGER_LAYER_IDS = [CHARGER_REACH_FILL_LAYER_ID, CHARGER_REACH_LINE_LAYER_ID, CHARGER_HUB_LAYER_ID, CHARGER_LAYER_ID, CHARGER_SQUARE_HUB_LAYER_ID, CHARGER_SQUARE_LAYER_ID];
 const MUNICIPAL_CHARGER_STROKE = "#1a1a1a";
 const COVERAGE_KINDS: ChargingKind[] = ["ac", "dc", "fleet"];
 const coverageId = (kind: ChargingKind) => `charging-coverage-${kind}`;
@@ -85,6 +95,8 @@ const COVERAGE_FILL_ALPHA = 0.16;
 const COVERAGE_OUTLINE_ALPHA = 0.85;
 const EMPTY_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 const LORRY_PARK_RING = "#7a4fd1";
+const HUB_RING_COLOR = "#1a1a1a";
+const PRIVATE_CHARGER_STROKE = "#52514e";
 
 // Metres per screen pixel at zoom 0 at Swiss latitudes (MapLibre's 512-px tiles, cos 47.4°), so a
 // street can be drawn at its real width: covering the painted street, not a hairline on top of it.
@@ -288,6 +300,48 @@ function chargingReachGeoJSON(preview: { lon: number; lat: number } | null) {
       ? [{ type: "Feature" as const, properties: {}, geometry: { type: "Polygon" as const, coordinates: [circleRing(site.lon, site.lat, REACH_M[site.kind])] } }]
       : [],
   };
+}
+
+// Square markers are signed-distance-field icons, so they can be coloured per site like the circles
+// (icon-color) and carry an outline (icon-halo). The SDF convention MapLibre expects: 0.75 at the
+// edge, falling by 1/8 per pixel outward (and rising inward).
+const SDF_RADIUS_PX = 8;
+const SQUARE_SIDE_PX = 24; // at icon-size 1: matches a circle of radius 12 (a 12-point site)
+
+function sdfIcon(size: number, signedDistance: (x: number, y: number) => number): { width: number; height: number; data: Uint8Array } {
+  const data = new Uint8Array(size * size * 4);
+  for (let j = 0; j < size; j++) {
+    for (let i = 0; i < size; i++) {
+      const d = signedDistance(i + 0.5 - size / 2, j + 0.5 - size / 2);
+      const o = (j * size + i) * 4;
+      data[o] = data[o + 1] = data[o + 2] = 255;
+      data[o + 3] = Math.max(0, Math.min(255, Math.round(255 * (0.75 - d / SDF_RADIUS_PX))));
+    }
+  }
+  return { width: size, height: size, data };
+}
+
+/** Signed distance from a point to the outline of an axis-aligned square of side `side` centred
+ * on the origin (negative inside). */
+function squareDistance(x: number, y: number, side: number): number {
+  const dx = Math.abs(x) - side / 2;
+  const dy = Math.abs(y) - side / 2;
+  return Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0);
+}
+
+function addChargerIcons(map: MlMap): void {
+  if (!map.hasImage(SQUARE_ICON)) {
+    map.addImage(SQUARE_ICON, sdfIcon(SQUARE_SIDE_PX + 2 * SDF_RADIUS_PX, (x, y) => squareDistance(x, y, SQUARE_SIDE_PX)), { sdf: true });
+  }
+  if (!map.hasImage(SQUARE_FRAME_ICON)) {
+    // A hollow frame around the square: its centre line the ring gap out, as thick as a hub ring.
+    const frameSide = SQUARE_SIDE_PX + 2 * (HUB_RING_GAP_PX + HUB_RING_WIDTH_PX / 2);
+    map.addImage(
+      SQUARE_FRAME_ICON,
+      sdfIcon(frameSide + HUB_RING_WIDTH_PX + 2 * SDF_RADIUS_PX, (x, y) => Math.abs(squareDistance(x, y, frameSide)) - HUB_RING_WIDTH_PX / 2),
+      { sdf: true },
+    );
+  }
 }
 
 type ImageCorners = [[number, number], [number, number], [number, number], [number, number]];
@@ -627,50 +681,79 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         paint: { "line-color": "#2a78d6", "line-width": 2.5, "line-opacity": 0.85 },
       });
       map.addSource(CHARGER_SOURCE_ID, { type: "geojson", data: chargingSitesToGeoJSON(simClock.getSimTimeMs()) });
+      addChargerIcons(map);
       const chargerRadius: unknown = ["interpolate", ["linear"], ["get", "points"], 1, 6, 12, 12];
+      const chargerFill: unknown = [
+        "case",
+        ["==", ["get", "building"], 1],
+        CONSTRUCTION_COLOR,
+        ["interpolate", ["linear"], ["get", "utilization"], 0, CHARGER_USE_RAMP[0], 0.7, CHARGER_USE_RAMP[1], 1, CHARGER_USE_RAMP[2]],
+      ];
+      const chargerOpacity: unknown = ["case", ["==", ["get", "building"], 1], 0.65, 1];
+      // The ring says what kind of site it is (the shape already says who runs it).
+      const ringColor: unknown = ["case", ["==", ["get", "kind"], "fleet"], LORRY_PARK_RING, HUB_RING_COLOR];
+      const isHub: unknown = ["in", ["get", "kind"], ["literal", ["dc", "fleet"]]];
+      // Municipal: circles.
       map.addLayer({
         id: CHARGER_HUB_LAYER_ID,
         type: "circle",
         source: CHARGER_SOURCE_ID,
-        filter: ["in", ["get", "kind"], ["literal", ["dc", "fleet"]]],
+        filter: ["all", ["==", ["get", "municipal"], 1], isHub] as never,
         layout: { visibility: evVisibility },
         paint: {
-          "circle-radius": ["+", chargerRadius, 5] as never,
+          "circle-radius": ["+", chargerRadius, HUB_RING_GAP_PX + HUB_RING_WIDTH_PX / 2] as never,
           "circle-color": "rgba(0,0,0,0)",
-          "circle-stroke-color": [
-            "case",
-            ["==", ["get", "kind"], "fleet"],
-            LORRY_PARK_RING,
-            ["==", ["get", "municipal"], 1],
-            MUNICIPAL_CHARGER_STROKE,
-            "#ffffff",
-          ],
-          "circle-stroke-width": ["case", ["==", ["get", "kind"], "fleet"], 4, 2.5],
+          "circle-stroke-color": ringColor as never,
+          "circle-stroke-width": ["case", ["==", ["get", "kind"], "fleet"], LORRY_RING_WIDTH_PX, HUB_RING_WIDTH_PX],
         },
       });
       map.addLayer({
         id: CHARGER_LAYER_ID,
         type: "circle",
         source: CHARGER_SOURCE_ID,
+        filter: ["==", ["get", "municipal"], 1],
         layout: { visibility: evVisibility },
         paint: {
           "circle-radius": chargerRadius as never,
-          "circle-color": [
-            "case",
-            ["==", ["get", "building"], 1],
-            CONSTRUCTION_COLOR,
-            ["interpolate", ["linear"], ["get", "utilization"], 0, CHARGER_USE_RAMP[0], 0.7, CHARGER_USE_RAMP[1], 1, CHARGER_USE_RAMP[2]],
-          ],
-          "circle-opacity": ["case", ["==", ["get", "building"], 1], 0.65, 1],
-          "circle-stroke-color": [
-            "case",
-            ["==", ["get", "selected"], 1],
-            SELECTED_COLOR,
-            ["==", ["get", "municipal"], 1],
-            MUNICIPAL_CHARGER_STROKE,
-            "#ffffff",
-          ],
+          "circle-color": chargerFill as never,
+          "circle-opacity": chargerOpacity as never,
+          "circle-stroke-color": ["case", ["==", ["get", "selected"], 1], SELECTED_COLOR, MUNICIPAL_CHARGER_STROKE],
           "circle-stroke-width": ["case", ["==", ["get", "selected"], 1], 4, 2.5],
+        },
+      });
+      // Private: squares, the same size as a circle for the same number of points.
+      const squareSize: unknown = ["interpolate", ["linear"], ["get", "points"], 1, 0.5, 12, 1];
+      map.addLayer({
+        id: CHARGER_SQUARE_HUB_LAYER_ID,
+        type: "symbol",
+        source: CHARGER_SOURCE_ID,
+        filter: ["all", ["==", ["get", "municipal"], 0], isHub] as never,
+        layout: {
+          visibility: evVisibility,
+          "icon-image": SQUARE_FRAME_ICON,
+          "icon-size": squareSize as never,
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+        },
+        paint: { "icon-color": ringColor as never },
+      });
+      map.addLayer({
+        id: CHARGER_SQUARE_LAYER_ID,
+        type: "symbol",
+        source: CHARGER_SOURCE_ID,
+        filter: ["==", ["get", "municipal"], 0],
+        layout: {
+          visibility: evVisibility,
+          "icon-image": SQUARE_ICON,
+          "icon-size": squareSize as never,
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+        },
+        paint: {
+          "icon-color": chargerFill as never,
+          "icon-opacity": chargerOpacity as never,
+          "icon-halo-color": ["case", ["==", ["get", "selected"], 1], SELECTED_COLOR, PRIVATE_CHARGER_STROKE],
+          "icon-halo-width": ["case", ["==", ["get", "selected"], 1], 4, 1.5],
         },
       });
 
@@ -692,7 +775,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
               [x - r, y - r],
               [x + r, y + r],
             ],
-            { layers: [CHARGER_LAYER_ID] },
+            { layers: CHARGER_HIT_LAYER_IDS },
           )[0];
           if (hit) {
             publicCharging.select(String(hit.properties?.id));
@@ -718,8 +801,10 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         const egid = building?.properties?.egid as string | undefined;
         if (egid) onSelectBuildingRef.current(egid);
       });
-      map.on("mouseenter", CHARGER_LAYER_ID, () => (map.getCanvas().style.cursor = "pointer"));
-      map.on("mouseleave", CHARGER_LAYER_ID, () => (map.getCanvas().style.cursor = publicCharging.getPlacing() ? "crosshair" : ""));
+      for (const layer of CHARGER_HIT_LAYER_IDS) {
+        map.on("mouseenter", layer, () => (map.getCanvas().style.cursor = "pointer"));
+        map.on("mouseleave", layer, () => (map.getCanvas().style.cursor = publicCharging.getPlacing() ? "crosshair" : ""));
+      }
       map.on("mouseenter", STREET_HIT_LAYER_ID, () => (map.getCanvas().style.cursor = "pointer"));
       map.on("mouseleave", STREET_HIT_LAYER_ID, () => (map.getCanvas().style.cursor = ""));
       map.on("mouseenter", POLY_LAYER_ID, () => (map.getCanvas().style.cursor = "pointer"));
@@ -1042,14 +1127,18 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     const interval = setInterval(tick, EV_CHARGING_TICK_MS);
     const unsubscribe = publicCharging.subscribe(tick);
     map.on("mousemove", onMove);
-    map.on("mousemove", CHARGER_LAYER_ID, onHover as never);
-    map.on("mouseleave", CHARGER_LAYER_ID, onLeave);
+    for (const layer of CHARGER_HIT_LAYER_IDS) {
+      map.on("mousemove", layer, onHover as never);
+      map.on("mouseleave", layer, onLeave);
+    }
     return () => {
       clearInterval(interval);
       unsubscribe();
       map.off("mousemove", onMove);
-      map.off("mousemove", CHARGER_LAYER_ID, onHover as never);
-      map.off("mouseleave", CHARGER_LAYER_ID, onLeave);
+      for (const layer of CHARGER_HIT_LAYER_IDS) {
+        map.off("mousemove", layer, onHover as never);
+        map.off("mouseleave", layer, onLeave);
+      }
       popup.remove();
       map.getCanvas().style.cursor = "";
       publicCharging.startPlacing(null);

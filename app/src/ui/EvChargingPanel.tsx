@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { BUILD_SPEC, CARS_PER_POINT, REACH_M, type ChargingKind } from "../config/charging";
 import { COVERAGE_COLOR } from "../map/colorModes";
 import { formatDate, toDateMs, toSimTimeMs } from "../sim/calendar";
@@ -47,6 +47,21 @@ function shortPriceTag(rp: number): string {
   const chf = rp / 100;
   return chf >= 1_000_000 ? `CHF ${Number((chf / 1_000_000).toFixed(2))}M` : `CHF ${Math.round(chf / 1000)}k`;
 }
+
+type OwnerFilter = "all" | "municipal" | "private";
+type KindFilter = "all" | ChargingKind;
+const OWNER_FILTERS: { id: OwnerFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "municipal", label: "Municipal" },
+  { id: "private", label: "Private" },
+];
+const KIND_FILTERS: { id: KindFilter; label: string }[] = [
+  { id: "all", label: "All kinds" },
+  { id: "ac", label: "On-street" },
+  { id: "dc", label: "Fast" },
+  { id: "fleet", label: "Lorry" },
+];
+const BUSIEST_COUNT = 6;
 
 const COVERAGE_LABEL: Record<ChargingKind, string> = { ac: "On-street", dc: "Fast charging", fleet: "Lorry parks" };
 const NONE_YET: Record<ChargingKind, string> = { ac: "No on-street chargers yet", dc: "No fast-charging hubs yet", fleet: "No lorry charging parks yet" };
@@ -242,16 +257,20 @@ export function EvChargingPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buildings, simDay, version]);
 
+  const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>("all");
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const busiest = useMemo(
     () =>
       publicCharging
         .getSites()
         .filter((s) => siteCapacityAt(s, simDay) > 0)
+        .filter((s) => ownerFilter === "all" || s.owner === ownerFilter)
+        .filter((s) => kindFilter === "all" || s.kind === kindFilter)
         .map((s) => ({ site: s, users: publicCharging.usersAt(s.id, simDay), capacity: siteCapacityAt(s, simDay) }))
         .sort((a, b) => b.users / b.capacity - a.users / a.capacity || b.users - a.users)
-        .slice(0, 5),
+        .slice(0, BUSIEST_COUNT),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [simDay, version],
+    [simDay, version, ownerFilter, kindFilter],
   );
   const underConstruction = publicCharging.getSites().filter((s) => s.openedAtMs > simDay);
 
@@ -391,9 +410,24 @@ export function EvChargingPanel() {
         </div>
       )}
 
-      {busiest.length > 0 && (
+      {publicCharging.getSites().length > 0 && (
         <>
           <h4 className="dh-subtitle">Busiest chargers</h4>
+          <div className="ev-filters">
+            {OWNER_FILTERS.map((f) => (
+              <button key={f.id} className={`ev-filter${ownerFilter === f.id ? " on" : ""}`} onClick={() => setOwnerFilter(f.id)}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="ev-filters">
+            {KIND_FILTERS.map((f) => (
+              <button key={f.id} className={`ev-filter${kindFilter === f.id ? " on" : ""}`} onClick={() => setKindFilter(f.id)}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          {busiest.length === 0 && <p className="dh-note">No open chargers match these filters yet.</p>}
           {busiest.map(({ site, users, capacity }) => (
             <button
               key={site.id}
