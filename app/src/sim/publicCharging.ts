@@ -28,12 +28,11 @@
  */
 
 import {
-  AC_SIZE_BUILD_MONTHS,
-  AC_SIZE_COST_CHF,
-  AC_SIZES,
-  AC_UPGRADE_EXTRA_CHF,
-  AC_UPGRADE_MONTHS,
   BUILD_SPEC,
+  SITE_SIZES,
+  UPGRADE_EXTRA_CHF,
+  UPGRADE_MONTHS,
+  type SiteSize,
   CARS_PER_POINT,
   HASSLE_AT_REACH_CHF,
   HASSLE_BASE_CHF,
@@ -154,22 +153,32 @@ function roundToThousandChfRp(chf: number): number {
   return Math.round(chf / 1000) * 1000 * 100;
 }
 
-/** What building a municipal site of this kind (and, on-street, this many points) costs at `atMs`
- * (Rp) — chargers get cheaper over time. */
+/** The sizes a municipal site of this kind can be built in (one, for a kind without a choice). */
+export function sizesFor(kind: ChargingKind): SiteSize[] {
+  const spec = BUILD_SPEC[kind];
+  return SITE_SIZES[kind] ?? [{ points: spec.points, costChf: spec.costChf, buildMonths: spec.buildMonths }];
+}
+
+function sizeOf(kind: ChargingKind, points: number): SiteSize {
+  const sizes = sizesFor(kind);
+  return sizes.find((s) => s.points === points) ?? sizes[0];
+}
+
+/** What building a municipal site of this kind and size costs at `atMs` (Rp) — chargers get cheaper
+ * over time. */
 export function buildCostRp(kind: ChargingKind, atMs: number, points = BUILD_SPEC[kind].points): number {
-  const chf = kind === "ac" ? (AC_SIZE_COST_CHF[points] ?? BUILD_SPEC.ac.costChf) : BUILD_SPEC[kind].costChf;
+  return roundToThousandChfRp(sizeOf(kind, points).costChf * priceFactor(BUILD_COST_TREND[kind], atMs));
+}
+
+/** Enlarging a municipal site of this kind from `fromPoints` to `toPoints` at `atMs` (Rp). */
+export function upgradeCostRp(kind: ChargingKind, fromPoints: number, toPoints: number, atMs: number): number {
+  const chf = sizeOf(kind, toPoints).costChf - sizeOf(kind, fromPoints).costChf + (UPGRADE_EXTRA_CHF[kind] ?? 0);
   return roundToThousandChfRp(chf * priceFactor(BUILD_COST_TREND[kind], atMs));
 }
 
-/** Enlarging a municipal on-street site from `fromPoints` to `toPoints` at `atMs` (Rp). */
-export function upgradeCostRp(fromPoints: number, toPoints: number, atMs: number): number {
-  const chf = (AC_SIZE_COST_CHF[toPoints] ?? 0) - (AC_SIZE_COST_CHF[fromPoints] ?? 0) + AC_UPGRADE_EXTRA_CHF;
-  return roundToThousandChfRp(chf * priceFactor(BUILD_COST_TREND.ac, atMs));
-}
-
-/** How long building a municipal site takes (months). */
+/** How long building a municipal site of this kind and size takes (months). */
 export function buildMonthsFor(kind: ChargingKind, points = BUILD_SPEC[kind].points): number {
-  return kind === "ac" ? (AC_SIZE_BUILD_MONTHS[points] ?? BUILD_SPEC.ac.buildMonths) : BUILD_SPEC[kind].buildMonths;
+  return sizeOf(kind, points).buildMonths;
 }
 
 /** What the player is placing: a kind of site and, on-street, its size. */
@@ -615,7 +624,7 @@ class PublicCharging {
   build(kind: ChargingKind, lon: number, lat: number, atMs: number, points = BUILD_SPEC[kind].points): ChargingSite | null {
     const snapped = streets.snapToStreet(lon, lat) ?? { lon, lat, distanceM: 0, street: null };
     const spec = BUILD_SPEC[kind];
-    if (kind !== "ac") points = spec.points;
+    points = sizeOf(kind, points).points; // only the sizes on offer
     const [x, y] = this.projection.toXY(snapped.lon, snapped.lat);
     const site = this.addSite({
       id: `municipal-${this.nextId++}`,
@@ -636,16 +645,17 @@ class PublicCharging {
     return site;
   }
 
-  /** Enlarges a municipal on-street site to `toPoints` (8 or 12): paid now, the new points ready a
-   * few months on (or once the site itself opens, if it's still being built). */
+  /** Enlarges a municipal site to a bigger size on offer for its kind (on-street 8 or 12 points, a
+   * hub 8): paid now, the new points ready some months on (or once the site itself opens, if it's
+   * still being built). */
   upgrade(siteId: string, toPoints: number, atMs: number): boolean {
     const site = this.byId.get(siteId);
-    if (!site || site.owner !== "municipal" || site.kind !== "ac") return false;
+    if (!site || site.owner !== "municipal") return false;
     const planned = this.plannedPoints(site);
-    if (toPoints <= planned || !AC_SIZES.includes(toPoints)) return false;
-    const readyAtMs = Math.max(atMs + AC_UPGRADE_MONTHS * MONTH_MS, site.openedAtMs);
+    if (toPoints <= planned || !sizesFor(site.kind).some((s) => s.points === toPoints)) return false;
+    const readyAtMs = Math.max(atMs + (UPGRADE_MONTHS[site.kind] ?? 0) * MONTH_MS, site.openedAtMs);
     site.expansions.push({ atMs: readyAtMs, points: toPoints - planned });
-    treasury.recordPayout("charging", atMs, upgradeCostRp(planned, toPoints, atMs), site.id);
+    treasury.recordPayout("charging", atMs, upgradeCostRp(site.kind, planned, toPoints, atMs), site.id);
     this.notify();
     return true;
   }

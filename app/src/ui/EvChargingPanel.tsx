@@ -1,10 +1,10 @@
 import { useMemo, useSyncExternalStore } from "react";
-import { AC_SIZES, BUILD_SPEC, CARS_PER_POINT, REACH_M, type ChargingKind } from "../config/charging";
+import { BUILD_SPEC, CARS_PER_POINT, REACH_M, type ChargingKind } from "../config/charging";
 import { COVERAGE_COLOR } from "../map/colorModes";
 import { formatDate, toDateMs, toSimTimeMs } from "../sim/calendar";
 import { simClock } from "../sim/engine";
 import { existsAt } from "../sim/lifetime";
-import { buildCostRp, buildMonthsFor, upgradeCostRp, publicCharging, siteCapacityAt, sitePriceRpPerKWh, type ChargingSite, type VehicleCounts } from "../sim/publicCharging";
+import { buildCostRp, buildMonthsFor, sizesFor, upgradeCostRp, publicCharging, siteCapacityAt, sitePriceRpPerKWh, type ChargingSite, type VehicleCounts } from "../sim/publicCharging";
 import { fleets } from "../sim/fleet";
 import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
@@ -42,9 +42,10 @@ function priceTag(rp: number): string {
   return formatCHF(Math.round(rp / 100_000) * 100_000);
 }
 
-/** The same, compact ("CHF 60k"), for the narrow size buttons. */
+/** The same, compact ("CHF 60k", "CHF 1.05M"), for the narrow size buttons. */
 function shortPriceTag(rp: number): string {
-  return `CHF ${Math.round(rp / 100_000)}k`;
+  const chf = rp / 100;
+  return chf >= 1_000_000 ? `CHF ${Number((chf / 1_000_000).toFixed(2))}M` : `CHF ${Math.round(chf / 1000)}k`;
 }
 
 const COVERAGE_LABEL: Record<ChargingKind, string> = { ac: "On-street", dc: "Fast charging", fleet: "Lorry parks" };
@@ -188,16 +189,18 @@ function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
           {site.owner === "municipal" ? "Adding" : "The operator is adding"} {e.points} points — ready {monthYear(e.atMs)}.
         </p>
       ))}
-      {site.owner === "municipal" && site.kind === "ac" && planned < AC_SIZES[AC_SIZES.length - 1] && (
+      {site.owner === "municipal" && sizesFor(site.kind).some((s) => s.points > planned) && (
         <>
-          <h4 className="ev-history-title">Enlarge (ready in a few months)</h4>
+          <h4 className="ev-history-title">Enlarge (ready in some months)</h4>
           <div className="ev-sizes">
-            {AC_SIZES.filter((size) => size > planned).map((size) => (
-              <button key={size} onClick={() => publicCharging.upgrade(site.id, size, simClock.getSimTimeMs())}>
-                <span className="ev-build-name">To {size} points</span>
-                <span className="ev-build-detail">{shortPriceTag(upgradeCostRp(planned, size, now))}</span>
-              </button>
-            ))}
+            {sizesFor(site.kind)
+              .filter((size) => size.points > planned)
+              .map(({ points }) => (
+                <button key={points} onClick={() => publicCharging.upgrade(site.id, points, simClock.getSimTimeMs())}>
+                  <span className="ev-build-name">To {points} points</span>
+                  <span className="ev-build-detail">{shortPriceTag(upgradeCostRp(site.kind, planned, points, now))}</span>
+                </button>
+              ))}
           </div>
         </>
       )}
@@ -340,7 +343,8 @@ export function EvChargingPanel() {
       {placing ? (
         <>
           <p className="dh-note">
-            Click on the map where the {placing.kind === "ac" ? `${placing.points} on-street chargers` : BUILD_SPEC[placing.kind].label.toLowerCase()} should
+            Click on the map where the{" "}
+            {placing.kind === "ac" ? `${placing.points} on-street chargers` : `${BUILD_SPEC[placing.kind].label.toLowerCase()} (${placing.points} points)`} should
             go — placed at the nearest street. The blue circle shows who {placing.kind === "ac" ? "they'd" : "it'd"} serve (
             {REACH_M[placing.kind] >= 1000 ? `${REACH_M[placing.kind] / 1000} km` : `${REACH_M[placing.kind]} m`}).
           </p>
@@ -350,23 +354,27 @@ export function EvChargingPanel() {
         </>
       ) : (
         <div className="ev-build">
-          <div className="ev-build-card">
-            <span className="ev-build-name">{BUILD_SPEC.ac.label}</span>
-            <span className="ev-build-detail">
-              {BUILD_SPEC.ac.powerKw} kW each · {BUILD_HINT.ac}
-            </span>
-            <div className="ev-sizes">
-              {AC_SIZES.map((size) => (
-                <button key={size} onClick={() => publicCharging.startPlacing("ac", size)}>
-                  <span className="ev-build-name">{size} points</span>
-                  <span className="ev-build-detail">{shortPriceTag(buildCostRp("ac", simDay, size))}</span>
-                  <span className="ev-build-detail">{buildMonthsFor("ac", size)} months</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          {(["dc", "fleet"] as ChargingKind[]).map((kind) => {
+          {(["ac", "dc", "fleet"] as ChargingKind[]).map((kind) => {
             const spec = BUILD_SPEC[kind];
+            const sizes = sizesFor(kind);
+            if (sizes.length > 1)
+              return (
+                <div className="ev-build-card" key={kind}>
+                  <span className="ev-build-name">{spec.label}</span>
+                  <span className="ev-build-detail">
+                    {spec.powerKw} kW each · {BUILD_HINT[kind]}
+                  </span>
+                  <div className="ev-sizes">
+                    {sizes.map(({ points }) => (
+                      <button key={points} onClick={() => publicCharging.startPlacing(kind, points)}>
+                        <span className="ev-build-name">{points} points</span>
+                        <span className="ev-build-detail">{shortPriceTag(buildCostRp(kind, simDay, points))}</span>
+                        <span className="ev-build-detail">{buildMonthsFor(kind, points)} months</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
             return (
               <button key={kind} onClick={() => publicCharging.startPlacing(kind)}>
                 <span className="ev-build-name">{spec.label}</span>
