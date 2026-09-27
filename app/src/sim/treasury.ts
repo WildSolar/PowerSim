@@ -23,9 +23,9 @@ import type { DecisionLogKind } from "./decisionLog";
 
 // Subsidies paid as households decide, plus what the municipality itself spends: the running and
 // one-off costs of campaigns and programmes, and money put into infrastructure.
-export type PayoutCategory = "solar" | "heating" | "vehicle" | "retrofit" | "programs" | "infrastructure" | "districtHeat" | "charging" | "zoning";
+export type PayoutCategory = "solar" | "heating" | "vehicle" | "retrofit" | "programs" | "infrastructure" | "districtHeat" | "charging" | "zoning" | "grid";
 
-export const PAYOUT_CATEGORIES: PayoutCategory[] = ["solar", "heating", "vehicle", "retrofit", "programs", "infrastructure", "districtHeat", "charging", "zoning"];
+export const PAYOUT_CATEGORIES: PayoutCategory[] = ["solar", "heating", "vehicle", "retrofit", "programs", "infrastructure", "districtHeat", "charging", "zoning", "grid"];
 
 export const PAYOUT_LABEL: Record<PayoutCategory, string> = {
   solar: "Solar subsidies",
@@ -37,6 +37,7 @@ export const PAYOUT_LABEL: Record<PayoutCategory, string> = {
   districtHeat: "District heating network extensions",
   charging: "Public chargers",
   zoning: "Zoning plans",
+  grid: "Grid reinforcement and batteries",
 };
 
 /** Which ledger line a decision kind's municipal subsidy belongs on, if it has one. */
@@ -66,7 +67,7 @@ interface Payout {
 export type PayoutsByCategory = Record<PayoutCategory, number>;
 
 function zeroPayouts(): PayoutsByCategory {
-  return { solar: 0, heating: 0, vehicle: 0, retrofit: 0, programs: 0, infrastructure: 0, districtHeat: 0, charging: 0, zoning: 0 };
+  return { solar: 0, heating: 0, vehicle: 0, retrofit: 0, programs: 0, infrastructure: 0, districtHeat: 0, charging: 0, zoning: 0, grid: 0 };
 }
 
 /** Money coming in outside the yearly accounts: the value-capture levy on zoning gains (zoning.ts),

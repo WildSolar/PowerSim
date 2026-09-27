@@ -6,6 +6,7 @@ import {
   EV_CHARGING_LEGEND,
   ZONING_LEGEND,
   PUBLIC_BUILDINGS_LEGEND,
+  GRID_LEGEND,
   DH_PRIORITY_COLOR,
   HIGH_STANDARD_COLOR,
   ZONING_PENDING_COLOR,
@@ -32,6 +33,7 @@ const MODES: { key: ColorMode; label: string }[] = [
   { key: "evCharging", label: "EV charging" },
   { key: "zoning", label: "Zoning" },
   { key: "publicBuildings", label: "Public buildings" },
+  { key: "grid", label: "Grid" },
   { key: "power", label: "Power draw" },
   { key: "solar", label: "Solar" },
   { key: "age", label: "Age" },
@@ -54,6 +56,7 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
     evCharging: EV_CHARGING_LEGEND,
     zoning: ZONING_LEGEND,
     publicBuildings: PUBLIC_BUILDINGS_LEGEND,
+    grid: GRID_LEGEND,
     age: AGE_LEGEND,
     insulation: INSULATION_LEGEND,
   };

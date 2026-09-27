@@ -7,6 +7,7 @@ import { ColorModeControl } from "./ui/ColorModeControl";
 import { DistrictHeatPanel } from "./ui/DistrictHeatPanel";
 import { EvChargingPanel } from "./ui/EvChargingPanel";
 import { ZoningPanel } from "./ui/ZoningPanel";
+import { GridPanel } from "./ui/GridPanel";
 import { PublicBuildingsPanel } from "./ui/PublicBuildingsPanel";
 import { ReportCardModal } from "./ui/ReportCardModal";
 import { TimeControl } from "./ui/TimeControl";
@@ -27,6 +28,7 @@ import { stock } from "./sim/stock";
 import { streets } from "./sim/streets";
 import { districtHeat } from "./sim/districtHeat";
 import { publicCharging } from "./sim/publicCharging";
+import { grid } from "./sim/grid";
 import { setMeasureAvailability } from "./sim/measureAvailability";
 import { studies } from "./sim/studies";
 import { municipalSolarCandidates } from "./sim/solarAdoption";
@@ -124,6 +126,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
           publicCharging.publicBuildingChargerCandidates(atMs).length === 0 ? "Every public building (campus) already has chargers." : null,
         );
         bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building
+        grid.init(loaded, () => stock.getAll()); // last: it reads every building's draw, public chargers included
         setDataset(loaded);
       })
       .catch((e: Error) => setError(e.message));
@@ -173,6 +176,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
       {colorMode === "districtHeat" && <DistrictHeatPanel />}
       {colorMode === "evCharging" && <EvChargingPanel />}
       {colorMode === "zoning" && <ZoningPanel />}
+      {colorMode === "grid" && <GridPanel />}
       {colorMode === "publicBuildings" && (
         <PublicBuildingsPanel
           buildings={stockBuildings}

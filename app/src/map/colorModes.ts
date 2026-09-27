@@ -4,7 +4,7 @@ import { currentHeatingSystemId } from "../sim/heatingRenewal";
 import type { BuildingChargingAccess } from "../sim/publicCharging";
 import type { ChargingKind } from "../config/charging";
 
-export type ColorMode = "none" | "category" | "heating" | "power" | "solar" | "age" | "insulation" | "districtHeat" | "evCharging" | "zoning" | "publicBuildings";
+export type ColorMode = "none" | "category" | "heating" | "power" | "solar" | "age" | "insulation" | "districtHeat" | "evCharging" | "zoning" | "publicBuildings" | "grid";
 
 export interface LegendEntry {
   bucket: string;
@@ -209,6 +209,14 @@ export const STREET_UNPIPED_COLOR = "#7a776f";
 
 // The EV charging layer: how a building's households could charge an electric car (the majority
 // of them, for a building of flats).
+// The grid layer: buildings by how loaded their transformer area's station was at the last reading.
+export const GRID_LEGEND: LegendEntry[] = [
+  { bucket: "ok", label: "Room to spare", color: "#1baf7a" },
+  { bucket: "tight", label: "Getting tight (75%+)", color: "#f2b01e" },
+  { bucket: "full", label: "Nearly full (90%+)", color: "#eb6834" },
+  { bucket: "over", label: "Overloaded — new connections wait", color: "#b23a2e" },
+];
+
 // The public buildings layer: the municipality's own buildings by what it has put on them.
 export const PUBLIC_BUILDINGS_LEGEND: LegendEntry[] = [
   { bucket: "both", label: "Solar and chargers", color: "#0d7a52" },

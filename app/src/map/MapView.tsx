@@ -19,6 +19,7 @@ import { pointsAt, publicCharging, siteCapacityAt, type ChargingSite } from "../
 import { REACH_M, type ChargingKind } from "../config/charging";
 import { zoning } from "../sim/zoning";
 import { mapFocus } from "./mapFocus";
+import { grid } from "../sim/grid";
 import { publicBuildingBucket } from "../sim/publicBuildings";
 import {
   AGE_LEGEND,
@@ -36,6 +37,7 @@ import {
   ZONING_BUILDING_COLOR,
   ZONING_LEGEND,
   PUBLIC_BUILDINGS_LEGEND,
+  GRID_LEGEND,
   ZONING_PENDING_COLOR,
   EV_CHARGING_LEGEND,
   evChargingBucket,
@@ -113,6 +115,8 @@ const DH_PRIORITY_FILL_LAYER_ID = "dh-priority-zones-fill";
 const DH_PRIORITY_LINE_LAYER_ID = "dh-priority-zones-line";
 const ZONE_LAYER_IDS = [ZONE_FILL_LAYER_ID, ZONE_DH_LAYER_ID, ZONE_STANDARD_LAYER_ID, ZONE_LINE_LAYER_ID, ZONE_MARK_LAYER_ID];
 const ZONING_TICK_MS = 3000;
+const STATION_SOURCE_ID = "grid-stations";
+const STATION_LAYER_ID = "grid-stations-circle";
 const STRIPE_DH = "zone-stripe-dh";
 const STRIPE_STANDARD = "zone-stripe-standard";
 
@@ -145,6 +149,7 @@ type BuildingProperties = {
   network: string; // districtHeatStats.ts's NetworkStatus
   charging: string; // colorModes.ts's evChargingBucket
   publicStatus: string; // publicBuildings.ts's publicBuildingBucket
+  gridStatus: string; // grid.ts's bucket for the building's transformer area
   powerW: number;
   solarCapacityKw: number;
   heightM?: number;
@@ -205,6 +210,7 @@ function buildingsToGeoJSON(
     network: mapNetworkBucketAt(b, simTimeMs),
     charging: evChargingBucket(chargingAccess.get(b.egid)),
     publicStatus: publicBuildingBucket(b, plants),
+    gridStatus: "ok",
     powerW: previousPowerW?.get(b.egid) ?? 0,
     solarCapacityKw: solarByEgid.get(b.egid) ?? 0,
   });
@@ -410,6 +416,19 @@ function stripeImage(color: string, forward: boolean): { width: number; height: 
   return { width: size, height: size, data };
 }
 
+/** Every transformer station, by how loaded it was at the last reading — for the grid layer. */
+function stationsGeoJSON(simTimeMs: number) {
+  const selected = grid.getSelectedId();
+  return {
+    type: "FeatureCollection" as const,
+    features: grid.getAreas().map((a) => ({
+      type: "Feature" as const,
+      properties: { id: a.id, bucket: grid.bucket(a, simTimeMs), capacityKw: grid.capacityAt(a, simTimeMs), selected: a.id === selected ? 1 : 0 },
+      geometry: { type: "Point" as const, coordinates: [a.lon, a.lat] },
+    })),
+  };
+}
+
 type ImageCorners = [[number, number], [number, number], [number, number], [number, number]];
 
 /** Where every charger of a kind reaches, as one image: the union of their reach circles, lightly
@@ -522,6 +541,7 @@ function colorExpression(mode: ColorMode, selectedEgid: string | null, scales: C
     evCharging: () => legendMatchExpression("charging", EV_CHARGING_LEGEND),
     zoning: () => ZONING_BUILDING_COLOR,
     publicBuildings: () => legendMatchExpression("publicStatus", PUBLIC_BUILDINGS_LEGEND),
+    grid: () => legendMatchExpression("gridStatus", GRID_LEGEND),
     age: () => legendMatchExpression("age", AGE_LEGEND),
     insulation: () => legendMatchExpression("energyClass", INSULATION_LEGEND),
     power: () => powerColorExpression(scales.powerMinW, scales.powerMaxW),
@@ -897,11 +917,45 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         },
       });
 
+      // Grid: a marker per transformer station, over the buildings, shown only in that layer.
+      map.addSource(STATION_SOURCE_ID, { type: "geojson", data: stationsGeoJSON(simClock.getSimTimeMs()) });
+      map.addLayer({
+        id: STATION_LAYER_ID,
+        type: "circle",
+        source: STATION_SOURCE_ID,
+        layout: { visibility: colorModeRef.current === "grid" ? "visible" : "none" },
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["get", "capacityKw"], 250, 6, 4000, 14],
+          "circle-color": ml(legendMatchExpression("bucket", GRID_LEGEND)),
+          "circle-stroke-color": ["case", ["==", ["get", "selected"], 1], SELECTED_COLOR, "#1a1a1a"],
+          "circle-stroke-width": ["case", ["==", ["get", "selected"], 1], 4, 2],
+        },
+      });
+
       if (dataset.boundary) addBoundaryLine(map, dataset.boundary);
 
       // One handler for every click: in the district heating layer a street takes precedence (that
       // layer is where extensions are planned), otherwise whichever building is under the cursor.
       map.on("click", (e: MapMouseEvent) => {
+        if (colorModeRef.current === "grid") {
+          // A station selects its area; a building selects itself and its area.
+          const { x, y } = e.point;
+          const r = STREET_CLICK_TOLERANCE_PX;
+          const station = map.queryRenderedFeatures(
+            [
+              [x - r, y - r],
+              [x + r, y + r],
+            ],
+            { layers: [STATION_LAYER_ID] },
+          )[0];
+          if (station) {
+            grid.select(Number(station.properties?.id));
+            return;
+          }
+          const hit = map.queryRenderedFeatures(e.point, { layers: [POLY_LAYER_ID, POINT_LAYER_ID] })[0];
+          const b = hit ? stock.lookup(String(hit.properties?.egid)) : undefined;
+          if (b) grid.select(grid.areaIdOf(b));
+        }
         if (colorModeRef.current === "zoning") {
           const parcel = map.queryRenderedFeatures(e.point, { layers: [ZONE_FILL_LAYER_ID] })[0];
           if (parcel) zoning.toggle(String(parcel.properties?.id));
@@ -1239,6 +1293,45 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     return () => {
       clearInterval(interval);
       unsubscribe();
+    };
+  }, [colorMode, dataset]);
+
+  // Grid layer: every building by its area's load, and the stations; refreshed after each reading
+  // and as reinforcements and batteries come into service.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer(STATION_LAYER_ID)) return;
+    const visible = colorMode === "grid";
+    map.setLayoutProperty(STATION_LAYER_ID, "visibility", visible ? "visible" : "none");
+    if (!visible) return;
+    const tick = () => {
+      const simTimeMs = simClock.getSimTimeMs();
+      (map.getSource(STATION_SOURCE_ID) as GeoJSONSource | undefined)?.setData(stationsGeoJSON(simTimeMs));
+      const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
+      const pointSource = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
+      const polyData = polygonsRef.current;
+      const pointData = pointsRef.current;
+      if (!polySource || !pointSource || !polyData || !pointData) return;
+      const buckets = grid.getAreas().map((a) => grid.bucket(a, simTimeMs));
+      for (const f of [...polyData.features, ...pointData.features]) {
+        const b = stock.lookup(f.properties.egid);
+        if (b) f.properties.gridStatus = buckets[grid.areaIdOf(b)] ?? "ok";
+      }
+      polySource.setData(polyData);
+      pointSource.setData(pointData);
+    };
+    tick();
+    const interval = setInterval(tick, SOLAR_TICK_MS);
+    const unsubscribe = grid.subscribe(tick);
+    const onEnter = () => (map.getCanvas().style.cursor = "pointer");
+    const onExit = () => (map.getCanvas().style.cursor = "");
+    map.on("mouseenter", STATION_LAYER_ID, onEnter);
+    map.on("mouseleave", STATION_LAYER_ID, onExit);
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+      map.off("mouseenter", STATION_LAYER_ID, onEnter);
+      map.off("mouseleave", STATION_LAYER_ID, onExit);
     };
   }, [colorMode, dataset]);
 
