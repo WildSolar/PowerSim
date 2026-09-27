@@ -1,0 +1,80 @@
+.zn-plan {
+  margin-bottom: 4px;
+}
+
+.zn-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+
+.zn-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 8px 0;
+}
+
+.zn-action-label {
+  font-size: 11px;
+  color: #898781;
+  margin-top: 2px;
+}
+
+.zn-quote {
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid #f97316;
+  border-radius: 8px;
+  background: #fffaf5;
+}
+
+.zn-quote-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.zn-reaction {
+  margin-left: auto;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.zn-reaction.good {
+  color: #0d7a52;
+}
+
+.zn-reaction.bad {
+  color: #b23a2e;
+}
+
+.zn-reaction.neutral {
+  color: #52514e;
+}
+
+.zn-change {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+  border-bottom: 1px solid #f1efea;
+}
+
+.zn-change-title {
+  color: #1a1a1a;
+}
+
+.zn-status {
+  font-size: 11px;
+  color: #898781;
+}
+
+.zn-status.good {
+  color: #0d7a52;
+}
+
+.zn-status.bad {
+  color: #b23a2e;
+}

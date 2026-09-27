@@ -51,6 +51,7 @@ import { tariffStore } from "./tariffStore";
 import type { Tariff } from "./tariff";
 import { dailyMeanTempC } from "./weather";
 import { priceFactor } from "./costTrends";
+import { zoning } from "./zoning";
 
 const DAY_MS = 24 * 60 * 60_000;
 const ANNUAL_SAMPLE_DAYS = 365;
@@ -144,7 +145,7 @@ function candidatesAt(
   const tariff = tariffStore.get();
   const estimate = annualHeatingEstimate(building, atMs);
   const scale = sizeScale(building);
-  const fossilBanned = policyStore.get().fossilHeatingInstallBanned;
+  const fossilBanned = policyStore.get().fossilHeatingInstallBanned || zoning.fossilHeatingBannedAt(building, atMs);
   const avgElecRpKWh = (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2;
 
   return HEATING_SYSTEM_ORDER.map((id) => {

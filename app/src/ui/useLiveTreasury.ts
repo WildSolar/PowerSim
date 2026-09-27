@@ -18,6 +18,8 @@ export interface LiveTreasury {
   budgetRp: number;
   /** Subsidies paid out so far this year, as decisions happened. */
   paidOutRp: number;
+  /** Value-capture levies (zoning) received so far this year. */
+  receivedRp: number;
 }
 
 /** The treasury as of right now: last year's closing balance, plus this year's government
@@ -66,5 +68,6 @@ export function useLiveTreasury(dataset: MunicipalityDataset): LiveTreasury {
   }, [dataset.buildings, yearStartMs, year]);
 
   const paidOutRp = treasury.paidOutTotal(yearStartMs, simDay + DAY_MS);
-  return { balanceRp: openingRp === null ? null : openingRp + budgetRp - paidOutRp, budgetRp, paidOutRp };
+  const receivedRp = treasury.received(yearStartMs, simDay + DAY_MS); // value-capture levies (zoning)
+  return { balanceRp: openingRp === null ? null : openingRp + budgetRp - paidOutRp + receivedRp, budgetRp, paidOutRp, receivedRp };
 }

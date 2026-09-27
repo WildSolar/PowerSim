@@ -161,7 +161,32 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "The Age layer shows every building by construction era, with buildings built during the game in green",
       ]),
       note(
-        "Known simplifications: building sites come from zoning and land-cover data (available for canton Zürich today), so a plot's shape is a rectangle fitted into the free space, not a real design. Existing rooftop solar registered on a building disappears with it. Policies to steer all of this (solar mandates, insulation standards, growth and replacement rates) are wired in but have no controls yet.",
+        "Known simplifications: building sites come from zoning and land-cover data (available for canton Zürich today), so a plot's shape is a rectangle fitted into the free space, not a real design. Existing rooftop solar registered on a building disappears with it. Where and how the town grows can be steered through the zoning plan (see \"Zoning\").",
+      ),
+    ],
+  },
+  {
+    id: "zoning",
+    icon: "🗺️",
+    title: "Zoning",
+    blocks: [
+      p(
+        "The zoning plan (Bau- und Zonenordnung) is one of the municipality's strongest levers: it decides what may be built where, and how much. The plan the game starts with is the real one, parcel by parcel, from the federal building-zone layer: residential, mixed, centre, work (industry and trade) and public-use zones. Switch the map to the Zoning layer to see it, and click parcels to pick them — or pick every parcel of a zone at once.",
+      ),
+      list([
+        "Rezoning a parcel to another use (residential, mixed, centre or work) changes what gets built on its open land, and what its old buildings become once they are replaced: a factory in what is now a residential zone becomes flats — and comes up for replacement sooner, because it no longer fits. Public-use land stays as it is.",
+        "Densifying it (one or two more floors than today's plan allows) lets new and replacement buildings go higher and hold more homes, and makes replacing old buildings there pay sooner. Taking the extra floors back is possible too.",
+        "A district-heat priority zone (from municipal energy planning) allows no new oil or gas heating at all; a new building on a street with a district heating pipe must connect, while one replacing its heating may still choose a heat pump.",
+        "A high-standard zone requires new and replacement buildings to be built to Minergie-P (U-values about a third below code) with a full roof of solar panels.",
+      ]),
+      p(
+        "The panel shows what a change would touch — the area, the buildings and homes standing there, the open building land — what the planning work costs, and how the public is likely to take it. A change is paid when it's put forward and comes into force about a year and a half later, after the planning procedure. It's a political decision: each group reacts at once (tenants welcome more homes, neighbours and homeowners dislike densification, businesses resent losing work zones, the climate-minded like energy zones and compact building), and a contested change — or any change covering 15% or more of the town's zoned land — goes to a public vote first, which can strike it down. On the map, a parcel with a change on the way is outlined in yellow; densified parcels are shaded stronger, and energy zones striped.",
+      ),
+      p(
+        "Zoning creates land value, and the municipality captures part of it: a levy of 25% of the gain (canton Zürich allows up to 40%) on every project that uses it, due when its permit is granted — on the extra floor space densification allows, and on the floor space of a project on land rezoned to a more valuable use (work to residential, say). It shows in the treasury as the zoning levy.",
+      ),
+      note(
+        "Placeholders: the land values behind the levy (CHF 500 per m² of floor space in a work zone, 1,000 residential, 1,050 mixed, 1,300 centre), the planning cost (CHF 40,000 plus 5,000 per hectare), how strongly each group reacts and how much a zoning change speeds up replacements. New building land outside today's zones isn't possible (federal law makes it rare), and the extra homes don't yet bring their own costs — schools, roads — beyond their energy use.",
       ),
     ],
   },
@@ -515,7 +540,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Money leaves the treasury only when a decision actually happens: the day a household installs a subsidised heat pump, buys a subsidised electric car, upgrades its insulation, or puts up solar panels, the municipal top-up is paid out. A grant nobody takes up costs nothing — but a grant also goes to everyone who would have decided the same way anyway, and finding the level that tips the undecided without overpaying the rest is the whole game of subsidy planning. The grants are set in Control → Measures.",
       ),
       p(
-        "Each completed year, the balance moves by: what consumers paid for grid electricity and district heat, plus the government allocation, plus what the municipality's own public chargers sold, minus the solar fed in, the wholesale cost of the net electricity bought in, grid maintenance, the heat bought from the district heating source, the upkeep of the pipes and of the chargers, and every subsidy paid out that year. Extending the district heating network, and building public chargers, is paid the day it is ordered. The utility costs are set in Control → Prices, under \"Municipal utility costs\".",
+        "Each completed year, the balance moves by: what consumers paid for grid electricity and district heat, plus the government allocation, plus what the municipality's own public chargers sold and the zoning levy collected, minus the solar fed in, the wholesale cost of the net electricity bought in, grid maintenance, the heat bought from the district heating source, the upkeep of the pipes and of the chargers, and every subsidy paid out that year. Extending the district heating network, building public chargers and changing the zoning plan are paid the day they're ordered. The utility costs are set in Control → Prices, under \"Municipal utility costs\".",
       ),
       note(
         "The utility side covers electricity and district heating only — gas, oil and petrol/diesel are paid straight to an external supplier, never through the municipal utility. Federal and cantonal grants (the baseline every heat pump, EV and solar installation already gets) are not municipal money; only the municipality's own top-up is.",
@@ -535,6 +560,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Heating — colored by primary heating system, live: a stock-renewal replacement (see \"Stock renewal\") recolors the building within a few seconds, not just at the moment you happen to look at its panel.",
         "Power draw — colored by live net power right now, on a diverging scale from exporting (solar surplus) to importing; recalculates every 1.5 real seconds.",
         "District heat — which buildings are connected to the district heating network, which could be (a pipe runs in their street), and which are out of reach, with the piped streets, extensions being built and the heat source drawn in. This is also where the network is extended — see \"District heating network\".",
+        "Zoning — the zoning plan, parcel by parcel, as it stands (and changes over time): zone types, densified parcels, energy zones, and changes on the way. This is where the plan is changed — see \"Zoning\".",
         "EV charging — how each building's households could charge an electric car (at home, at an on-street charger with room, only at a fast-charging hub, only at full chargers, or nowhere nearby), with every public charger coloured by how full it is (for households' cars as well as businesses' vans and lorries). Click a charger for its usage; this is also where the municipality builds its own — see \"Public charging\".",
         "Solar — colored by installed solar capacity, from none to the municipality's largest installation; live, the same way Heating is — a new adoption (see \"Solar adoption\") recolors the building within a few seconds.",
       ]),

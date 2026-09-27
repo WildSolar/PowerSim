@@ -83,3 +83,6 @@ class MunicipalityDataset:
     # The registered road vehicles — see sources/vehicles.py: {year, cars, cars_electric,
     # goods_vehicles, goods_vehicles_electric}, or None if the register couldn't be reached.
     vehicle_register: dict | None = None
+    # The building-zone parcels (federal harmonised layer), for zoning — see sources/sites.py:
+    # {id, zone, area_m2, rings}.
+    zone_parcels: list = field(default_factory=list)

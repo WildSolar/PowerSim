@@ -32,7 +32,9 @@ MIN_SHORT_SIDE_M = 12.0
 MAX_SITES = 600
 
 
-def fetch_zones(bfs_number: int) -> dict[str, list]:
+def fetch_zone_features(bfs_number: int) -> list[tuple[str, str, object]]:
+    """Every building-zone polygon of the municipality the game knows a zone for, as
+    (feature id, game zone, shapely geometry in LV95)."""
     response = requests.get(
         ZONING_URL,
         params={
@@ -47,12 +49,36 @@ def fetch_zones(bfs_number: int) -> dict[str, list]:
         timeout=90,
     )
     response.raise_for_status()
-    zones: dict[str, list] = {}
+    features = []
     for feature in response.json()["results"]:
         zone = ZONE_BY_CODE.get(feature["properties"]["ch_code_hn"])
         if zone:
-            zones.setdefault(zone, []).append(make_valid(shape(feature["geometry"])))
+            features.append((str(feature.get("featureId", feature.get("id"))), zone, make_valid(shape(feature["geometry"]))))
+    return features
+
+
+def zones_by_type(features: list[tuple[str, str, object]]) -> dict[str, list]:
+    zones: dict[str, list] = {}
+    for _, zone, geometry in features:
+        zones.setdefault(zone, []).append(geometry)
     return zones
+
+
+PARCEL_SIMPLIFY_M = 0.5
+
+
+def zone_parcels(features: list[tuple[str, str, object]]) -> list[dict]:
+    """The zone parcels as the player sees and changes them: one per zone polygon of the
+    federal layer, {id, zone, area_m2, rings: polygons -> rings (outer first) -> [lon, lat]}."""
+    parcels = []
+    for feature_id, zone, geometry in features:
+        polygons = []
+        for polygon in _polygons(geometry.simplify(PARCEL_SIMPLIFY_M, preserve_topology=True)):
+            rings = [polygon.exterior, *polygon.interiors]
+            polygons.append([[list(coords.lv95_to_lonlat(x, y)) for x, y in ring.coords] for ring in rings])
+        if polygons:
+            parcels.append({"id": feature_id, "zone": zone, "area_m2": round(geometry.area), "rings": polygons})
+    return parcels
 
 
 def _polygons(geometry) -> list[Polygon]:

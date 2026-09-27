@@ -76,6 +76,30 @@ export interface MeasureReaction {
   tone: "good" | "neutral" | "bad";
 }
 
+export type Stances = Partial<Record<Bloc, number>>;
+
+/** A question put to the voters: a measure's enactment, or any other decision (a zoning change). */
+interface Ballot {
+  atMs: number;
+  title: string;
+  stances: Stances;
+  resolve: (accepted: boolean, atMs: number) => void;
+}
+
+/** A one-off decision outside the measure catalog (zoning.ts) that the public reacts to and may
+ * put to a vote. */
+export interface PublicDecision {
+  key: string; // unique, for the ballot
+  title: string;
+  stances: Stances;
+  referendum?: "optional" | "mandatory";
+  /** Months until it takes effect: a vote is held before then. */
+  leadTimeMonths: number;
+  atMs: number;
+  /** Called with the verdict once voters decide (not called if there's no vote). */
+  onVote?: (accepted: boolean, atMs: number) => void;
+}
+
 function clamp(x: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, x));
 }
@@ -84,7 +108,7 @@ class ApprovalEngine {
   private levels: Record<Bloc, number> = { homeowners: 60, tenants: 60, drivers: 60, business: 60, climate: 60 };
   private history: { atMs: number; approval: number }[] = [];
   private log: ApprovalLogEntry[] = [];
-  private votes = new Map<string, { atMs: number; params: MeasureParams }>();
+  private votes = new Map<string, Ballot>();
   private gameOver: GameOver | null = null;
   private lowMonths = 0;
   private warned = false;
@@ -169,25 +193,52 @@ class ApprovalEngine {
     return { ...this.levels };
   }
 
-  /** The vote scheduled on a measure and what a poll shows right now. */
-  getVoteInfo(id: string, def: MeasureDef, nowMs: number): { atMs: number; pollYes: number } | null {
+  /** The vote scheduled on a measure (or any ballot, by its key) and what a poll shows right now. */
+  getVoteInfo(id: string, _def: MeasureDef | null, nowMs: number): { atMs: number; pollYes: number } | null {
     const vote = this.votes.get(id);
     if (!vote) return null;
-    return { atMs: vote.atMs, pollYes: this.yesShare(def, vote.params, hashSeed(this.seed, "poll", id, String(Math.floor(nowMs / MONTH_MS))), POLL_NOISE_POINTS) };
+    return { atMs: vote.atMs, pollYes: this.yesShare(vote.stances, hashSeed(this.seed, "poll", id, String(Math.floor(nowMs / MONTH_MS))), POLL_NOISE_POINTS) };
   }
 
   /** How the public is likely to take a measure, deliberately coarse: enough to tell a crowd-pleaser
    * from a fight, not enough to read off the blocs. */
   reaction(def: MeasureDef, params: MeasureParams): MeasureReaction {
-    const stances = this.stancesOf(def, params);
+    return this.reactionTo(this.stancesOf(def, params));
+  }
+
+  /** The same, for any set of stances (a zoning change). */
+  reactionTo(stances: Stances): MeasureReaction {
     const values = BLOC_ORDER.map((b) => stances[b] ?? 0);
-    const net = this.netStance(def, params);
+    const net = this.net(stances);
     if (Math.max(...values) >= 0.3 && Math.min(...values) <= -0.3) return { label: "Divisive", tone: "bad" };
     if (net >= 0.2) return { label: "Widely welcomed", tone: "good" };
     if (net >= 0.05) return { label: "Mostly welcomed", tone: "good" };
     if (net > -0.05) return { label: "Little reaction", tone: "neutral" };
     if (net > -0.2) return { label: "Unpopular with some", tone: "bad" };
     return { label: "Widely resented", tone: "bad" };
+  }
+
+  /** Whether a decision with these stances would go to a vote. */
+  wouldGoToVote(stances: Stances, referendum: "optional" | "mandatory" | undefined): boolean {
+    if (!referendum) return false;
+    return referendum === "mandatory" || this.net(stances) < OPTIONAL_REFERENDUM_STANCE;
+  }
+
+  /** A one-off decision lands: every bloc reacts at once, and it may be put to a vote. Returns when
+   * the vote is, or null if there is none. */
+  decide(decision: PublicDecision): number | null {
+    if (this.gameOver) return null;
+    for (const b of BLOC_ORDER) this.shift(b, (decision.stances[b] ?? 0) * ENACT_SHOCK_POINTS * this.sensitivity);
+    let voteAt: number | null = null;
+    if (this.wouldGoToVote(decision.stances, decision.referendum)) {
+      const delayMonths = Math.max(1, Math.min(VOTE_DELAY_MONTHS, decision.leadTimeMonths - 1));
+      voteAt = decision.atMs + delayMonths * MONTH_MS;
+      this.votes.set(decision.key, { atMs: voteAt, title: decision.title, stances: decision.stances, resolve: (accepted, atMs) => decision.onVote?.(accepted, atMs) });
+      const when = new Date(toDateMs(voteAt)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+      this.addLog(decision.atMs, `${decision.title} goes to a public vote in ${when}.`);
+    }
+    this.bump();
+    return voteAt;
   }
 
   // --- time ---
@@ -218,13 +269,12 @@ class ApprovalEngine {
     return BLOC_ORDER.reduce((sum, b) => sum + BLOC_WEIGHT[b] * this.levels[b], 0);
   }
 
-  private stancesOf(def: MeasureDef, params: MeasureParams): Partial<Record<Bloc, number>> {
+  private stancesOf(def: MeasureDef, params: MeasureParams): Stances {
     return def.approval?.(params) ?? {};
   }
 
-  /** The electorate-weighted stance toward a measure, -1 to +1. */
-  private netStance(def: MeasureDef, params: MeasureParams): number {
-    const stances = this.stancesOf(def, params);
+  /** The electorate-weighted stance, -1 to +1. */
+  private net(stances: Stances): number {
     return BLOC_ORDER.reduce((sum, b) => sum + BLOC_WEIGHT[b] * (stances[b] ?? 0), 0);
   }
 
@@ -301,38 +351,34 @@ class ApprovalEngine {
   private scheduleVoteIfNeeded(id: string, def: MeasureDef, params: MeasureParams, atMs: number): void {
     this.votes.delete(id);
     measures.setVote(id, null);
-    if (!def.referendum) return;
-    if (def.referendum === "optional" && this.netStance(def, params) >= OPTIONAL_REFERENDUM_STANCE) return;
+    if (!this.wouldGoToVote(this.stancesOf(def, params), def.referendum)) return;
     const delayMonths = Math.max(1, Math.min(VOTE_DELAY_MONTHS, def.leadTimeMonths - 1));
     const voteAt = atMs + delayMonths * MONTH_MS;
-    this.votes.set(id, { atMs: voteAt, params });
+    this.votes.set(id, { atMs: voteAt, title: def.title, stances: this.stancesOf(def, params), resolve: (accepted, when) => measures.resolveVote(id, accepted, when) });
     measures.setVote(id, voteAt);
     const when = new Date(toDateMs(voteAt)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
     this.addLog(atMs, `${def.title} goes to a public vote in ${when}.`);
   }
 
   /** The share of voters in favour, in percent. */
-  private yesShare(def: MeasureDef, params: MeasureParams, noiseSeed: number, noisePoints: number): number {
+  private yesShare(stances: Stances, noiseSeed: number, noisePoints: number): number {
     const noise = (mulberry32(noiseSeed)() * 2 - 1) * noisePoints;
-    return clamp(50 + 50 * VOTE_STANCE_SENSITIVITY * this.netStance(def, params) + (this.aggregate() - 50) * VOTE_MOOD_SENSITIVITY + noise, 0, 100);
+    return clamp(50 + 50 * VOTE_STANCE_SENSITIVITY * this.net(stances) + (this.aggregate() - 50) * VOTE_MOOD_SENSITIVITY + noise, 0, 100);
   }
 
-  private holdVote(id: string, vote: { atMs: number; params: MeasureParams }, nowMs: number): void {
+  private holdVote(id: string, vote: Ballot, nowMs: number): void {
     this.votes.delete(id);
-    const def = measures.getDef(id);
-    if (!def) return;
-    const yes = this.yesShare(def, vote.params, hashSeed(this.seed, "vote", id, String(vote.atMs | 0)), VOTE_NOISE_POINTS);
+    const yes = this.yesShare(vote.stances, hashSeed(this.seed, "vote", id, String(vote.atMs | 0)), VOTE_NOISE_POINTS);
     const accepted = yes >= 50;
     if (accepted) {
       this.shiftAll(VOTE_WON_POINTS * this.sensitivity);
-      this.addLog(nowMs, `Voters approved ${def.title} (${Math.round(yes)}% in favour).`);
+      this.addLog(nowMs, `Voters approved ${vote.title} (${Math.round(yes)}% in favour).`);
     } else {
-      const stances = this.stancesOf(def, vote.params);
-      for (const b of BLOC_ORDER) this.shift(b, -(stances[b] ?? 0) * ENACT_SHOCK_POINTS * this.sensitivity * REPEAL_RECOVERY_FRACTION);
+      for (const b of BLOC_ORDER) this.shift(b, -(vote.stances[b] ?? 0) * ENACT_SHOCK_POINTS * this.sensitivity * REPEAL_RECOVERY_FRACTION);
       this.shiftAll(-VOTE_LOST_POINTS * this.sensitivity);
-      this.addLog(nowMs, `Voters rejected ${def.title} (${Math.round(yes)}% in favour). It is struck down.`);
+      this.addLog(nowMs, `Voters rejected ${vote.title} (${Math.round(yes)}% in favour). It is struck down.`);
     }
-    measures.resolveVote(id, accepted, nowMs);
+    vote.resolve(accepted, nowMs);
     this.bump();
   }
 

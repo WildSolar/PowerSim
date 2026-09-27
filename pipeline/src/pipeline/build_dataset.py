@@ -137,10 +137,13 @@ def build(bfs_number: int) -> MunicipalityDataset:
     max_lon, max_lat = coords.lv95_to_lonlat(max_e + margin, max_n + margin)
     excluded = exclusions_source.fetch_excluded_areas(min_lon, min_lat, max_lon, max_lat)
     print(f"  {len(excluded)} areas kept out of development")
+    zone_features = sites_source.fetch_zone_features(bfs_number)
     development_sites = sites_source.compute_sites(
-        sites_source.fetch_zones(bfs_number), land, list(footprint_by_egid.values()), excluded
+        sites_source.zones_by_type(zone_features), land, list(footprint_by_egid.values()), excluded
     )
     print(f"  {len(development_sites)} development sites")
+    zone_parcels = sites_source.zone_parcels(zone_features)
+    print(f"  {len(zone_parcels)} zone parcels")
 
     print("Fetching the street network (swissTLM3D)...")
     boundary = boundary_source.fetch_boundary(bfs_number)
@@ -261,6 +264,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
         district_heat=network,
         charging_sites=charging_sites,
         vehicle_register=vehicle_register,
+        zone_parcels=zone_parcels,
     )
 
 

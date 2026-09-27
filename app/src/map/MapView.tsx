@@ -17,6 +17,7 @@ import { mapNetworkBucketAt } from "../sim/districtHeatStats";
 import { streets } from "../sim/streets";
 import { pointsAt, publicCharging, siteCapacityAt, type ChargingSite } from "../sim/publicCharging";
 import { REACH_M, type ChargingKind } from "../config/charging";
+import { zoning } from "../sim/zoning";
 import {
   AGE_LEGEND,
   buildingAgeBucket,
@@ -28,6 +29,11 @@ import {
   DISTRICT_HEAT_LEGEND,
   CHARGER_USE_RAMP,
   COVERAGE_COLOR,
+  DH_PRIORITY_COLOR,
+  HIGH_STANDARD_COLOR,
+  ZONING_BUILDING_COLOR,
+  ZONING_LEGEND,
+  ZONING_PENDING_COLOR,
   EV_CHARGING_LEGEND,
   evChargingBucket,
   HEATING_LEGEND,
@@ -93,6 +99,17 @@ const COVERAGE_MAX_PX = 2048;
 const COVERAGE_OUTLINE_PX = 2;
 const COVERAGE_FILL_ALPHA = 0.16;
 const COVERAGE_OUTLINE_ALPHA = 0.85;
+const ZONE_SOURCE_ID = "zone-parcels";
+const ZONE_FILL_LAYER_ID = "zone-parcels-fill";
+const ZONE_DH_LAYER_ID = "zone-parcels-dh-priority";
+const ZONE_STANDARD_LAYER_ID = "zone-parcels-high-standard";
+const ZONE_LINE_LAYER_ID = "zone-parcels-line";
+const ZONE_MARK_LAYER_ID = "zone-parcels-mark"; // picked or with a change on the way
+const ZONE_LAYER_IDS = [ZONE_FILL_LAYER_ID, ZONE_DH_LAYER_ID, ZONE_STANDARD_LAYER_ID, ZONE_LINE_LAYER_ID, ZONE_MARK_LAYER_ID];
+const ZONING_TICK_MS = 3000;
+const STRIPE_DH = "zone-stripe-dh";
+const STRIPE_STANDARD = "zone-stripe-standard";
+
 const EMPTY_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 const LORRY_PARK_RING = "#7a4fd1";
 const HUB_RING_COLOR = "#1a1a1a";
@@ -344,6 +361,47 @@ function addChargerIcons(map: MlMap): void {
   }
 }
 
+/** Every zone parcel as the plan stands at `simTimeMs`, with whether it's picked or has a change
+ * on the way — for the zoning layer. */
+function zoneParcelsGeoJSON(simTimeMs: number) {
+  const selection = zoning.getSelection();
+  return {
+    type: "FeatureCollection" as const,
+    features: zoning.getParcels().flatMap((parcel) => {
+      const state = zoning.stateAt(parcel.id, simTimeMs);
+      if (!state) return [];
+      const properties = {
+        id: parcel.id,
+        zone: state.zone,
+        extraFloors: state.extraFloors,
+        dhPriority: state.dhPriority ? 1 : 0,
+        highStandard: state.highStandard ? 1 : 0,
+        mark: selection.has(parcel.id) ? "selected" : zoning.hasPendingChange(parcel.id, simTimeMs) ? "pending" : "none",
+      };
+      return parcel.rings.map((rings) => ({ type: "Feature" as const, properties, geometry: { type: "Polygon" as const, coordinates: rings } }));
+    }),
+  };
+}
+
+/** A small tile of diagonal stripes, for the energy-zone overlays (fill-pattern). */
+function stripeImage(color: string, forward: boolean): { width: number; height: number; data: Uint8Array } {
+  const size = 12;
+  const data = new Uint8Array(size * size * 4);
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const d = ((forward ? x + y : x - y + size) % size + size) % size;
+      const on = d < 3;
+      const o = (y * size + x) * 4;
+      data[o] = r;
+      data[o + 1] = g;
+      data[o + 2] = b;
+      data[o + 3] = on ? 170 : 0;
+    }
+  }
+  return { width: size, height: size, data };
+}
+
 type ImageCorners = [[number, number], [number, number], [number, number], [number, number]];
 
 /** Where every charger of a kind reaches, as one image: the union of their reach circles, lightly
@@ -454,6 +512,7 @@ function colorExpression(mode: ColorMode, selectedEgid: string | null, scales: C
     heating: () => legendMatchExpression("heating", HEATING_LEGEND),
     districtHeat: () => legendMatchExpression("network", DISTRICT_HEAT_LEGEND),
     evCharging: () => legendMatchExpression("charging", EV_CHARGING_LEGEND),
+    zoning: () => ZONING_BUILDING_COLOR,
     age: () => legendMatchExpression("age", AGE_LEGEND),
     insulation: () => legendMatchExpression("energyClass", INSULATION_LEGEND),
     power: () => powerColorExpression(scales.powerMinW, scales.powerMaxW),
@@ -611,6 +670,54 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         paint: { "circle-radius": 9, "circle-color": PIPE_COLOR, "circle-stroke-color": "#fff", "circle-stroke-width": 2 },
       });
 
+      // Zoning: the parcels on the ground, under the buildings, shown only in that layer.
+      const zoneVisibility = colorModeRef.current === "zoning" ? "visible" : "none";
+      if (!map.hasImage(STRIPE_DH)) map.addImage(STRIPE_DH, stripeImage(DH_PRIORITY_COLOR, true));
+      if (!map.hasImage(STRIPE_STANDARD)) map.addImage(STRIPE_STANDARD, stripeImage(HIGH_STANDARD_COLOR, false));
+      map.addSource(ZONE_SOURCE_ID, { type: "geojson", data: zoneParcelsGeoJSON(simClock.getSimTimeMs()) });
+      map.addLayer({
+        id: ZONE_FILL_LAYER_ID,
+        type: "fill",
+        source: ZONE_SOURCE_ID,
+        layout: { visibility: zoneVisibility },
+        paint: {
+          "fill-color": ml(legendMatchExpression("zone", ZONING_LEGEND)),
+          // Denser where more floors are allowed.
+          "fill-opacity": ["+", 0.3, ["*", 0.18, ["get", "extraFloors"]]],
+        },
+      });
+      map.addLayer({
+        id: ZONE_DH_LAYER_ID,
+        type: "fill",
+        source: ZONE_SOURCE_ID,
+        filter: ["==", ["get", "dhPriority"], 1],
+        layout: { visibility: zoneVisibility },
+        paint: { "fill-pattern": STRIPE_DH },
+      });
+      map.addLayer({
+        id: ZONE_STANDARD_LAYER_ID,
+        type: "fill",
+        source: ZONE_SOURCE_ID,
+        filter: ["==", ["get", "highStandard"], 1],
+        layout: { visibility: zoneVisibility },
+        paint: { "fill-pattern": STRIPE_STANDARD },
+      });
+      map.addLayer({
+        id: ZONE_LINE_LAYER_ID,
+        type: "line",
+        source: ZONE_SOURCE_ID,
+        layout: { visibility: zoneVisibility, "line-join": "round" },
+        paint: { "line-color": ml(legendMatchExpression("zone", ZONING_LEGEND)), "line-width": 1.5 },
+      });
+      map.addLayer({
+        id: ZONE_MARK_LAYER_ID,
+        type: "line",
+        source: ZONE_SOURCE_ID,
+        filter: ["!=", ["get", "mark"], "none"],
+        layout: { visibility: zoneVisibility, "line-join": "round" },
+        paint: { "line-color": ["match", ["get", "mark"], "selected", SELECTED_COLOR, ZONING_PENDING_COLOR], "line-width": 3.5 },
+      });
+
       // Charger coverage (the EV charging layer's toggles): on the ground, under the buildings.
       for (const kind of COVERAGE_KINDS) {
         map.addSource(coverageId(kind), {
@@ -762,6 +869,11 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       // One handler for every click: in the district heating layer a street takes precedence (that
       // layer is where extensions are planned), otherwise whichever building is under the cursor.
       map.on("click", (e: MapMouseEvent) => {
+        if (colorModeRef.current === "zoning") {
+          const parcel = map.queryRenderedFeatures(e.point, { layers: [ZONE_FILL_LAYER_ID] })[0];
+          if (parcel) zoning.toggle(String(parcel.properties?.id));
+          return;
+        }
         if (colorModeRef.current === "evCharging") {
           const placing = publicCharging.getPlacing();
           if (placing) {
@@ -1034,6 +1146,56 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       clearInterval(interval);
       unsubscribe();
       label?.remove();
+    };
+  }, [colorMode, dataset]);
+
+  // Zoning layer: the parcels as the plan stands (changes come into force over time), which are
+  // picked, and a hover card per parcel.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer(ZONE_FILL_LAYER_ID)) return;
+    const visible = colorMode === "zoning";
+    for (const id of ZONE_LAYER_IDS) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+    if (!visible) return;
+
+    const tick = () => (map.getSource(ZONE_SOURCE_ID) as GeoJSONSource | undefined)?.setData(zoneParcelsGeoJSON(simClock.getSimTimeMs()));
+    const popup = new Popup({ closeButton: false, closeOnClick: false, offset: 10, className: "charger-popup" });
+    const onHover = (e: MapMouseEvent & { features?: { properties: Record<string, unknown> }[] }) => {
+      const id = String(e.features?.[0]?.properties.id);
+      const state = zoning.stateAt(id, simClock.getSimTimeMs());
+      const parcel = zoning.getParcel(id);
+      if (!state || !parcel) return;
+      const label = ZONING_LEGEND.find((l) => l.bucket === state.zone)?.label ?? state.zone;
+      const extras = [
+        state.extraFloors > 0 ? `+${state.extraFloors} floor${state.extraFloors === 1 ? "" : "s"}` : null,
+        state.dhPriority ? "district-heat priority" : null,
+        state.highStandard ? "high standard" : null,
+      ].filter(Boolean);
+      popup
+        .setLngLat(e.lngLat)
+        .setText(`${label} · ${(parcel.areaM2 / 10_000).toFixed(1)} ha${extras.length > 0 ? ` · ${extras.join(", ")}` : ""}`)
+        .addTo(map);
+    };
+    const onLeave = () => popup.remove();
+    const onEnter = () => (map.getCanvas().style.cursor = "pointer");
+    const onExit = () => (map.getCanvas().style.cursor = "");
+
+    tick();
+    const interval = setInterval(tick, ZONING_TICK_MS);
+    const unsubscribe = zoning.subscribe(tick);
+    map.on("mousemove", ZONE_FILL_LAYER_ID, onHover as never);
+    map.on("mouseleave", ZONE_FILL_LAYER_ID, onLeave);
+    map.on("mouseenter", ZONE_FILL_LAYER_ID, onEnter);
+    map.on("mouseleave", ZONE_FILL_LAYER_ID, onExit);
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+      map.off("mousemove", ZONE_FILL_LAYER_ID, onHover as never);
+      map.off("mouseleave", ZONE_FILL_LAYER_ID, onLeave);
+      map.off("mouseenter", ZONE_FILL_LAYER_ID, onEnter);
+      map.off("mouseleave", ZONE_FILL_LAYER_ID, onExit);
+      popup.remove();
+      map.getCanvas().style.cursor = "";
     };
   }, [colorMode, dataset]);
 

@@ -23,9 +23,9 @@ import type { DecisionLogKind } from "./decisionLog";
 
 // Subsidies paid as households decide, plus what the municipality itself spends: the running and
 // one-off costs of campaigns and programmes, and money put into infrastructure.
-export type PayoutCategory = "solar" | "heating" | "vehicle" | "retrofit" | "programs" | "infrastructure" | "districtHeat" | "charging";
+export type PayoutCategory = "solar" | "heating" | "vehicle" | "retrofit" | "programs" | "infrastructure" | "districtHeat" | "charging" | "zoning";
 
-export const PAYOUT_CATEGORIES: PayoutCategory[] = ["solar", "heating", "vehicle", "retrofit", "programs", "infrastructure", "districtHeat", "charging"];
+export const PAYOUT_CATEGORIES: PayoutCategory[] = ["solar", "heating", "vehicle", "retrofit", "programs", "infrastructure", "districtHeat", "charging", "zoning"];
 
 export const PAYOUT_LABEL: Record<PayoutCategory, string> = {
   solar: "Solar subsidies",
@@ -36,6 +36,7 @@ export const PAYOUT_LABEL: Record<PayoutCategory, string> = {
   infrastructure: "Municipal infrastructure",
   districtHeat: "District heating network extensions",
   charging: "Public chargers",
+  zoning: "Zoning plans",
 };
 
 /** Which ledger line a decision kind's municipal subsidy belongs on, if it has one. */
@@ -65,11 +66,20 @@ interface Payout {
 export type PayoutsByCategory = Record<PayoutCategory, number>;
 
 function zeroPayouts(): PayoutsByCategory {
-  return { solar: 0, heating: 0, vehicle: 0, retrofit: 0, programs: 0, infrastructure: 0, districtHeat: 0, charging: 0 };
+  return { solar: 0, heating: 0, vehicle: 0, retrofit: 0, programs: 0, infrastructure: 0, districtHeat: 0, charging: 0, zoning: 0 };
+}
+
+/** Money coming in outside the yearly accounts: the value-capture levy on zoning gains (zoning.ts),
+ * due when a project that gains from a zoning change gets its permit. */
+interface Receipt {
+  atMs: number;
+  amountRp: number;
+  ref: string;
 }
 
 class Treasury {
   private payouts: Payout[] = [];
+  private receipts: Receipt[] = [];
   private version = 0;
   private bookedVersion = 0;
   private readonly listeners = new Set<() => void>();
@@ -92,6 +102,7 @@ class Treasury {
   /** A fresh game: forget every payout. */
   reset(): void {
     this.payouts = [];
+    this.receipts = [];
     this.notify();
   }
 
@@ -99,6 +110,19 @@ class Treasury {
     if (!(amountRp > 0)) return;
     this.payouts.push({ atMs, category, amountRp, egid });
     this.notify();
+  }
+
+  recordReceipt(atMs: number, amountRp: number, ref: string): void {
+    if (!(amountRp > 0)) return;
+    this.receipts.push({ atMs, amountRp, ref });
+    this.notify();
+  }
+
+  /** Levies received in `[fromMs, toMs)`. */
+  received(fromMs: number, toMs: number): number {
+    let total = 0;
+    for (const r of this.receipts) if (r.atMs >= fromMs && r.atMs < toMs) total += r.amountRp;
+    return total;
   }
 
   /** Total paid out per category in `[fromMs, toMs)`. */

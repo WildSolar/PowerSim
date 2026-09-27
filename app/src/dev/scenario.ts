@@ -7,7 +7,7 @@
  * and remember everything.
  */
 
-import type { MunicipalityDataset } from "../data/types";
+import type { MunicipalityDataset, SiteZone } from "../data/types";
 import { approval } from "../sim/approval";
 import { toDateMs } from "../sim/calendar";
 import { computeEmissionsForYear } from "../sim/emissions";
@@ -21,6 +21,7 @@ import { stock } from "../sim/stock";
 import { streets } from "../sim/streets";
 import { districtHeat } from "../sim/districtHeat";
 import { publicCharging } from "../sim/publicCharging";
+import { zoning, type ZoningAction } from "../sim/zoning";
 import { fleets } from "../sim/fleet";
 import { tariffStore } from "../sim/tariffStore";
 import { setCostTrendsEnabled } from "../sim/costTrends";
@@ -42,6 +43,9 @@ export interface ScenarioSpec {
   costTrends?: boolean;
   /** Tariff changes at the start (e.g. the municipal public charging prices). */
   tariff?: Record<string, number>;
+  /** Zoning changes, put forward for every parcel of a zone type (as the plan stands then) in the
+   * given calendar year — voted on only with withApproval. */
+  zoning?: { zone: SiteZone; action: ZoningAction; year?: number }[];
   /** Run the approval model too (votes and game over included). Off by default: the physical effect of
    * a measure is easier to judge without a referendum striking it down. */
   withApproval?: boolean;
@@ -52,6 +56,9 @@ export interface ScenarioSpec {
 export interface ScenarioRow {
   year: number;
   buildings: number;
+  dwellings: number;
+  gfaM2: number;
+  zoningLevyChf: number;
   heating: Record<string, number>;
   heatPumpShare: number;
   carSlots: { evShare: number };
@@ -108,6 +115,9 @@ function snapshot(dataset: MunicipalityDataset, year: number, atMs: number): Sce
   return {
     year,
     buildings: buildings.length,
+    dwellings: buildings.reduce((sum, b) => sum + b.dwellings.length, 0),
+    gfaM2: Math.round(buildings.reduce((sum, b) => sum + (b.footprintAreaM2 ?? 0) * Math.max(1, b.floorCount ?? 2), 0)),
+    zoningLevyChf: Math.round(zoning.leviesTotalRp(atMs) / 100),
     heating,
     heatPumpShare: Math.round((heatPumps / (buildings.length || 1)) * 1000) / 1000,
     carSlots: { evShare: Math.round((evSlots / (carSlots || 1)) * 1000) / 1000 },
@@ -134,6 +144,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   if (spec.withApproval) approval.init(difficulty, `approval:${dataset.bfsNumber}`);
   streets.init(dataset);
   districtHeat.init(dataset);
+  zoning.init(dataset); // before the stock: new buildings ask their parcel what it allows
   publicCharging.init(dataset, 0);
   publicCharging.setBuildingLookup((egid) => stock.lookup(egid));
   fleets.init(dataset, (egid) => stock.lookup(egid)); // before the stock: it commits their decisions
@@ -160,9 +171,19 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     }
   };
   if (spec.tariff) tariffStore.set(spec.tariff);
+  const pendingZoning = [...(spec.zoning ?? [])];
+  const zoneDue = (year: number, atMs: number) => {
+    for (const z of pendingZoning.filter((p) => (p.year ?? startYear) <= year)) {
+      zoning.clearSelection();
+      zoning.selectMany(zoning.parcelIdsInZone(z.zone, atMs));
+      zoning.submit(z.action, stock.getAll(), atMs, { withoutVote: !spec.withApproval });
+      pendingZoning.splice(pendingZoning.indexOf(z), 1);
+    }
+  };
   setCostTrendsEnabled(spec.costTrends ?? true);
   enactDue(startYear, 0);
   buildDue(startYear, 0);
+  zoneDue(startYear, 0);
 
   for (;;) {
     const previous = new Date(toDateMs(t));
@@ -175,6 +196,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     publicCharging.advance(t);
     enactDue(year, t);
     buildDue(year, t);
+    zoneDue(year, t);
 
     const newYear = now.getUTCFullYear() !== previous.getUTCFullYear();
     // Solar adoption settles a year's round the first time that year is asked about — in the game the

@@ -6,6 +6,7 @@ import { DwellingPanel } from "./ui/DwellingPanel";
 import { ColorModeControl } from "./ui/ColorModeControl";
 import { DistrictHeatPanel } from "./ui/DistrictHeatPanel";
 import { EvChargingPanel } from "./ui/EvChargingPanel";
+import { ZoningPanel } from "./ui/ZoningPanel";
 import { ReportCardModal } from "./ui/ReportCardModal";
 import { TimeControl } from "./ui/TimeControl";
 import { ApprovalPanel } from "./ui/ApprovalPanel";
@@ -25,6 +26,7 @@ import { stock } from "./sim/stock";
 import { streets } from "./sim/streets";
 import { districtHeat } from "./sim/districtHeat";
 import { publicCharging } from "./sim/publicCharging";
+import { zoning } from "./sim/zoning";
 import { fleets } from "./sim/fleet";
 import { bookInitialPublicCharging } from "./sim/mobility";
 import { policyStore } from "./sim/policy";
@@ -81,6 +83,7 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
         approval.init(difficulty, `approval:${loaded.bfsNumber}`);
         streets.init(loaded); // before the stock: new buildings are linked to their street, and to the district heating network
         districtHeat.init(loaded);
+        zoning.init(loaded); // before the stock: new buildings ask their parcel what it allows
         publicCharging.init(loaded, 0);
         publicCharging.setBuildingLookup((egid) => stock.lookup(egid));
         fleets.init(loaded, (egid) => stock.lookup(egid)); // before the stock: it commits their decisions
@@ -134,6 +137,7 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
       </div>
       {colorMode === "districtHeat" && <DistrictHeatPanel />}
       {colorMode === "evCharging" && <EvChargingPanel />}
+      {colorMode === "zoning" && <ZoningPanel />}
       <div className="bottom-left-stack">
         <button className="pill-button" onClick={() => setShowControl(true)}>
           ⚙️ {dataset.name} Control

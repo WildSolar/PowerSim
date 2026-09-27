@@ -99,6 +99,16 @@ export interface MunicipalityDataset {
   chargingSites?: ChargingSiteData[];
   /** The registered road vehicles (BFS), latest year. Absent in older datasets. */
   vehicleRegister?: VehicleRegister | null;
+  /** The building-zone parcels of the federal harmonised layer — see pipeline/sources/sites.py. */
+  zoneParcels?: ZoneParcelData[];
+}
+
+export interface ZoneParcelData {
+  id: string;
+  zone: SiteZone;
+  areaM2: number;
+  /** Polygons -> rings (outer ring first, then holes) -> [lon, lat]. */
+  rings: [number, number][][][];
 }
 
 export interface VehicleRegister {

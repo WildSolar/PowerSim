@@ -65,6 +65,7 @@ export interface MunicipalFinances {
   districtHeatUpkeepRp: number; // running the pipes, per metre of piped street
   publicChargingRevenueRp: number; // sold at the municipality's own public chargers, at the tariff's public charging prices
   publicChargingUpkeepRp: number; // keeping those chargers running
+  zoningLevyRp: number; // value-capture levy on projects that gained from a zoning change (zoning.ts)
   governmentAllocationRp: number; // this year's allocation from the overall government (a placeholder framing, see config/treasury.ts)
   spendingRp: PayoutsByCategory; // the municipality's own top-ups, per kind, paid out as decisions happened this year — never the federal/cantonal grants
   spendingTotalRp: number;
@@ -136,12 +137,14 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
   treasury.settleThrough(yearEndMs);
   const spendingRp = treasury.paidOut(yearStartMs, yearEndMs);
   const spendingTotalRp = PAYOUT_CATEGORIES.reduce((sum, c) => sum + spendingRp[c], 0);
+  const zoningLevyRp = treasury.received(yearStartMs, yearEndMs);
   const dwellingsAtYearStart = buildings.reduce((sum, b) => sum + (existsAt(b, yearStartMs) ? b.dwellings.length : 0), 0);
   const governmentAllocationRp = treasury.allocationRp(dwellingsAtYearStart, allocationApprovalFactor(approval.atYearStart(year)));
   const netIncomeRp =
     consumerRevenueRp +
     districtHeatRevenueRp +
     publicChargingRevenueRp +
+    zoningLevyRp +
     governmentAllocationRp -
     feedInPaidRp -
     wholesaleCostRp -
@@ -162,6 +165,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     districtHeatUpkeepRp,
     publicChargingRevenueRp,
     publicChargingUpkeepRp,
+    zoningLevyRp,
     governmentAllocationRp,
     spendingRp,
     spendingTotalRp,

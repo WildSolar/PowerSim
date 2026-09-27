@@ -6,7 +6,7 @@ import "./timeControl.css";
 /** The municipal treasury at a glance, always on screen: what is in it now, this year's
  * allocation from the overall government, and what has been paid out in subsidies so far. */
 export function TreasuryPanel({ dataset }: { dataset: MunicipalityDataset }) {
-  const { balanceRp, budgetRp, paidOutRp } = useLiveTreasury(dataset);
+  const { balanceRp, budgetRp, paidOutRp, receivedRp } = useLiveTreasury(dataset);
 
   return (
     <div className="time-control" title="Money leaves the treasury only when a subsidised decision actually happens">
@@ -26,6 +26,14 @@ export function TreasuryPanel({ dataset }: { dataset: MunicipalityDataset }) {
           −{formatCHF(paidOutRp)}
         </span>
       </div>
+      {receivedRp > 0 && (
+        <div className="info-row" title="Value-capture levy on projects that gained from a zoning change">
+          <span>Zoning levy so far</span>
+          <span className="info-value" style={{ color: "#1baf7a" }}>
+            +{formatCHF(receivedRp)}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

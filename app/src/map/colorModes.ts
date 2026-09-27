@@ -4,7 +4,7 @@ import { currentHeatingSystemId } from "../sim/heatingRenewal";
 import type { BuildingChargingAccess } from "../sim/publicCharging";
 import type { ChargingKind } from "../config/charging";
 
-export type ColorMode = "none" | "category" | "heating" | "power" | "solar" | "age" | "insulation" | "districtHeat" | "evCharging";
+export type ColorMode = "none" | "category" | "heating" | "power" | "solar" | "age" | "insulation" | "districtHeat" | "evCharging" | "zoning";
 
 export interface LegendEntry {
   bucket: string;
@@ -209,6 +209,20 @@ export const STREET_UNPIPED_COLOR = "#7a776f";
 
 // The EV charging layer: how a building's households could charge an electric car (the majority
 // of them, for a building of flats).
+// The zoning layer: parcels by zone type, in the colours Swiss zoning plans use (yellow homes,
+// orange mixed, red centre, violet industry and trade, blue public use).
+export const ZONING_LEGEND: LegendEntry[] = [
+  { bucket: "residential", label: "Residential", color: "#f2c14e" },
+  { bucket: "mixed", label: "Mixed (homes and business)", color: "#e8894a" },
+  { bucket: "centre", label: "Centre", color: "#c0504d" },
+  { bucket: "work", label: "Work (industry, trade)", color: "#8e6cc2" },
+  { bucket: "public", label: "Public use", color: "#7fa7c9" },
+];
+export const ZONING_BUILDING_COLOR = "#d9d6cf";
+export const DH_PRIORITY_COLOR = "#c8641e";
+export const HIGH_STANDARD_COLOR = "#0d7a52";
+export const ZONING_PENDING_COLOR = "#f2b01e";
+
 export const EV_CHARGING_LEGEND: LegendEntry[] = [
   { bucket: "home", label: "Can charge at home", color: "#1baf7a" },
   { bucket: "public", label: "On-street charger with room nearby", color: "#2a78d6" },

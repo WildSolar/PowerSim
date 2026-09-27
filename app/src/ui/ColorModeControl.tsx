@@ -4,6 +4,10 @@ import {
   CONSTRUCTION_COLOR,
   DISTRICT_HEAT_LEGEND,
   EV_CHARGING_LEGEND,
+  ZONING_LEGEND,
+  DH_PRIORITY_COLOR,
+  HIGH_STANDARD_COLOR,
+  ZONING_PENDING_COLOR,
   CHARGER_USE_RAMP,
   HEATING_LEGEND,
   INSULATION_LEGEND,
@@ -25,6 +29,7 @@ const MODES: { key: ColorMode; label: string }[] = [
   { key: "heating", label: "Heating" },
   { key: "districtHeat", label: "District heat" },
   { key: "evCharging", label: "EV charging" },
+  { key: "zoning", label: "Zoning" },
   { key: "power", label: "Power draw" },
   { key: "solar", label: "Solar" },
   { key: "age", label: "Age" },
@@ -45,6 +50,7 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
     heating: HEATING_LEGEND,
     districtHeat: DISTRICT_HEAT_LEGEND,
     evCharging: EV_CHARGING_LEGEND,
+    zoning: ZONING_LEGEND,
     age: AGE_LEGEND,
     insulation: INSULATION_LEGEND,
   };
@@ -84,6 +90,26 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
               <span>{line.label}</span>
             </div>
           ))}
+        </div>
+      )}
+      {mode === "zoning" && (
+        <div className="legend" style={{ marginTop: 6 }}>
+          <div className="legend-row">
+            <span className="swatch" style={{ background: "#f2c14e", opacity: 0.95 }} />
+            <span>Stronger colour: extra floors allowed</span>
+          </div>
+          <div className="legend-row">
+            <span className="swatch" style={{ background: `repeating-linear-gradient(135deg, ${DH_PRIORITY_COLOR} 0 3px, transparent 3px 7px)` }} />
+            <span>District-heat priority zone</span>
+          </div>
+          <div className="legend-row">
+            <span className="swatch" style={{ background: `repeating-linear-gradient(45deg, ${HIGH_STANDARD_COLOR} 0 3px, transparent 3px 7px)` }} />
+            <span>High-standard zone</span>
+          </div>
+          <div className="legend-row">
+            <span className="swatch line-swatch" style={{ background: ZONING_PENDING_COLOR }} />
+            <span>Change on the way</span>
+          </div>
         </div>
       )}
       {mode === "evCharging" && (

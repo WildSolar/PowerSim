@@ -69,7 +69,7 @@ import {
   ZONE_GROUP_WEIGHTS,
   type BuildingGroup,
 } from "../config/stock";
-import type { Building, Dwelling, DevelopmentSite, MunicipalityDataset } from "../data/types";
+import type { Building, Dwelling, DevelopmentSite, MunicipalityDataset, SiteZone } from "../data/types";
 import { toDateMs } from "./calendar";
 import { constructionRules, type ConstructionRules } from "./constructionRules";
 import { simClock } from "./engine";
@@ -93,6 +93,7 @@ import {
 import { applyNewBuildAttributes, buildingGroup, gfaOf } from "./newBuild";
 import { policyStore } from "./policy";
 import { commitVehicleDecisions } from "./mobility";
+import { groupFitsZone, zoning } from "./zoning";
 import { fleets } from "./fleet";
 import { energyClassAt } from "./retrofit";
 import { measures } from "./measures";
@@ -596,7 +597,8 @@ class StockStore {
 
     const rules = constructionRules(policyStore.get(), yearOf(atMs));
     const thin = this.rng("thin", egid, String(this.thinCounter++));
-    if (thin() >= Math.min(1, (rules.renewalRateMultiplier * this.densificationBoost()) / THINNING_CAP)) {
+    const zoningBoost = zoning.renewalBoost(b, this.groupOf.get(egid) ?? null, atMs);
+    if (thin() >= Math.min(1, (rules.renewalRateMultiplier * this.densificationBoost() * zoningBoost) / THINNING_CAP)) {
       this.scheduleTrigger(b, atMs, thin());
       return false;
     }
@@ -673,18 +675,34 @@ class StockStore {
     const group = this.groupOf.get(old.egid) ?? null;
     const oldDwellings = old.dwellings.length;
     const oldFloors = Math.max(1, old.floorCount ?? 2);
+    // Zoning: floors the plan now allows on top, and — if the parcel was rezoned to a use this
+    // building doesn't fit — a building of the new use in its place (a factory becomes flats).
+    const extraFloors = zoning.stateForBuilding(old, atMs)?.extraFloors ?? 0;
+    const newZone = zoning.rezoned(old, atMs);
+    const conversion = group !== null && newZone !== null && !groupFitsZone(group, newZone) ? this.conversionFor(old, newZone, rng) : null;
+    const [cx, cy] = this.centroidXY.get(old.egid) as XY;
+    const cap = this.heightCap(cx, cy, old.egid) + extraFloors;
 
     let dwellingCount = oldDwellings;
     let floors = oldFloors;
     let areaScale = 1;
-    if (group !== null) {
+    if (conversion) {
+      floors = Math.max(1, Math.min(Math.max(conversion.floors, oldFloors) + extraFloors, conversion.group === "houseSingle" ? 3 : cap));
+      const gfa = (old.footprintAreaM2 ?? 0) * floors;
+      dwellingCount = conversion.group === "apartments" ? Math.max(3, Math.round(gfa / this.gfaPerApartment)) : conversion.group === "houseSingle" ? 1 : 0;
+    } else if (group !== null) {
       const uplift = REPLACEMENT_UPLIFT_MIN + rng() * (REPLACEMENT_UPLIFT_MAX - REPLACEMENT_UPLIFT_MIN);
       if (oldDwellings > 0) dwellingCount = Math.max(oldDwellings, stochasticRound(oldDwellings * uplift, rng()));
       const effectiveUplift = oldDwellings > 0 ? dwellingCount / oldDwellings : uplift;
       const desiredFloors = Math.max(oldFloors, stochasticRound(oldFloors * effectiveUplift, rng()));
-      const [cx, cy] = this.centroidXY.get(old.egid) as XY;
       floors = Math.max(oldFloors, Math.min(desiredFloors, this.heightCap(cx, cy, old.egid)));
       if (floors < desiredFloors) areaScale = floors / desiredFloors; // capped: same dwellings, squeezed into less floor area
+      if (extraFloors > 0) {
+        // Densified: the extra floors on top, filled with homes like the rest.
+        const higher = Math.min(floors + extraFloors, cap);
+        if (oldDwellings > 0) dwellingCount = Math.max(dwellingCount, Math.round((dwellingCount * higher) / floors));
+        floors = higher;
+      }
     }
 
     const building: Building = {
@@ -694,8 +712,8 @@ class StockStore {
       footprint: old.footprint,
       address: old.address,
       constructionYear: yearOf(builtAtMs),
-      category: old.category,
-      buildingClass: old.buildingClass,
+      category: conversion?.category ?? old.category,
+      buildingClass: conversion?.buildingClass ?? old.buildingClass,
       floorCount: floors,
       energyReferenceAreaM2: null,
       footprintAreaM2: old.footprintAreaM2,
@@ -758,7 +776,9 @@ class StockStore {
       if (open.length === 0) return false;
       const state = pickWeighted(open, open.map((s) => Math.sqrt(Math.max(1, s.site.areaM2 - s.usedAreaM2))), rng());
 
-      const group = this.pickGroup(state, rng);
+      const zone = zoning.zoneForSite(state.site, atMs);
+      const extraFloors = zoning.extraFloorsForSite(state.site, atMs);
+      const group = this.pickGroup(state, zone, rng);
       if (!group) {
         state.exhausted = true;
         continue;
@@ -817,6 +837,7 @@ class StockStore {
 
       let floors = Math.max(1, template.floors + (group === "apartments" ? Math.floor(rng() * 3) - 1 : 0));
       floors = Math.min(floors, group === "houseSingle" ? 3 : this.heightCap(rect.cx, rect.cy, ""), 12);
+      if (group !== "houseSingle") floors += extraFloors; // a densified parcel: higher than its neighbours
       const gfa = footprintArea * floors;
       let dwellingCount = 0;
       if (group === "apartments") dwellingCount = Math.max(3, Math.round(gfa / this.gfaPerApartment));
@@ -859,9 +880,9 @@ class StockStore {
     return false;
   }
 
-  private pickGroup(state: SiteState, rng: () => number): BuildingGroup | null {
-    const weights = { ...ZONE_GROUP_WEIGHTS[state.site.zone] } as Partial<Record<BuildingGroup, number>>;
-    if (state.site.zone === "residential") {
+  private pickGroup(state: SiteState, zone: SiteZone, rng: () => number): BuildingGroup | null {
+    const weights = { ...ZONE_GROUP_WEIGHTS[zone] } as Partial<Record<BuildingGroup, number>>;
+    if (zone === "residential") {
       const small = state.site.areaM2 - state.usedAreaM2 < SMALL_RESIDENTIAL_SITE_M2;
       weights.houseSingle = small ? 0.8 : 0.15;
       weights.apartments = small ? 0.2 : 0.85;
@@ -1031,13 +1052,30 @@ class StockStore {
 
   /** The attributes decided at permit time: heating, insulation, solar. */
   private finishBuilding(b: Building, permitAtMs: number, builtAtMs: number, rules: ConstructionRules, rng: () => number): void {
+    const districtHeatingOnStreet = districtHeat.servesAt(b.streetSegments, permitAtMs);
     applyNewBuildAttributes(b, {
-      rules,
+      rules: zoning.localRules(rules, b, permitAtMs, districtHeatingOnStreet), // its parcel's energy zones
       permitAtMs,
       builtAtMs,
-      districtHeatingOnStreet: districtHeat.servesAt(b.streetSegments, permitAtMs),
+      districtHeatingOnStreet,
       draws: { quality: rng(), heating: rng(), solar: rng() },
     });
+    zoning.chargeLevy(b, gfaOf(b), permitAtMs);
+  }
+
+  /** What an old building becomes when its parcel has been rezoned to a use it doesn't fit: a kind
+   * the new zone allows (flats rather than a house on a big footprint), with the typical storey
+   * count and register classes of that kind. */
+  private conversionFor(old: Building, zone: SiteZone, rng: () => number): { group: BuildingGroup; floors: number; buildingClass: string | null; category: string | null } | null {
+    const weights = { ...ZONE_GROUP_WEIGHTS[zone] } as Partial<Record<BuildingGroup, number>>;
+    if ((old.footprintAreaM2 ?? 0) > 250) delete weights.houseSingle;
+    const groups = (Object.keys(weights) as BuildingGroup[]).filter((g) => (weights[g] ?? 0) > 0 && this.templates[g].length > 0);
+    if (groups.length === 0) return null;
+    const group = pickWeighted(groups, groups.map((g) => weights[g] as number), rng());
+    const pool = this.templates[group];
+    const template = pool[Math.floor(rng() * pool.length)];
+    const floors = [...pool.map((t) => t.floors)].sort((a, b) => a - b)[Math.floor(pool.length / 2)];
+    return { group, floors, buildingClass: template.buildingClass, category: template.category };
   }
 
   private register(b: Building, atMs: number): void {
