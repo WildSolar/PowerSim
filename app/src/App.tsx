@@ -70,6 +70,27 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
   const keyboardEnabled = !showControl && !showWiki && reportCardYear === null;
   useTimeKeyboard(keyboardEnabled);
 
+  // Escape closes whatever is on top: the Year in Review, then the Wiki or the Control window, then a
+  // charger being placed, then a dwelling (back to its building), a building, a selected charger.
+  // The game-over screen stays.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (approval.getGameOver()) return;
+      if (reportCardYear !== null) reportCardStore.dismiss();
+      else if (showWiki) setShowWiki(false);
+      else if (showControl) setShowControl(false);
+      else if (publicCharging.getPlacing()) publicCharging.startPlacing(null);
+      else if (selectedEwid !== null) setSelectedEwid(null);
+      else if (selectedEgid !== null) setSelectedEgid(null);
+      else if (publicCharging.getSelectedId() !== null) publicCharging.select(null);
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [reportCardYear, showWiki, showControl, selectedEwid, selectedEgid]);
+
   useEffect(() => {
     simClock.start();
     const stopWatcher = startYearEndWatcher();
