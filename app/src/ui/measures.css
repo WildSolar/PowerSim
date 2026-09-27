@@ -186,3 +186,11 @@
   color: #7a5200;
   font-size: 12px;
 }
+
+.measure-card.unavailable > :not(.measure-head):not(.measure-note):not(.measure-actions) {
+  opacity: 0.5;
+}
+
+.measure-card.unavailable .measure-title {
+  color: #898781;
+}

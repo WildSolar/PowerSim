@@ -746,30 +746,39 @@ class PublicCharging {
     const whole = Math.floor(perYear);
     const count = whole + (firstRandom(hashSeed("public-building-chargers", String(year))) < perYear - whole ? 1 : 0);
     const demand = this.unmet.filter((d) => d.kind === "ac" && d.atMs >= yearStartMs(year - 1) && d.atMs < now);
-    const candidates = this.buildingsProvider()
-      .filter((b) => buildingGroup(b) === "public" && existsAt(b, now) && this.sitesAtBuilding(b.egid).length === 0)
+    const candidates = this.publicBuildingChargerCandidates(now)
       .map((b) => {
         const [x, y] = this.projection.toXY(b.lon, b.lat);
         return { b, demand: demand.filter((d) => Math.hypot(d.x - x, d.y - y) <= REACH_M.ac).length };
       })
       .sort((a, c) => c.demand - a.demand || (c.b.footprintAreaM2 ?? 0) - (a.b.footprintAreaM2 ?? 0));
-    // One site per campus: a school's several buildings share a car park. The register numbers them
-    // as sub-addresses of one address (Hofackerstrasse 2.1, 2.3), and they stand close together.
-    const atPublic = this.sites.filter((s) => s.atBuildingEgid !== undefined);
-    const taken = atPublic.map((s) => [s.x, s.y] as [number, number]);
-    const takenAddresses = new Set(atPublic.map((s) => campusAddress(this.buildingLookup(s.atBuildingEgid as string)?.address ?? null)).filter(Boolean));
     let placed = 0;
     for (const { b } of candidates) {
       if (placed >= count) break;
-      const [x, y] = this.projection.toXY(b.lon, b.lat);
-      const address = campusAddress(b.address);
-      if (taken.some(([tx, ty]) => Math.hypot(tx - x, ty - y) < PUBLIC_BUILDING_CAMPUS_M) || (address && takenAddresses.has(address))) continue;
-      const site = this.buildAtBuilding(b, channels.publicBuildingChargerPoints, now, { select: false });
-      taken.push([site.x, site.y]);
-      if (address) takenAddresses.add(address);
+      if (this.onChargedCampus(b)) continue; // one placed earlier in this round covers its campus now
+      this.buildAtBuilding(b, channels.publicBuildingChargerPoints, now, { select: false });
       placed++;
     }
     return placed > 0;
+  }
+
+  /** Whether a building's campus already has a charging site at a public building. One site per
+   * campus: a school's several buildings share a car park. The register numbers them as
+   * sub-addresses of one address (Hofackerstrasse 2.1, 2.3), and they stand close together. */
+  private onChargedCampus(b: Building): boolean {
+    const [x, y] = this.projection.toXY(b.lon, b.lat);
+    const address = campusAddress(b.address);
+    return this.sites.some((s) => {
+      if (s.atBuildingEgid === undefined) return false;
+      if (Math.hypot(s.x - x, s.y - y) < PUBLIC_BUILDING_CAMPUS_M) return true;
+      return address !== null && campusAddress(this.buildingLookup(s.atBuildingEgid)?.address ?? null) === address;
+    });
+  }
+
+  /** The public buildings the "Chargers at public buildings" measure can still put a site at on
+   * `atMs`: standing, and on a campus without one yet. */
+  publicBuildingChargerCandidates(atMs: number): Building[] {
+    return this.buildingsProvider().filter((b) => buildingGroup(b) === "public" && existsAt(b, atMs) && !this.onChargedCampus(b));
   }
 
   private operatorRound(year: number): boolean {

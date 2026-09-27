@@ -301,6 +301,20 @@ function evaluateAdoption(
 
 const MUNICIPAL_SOLAR_MIN_FOOTPRINT_M2 = 200;
 
+/** The public buildings the "Solar on public buildings" measure can still put panels on at `atMs`:
+ * standing, with a roof big enough, and no solar yet (nor any on order). */
+export function municipalSolarCandidates(buildings: Building[], realPlants: PowerPlant[], atMs: number): Building[] {
+  const realEgids = realPvEgids(realPlants);
+  return buildings.filter(
+    (b) =>
+      buildingGroup(b) === "public" &&
+      (b.footprintAreaM2 ?? 0) >= MUNICIPAL_SOLAR_MIN_FOOTPRINT_M2 &&
+      existsAt(b, atMs) &&
+      !adoptionByEgid.has(b.egid) &&
+      !realEgids.has(b.egid),
+  );
+}
+
 /** The municipality puts solar on some of its own (public) buildings this year — a measure, not an
  * owner's decision: full usable roof, paid for by the treasury (less the federal payment every
  * installation gets), generating from the install date. */
@@ -309,17 +323,9 @@ function installMunicipalSolar(buildings: Building[], realPlants: PowerPlant[], 
   if (perYear <= 0) return;
   const whole = Math.floor(perYear);
   const count = whole + (mulberry32(hashSeed("municipal-solar-count", String(year)))() < perYear - whole ? 1 : 0);
-  const realEgids = realPvEgids(realPlants);
-  const candidates = buildings
-    .filter(
-      (b) =>
-        buildingGroup(b) === "public" &&
-        (b.footprintAreaM2 ?? 0) >= MUNICIPAL_SOLAR_MIN_FOOTPRINT_M2 &&
-        existsAt(b, yearStartMs) &&
-        !adoptionByEgid.has(b.egid) &&
-        !realEgids.has(b.egid),
-    )
-    .sort((a, b) => hashSeed(a.egid, "municipal-solar", String(year)) - hashSeed(b.egid, "municipal-solar", String(year)));
+  const candidates = municipalSolarCandidates(buildings, realPlants, yearStartMs).sort(
+    (a, b) => hashSeed(a.egid, "municipal-solar", String(year)) - hashSeed(b.egid, "municipal-solar", String(year)),
+  );
   for (const building of candidates.slice(0, count)) {
     const usable = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
     const capacityKw = (building.footprintAreaM2 ?? 0) * usable * kwpPerM2At(year);

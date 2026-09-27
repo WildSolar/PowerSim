@@ -201,6 +201,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Solar: the full usable roof, ordered directly from the panel, paid by the treasury (less the federal payment every installation gets) and generating from a few months on. Or automatically, a few buildings a year, with the \"Solar on public buildings\" measure.",
         "Chargers: a public charging site in the building's car park, in any of the on-street sizes (4, 8 or 12 points), ordered directly. Or automatically with the \"Chargers at public buildings\" measure, which picks the buildings with the most unmet charging demand around them first. Either way they're municipal chargers like any other (see \"Public charging\").",
+        "Once every public building the programmes could reach has solar (or chargers), the matching measure has nothing left to do: it's greyed out in Control → Measures, and one already enacted sits idle at no cost.",
       ]),
       note(
         "The building register doesn't say who owns a building, so every public-use building counts as the municipality's — churches (owned by the church communities) and the hospital included.",

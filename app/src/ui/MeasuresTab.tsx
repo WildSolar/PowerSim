@@ -4,6 +4,7 @@ import { MEASURE_CATALOG } from "../sim/measureCatalog";
 import { defaultParams, MEASURE_CATEGORY_LABEL, type MeasureCategory, type MeasureDef, type MeasureParams } from "../sim/measureTypes";
 import { approval } from "../sim/approval";
 import { measures } from "../sim/measures";
+import { measureUnavailableReason } from "../sim/measureAvailability";
 import { useSimDay } from "../sim/store";
 import { treasury } from "../sim/treasury";
 import { formatCHF } from "./format";
@@ -26,6 +27,8 @@ function MeasureCard({ def, nowMs }: { def: MeasureDef; nowMs: number }) {
   const reaction = approval.reaction(def, draft);
   const vote = approval.getVoteInfo(def.id, def, nowMs);
   const changed = latest === null || !sameParams(latest, draft);
+  // Nothing left for it to do (every public building already has what it would build).
+  const unavailable = measureUnavailableReason(def.id, nowMs);
 
   let status: { label: string; tone: "off" | "pending" | "active" } = { label: "Not enacted", tone: "off" };
   if (state?.pending) {
@@ -35,11 +38,17 @@ function MeasureCard({ def, nowMs }: { def: MeasureDef; nowMs: number }) {
   }
 
   return (
-    <div className="measure-card">
+    <div className={`measure-card${unavailable ? " unavailable" : ""}`}>
       <div className="measure-head">
         <span className="measure-title">{def.title}</span>
-        <span className={`measure-status ${status.tone}`}>{status.label}</span>
+        <span className={`measure-status ${status.tone}`}>{unavailable && latest !== null ? "Idle" : status.label}</span>
       </div>
+      {unavailable && (
+        <div className="measure-note">
+          Nothing left to do: {unavailable}
+          {latest !== null ? " It costs nothing while idle." : ""}
+        </div>
+      )}
       {state?.pending && state.active && <div className="measure-note">Currently in effect with the earlier settings.</div>}
       <p className="measure-summary">{def.summary}</p>
 
@@ -93,7 +102,7 @@ function MeasureCard({ def, nowMs }: { def: MeasureDef; nowMs: number }) {
       )}
 
       <div className="measure-actions">
-        <button className="measure-enact" disabled={!changed} onClick={() => measures.enact(def.id, draft)}>
+        <button className="measure-enact" disabled={!changed || unavailable !== null} onClick={() => measures.enact(def.id, draft)}>
           {latest === null ? "Enact" : "Apply change"}
         </button>
         {latest !== null && (

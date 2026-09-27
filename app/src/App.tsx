@@ -27,6 +27,8 @@ import { stock } from "./sim/stock";
 import { streets } from "./sim/streets";
 import { districtHeat } from "./sim/districtHeat";
 import { publicCharging } from "./sim/publicCharging";
+import { setMeasureAvailability } from "./sim/measureAvailability";
+import { municipalSolarCandidates } from "./sim/solarAdoption";
 import { zoning } from "./sim/zoning";
 import { fleets } from "./sim/fleet";
 import { bookInitialPublicCharging } from "./sim/mobility";
@@ -90,6 +92,13 @@ function Game({ slug, difficulty }: { slug: string; difficulty: Difficulty }) {
         publicCharging.setBuildingsProvider(() => stock.getAll());
         fleets.init(loaded, (egid) => stock.lookup(egid)); // before the stock: it commits their decisions
         stock.init(loaded);
+        // The public-building programmes have nothing left to do once every building they could reach has it.
+        setMeasureAvailability("municipal-solar", (atMs) =>
+          municipalSolarCandidates(stock.getAll(), loaded.powerPlants, atMs).length === 0 ? "Every public building with a roof for it already has solar." : null,
+        );
+        setMeasureAvailability("public-building-chargers", (atMs) =>
+          publicCharging.publicBuildingChargerCandidates(atMs).length === 0 ? "Every public building (campus) already has chargers." : null,
+        );
         bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building
         setDataset(loaded);
       })
