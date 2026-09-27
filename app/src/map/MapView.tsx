@@ -440,14 +440,15 @@ function gridZonesGeoJSON(simTimeMs: number) {
   const zones = grid.zonePolygons();
   return {
     type: "FeatureCollection" as const,
-    features: grid
-      .getAreas()
-      .filter((a) => (zones[a.id]?.length ?? 0) >= 4)
-      .map((a) => ({
-        type: "Feature" as const,
-        properties: { id: a.id, bucket: grid.bucket(a, simTimeMs), selected: a.id === selected ? 1 : 0 },
-        geometry: { type: "Polygon" as const, coordinates: [zones[a.id]] },
-      })),
+    features: grid.getAreas().flatMap((a) => {
+      const zone = zones[a.id];
+      if (!zone || zone.fill.length === 0) return [];
+      const properties = { id: a.id, bucket: grid.bucket(a, simTimeMs), selected: a.id === selected ? 1 : 0 };
+      return [
+        { type: "Feature" as const, properties: { ...properties, part: "fill" }, geometry: { type: "MultiPolygon" as const, coordinates: zone.fill } },
+        { type: "Feature" as const, properties: { ...properties, part: "edge" }, geometry: { type: "MultiLineString" as const, coordinates: zone.edges } },
+      ];
+    }),
   };
 }
 
@@ -801,6 +802,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         id: GRID_ZONE_FILL_LAYER_ID,
         type: "fill",
         source: GRID_ZONE_SOURCE_ID,
+        filter: ["==", ["get", "part"], "fill"],
         layout: { visibility: gridVisibility },
         paint: { "fill-color": ml(legendMatchExpression("bucket", GRID_LEGEND)), "fill-opacity": ["case", ["==", ["get", "selected"], 1], 0.3, 0.14] },
       });
@@ -808,15 +810,16 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         id: GRID_ZONE_LINE_LAYER_ID,
         type: "line",
         source: GRID_ZONE_SOURCE_ID,
-        layout: { visibility: gridVisibility, "line-join": "round" },
+        filter: ["==", ["get", "part"], "edge"],
+        layout: { visibility: gridVisibility, "line-join": "round", "line-cap": "round" },
         paint: { "line-color": "#52514e", "line-width": 1.2, "line-opacity": 0.7 },
       });
       map.addLayer({
         id: GRID_ZONE_SELECTED_LAYER_ID,
         type: "line",
         source: GRID_ZONE_SOURCE_ID,
-        filter: ["==", ["get", "selected"], 1],
-        layout: { visibility: gridVisibility, "line-join": "round" },
+        filter: ["all", ["==", ["get", "part"], "edge"], ["==", ["get", "selected"], 1]],
+        layout: { visibility: gridVisibility, "line-join": "round", "line-cap": "round" },
         paint: { "line-color": SELECTED_COLOR, "line-width": 3.5 },
       });
 

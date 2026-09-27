@@ -40,7 +40,14 @@ import { buildingPowerW } from "./buildingPower";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { simClock } from "./engine";
 import { existsAt } from "./lifetime";
-import { LocalProjection } from "./localGeo";
+import {
+  clipRingToHalfPlanes,
+  clipSegmentToHalfPlanes,
+  type HalfPlane,
+  LocalProjection,
+  segmentInsideRings,
+  type XY,
+} from "./localGeo";
 import { ghiWm2 } from "./pv";
 import { publicCharging } from "./publicCharging";
 import { hashSeed, mulberry32 } from "./rng";
@@ -96,9 +103,16 @@ export function reinforceCostRp(fromKw: number): number {
   return (REINFORCE_BASE_CHF + REINFORCE_CHF_PER_KVA * toKw) * 100;
 }
 
+/** A station's zone for the map, in [lon, lat]: its area as polygons, and its outline as lines. */
+export interface GridZone {
+  fill: [number, number][][][];
+  edges: [number, number][][];
+}
+
 class Grid {
   private areas: GridArea[] = [];
-  private zones: [number, number][][] | null = null;
+  private zones: GridZone[] | null = null;
+  private boundary: XY[][][] | null = null; // the municipality, in local metres: parts, then rings
   private areaOfEgid = new Map<string, number>();
   private projection = new LocalProjection(8.4, 47.4);
   private realPlants: PowerPlant[] = [];
@@ -119,6 +133,15 @@ class Grid {
     this.buildingsProvider = buildingsProvider;
     this.areaOfEgid = new Map();
     this.zones = null;
+    // Each ring without its closing point (the clipping treats rings as closed).
+    this.boundary =
+      dataset.boundary?.map((rings) =>
+        rings.map((ring) => {
+          const xy = ring.map(([lon, lat]) => this.projection.toXY(lon, lat));
+          const [f, l] = [xy[0], xy[xy.length - 1]];
+          return xy.length > 1 && f[0] === l[0] && f[1] === l[1] ? xy.slice(0, -1) : xy;
+        }),
+      ) ?? null;
     this.selectedId = null;
     const startYear = yearOf(0);
 
@@ -258,49 +281,84 @@ class Grid {
     return id;
   }
 
-  /** The zone each station serves: the part of the map closer to it than to any other station —
-   * which is exactly where its buildings are (each joins its nearest station). Drawn within the
-   * buildings' extent plus a margin. [lon, lat] rings, by area id; computed once. */
-  zonePolygons(): [number, number][][] {
+  /** The zone each station serves: the part of the town closer to it than to any other station —
+   * which is exactly where its buildings are (each joins its nearest station) — cut to the municipal
+   * boundary. `fill` is a multipolygon; `edges` are its outlines as lines, drawn only inside the town
+   * (a cut along the boundary would otherwise leave seams outside it). [lon, lat], by area id;
+   * computed once. */
+  zonePolygons(): GridZone[] {
     if (this.zones) return this.zones;
-    const all = this.buildingsProvider();
-    const xy = all.map((b) => this.projection.toXY(b.lon, b.lat));
+    const boundary = this.boundary;
+    // The extent the cells are cut from: the municipality, or without one the buildings, plus a margin.
+    const extent = boundary ? boundary.flat(2) : this.buildingsProvider().map((b) => this.projection.toXY(b.lon, b.lat));
     const margin = 300;
-    const minX = Math.min(...xy.map((p) => p[0])) - margin;
-    const maxX = Math.max(...xy.map((p) => p[0])) + margin;
-    const minY = Math.min(...xy.map((p) => p[1])) - margin;
-    const maxY = Math.max(...xy.map((p) => p[1])) + margin;
+    const minX = Math.min(...extent.map((p) => p[0])) - margin;
+    const maxX = Math.max(...extent.map((p) => p[0])) + margin;
+    const minY = Math.min(...extent.map((p) => p[1])) - margin;
+    const maxY = Math.max(...extent.map((p) => p[1])) + margin;
+    const box: XY[] = [
+      [minX, minY],
+      [maxX, minY],
+      [maxX, maxY],
+      [minX, maxY],
+    ];
+    const allRings = boundary?.flat() ?? [];
+    const toLonLat = (p: XY) => this.projection.toLonLat(p[0], p[1]);
+    const lerp = (p: XY, q: XY, t: number): XY => [p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])];
+    const close = (ring: XY[]) => [...ring, ring[0]].map(toLonLat);
+
     this.zones = this.areas.map((a) => {
-      let poly: [number, number][] = [
-        [minX, minY],
-        [maxX, minY],
-        [maxX, maxY],
-        [minX, maxY],
-      ];
-      for (const o of this.areas) {
-        if (o.id === a.id || poly.length === 0) continue;
-        // Keep the side of the midline between the two stations that is closer to this one.
-        const mx = (a.x + o.x) / 2;
-        const my = (a.y + o.y) / 2;
-        const nx = o.x - a.x;
-        const ny = o.y - a.y;
-        const side = (p: [number, number]) => (p[0] - mx) * nx + (p[1] - my) * ny;
-        const clipped: [number, number][] = [];
-        for (let i = 0; i < poly.length; i++) {
-          const p = poly[i];
-          const q = poly[(i + 1) % poly.length];
-          const dp = side(p);
-          const dq = side(q);
-          if (dp <= 0) clipped.push(p);
-          if (dp <= 0 !== dq <= 0) {
-            const t = dp / (dp - dq);
-            clipped.push([p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])]);
-          }
-        }
-        poly = clipped;
+      // Keep the side of each midline between this station and another that is closer to this one.
+      const planes: HalfPlane[] = this.areas
+        .filter((o) => o.id !== a.id)
+        .map((o) => {
+          const mx = (a.x + o.x) / 2;
+          const my = (a.y + o.y) / 2;
+          const nx = o.x - a.x;
+          const ny = o.y - a.y;
+          return (p: XY) => (p[0] - mx) * nx + (p[1] - my) * ny;
+        });
+      const cell = clipRingToHalfPlanes(box, planes);
+      if (!boundary) {
+        return cell.length >= 3 ? { fill: [[close(cell)]], edges: [close(cell)] } : { fill: [], edges: [] };
       }
-      const ring = poly.map(([x, y]) => this.projection.toLonLat(x, y) as [number, number]);
-      return ring.length > 0 ? [...ring, ring[0]] : ring;
+
+      // The fill: each part of the municipality (with any enclaves as holes), cut to the cell.
+      const fill: [number, number][][][] = [];
+      for (const rings of boundary) {
+        const outer = clipRingToHalfPlanes(rings[0], planes);
+        if (outer.length < 3) continue;
+        const holes = rings.slice(1).map((r) => clipRingToHalfPlanes(r, planes)).filter((r) => r.length >= 3);
+        fill.push([outer, ...holes].map(close));
+      }
+
+      // The outline: the cell's sides where they run inside the town, and the town's border where it
+      // runs through the cell. Consecutive pieces are joined into one line.
+      const lines: XY[][] = [];
+      let line: XY[] | null = null;
+      const add = (p: XY, q: XY) => {
+        const end = line?.[line.length - 1];
+        if (line && end && end[0] === p[0] && end[1] === p[1]) line.push(q);
+        else {
+          line = [p, q];
+          lines.push(line);
+        }
+      };
+      for (let i = 0; i < cell.length; i++) {
+        const p = cell[i];
+        const q = cell[(i + 1) % cell.length];
+        for (const [t0, t1] of segmentInsideRings(p, q, allRings)) add(lerp(p, q, t0), lerp(p, q, t1));
+      }
+      for (const ring of allRings) {
+        line = null;
+        for (let i = 0; i < ring.length; i++) {
+          const p = ring[i];
+          const q = ring[(i + 1) % ring.length];
+          const kept = clipSegmentToHalfPlanes(p, q, planes);
+          if (kept) add(lerp(p, q, kept[0]), lerp(p, q, kept[1]));
+        }
+      }
+      return { fill, edges: lines.map((l) => l.map(toLonLat)) };
     });
     return this.zones;
   }

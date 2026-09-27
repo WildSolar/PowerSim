@@ -243,3 +243,89 @@ export class MinHeap<T> {
     return top;
   }
 }
+
+/** The side of a line a point is on: keep where `side(p) <= 0`. For convex clipping. */
+export type HalfPlane = (p: XY) => number;
+
+/** The part of a ring on the kept side of every half-plane (Sutherland–Hodgman). The clip region is
+ * convex, so even a concave ring comes out whole — at most with zero-width seams along a cut, which
+ * don't show in a fill. */
+export function clipRingToHalfPlanes(ring: XY[], planes: HalfPlane[]): XY[] {
+  let poly = ring;
+  for (const side of planes) {
+    if (poly.length === 0) break;
+    const clipped: XY[] = [];
+    for (let i = 0; i < poly.length; i++) {
+      const p = poly[i];
+      const q = poly[(i + 1) % poly.length];
+      const dp = side(p);
+      const dq = side(q);
+      if (dp <= 0) clipped.push(p);
+      if (dp <= 0 !== dq <= 0) {
+        const t = dp / (dp - dq);
+        clipped.push([p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])]);
+      }
+    }
+    poly = clipped;
+  }
+  return poly;
+}
+
+/** The part of a segment on the kept side of every half-plane, as [from, to] parameters, or null. */
+export function clipSegmentToHalfPlanes(p: XY, q: XY, planes: HalfPlane[]): [number, number] | null {
+  let t0 = 0;
+  let t1 = 1;
+  for (const side of planes) {
+    const dp = side(p);
+    const dq = side(q);
+    if (dp > 0 && dq > 0) return null;
+    if (dp > 0) t0 = Math.max(t0, dp / (dp - dq));
+    else if (dq > 0) t1 = Math.min(t1, dp / (dp - dq));
+  }
+  return t0 < t1 ? [t0, t1] : null;
+}
+
+/** Whether a point lies inside a set of rings, by the even-odd rule (holes count as outside). */
+export function insideRings(p: XY, rings: XY[][]): boolean {
+  let inside = false;
+  for (const ring of rings) {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i];
+      const [xj, yj] = ring[j];
+      if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** The parts of a segment inside a set of rings (even-odd), as [from, to] parameters. */
+export function segmentInsideRings(p: XY, q: XY, rings: XY[][]): [number, number][] {
+  const ts = [0, 1];
+  const dx = q[0] - p[0];
+  const dy = q[1] - p[1];
+  for (const ring of rings) {
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i];
+      const b = ring[(i + 1) % ring.length];
+      const ex = b[0] - a[0];
+      const ey = b[1] - a[1];
+      const den = dx * ey - dy * ex;
+      if (den === 0) continue;
+      const t = ((a[0] - p[0]) * ey - (a[1] - p[1]) * ex) / den;
+      const u = ((a[0] - p[0]) * dy - (a[1] - p[1]) * dx) / den;
+      if (t > 0 && t < 1 && u >= 0 && u <= 1) ts.push(t);
+    }
+  }
+  ts.sort((a, b) => a - b);
+  const pieces: [number, number][] = [];
+  for (let i = 0; i + 1 < ts.length; i++) {
+    const [t0, t1] = [ts[i], ts[i + 1]];
+    if (t1 - t0 < 1e-9) continue;
+    const m = (t0 + t1) / 2;
+    if (!insideRings([p[0] + m * dx, p[1] + m * dy], rings)) continue;
+    const last = pieces[pieces.length - 1];
+    if (last && Math.abs(last[1] - t0) < 1e-9) last[1] = t1;
+    else pieces.push([t0, t1]);
+  }
+  return pieces;
+}
