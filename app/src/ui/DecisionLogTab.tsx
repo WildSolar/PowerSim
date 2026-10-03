@@ -158,7 +158,6 @@ export function DecisionLogTab({ dataset }: DecisionLogTabProps) {
 
   return (
     <div className="panel-typography">
-      <h2 style={{ fontSize: 14, marginTop: 0 }}>🐛 Decision log</h2>
       <p style={{ fontSize: 12, color: "var(--ink-3)", margin: "0 0 10px" }}>
         Every stock-renewal/solar-adoption decision actually committed — a development tool for calibration, not something players see.
       </p>

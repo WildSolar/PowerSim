@@ -37,7 +37,7 @@ function toSlices(energy: CategoryEnergyKWh, categories: typeof CONSUMPTION_CATE
 /** The municipality-wide summary — building/dwelling/solar counts, an Energy
  * breakdown pie pair (day/week/month/year, switchable), and the live Net power
  * / Solar generation charts. Shares `.panel-typography` (panels.css) for its
- * h2/dl look, since it's rendered inside ControlPanel's `.modal-content` rather
+ * h2/dl look, since it's rendered inside the town hall's page rather
  * than a `.panel` card. */
 export function CityStatsTab({ dataset }: CityStatsTabProps) {
   const tariff = useTariff();

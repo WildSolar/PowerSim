@@ -228,7 +228,6 @@ export function MeasuresTab() {
 
   return (
     <div className="measures-tab">
-      <h2>🏛️ Measures</h2>
       <SupervisionNotice />
       <p className="measures-intro">
         What the municipality can decide. Money leaves the treasury only when something actually happens — a subsidy when a household takes it up, a

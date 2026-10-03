@@ -24,7 +24,7 @@ const DAY_MS = 24 * 60 * 60_000;
 
 /** The current simulated day, as a day-bucketed timestamp, re-rendering only
  * when it actually changes — unlike useSimTime, safe for a component that
- * shouldn't re-render every animation frame (CityStatsTab, ControlPanel's
+ * shouldn't re-render every animation frame (CityStatsTab, TownHall's
  * History tab), but still live enough for solarAdoption.ts's
  * effectivePowerPlantsAt: an adoption decided for later in the year must
  * stay invisible until the simulated day it's actually dated, so a whole

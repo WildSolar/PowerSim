@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
-import { ControlPanel } from "./ui/ControlPanel";
+import { TownHall, type TownHallSection } from "./ui/TownHall";
 import { DwellingPanel } from "./ui/DwellingPanel";
 import { LayerDock, isToolLayer, layerLabel } from "./ui/LayerDock";
 import { LayerLegend } from "./ui/LayerLegend";
@@ -13,7 +13,6 @@ import { GridPanel } from "./ui/GridPanel";
 import { PublicBuildingsPanel } from "./ui/PublicBuildingsPanel";
 import { ReportCardModal } from "./ui/ReportCardModal";
 import { GameOverModal } from "./ui/GameOverModal";
-import type { ControlTab } from "./ui/ControlPanel";
 import { StartMenu } from "./ui/StartMenu";
 import { WikiPanel } from "./ui/WikiPanel";
 import { loadDataset } from "./data/loadDataset";
@@ -73,16 +72,16 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
   const [selectedEgid, setSelectedEgid] = useState<string | null>(null);
   const [selectedEwid, setSelectedEwid] = useState<string | null>(null);
   const [colorMode, setColorMode] = useState<ColorMode>("none");
-  const [controlTab, setControlTab] = useState<ControlTab | null>(null);
-  const showControl = controlTab !== null;
+  const [townHall, setTownHall] = useState<TownHallSection | null>(null);
+  const showTownHall = townHall !== null;
   const [showWiki, setShowWiki] = useState(false);
   const [inboxSelection, setInboxSelection] = useState<InboxSelection | null>(null);
   const reportCardYear = useReportCardYear();
   const stockBuildings = useStockBuildings();
-  const keyboardEnabled = !showControl && !showWiki && inboxSelection === null && reportCardYear === null;
+  const keyboardEnabled = !showTownHall && !showWiki && inboxSelection === null && reportCardYear === null;
   useTimeKeyboard(keyboardEnabled);
 
-  // Escape closes whatever is on top: the Year in Review, then the Wiki or the Control window, then a
+  // Escape closes whatever is on top: the Year in Review, then the Wiki or the town hall, then a
   // charger being placed, then a dwelling (back to its building), a building, a selected charger,
   // and finally the map layer (back to Default, closing its panel). The game-over screen stays.
   useEffect(() => {
@@ -92,7 +91,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
       if (reportCardYear !== null) reportCardStore.dismiss();
       else if (inboxSelection !== null) setInboxSelection(null);
       else if (showWiki) setShowWiki(false);
-      else if (showControl) setControlTab(null);
+      else if (showTownHall) setTownHall(null);
       else if (publicCharging.getPlacing()) publicCharging.startPlacing(null);
       else if (selectedEwid !== null) setSelectedEwid(null);
       else if (selectedEgid !== null) setSelectedEgid(null);
@@ -103,7 +102,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [reportCardYear, inboxSelection, showWiki, showControl, selectedEwid, selectedEgid, colorMode]);
+  }, [reportCardYear, inboxSelection, showWiki, showTownHall, selectedEwid, selectedEgid, colorMode]);
 
   useEffect(() => {
     simClock.start();
@@ -196,8 +195,8 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
     <div style={{ position: "absolute", inset: 0 }}>
       <TopBar
         dataset={liveDataset ?? dataset}
-        onOpenTreasury={() => setControlTab("treasury")}
-        onOpenTownHall={() => setControlTab("measures")}
+        onOpenTreasury={() => setTownHall("treasury")}
+        onOpenTownHall={() => setTownHall((open) => (open ? null : "measures"))}
         onOpenInbox={() => setInboxSelection({ tab: "letters", id: null })}
         onOpenWiki={() => setShowWiki(true)}
         onMenu={returnToMenu}
@@ -252,7 +251,9 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
         ) : null}
       </div>
       <GameOverModal />
-      {controlTab && <ControlPanel dataset={liveDataset ?? dataset} transparency={transparency} initialTab={controlTab} onClose={() => setControlTab(null)} />}
+      {townHall && (
+        <TownHall dataset={liveDataset ?? dataset} transparency={transparency} section={townHall} onSection={setTownHall} onClose={() => setTownHall(null)} />
+      )}
       {showWiki && <WikiPanel onClose={() => setShowWiki(false)} />}
       {inboxSelection && (
         <InboxPanel

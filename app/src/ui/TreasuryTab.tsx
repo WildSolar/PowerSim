@@ -77,7 +77,6 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
 
   return (
     <>
-      <h2>🧾 Treasury</h2>
       <div className="borrow-summary">
         <div>
           <span className="borrow-label">Balance now</span>

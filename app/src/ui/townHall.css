@@ -1,0 +1,211 @@
+/* The town hall: a full-screen page below the top bar (which stays, with its live numbers). */
+
+.town-hall {
+  position: absolute;
+  top: var(--top-bar-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--fill);
+  color: var(--ink);
+  z-index: 6;
+}
+
+.th-header {
+  display: flex;
+  align-items: stretch;
+  gap: 24px;
+  padding: 0 16px 0 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.th-heading {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 10px 0;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.th-kicker {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.th-paused {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.th-paused::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--ink-3);
+  vertical-align: 1px;
+}
+
+.th-paused.running::before {
+  background: var(--good);
+}
+
+.th-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.th-tabs button {
+  position: relative;
+  padding: 0 14px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.th-tabs button:hover {
+  color: var(--ink);
+}
+
+.th-tabs button.active {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.th-tabs button.active::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 0;
+  height: 3px;
+  background: var(--accent);
+}
+
+.th-close {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.th-close:hover {
+  background: var(--fill);
+}
+
+.th-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.th-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 28px 32px 48px;
+  font-size: 13px;
+}
+
+.th-page-head {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ink);
+}
+
+.th-page-head h1 {
+  margin: 0 0 4px;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.th-page-head p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+/* Prose inside the sections, as the old Control window set it. */
+.th-page p {
+  line-height: 1.55;
+}
+
+.th-page .modal-note {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-1);
+  padding: 8px 10px;
+  margin: 0 0 12px;
+}
+
+.th-page .prices-columns > * {
+  flex: 1 1 360px;
+  max-width: 560px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+}
+
+.th-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+
+.th-stats > section {
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .th-header {
+    flex-wrap: wrap;
+    gap: 0 12px;
+    padding: 0 12px;
+  }
+  .th-tabs {
+    order: 3;
+    flex-basis: 100%;
+    height: 40px;
+  }
+  .th-page {
+    padding: 20px 16px 40px;
+  }
+  .th-stats {
+    grid-template-columns: 1fr;
+  }
+}

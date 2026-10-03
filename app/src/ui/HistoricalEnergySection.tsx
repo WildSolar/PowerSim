@@ -26,7 +26,7 @@ export interface HistoricalEnergySectionProps {
   tariffKey: string;
 }
 
-/** Day/week/month bar-chart history — shared by ControlPanel's History tab
+/** Day/week/month bar-chart history — shared by the town hall's Statistics
  * (municipality-wide), BuildingPanel, and DwellingPanel, the only difference
  * between them being which sampler (and entityId) they pass in. */
 export function HistoricalEnergySection({ entityId, sampler, tariffKey }: HistoricalEnergySectionProps) {

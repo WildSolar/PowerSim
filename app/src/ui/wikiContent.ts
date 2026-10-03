@@ -40,6 +40,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
       p(
         "Click any building to inspect it: its real attributes (construction year, heating system, floor count), which simulated devices it has, and how much power it's drawing right now. Click a dwelling inside a residential building to go one level deeper, down to individual appliances.",
       ),
+      p(
+        "The bar across the top shows the date and the speed, and the three numbers that matter most: the treasury, approval, and last year's emissions against the first year's. On the left of the map are its layers (see \"Map layers\"). Everything that isn't on the map — measures, the accounts, prices and the statistics — is in the Town hall (top right). The game pauses while the Town hall is open and carries on at the same speed when you close it; you can still set it running from the top bar if you'd rather watch.",
+      ),
       note(
         "Where real data exists (which buildings have solar, what heats them, how many dwellings), the simulation uses it. Where it doesn't (who owns an EV, exactly when someone runs their dishwasher), it uses a seeded random model tuned to be physically plausible rather than a guess at any one real household.",
       ),
