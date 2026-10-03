@@ -5,6 +5,8 @@ import { captureSave, GAME_VERSION, saveToString, type RunInfo } from "../sim/sa
 import { deleteSave, listSaves, newSaveId, putSave, type StoredSave } from "../sim/saveStore";
 import { formatDate } from "../sim/calendar";
 import { usePauseWhileOpen } from "./usePauseWhileOpen";
+import { ChangelogPanel } from "./ChangelogPanel";
+import { VERSION_LABEL } from "../changelog";
 import { downloadText, saveFileName, savedAtLabel } from "./saveFiles";
 import "./gameMenu.css";
 
@@ -18,6 +20,7 @@ export function GameMenu({ run, onClose, onMainMenu }: { run: RunInfo; onClose: 
   const [message, setMessage] = useState<{ text: string; tone: "good" | "bad" } | null>(null);
   const [exported, setExported] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
 
   const refresh = () =>
     listSaves()
@@ -89,7 +92,7 @@ export function GameMenu({ run, onClose, onMainMenu }: { run: RunInfo; onClose: 
                     <span className="gm-save-name">{s.meta.name}</span>
                     <span className="gm-save-meta">
                       {s.meta.dateLabel} · saved {savedAtLabel(s.meta.savedAt)}
-                      {s.meta.version !== GAME_VERSION ? " · older version" : ""}
+                      {s.meta.version !== GAME_VERSION ? ` · made with ${s.meta.release ?? "another version"}` : ""}
                     </span>
                   </div>
                   {s.id !== "autosave" && (
@@ -150,7 +153,12 @@ export function GameMenu({ run, onClose, onMainMenu }: { run: RunInfo; onClose: 
         {message && <p className={`gm-message ${message.tone}`}>{message.text}</p>}
 
         <footer className="gm-foot">
-          <span className="gm-version">Version {GAME_VERSION}</span>
+          <span className="gm-version">
+            Version {VERSION_LABEL} · build {GAME_VERSION} ·{" "}
+            <button className="gm-link" onClick={() => setShowChangelog(true)}>
+              What's new
+            </button>
+          </span>
           <button
             className="gm-secondary"
             onClick={() => {
@@ -161,6 +169,7 @@ export function GameMenu({ run, onClose, onMainMenu }: { run: RunInfo; onClose: 
           </button>
         </footer>
       </div>
+      {showChangelog && <ChangelogPanel onClose={() => setShowChangelog(false)} />}
     </div>
   );
 }

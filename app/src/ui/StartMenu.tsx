@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { loadMunicipalityIndex, type MunicipalityIndexEntry } from "../data/loadDataset";
 import { DEFAULT_DIFFICULTY, DIFFICULTY_ORDER, DIFFICULTY_SPECS, type Difficulty } from "../config/difficulty";
 import { LoadGamePanel } from "./LoadGamePanel";
+import { ChangelogPanel, hasUnseenRelease } from "./ChangelogPanel";
+import { VERSION_LABEL } from "../changelog";
 import type { SaveFile } from "../sim/saveGame";
 import "./StartMenu.css";
 
@@ -24,6 +26,8 @@ export function StartMenu({ onStart }: Props) {
   const [difficulty, setDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY);
   const [transparency, setTransparency] = useState(false);
   const [tab, setTab] = useState<"new" | "load">("new");
+  const [showChangelog, setShowChangelog] = useState(false);
+  const [unseen, setUnseen] = useState(hasUnseenRelease);
 
   useEffect(() => {
     loadMunicipalityIndex()
@@ -48,6 +52,17 @@ export function StartMenu({ onStart }: Props) {
           Zéro
         </h1>
         <p>A Swiss municipality, its buildings, its grid — and the road to net zero.</p>
+        <div className="start-menu-version">
+          <span>Version {VERSION_LABEL}</span>
+          <button
+            onClick={() => {
+              setShowChangelog(true);
+              setUnseen(false);
+            }}
+          >
+            What's new{unseen && <span className="start-menu-new">New</span>}
+          </button>
+        </div>
       </div>
       <div className="start-menu-card">
         <div className="start-menu-tabs" role="tablist">
@@ -114,6 +129,7 @@ export function StartMenu({ onStart }: Props) {
           </>
         )}
       </div>
+      {showChangelog && <ChangelogPanel onClose={() => setShowChangelog(false)} />}
     </div>
   );
 }

@@ -42,6 +42,7 @@ import { restoreYearReport, snapshotYearReport } from "./yearReport";
 import { resetYearEndWatcher } from "./yearEndWatcher";
 import { zoning } from "./zoning";
 import { decodeJson, encodeJson, fromBase64, gunzip, gzip, toBase64 } from "./saveCodec";
+import { VERSION_LABEL } from "../changelog";
 
 /** This build's version: a save only loads into the build that made it. */
 export const GAME_VERSION: string = __GAME_VERSION__;
@@ -53,7 +54,10 @@ const STRING_PREFIX = "CZ1:";
 /** What describes a save without opening it: shown in the lists. */
 export interface SaveMeta {
   format: typeof FORMAT;
+  /** The build (git commit) that made it: only the same build loads it. */
   version: string;
+  /** The public version that made it ("0.1.0"), for the lists. Absent in the earliest saves. */
+  release?: string;
   /** When it was saved, in real time (ISO). */
   savedAt: string;
   /** The player's name for it ("Autosave" for the automatic one). */
@@ -122,6 +126,7 @@ export async function captureSave(run: RunInfo, name: string): Promise<{ meta: S
   const meta: SaveMeta = {
     format: FORMAT,
     version: GAME_VERSION,
+    release: VERSION_LABEL,
     savedAt: new Date().toISOString(),
     name,
     slug: run.slug,
@@ -184,6 +189,11 @@ export async function openSave(bytes: Uint8Array): Promise<SaveFile> {
   return file;
 }
 
+/** "0.1.0 (build abc1234)", or just the build for the earliest saves. */
+export function versionOf(meta: SaveMeta): string {
+  return meta.release ? `${meta.release}, build ${meta.version}` : `build ${meta.version}`;
+}
+
 /** Whether a save can be loaded into this build. */
 export function isCompatible(meta: SaveMeta): boolean {
   return meta.version === GAME_VERSION;
@@ -192,7 +202,7 @@ export function isCompatible(meta: SaveMeta): boolean {
 function checkVersion(meta: SaveMeta): void {
   if (!isCompatible(meta)) {
     throw new SaveError(
-      `This save was made with another version of Commune Zéro (${meta.version}; this is ${GAME_VERSION}). For now, a save can only be loaded into the version that made it.`,
+      `This save was made with another version of Commune Zéro (${versionOf(meta)}; this is ${VERSION_LABEL}, build ${GAME_VERSION}). For now, a save can only be loaded into the exact version that made it.`,
     );
   }
 }

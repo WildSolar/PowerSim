@@ -1,0 +1,177 @@
+/* "What's new": a full page over everything, set like the wiki's reading column. */
+
+.changelog {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--fill);
+  color: var(--ink);
+  z-index: 30;
+}
+
+.cl-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.cl-kicker {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.cl-kicker::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 10px;
+  background: var(--accent);
+  vertical-align: 2px;
+}
+
+.cl-version {
+  font-size: 12px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.cl-version span {
+  color: var(--ink-3);
+}
+
+.cl-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.cl-close:hover {
+  background: var(--fill);
+}
+
+.cl-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.cl-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 36px 40px 56px;
+}
+
+.cl-page h1 {
+  margin: 0 0 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ink);
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.cl-release + .cl-release {
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line-strong);
+}
+
+.cl-release-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+
+.cl-release-head h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.cl-date {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.cl-date.dev {
+  color: var(--accent);
+}
+
+.cl-title {
+  margin-top: 2px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.cl-summary {
+  margin: 10px 0 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.cl-group {
+  margin-top: 18px;
+}
+
+.cl-group h3 {
+  margin: 0 0 6px;
+  font-family: var(--font);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.cl-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cl-group li {
+  position: relative;
+  padding: 8px 0 8px 22px;
+  border-top: 1px solid var(--line);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+
+.cl-group li:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.cl-group li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 18px;
+  width: 8px;
+  height: 2px;
+  background: var(--accent);
+}
+
+@media (max-width: 720px) {
+  .cl-page {
+    padding: 24px 16px 40px;
+  }
+}

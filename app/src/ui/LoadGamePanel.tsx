@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { DIFFICULTY_SPECS } from "../config/difficulty";
 import type { MunicipalityIndexEntry } from "../data/loadDataset";
-import { GAME_VERSION, isCompatible, openSave, SaveError, saveFromString, saveToString, type SaveFile } from "../sim/saveGame";
+import { GAME_VERSION, isCompatible, openSave, SaveError, saveFromString, saveToString, versionOf, type SaveFile } from "../sim/saveGame";
+import { VERSION_LABEL } from "../changelog";
 import { deleteSave, listSaves, readSave, type StoredSave } from "../sim/saveStore";
 import { downloadText, saveFileName, savedAtLabel } from "./saveFiles";
 
@@ -57,13 +58,13 @@ export function LoadGamePanel({ municipalities, onLoad }: { municipalities: Muni
                       return openSave(bytes);
                     })
                   }
-                  title={ok ? "Load this game" : `Made with another version (${s.meta.version}); this is ${GAME_VERSION}.`}
+                  title={ok ? "Load this game" : `Made with another version (${versionOf(s.meta)}); this is ${VERSION_LABEL}, build ${GAME_VERSION}.`}
                 >
                   <span className="load-name">{s.meta.name}</span>
                   <span className="load-meta">
                     {s.meta.municipality} · {s.meta.dateLabel} · {DIFFICULTY_SPECS[s.meta.difficulty]?.label ?? s.meta.difficulty} · approval {s.meta.approval}%
                   </span>
-                  <span className="load-meta">{ok ? `Saved ${savedAtLabel(s.meta.savedAt)}` : "Made with another version — can't be loaded"}</span>
+                  <span className="load-meta">{ok ? `Saved ${savedAtLabel(s.meta.savedAt)}` : `Made with ${s.meta.release ?? "another version"} — can't be loaded`}</span>
                 </button>
                 <div className="load-actions">
                   {ok && (
@@ -114,7 +115,9 @@ export function LoadGamePanel({ municipalities, onLoad }: { municipalities: Muni
         </label>
       </div>
       {error && <p className="start-menu-error">{error}</p>}
-      <p className="load-version">Version {GAME_VERSION}. A save loads only into the version that made it.</p>
+      <p className="load-version">
+        Version {VERSION_LABEL} (build {GAME_VERSION}). A save loads only into the exact version that made it.
+      </p>
     </div>
   );
 }
