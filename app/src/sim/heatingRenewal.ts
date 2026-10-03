@@ -53,6 +53,7 @@ import { dailyMeanTempC } from "./weather";
 import { priceFactor } from "./costTrends";
 import { zoning } from "./zoning";
 import { districtHeatFullAt, gridDrawBlockedAt } from "./gridLimits";
+import { heatPumpSiting } from "./heatPumpSiting";
 
 const DAY_MS = 24 * 60 * 60_000;
 const ANNUAL_SAMPLE_DAYS = 365;
@@ -141,11 +142,20 @@ function isHeatPump(id: HeatingSystemId): boolean {
   return id === "airHeatPump" || id === "groundHeatPump";
 }
 
+/** Whether the site allows a new heat pump of this kind (heatPumpSiting.ts): the ground for a
+ * ground-source one, the neighbours' quiet for an air one. Other systems: always. */
+export function siteAllowsHeating(building: Building, id: HeatingSystemId, atMs: number, newBuild: boolean): boolean {
+  if (id === "groundHeatPump") return heatPumpSiting.groundSource(building, atMs).kind !== "none";
+  if (id === "airHeatPump") return heatPumpSiting.airNoise(building, atMs, newBuild).step !== "notPermitted";
+  return true;
+}
+
 function candidatesAt(
   building: Building,
   atMs: number,
   incumbent: HeatingSystemId,
   withMunicipalSubsidy = true,
+  newBuild = false,
 ): RenewalCandidate<HeatingSystemId>[] {
   const tariff = tariffStore.get();
   const estimate = annualHeatingEstimate(building, atMs);
@@ -157,7 +167,22 @@ function candidatesAt(
   return HEATING_SYSTEM_ORDER.map((id) => {
     const spec = HEATING_SYSTEM_CATALOG[id];
     // Keeping the same system can be much cheaper than installing it new (see replacementInstallCostRp).
-    const installRp = (id === incumbent ? (spec.replacementInstallCostRp ?? spec.baseInstallCostRp) : spec.baseInstallCostRp) * priceFactor(id, atMs);
+    const keeps = id === incumbent && !newBuild;
+    let installRp = (keeps ? (spec.replacementInstallCostRp ?? spec.baseInstallCostRp) : spec.baseInstallCostRp) * priceFactor(id, atMs);
+    // A new heat pump has to fit its site (heatPumpSiting.ts); one replacing its like keeps its
+    // boreholes or wells, or its permitted outdoor spot.
+    let sited = true;
+    let siteRunningRp = 0;
+    if (id === "groundHeatPump" && !keeps) {
+      const source = heatPumpSiting.groundSource(building, atMs);
+      sited = source.kind !== "none";
+      if (source.kind !== "none") installRp *= source.costFactor;
+      if (source.kind === "groundwater") siteRunningRp = source.annualFeeRp;
+    } else if (id === "airHeatPump" && !keeps) {
+      const noise = heatPumpSiting.airNoise(building, atMs, newBuild);
+      sited = noise.step !== "notPermitted";
+      installRp += noise.extraCostRp;
+    }
     const beforeMunicipalRp = Math.max(0, installRp * scale - spec.subsidyRp);
     const municipalRp = withMunicipalSubsidy ? Math.min(municipalHeatingSubsidyRp(id), beforeMunicipalRp) : 0;
     const installCostRp = beforeMunicipalRp - municipalRp;
@@ -169,8 +194,9 @@ function candidatesAt(
       available:
         (id === "districtHeating" ? incumbent === "districtHeating" || (districtHeat.servesAt(building.streetSegments, atMs) && !districtHeatFullAt(atMs)) : true) &&
         !(fossilBanned && (id === "gasBoiler" || id === "oilBoiler")) &&
-        !(isHeatPump(id) && !isHeatPump(incumbent) && gridBlocked),
-      annualizedCostRp: installCostRp / spec.lifetimeMeanYears + runningCostRpFor(id, estimate, tariff, avgElecRpKWh),
+        !(isHeatPump(id) && !isHeatPump(incumbent) && gridBlocked) &&
+        sited,
+      annualizedCostRp: installCostRp / spec.lifetimeMeanYears + runningCostRpFor(id, estimate, tariff, avgElecRpKWh) + siteRunningRp,
       lifetimeMeanYears: spec.lifetimeMeanYears,
       greenness: spec.greenness,
     };
@@ -244,10 +270,10 @@ export function chooseNewBuildHeating(
   temperatureFraction: number,
 ): { chosen: HeatingSystemId; candidates: NewBuildHeatingCandidate[]; biasStrengthRp: number } {
   const bias = biasStrengthRp(building);
-  const base = candidatesAt(building, atMs, "airHeatPump", false); // a new build gets no renovation grant
+  const base = candidatesAt(building, atMs, "airHeatPump", false, true); // a new build gets no renovation grant
   const scored = base.map((c) => ({
     ...c,
-    available: isAvailable(c.id),
+    available: isAvailable(c.id) && siteAllowsHeating(building, c.id, atMs, true),
     effectiveCostRp: c.annualizedCostRp - bias * c.greenness,
   }));
   const available = scored.filter((c) => c.available);
@@ -315,7 +341,20 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function renewalNote(event: RenewalEvent<HeatingSystemId>): string {
+/** Why a heat pump the owner would have preferred wasn't possible here, if it's down to the site. */
+function siteReason(building: Building, id: HeatingSystemId, atMs: number): string {
+  if (id === "groundHeatPump") {
+    const source = heatPumpSiting.groundSource(building, atMs);
+    return source.kind === "none" ? ` (${source.reason})` : "";
+  }
+  if (id === "airHeatPump") {
+    const noise = heatPumpSiting.airNoise(building, atMs);
+    return noise.step === "notPermitted" ? " (its outdoor unit would be too loud for the neighbours, even installed indoors)" : "";
+  }
+  return "";
+}
+
+function renewalNote(event: RenewalEvent<HeatingSystemId>, building?: Building): string {
   const oldLabel = HEATING_SYSTEM_CATALOG[event.previousSystem as HeatingSystemId].label.toLowerCase();
   const base = `The old ${oldLabel} had reached the end of its service life.`;
 
@@ -324,7 +363,8 @@ function renewalNote(event: RenewalEvent<HeatingSystemId>): string {
     return `${base} It was replaced with ${again} — no clearly better alternative was found.`;
   }
   if (event.reasonKind === "forcedByAvailability" && event.bestOverallId) {
-    return `${base} Since ${articleLabel(event.bestOverallId)} was not available, ${articleLabel(event.system)} was installed instead.`;
+    const why = building ? siteReason(building, event.bestOverallId, event.installedAtMs) : "";
+    return `${base} Since ${articleLabel(event.bestOverallId)} was not available${why}, ${articleLabel(event.system)} was installed instead.`;
   }
   return `${base} ${capitalize(articleLabel(event.system))} was installed — cheaper to run over its lifetime.`;
 }
@@ -335,7 +375,7 @@ function renewalNote(event: RenewalEvent<HeatingSystemId>): string {
 export function heatingRenewalLog(building: Building, simTimeMs: number): HeatingRenewalLogEntry[] {
   const chain = chainFor(building, simTimeMs);
   if (!chain) return [];
-  return chain.filter((e) => e.reasonKind !== "initial").map((e) => ({ installedAtMs: e.installedAtMs, note: renewalNote(e) }));
+  return chain.filter((e) => e.reasonKind !== "initial").map((e) => ({ installedAtMs: e.installedAtMs, note: renewalNote(e, building) }));
 }
 
 export interface HeatingRenewalRecord {

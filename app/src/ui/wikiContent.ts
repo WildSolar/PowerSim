@@ -416,6 +416,26 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "heat-pump-siting",
+    icon: "📍",
+    title: "Where a heat pump may go",
+    blocks: [
+      p(
+        "Not every building can have every heat pump. Two things decide it, and both are public, so every building panel shows them under its heating (\"For a new heat pump\").",
+      ),
+      list([
+        "The ground. Canton Zurich's heat-use atlas puts every location in a zone. In a groundwater protection zone around a drinking-water well, nothing may be taken from the ground. Over a gravel aquifer that can supply drinking water — in Schlieren, the whole valley floor, about half the town — no boreholes may be drilled; groundwater may be used instead, but only by large systems (from about 190 kW of heating, a large building or several together), with wells, a water-rights concession and a yearly fee. Elsewhere boreholes are allowed, over some aquifers and spring-water areas with conditions (casing, depth limits) that make them about 15% dearer. Boreholes also keep clear of tunnels.",
+        "Noise. An air heat pump's outdoor unit must stay under the night limit at the neighbours' windows (45 dB in residential zones, 50 dB in mixed, centre and work zones) — what counts is how loud the unit is (bigger buildings need bigger, louder ones), how close the neighbours are and how sensitive the zone is. Whatever is over the limit has to come off: a quieter model and a careful spot (up to 5 dB, about CHF 2,500 on a house), a sound hood (up to 10 dB, about CHF 7,000), or installing it indoors with air ducts (up to 20 dB, about CHF 20,000 in an existing building, little in a new one). Beyond that, an air heat pump isn't permitted. Units get a little quieter over the years.",
+      ]),
+      p(
+        "Both feed into every heating decision: an option the site rules out isn't available, and noise measures and borehole conditions add to the price. A building replacing a heat pump with its like keeps its boreholes or wells and its permitted spot. Rezoning a residential parcel to a mixed or work zone allows 5 dB more; densification brings neighbours closer. The Heating layer's \"Ground heat rules\" toggle shows the atlas on the map.",
+      ),
+      note(
+        "Simplifications: the neighbours' distance is taken from the gaps to the two nearest buildings with homes or workplaces (sheds and garages don't count, nor buildings it's joined to), not a real placement study; sound powers and the costs of noise measures are informed placeholders, as is the concession fee. Groundwater heat pumps are counted as ground-source heat pumps, with the same efficiency. The atlas covers canton Zurich only — elsewhere, no ground restriction applies.",
+      ),
+    ],
+  },
+  {
     id: "stock-renewal",
     icon: "🔄",
     title: "Stock renewal: when infrastructure gets replaced",
@@ -639,7 +659,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Default — a flat neutral color, just the geometry.",
         "Building type — colored by GWR's coarse residential/non-residential category.",
-        "Heating — colored by primary heating system, live: a stock-renewal replacement (see \"Stock renewal\") recolors the building within a few seconds, not just at the moment you happen to look at its panel.",
+        "Heating — colored by primary heating system, live: a stock-renewal replacement (see \"Stock renewal\") recolors the building within a few seconds, not just at the moment you happen to look at its panel. Its \"Ground heat rules\" toggle shows where heat may be taken from the ground (see \"Where a heat pump may go\").",
         "Power draw — colored by live net power right now, on a diverging scale from exporting (solar surplus) to importing; recalculates every 1.5 real seconds.",
         "District heat — which buildings are connected to the district heating network, which could be (a pipe runs in their street), and which are out of reach, with the piped streets, extensions being built and the heat source drawn in. This is also where the network is extended — see \"District heating network\".",
         "Public buildings — the municipality's own buildings (schools, sports halls, churches, hospitals, museums and cultural buildings), by whether they carry solar, chargers, both or neither. Its panel lists them all; pick one (there or on the map) to put solar on its roof or chargers in its car park directly — see \"Public buildings\".",

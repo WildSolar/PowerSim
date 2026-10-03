@@ -26,6 +26,7 @@ from . import coords
 from .schema import Building, Dwelling, MunicipalityDataset, PowerPlant, StreetSegment
 from .sources import footprints as footprints_source
 from .sources import boundary as boundary_source
+from .sources import heat_use as heat_use_source
 from .sources import chargers as chargers_source
 from .sources import vehicles as vehicles_source
 from .sources import district_heat as district_heat_source
@@ -172,6 +173,10 @@ def build(bfs_number: int) -> MunicipalityDataset:
         piped_km = sum(segments[s].length_m for s in network["initial_segments"]) / 1000
         print(f"  district heating: {len(dh_egids)} customers, {len(network['initial_segments'])} segments ({piped_km:.1f} km) piped, source: {network['source']['name']}")
 
+    print("Fetching the heat-use atlas (canton ZH)...")
+    heat_use = heat_use_source.fetch_heat_use(boundary_lv95)
+    if heat_use:
+        print(f"  {len(heat_use['zones'])} zones ({', '.join(z['zone'] for z in heat_use['zones'])}), {len(heat_use['conditions'])} condition areas, {len(heat_use['tunnels'])} tunnels")
     print("Fetching public charging sites (BFE register)...")
     charging_sites = chargers_source.fetch_sites(boundary_lv95)
     print(f"  {len(charging_sites)} sites, {sum(s['points'] for s in charging_sites)} charge points ({sum(1 for s in charging_sites if s['kind'] == 'dc')} fast-charging sites)")
@@ -265,6 +270,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
         charging_sites=charging_sites,
         vehicle_register=vehicle_register,
         zone_parcels=zone_parcels,
+        heat_use=heat_use,
     )
 
 

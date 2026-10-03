@@ -31,6 +31,7 @@ import { BillSection } from "./BillSection";
 import { COMMERCIAL_CATEGORY_ICON, COMMERCIAL_CATEGORY_LABEL } from "./commercialDisplay";
 import { EnergyBreakdown } from "./EnergyBreakdown";
 import { FleetSection } from "./FleetSection";
+import { HeatPumpSiteSection } from "./HeatPumpSiteSection";
 import { energySourceLabel } from "./energySourceLabel";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { HistoryChart } from "./HistoryChart";
@@ -179,6 +180,7 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
         )}
       </div>
       <RenewalLogSection title="Heating history" entries={heatingLog} />
+      {heatingSystemId && <HeatPumpSiteSection building={building} simTimeMs={simTimeMs} />}
       <RenewalLogSection title="Insulation history" entries={retrofitLog(building, simTimeMs)} />
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Hot water</h2>

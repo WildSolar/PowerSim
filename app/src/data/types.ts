@@ -103,6 +103,17 @@ export interface MunicipalityDataset {
   vehicleRegister?: VehicleRegister | null;
   /** The building-zone parcels of the federal harmonised layer — see pipeline/sources/sites.py. */
   zoneParcels?: ZoneParcelData[];
+  /** Where heat may be taken from the ground (canton ZH's heat-use atlas) — see
+   * pipeline/sources/heat_use.py. Absent outside canton Zurich and in older datasets. */
+  heatUse?: HeatUseData | null;
+}
+
+export interface HeatUseData {
+  zones: { zone: "A" | "B" | "C" | "D" | "E" | "F"; noBoreholes: boolean; rings: [number, number][][][] }[];
+  /** Areas with special conditions for boreholes (depth limits, casing). */
+  conditions: { rings: [number, number][][][] }[];
+  /** Tunnels and galleries, as lines of [lon, lat]. */
+  tunnels: [number, number][][];
 }
 
 export interface ZoneParcelData {

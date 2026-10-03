@@ -258,6 +258,14 @@ export function evChargingBucket(access: BuildingChargingAccess | undefined): st
 // Charging sites by how full they are: room to spare -> filling up -> full.
 export const CHARGER_USE_RAMP = ["#1baf7a", "#f2b01e", "#d0342c"];
 export const CHARGER_BUILDING_COLOR = "#b6b4ac";
+// The heat-use atlas on the Heating layer: what the ground allows (heatPumpSiting.ts).
+export const HEAT_USE_LEGEND: { bucket: string; label: string; color: string }[] = [
+  { bucket: "noGround", label: "Protection zone: no ground heat", color: "#c8362f" },
+  { bucket: "noBoreholes", label: "Drinking-water aquifer: no boreholes", color: "#2a78d6" },
+  { bucket: "conditions", label: "Boreholes with conditions", color: "#e0a030" },
+];
+export const TUNNEL_COLOR = "#7a5230";
+
 // The coverage overlays, one per kind of charger.
 export const COVERAGE_COLOR: Record<ChargingKind, string> = { ac: "#2a78d6", dc: "#0e9aa7", fleet: "#7a4fd1" };
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { Map as MlMap, Marker, NavigationControl, Popup, type GeoJSONSource, type ImageSource, type MapMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
@@ -20,6 +20,7 @@ import { REACH_M, type ChargingKind } from "../config/charging";
 import { zoning } from "../sim/zoning";
 import { mapFocus } from "./mapFocus";
 import { grid } from "../sim/grid";
+import { heatPumpSiting } from "../sim/heatPumpSiting";
 import { publicBuildingBucket } from "../sim/publicBuildings";
 import {
   AGE_LEGEND,
@@ -52,6 +53,8 @@ import {
   solarColorExpression,
   type ColorMode,
   type MapExpr,
+  HEAT_USE_LEGEND,
+  TUNNEL_COLOR,
 } from "./colorModes";
 
 const BASEMAP_STYLE_URL = "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.basemap.vt/style.json";
@@ -118,6 +121,10 @@ const ZONING_TICK_MS = 3000;
 const STATION_SOURCE_ID = "grid-stations";
 const STATION_LAYER_ID = "grid-stations-circle";
 const GRID_ZONE_SOURCE_ID = "grid-zones";
+const HEAT_USE_SOURCE_ID = "heat-use";
+const HEAT_USE_FILL_LAYER_ID = "heat-use-fill";
+const HEAT_USE_LINE_LAYER_ID = "heat-use-line";
+const TUNNEL_LAYER_ID = "heat-use-tunnels";
 const GRID_ZONE_FILL_LAYER_ID = "grid-zones-fill";
 const GRID_ZONE_LINE_LAYER_ID = "grid-zones-line";
 const GRID_ZONE_SELECTED_LAYER_ID = "grid-zones-selected";
@@ -450,6 +457,25 @@ function gridZonesGeoJSON(simTimeMs: number) {
       ];
     }),
   };
+}
+
+/** The heat-use atlas, by what it means for a heat pump — the zones where boreholes are allowed
+ * without conditions are left clear. */
+function heatUseGeoJSON() {
+  const features: object[] = [];
+  for (const z of heatPumpSiting.getZones()) {
+    const bucket = z.zone === "A" ? "noGround" : z.zone === "B" || z.noBoreholes ? "noBoreholes" : z.zone === "C" || z.zone === "E" ? "conditions" : null;
+    if (!bucket) continue;
+    features.push({
+      type: "Feature",
+      properties: { bucket },
+      geometry: { type: "MultiPolygon", coordinates: z.polygons.map((rings) => rings.map((ring) => ring.map((p) => heatPumpSiting.toLonLat(p)))) },
+    });
+  }
+  for (const line of heatPumpSiting.getTunnels()) {
+    features.push({ type: "Feature", properties: { bucket: "tunnel" }, geometry: { type: "LineString", coordinates: line.map((p) => heatPumpSiting.toLonLat(p)) } });
+  }
+  return { type: "FeatureCollection" as const, features };
 }
 
 type ImageCorners = [[number, number], [number, number], [number, number], [number, number]];
@@ -821,6 +847,34 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         filter: ["all", ["==", ["get", "part"], "edge"], ["==", ["get", "selected"], 1]],
         layout: { visibility: gridVisibility, "line-join": "round", "line-cap": "round" },
         paint: { "line-color": SELECTED_COLOR, "line-width": 3.5 },
+      });
+
+      // The heat-use atlas (the Heating layer's toggle): on the ground, under the buildings.
+      const heatUseVisibility = colorModeRef.current === "heating" && heatPumpSiting.isOverlayShown() ? "visible" : "none";
+      map.addSource(HEAT_USE_SOURCE_ID, { type: "geojson", data: heatUseGeoJSON() as never });
+      map.addLayer({
+        id: HEAT_USE_FILL_LAYER_ID,
+        type: "fill",
+        source: HEAT_USE_SOURCE_ID,
+        filter: ["!=", ["get", "bucket"], "tunnel"],
+        layout: { visibility: heatUseVisibility },
+        paint: { "fill-color": ml(legendMatchExpression("bucket", HEAT_USE_LEGEND)), "fill-opacity": 0.22 },
+      });
+      map.addLayer({
+        id: HEAT_USE_LINE_LAYER_ID,
+        type: "line",
+        source: HEAT_USE_SOURCE_ID,
+        filter: ["!=", ["get", "bucket"], "tunnel"],
+        layout: { visibility: heatUseVisibility, "line-join": "round" },
+        paint: { "line-color": ml(legendMatchExpression("bucket", HEAT_USE_LEGEND)), "line-width": 1.5, "line-opacity": 0.8 },
+      });
+      map.addLayer({
+        id: TUNNEL_LAYER_ID,
+        type: "line",
+        source: HEAT_USE_SOURCE_ID,
+        filter: ["==", ["get", "bucket"], "tunnel"],
+        layout: { visibility: heatUseVisibility, "line-cap": "round" },
+        paint: { "line-color": TUNNEL_COLOR, "line-width": 3, "line-opacity": 0.8 },
       });
 
       // Charger coverage (the EV charging layer's toggles): on the ground, under the buildings.
@@ -1350,6 +1404,18 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
 
   // Grid layer: every building by its area's load, and the stations; refreshed after each reading
   // and as reinforcements and batteries come into service.
+  // Heating layer: the heat-use atlas, when its toggle is on.
+  const heatUseShown = useSyncExternalStore(
+    (l) => heatPumpSiting.subscribe(l),
+    () => heatPumpSiting.isOverlayShown(),
+  );
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer(HEAT_USE_FILL_LAYER_ID)) return;
+    const visible = colorMode === "heating" && heatUseShown ? "visible" : "none";
+    for (const id of [HEAT_USE_FILL_LAYER_ID, HEAT_USE_LINE_LAYER_ID, TUNNEL_LAYER_ID]) map.setLayoutProperty(id, "visibility", visible);
+  }, [colorMode, heatUseShown]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.getLayer(STATION_LAYER_ID)) return;

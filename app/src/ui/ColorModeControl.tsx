@@ -1,4 +1,8 @@
+import { useSyncExternalStore } from "react";
+import { heatPumpSiting } from "../sim/heatPumpSiting";
 import {
+  HEAT_USE_LEGEND,
+  TUNNEL_COLOR,
   AGE_LEGEND,
   CATEGORY_LEGEND,
   CONSTRUCTION_COLOR,
@@ -82,6 +86,7 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
           ))}
         </div>
       )}
+      {mode === "heating" && heatPumpSiting.hasHeatUseAtlas() && <HeatUseLegend />}
       {mode === "districtHeat" && (
         <div className="legend" style={{ marginTop: 6 }}>
           {[
@@ -174,6 +179,36 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
             <span>No solar</span>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** The Heating layer's toggle for the heat-use atlas, and its legend while shown. */
+function HeatUseLegend() {
+  const shown = useSyncExternalStore(
+    (l) => heatPumpSiting.subscribe(l),
+    () => heatPumpSiting.isOverlayShown(),
+  );
+  return (
+    <div className="legend" style={{ marginTop: 6 }}>
+      <label className="legend-row" style={{ cursor: "pointer" }} title="Canton Zurich's heat-use atlas: where heat may be taken from the ground">
+        <input type="checkbox" checked={shown} onChange={() => heatPumpSiting.toggleOverlay()} style={{ margin: "0 4px 0 0" }} />
+        <span>Ground heat rules</span>
+      </label>
+      {shown && (
+        <>
+          {HEAT_USE_LEGEND.map((entry) => (
+            <div className="legend-row" key={entry.bucket}>
+              <span className="swatch" style={{ background: entry.color, opacity: 0.6 }} />
+              <span>{entry.label}</span>
+            </div>
+          ))}
+          <div className="legend-row">
+            <span className="swatch line-swatch" style={{ background: TUNNEL_COLOR }} />
+            <span>Tunnel (boreholes keep clear)</span>
+          </div>
+        </>
       )}
     </div>
   );

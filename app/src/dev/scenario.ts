@@ -22,6 +22,7 @@ import { streets } from "../sim/streets";
 import { districtHeat } from "../sim/districtHeat";
 import { publicCharging } from "../sim/publicCharging";
 import { grid } from "../sim/grid";
+import { heatPumpSiting } from "../sim/heatPumpSiting";
 import { setDistrictHeatLimit } from "../sim/gridLimits";
 import { networkFullAt } from "../sim/districtHeatStats";
 import { zoning, type ZoningAction } from "../sim/zoning";
@@ -168,6 +169,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   streets.init(dataset);
   districtHeat.init(dataset);
   zoning.init(dataset); // before the stock: new buildings ask their parcel what it allows
+  heatPumpSiting.init(dataset, () => stock.getAll()); // before the stock: heating decisions ask it where a heat pump may go
   publicCharging.init(dataset, 0);
   publicCharging.setBuildingLookup((egid) => stock.lookup(egid));
   publicCharging.setBuildingsProvider(() => stock.getAll());

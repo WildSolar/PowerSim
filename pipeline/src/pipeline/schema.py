@@ -86,3 +86,6 @@ class MunicipalityDataset:
     # The building-zone parcels (federal harmonised layer), for zoning — see sources/sites.py:
     # {id, zone, area_m2, rings}.
     zone_parcels: list = field(default_factory=list)
+    # Where heat may be taken from the ground (canton ZH's Wärmenutzungsatlas) — see
+    # sources/heat_use.py: {zones: [{zone, no_boreholes, rings}], conditions, tunnels}, or None.
+    heat_use: dict | None = None
