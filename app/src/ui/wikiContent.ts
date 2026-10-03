@@ -132,17 +132,19 @@ export const WIKI_SECTIONS: WikiSection[] = [
     id: "year-in-review",
     title: "Year in Review",
     blocks: [
-      p("When a year ends, the game pauses and the Year in Review opens — the town's report card for the year just gone:"),
+      p(
+        "When a year ends, the game pauses and the Year in Review opens — the town's annual report for the year just gone. Across the top: the year's CO₂, the treasury at year end, approval and how it moved, and the years left until 2050. Below:",
+      ),
       list([
         "Emissions: the year's CO₂ by source, against the first year (see \"Emissions & net zero\").",
-        "Money: the treasury and the year's income and spending (see \"Municipal finances\").",
-        "Energy: what the town used, by kind.",
-        "Heating: how much heat each kind of system delivered, and every replacement of the year — “14× Oil boiler → Ground heat pump” — marked ‘like for like’ where nothing changed.",
-        "Solar: how many buildings put up panels, and how much they added.",
-        "Headlines: the local paper's lead stories of the year.",
+        "Money: the year's accounts — income and spending line by line, largest first, and the net result (see \"Municipal finances\").",
+        "Headlines: the local paper's lead story of each month.",
+        "Electricity used: what the town used it for.",
+        "Heat delivered: how much heat each kind of system delivered, for space heating and hot water.",
+        "What changed: every heating replacement of the year — “14× Oil boiler → Ground heat pump”, marked ‘like for like’ where nothing changed — insulation upgrades, new solar and batteries, and buildings completed or torn down.",
       ]),
       note(
-        "The heating figures count every fuel, so they don't add up with the energy figures above them, which count only electricity. Closing the report doesn't restart the clock: pick a speed when you're ready.",
+        "The heating figures count every fuel, so they don’t add up with the electricity figures. Closing the report doesn't restart the clock: pick a speed when you're ready.",
       ),
     ],
   },

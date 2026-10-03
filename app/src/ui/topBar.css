@@ -1,5 +1,6 @@
 .top-bar {
   position: absolute;
+  overflow: hidden;
   top: 0;
   left: 0;
   right: 0;
@@ -104,6 +105,8 @@
 
 .tb-kpis {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
   justify-content: center;
   gap: 0;
   padding: 0;
@@ -222,6 +225,21 @@
   }
   .kpi {
     padding: 0 12px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .kpi-sub {
+    display: none;
+  }
+  .kpi {
+    padding: 0 10px;
+  }
+  .tb-clock {
+    gap: 10px;
+  }
+  .tb-date {
+    min-width: 0;
   }
 }
 

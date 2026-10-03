@@ -1,74 +1,318 @@
-.report-card-shell {
-  width: min(760px, 94vw);
-  height: min(640px, 90vh);
+/* The Year in Review: a full page below the top bar, set like an annual report. */
+
+.year-review {
+  position: absolute;
+  top: var(--top-bar-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--fill);
+  color: var(--ink);
+  z-index: 9;
 }
 
-.report-card-shell .modal-content {
+.yr-body {
+  height: 100%;
   overflow-y: auto;
 }
 
-.renewal-tally {
-  margin-top: 4px;
+.yr-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 32px 48px;
 }
 
-.renewal-tally-row {
+.yr-head {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  margin-bottom: 4px;
-  border-radius: var(--r-2);
-  background: var(--fill);
-  border: 1px solid var(--line);
-  font-size: 12px;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  padding-bottom: 18px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--ink);
 }
 
-.renewal-tally-count {
-  flex-shrink: 0;
+.yr-kicker {
+  font-size: 11px;
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--accent);
-  min-width: 28px;
 }
 
-.renewal-tally-label {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.finance-value {
+.yr-head h1 {
+  margin: 2px 0 6px;
+  font-size: 88px;
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  flex-shrink: 0;
 }
 
-.finance-value.positive {
+.yr-head p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.yr-close {
+  flex-shrink: 0;
+  padding: 10px 18px;
+  border: none;
+  border-radius: var(--r-2);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.yr-close:hover {
+  background: var(--accent-strong);
+}
+
+/* --- The four headline figures --------------------------------------------------------- */
+
+.yr-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  overflow: hidden;
+}
+
+.yr-figures section {
+  padding: 16px 18px;
+}
+
+.yr-figures section + section {
+  border-left: 1px solid var(--line);
+}
+
+.yr-figures h3,
+.yr-changes h3 {
+  margin: 0 0 6px;
+  font-family: var(--font);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.yr-value {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.yr-detail {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.year-review .good {
   color: var(--good);
 }
 
-.finance-value.negative {
+.year-review .bad {
   color: var(--bad);
 }
 
-.report-headlines {
-  margin: 4px 0 0;
-  padding-left: 0;
-  list-style: none;
-  font-family: var(--font-paper);
-  font-size: 13px;
+/* --- Cards ---------------------------------------------------------------------------------- */
+
+.yr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+  align-items: start;
 }
 
-.report-headlines li {
-  padding: 2px 0;
+.yr-card {
+  min-width: 0;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
 }
 
-.report-headline-month {
-  display: inline-block;
-  min-width: 78px;
-  font-family: var(--font);
-  font-size: 11px;
+.yr-card.yr-wide {
+  grid-column: 1 / -1;
+}
+
+.yr-card h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.yr-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+.yr-card.yr-wide > .yr-note {
+  margin: -6px 0 12px;
+}
+
+/* The accounts */
+
+.yr-ledger + .yr-ledger {
+  margin-top: 14px;
+}
+
+.yr-ledger-head,
+.yr-ledger-row,
+.yr-ledger-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.yr-ledger-head {
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line-strong);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.yr-ledger-row {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
   color: var(--ink-2);
+}
+
+.yr-ledger-row span:last-child {
+  color: var(--ink);
+}
+
+.yr-ledger-total {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 2px solid var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.yr-ledger-total span:first-child {
+  color: var(--ink);
+}
+
+/* Headlines, set like the paper */
+
+.yr-headlines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.yr-headlines li {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-paper);
+  font-size: 14.5px;
+  line-height: 1.35;
+}
+
+.yr-headlines li:last-child {
+  border-bottom: none;
+}
+
+.yr-headline-month {
+  padding-top: 2px;
+  font-family: var(--font);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* What changed */
+
+.yr-changes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px 28px;
+}
+
+.yr-tally {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.yr-tally li {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.yr-count {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.yr-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--fill-2);
+  font-size: 10.5px;
+  color: var(--ink-2);
+}
+
+.yr-sum {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.yr-empty {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.yr-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+@media (max-width: 720px) {
+  .yr-page {
+    padding: 20px 16px 40px;
+  }
+  .yr-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .yr-head h1 {
+    font-size: 64px;
+  }
+  .yr-figures section + section {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+  .yr-grid {
+    grid-template-columns: 1fr;
+  }
 }

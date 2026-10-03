@@ -17,7 +17,6 @@ import { useYearCategoryEnergy } from "./useYearCategoryEnergy";
 import { useYearEmissions, BASELINE_YEAR, NET_ZERO_TARGET_YEAR } from "./useYearEmissions";
 import { useYearFinances } from "./useYearFinances";
 import { useYearHeatingReport } from "./useYearHeatingReport";
-import "./modal.css";
 import "./panels.css";
 import "./pieChart.css";
 import "./reportCard.css";
@@ -28,7 +27,7 @@ export interface ReportCardModalProps {
   onClose: () => void;
 }
 
-/** The year-end "report card" — pops up automatically when yearEndWatcher.ts
+/** The year-end "report card" — a full page below the top bar, opened automatically when yearEndWatcher.ts
  * pauses the clock at a calendar year boundary. The energy pie, emissions and
  * finances all read yearReport.ts's one shared sampling of the year; the
  * heating technology breakdown and renewal tally come from useYearHeatingReport
@@ -103,258 +102,314 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
 
   const { data: finances, loading: financesLoading } = useYearFinances(dataset, year);
 
+  const homes = standing.reduce((sum, b) => sum + b.dwellings.length, 0);
+  const approvalNow = Math.round(approval.getApproval());
+  const signed = (rp: number) => `${rp >= 0 ? "+" : "−"}${formatCHF(Math.abs(rp))}`;
+  const loading = <div className="loading-note">Counting the year…</div>;
+
+  const income: LedgerRow[] = finances
+    ? [
+        { label: "Electricity sold to customers", rp: finances.current.consumerRevenueRp },
+        { label: "Government allocation", rp: finances.current.governmentAllocationRp },
+        { label: "District heat sold", rp: finances.current.districtHeatRevenueRp },
+        { label: "Public charging sold (municipal chargers)", rp: finances.current.publicChargingRevenueRp },
+        { label: "Zoning levy", rp: finances.current.zoningLevyRp },
+        { label: "Borrowed (loans and bonds)", rp: finances.current.borrowedRp },
+      ]
+    : [];
+  const costs: LedgerRow[] = finances
+    ? [
+        { label: "Wholesale electricity", rp: finances.current.wholesaleCostRp },
+        { label: "Solar feed-in paid", rp: finances.current.feedInPaidRp },
+        { label: "Grid upkeep", rp: finances.current.gridMaintenanceCostRp },
+        { label: "District heat bought from the source", rp: finances.current.districtHeatPurchaseRp },
+        { label: "District heating network upkeep", rp: finances.current.districtHeatUpkeepRp },
+        { label: "Public charger upkeep", rp: finances.current.publicChargingUpkeepRp },
+        { label: "Utility profit handed to the town", rp: finances.current.profitTransferRp },
+        ...PAYOUT_CATEGORIES.map((c) => ({ label: PAYOUT_LABEL[c], rp: finances.current.spendingRp[c] })),
+      ]
+    : [];
+
   return (
-    <div className="modal-backdrop">
-      <div className="modal-shell report-card-shell">
-        <button className="modal-close" onClick={onClose} aria-label="Close">
-          ×
-        </button>
-        <div className="modal-content">
-          <h2>🎉 Year in Review — {year}</h2>
-          <p>
-            {dataset.name}, {year}: {standing.length} buildings, {standing.reduce((sum, b) => sum + b.dwellings.length, 0)}{" "}
-            dwellings.
-          </p>
-
-          {headlines.length > 0 && (
-            <>
-              <h3 className="section-heading">The year in headlines</h3>
-              <ul className="report-headlines">
-                {headlines.map((e) => (
-                  <li key={e.id}>
-                    <span className="report-headline-month">{e.dateLabel.split(" ")[0]}</span> {e.lead.headline}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-
-          <h3 className="section-heading">Public approval</h3>
-          <p>
-            Approval stands at {Math.round(approval.getApproval())}%
-            {Math.abs(approvalChange) >= 1 ? `, ${approvalChange > 0 ? "up" : "down"} ${Math.abs(Math.round(approvalChange))} points over the year` : ", about where it was a year ago"}.
-          </p>
-
-          <h3 className="section-heading">Emissions</h3>
-          {emissionsLoading || !emissions ? (
-            <div className="loading-note">Computing…</div>
-          ) : (
-            <>
-              <PieChart title={`${year} total`} slices={emissionSlices} formatValue={formatCO2} />
-              <p style={{ fontSize: 12, margin: "8px 0 0" }}>
-                {year === BASELINE_YEAR ? (
-                  <>This is the baseline year — every future report compares back to this one.</>
-                ) : (
-                  <>
-                    {formatCO2(emissions.current.totalKgCO2)} this year, {vsBaselinePct <= 0 ? "down" : "up"} {Math.abs(vsBaselinePct).toFixed(1)}%
-                    from the {BASELINE_YEAR} baseline ({formatCO2(emissions.baseline.totalKgCO2)}).
-                  </>
-                )}{" "}
-                Target: net zero by {NET_ZERO_TARGET_YEAR} — {Math.max(0, NET_ZERO_TARGET_YEAR - year)} years left.
+    <div className="year-review" role="dialog" aria-label={`Year in Review ${year}`}>
+      <div className="yr-body">
+        <div className="yr-page">
+          <header className="yr-head">
+            <div>
+              <div className="yr-kicker">Year in Review · {dataset.name}</div>
+              <h1>{year}</h1>
+              <p>
+                {standing.length.toLocaleString("de-CH")} buildings, {homes.toLocaleString("de-CH")} homes. The game is paused — pick a speed when you're
+                ready.
               </p>
-              <p style={{ fontSize: 12, color: "var(--ink-3)", margin: "4px 0 0" }}>
-                Operational emissions only — what's actually burned or drawn from the grid, net of solar exported. Manufacturing a heat pump, an
-                EV's battery, or a solar panel isn't counted.
-              </p>
-            </>
-          )}
-
-          <h3 className="section-heading">Municipal finances</h3>
-          {financesLoading || !finances ? (
-            <div className="loading-note">Computing…</div>
-          ) : (
-            <>
-              <p style={{ fontSize: 20, fontWeight: 700, margin: "0 0 2px", color: finances.balanceRp >= 0 ? "var(--good)" : "var(--bad)" }}>
-                {formatCHF(finances.balanceRp)}
-              </p>
-              <p style={{ fontSize: 12, color: "var(--ink-3)", margin: "0 0 8px" }}>Treasury balance, accumulated since {BASELINE_YEAR}.</p>
-              <div className="renewal-tally">
-                <div className="renewal-tally-row">
-                  <span className="renewal-tally-label">Consumer electricity revenue</span>
-                  <span className="finance-value positive">+{formatCHF(finances.current.consumerRevenueRp)}</span>
-                </div>
-                <div className="renewal-tally-row">
-                  <span className="renewal-tally-label">Government energy budget</span>
-                  <span className="finance-value positive">+{formatCHF(finances.current.governmentAllocationRp)}</span>
-                </div>
-                <div className="renewal-tally-row">
-                  <span className="renewal-tally-label">Solar feed-in paid</span>
-                  <span className="finance-value negative">−{formatCHF(finances.current.feedInPaidRp)}</span>
-                </div>
-                <div className="renewal-tally-row">
-                  <span className="renewal-tally-label">Wholesale electricity purchased</span>
-                  <span className="finance-value negative">−{formatCHF(finances.current.wholesaleCostRp)}</span>
-                </div>
-                <div className="renewal-tally-row">
-                  <span className="renewal-tally-label">Grid maintenance</span>
-                  <span className="finance-value negative">−{formatCHF(finances.current.gridMaintenanceCostRp)}</span>
-                </div>
-                {finances.current.districtHeatRevenueRp > 0 && (
-                  <>
-                    <div className="renewal-tally-row">
-                      <span className="renewal-tally-label">District heat sold</span>
-                      <span className="finance-value positive">+{formatCHF(finances.current.districtHeatRevenueRp)}</span>
-                    </div>
-                    <div className="renewal-tally-row">
-                      <span className="renewal-tally-label">District heat bought from the source</span>
-                      <span className="finance-value negative">−{formatCHF(finances.current.districtHeatPurchaseRp)}</span>
-                    </div>
-                  </>
-                )}
-                {finances.current.publicChargingRevenueRp > 0 && (
-                  <div className="renewal-tally-row">
-                    <span className="renewal-tally-label">Public charging sold (municipal chargers)</span>
-                    <span className="finance-value positive">+{formatCHF(finances.current.publicChargingRevenueRp)}</span>
-                  </div>
-                )}
-                {finances.current.profitTransferRp > 0 && (
-                  <div className="renewal-tally-row">
-                    <span className="renewal-tally-label">Utility profit handed to the town's general account</span>
-                    <span className="finance-value negative">−{formatCHF(finances.current.profitTransferRp)}</span>
-                  </div>
-                )}
-                {finances.current.borrowedRp > 0 && (
-                  <div className="renewal-tally-row">
-                    <span className="renewal-tally-label">Borrowed (loans and bonds)</span>
-                    <span className="finance-value positive">+{formatCHF(finances.current.borrowedRp)}</span>
-                  </div>
-                )}
-                {finances.current.zoningLevyRp > 0 && (
-                  <div className="renewal-tally-row">
-                    <span className="renewal-tally-label">Value-capture levy (zoning)</span>
-                    <span className="finance-value positive">+{formatCHF(finances.current.zoningLevyRp)}</span>
-                  </div>
-                )}
-                {finances.current.publicChargingUpkeepRp > 0 && (
-                  <div className="renewal-tally-row">
-                    <span className="renewal-tally-label">Public charger upkeep</span>
-                    <span className="finance-value negative">−{formatCHF(finances.current.publicChargingUpkeepRp)}</span>
-                  </div>
-                )}
-                {finances.current.districtHeatUpkeepRp > 0 && (
-                  <div className="renewal-tally-row">
-                    <span className="renewal-tally-label">District heating network upkeep</span>
-                    <span className="finance-value negative">−{formatCHF(finances.current.districtHeatUpkeepRp)}</span>
-                  </div>
-                )}
-                {PAYOUT_CATEGORIES.filter((c) => finances.current.spendingRp[c] > 0).map((c) => (
-                  <div className="renewal-tally-row" key={c}>
-                    <span className="renewal-tally-label">{PAYOUT_LABEL[c]}</span>
-                    <span className="finance-value negative">−{formatCHF(finances.current.spendingRp[c])}</span>
-                  </div>
-                ))}
-                <div className="renewal-tally-row" style={{ fontWeight: 600 }}>
-                  <span className="renewal-tally-label">Net this year</span>
-                  <span className={`finance-value ${finances.current.netIncomeRp >= 0 ? "positive" : "negative"}`}>
-                    {finances.current.netIncomeRp >= 0 ? "+" : "−"}
-                    {formatCHF(Math.abs(finances.current.netIncomeRp))}
-                  </span>
-                </div>
-              </div>
-              <p style={{ fontSize: 12, color: "var(--ink-3)", margin: "8px 0 0" }}>
-                Electricity and district heat operations settle once a year; gas, oil and petrol/diesel are paid straight to their own
-                suppliers, never through the municipal utility. Subsidies leave the treasury only when a household actually makes the decision — including households
-                that would have made it anyway. Federal and cantonal grants are not municipal money.
-              </p>
-            </>
-          )}
-
-          <h3 className="section-heading">Energy by category</h3>
-          {overallLoading || !overallEnergy ? (
-            <div className="loading-note">Computing…</div>
-          ) : (
-            <PieChart title="All categories" slices={overallSlices} />
-          )}
-
-          <h3 className="section-heading">Heating energy by technology</h3>
-          <p style={{ fontSize: 12, color: "var(--ink-3)", margin: "0 0 6px" }}>
-            Heat actually delivered, across every fuel — not just the electricity "Energy by category" above covers, so the two totals aren't
-            directly comparable.
-          </p>
-          {heatingLoading || !heatingReport ? (
-            <div className="loading-note">Computing your year in review…</div>
-          ) : (
-            <div className="pie-chart-row">
-              <PieChart title="Space heating" slices={spaceSlices} />
-              <PieChart title="Water heating" slices={waterSlices} />
             </div>
-          )}
+            <button className="yr-close" onClick={onClose}>
+              Back to the map
+            </button>
+          </header>
 
-          <h3 className="section-heading">Heating renewals this year</h3>
-          {heatingLoading || !heatingReport ? (
-            <div className="loading-note">Computing…</div>
-          ) : heatingReport.renewals.length === 0 ? (
-            <p>No heating systems were replaced this calendar year.</p>
-          ) : (
-            <>
-              <p>
-                {totalRenewals} building{totalRenewals === 1 ? "" : "s"} renewed their heating system this year.
-              </p>
-              <div className="renewal-tally">
-                {heatingReport.renewals.map((r) => (
-                  <div className="renewal-tally-row" key={`${r.previousSystem}>${r.system}`}>
-                    <span className="renewal-tally-count">{r.count}×</span>
-                    <span className="renewal-tally-label">
-                      {HEATING_SYSTEM_CATALOG[r.previousSystem].icon} {HEATING_SYSTEM_CATALOG[r.previousSystem].label}
-                      {" → "}
-                      {HEATING_SYSTEM_CATALOG[r.system].icon} {HEATING_SYSTEM_CATALOG[r.system].label}
-                      {r.previousSystem === r.system && <span className="ev-badge">like-for-like</span>}
-                    </span>
-                  </div>
-                ))}
+          <div className="yr-figures">
+            <section>
+              <h3>CO₂</h3>
+              <div className="yr-value">{emissions ? `${(emissions.current.totalKgCO2 / 1_000_000).toLocaleString("de-CH", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kt` : "…"}</div>
+              <div className="yr-detail">
+                {!emissions ? (
+                  "Counting…"
+                ) : year === BASELINE_YEAR ? (
+                  "The baseline every later year is measured against."
+                ) : (
+                  <span className={vsBaselinePct <= 0 ? "good" : "bad"}>
+                    {vsBaselinePct <= 0 ? "−" : "+"}
+                    {Math.abs(vsBaselinePct).toFixed(1)}% against {BASELINE_YEAR}
+                  </span>
+                )}
               </div>
-            </>
-          )}
-
-          <h3 className="section-heading">Insulation retrofits this year</h3>
-          {retrofits.total === 0 ? (
-            <p>No building had its envelope upgraded this calendar year.</p>
-          ) : (
-            <>
-              <p>
-                {retrofits.total} building{retrofits.total === 1 ? "" : "s"} upgraded {retrofits.total === 1 ? "its" : "their"} insulation this year.
-              </p>
-              <div className="renewal-tally">
-                {retrofits.entries.map((r) => (
-                  <div className="renewal-tally-row" key={`${r.from}>${r.to}`}>
-                    <span className="renewal-tally-count">{r.count}×</span>
-                    <span className="renewal-tally-label">
-                      {ENERGY_CLASS_CATALOG[r.from].label}
-                      {" → "}
-                      {ENERGY_CLASS_CATALOG[r.to].label}
-                    </span>
-                  </div>
-                ))}
+            </section>
+            <section>
+              <h3>Treasury at year end</h3>
+              <div className="yr-value">{finances ? millions(finances.balanceRp) : "…"}</div>
+              <div className="yr-detail">
+                {finances ? <span className={finances.current.netIncomeRp >= 0 ? "good" : "bad"}>{finances.current.netIncomeRp >= 0 ? "+" : "−"}{millions(Math.abs(finances.current.netIncomeRp))} over the year</span> : "Counting…"}
               </div>
-            </>
-          )}
+            </section>
+            <section>
+              <h3>Approval</h3>
+              <div className="yr-value">{approvalNow}%</div>
+              <div className="yr-detail">
+                {Math.abs(approvalChange) >= 1 ? (
+                  <span className={approvalChange > 0 ? "good" : "bad"}>
+                    {approvalChange > 0 ? "▲" : "▼"} {Math.abs(Math.round(approvalChange))} points over the year
+                  </span>
+                ) : (
+                  "About where it was a year ago"
+                )}
+              </div>
+            </section>
+            <section>
+              <h3>Net zero</h3>
+              <div className="yr-value">{Math.max(0, NET_ZERO_TARGET_YEAR - year)} years</div>
+              <div className="yr-detail">left until {NET_ZERO_TARGET_YEAR}</div>
+            </section>
+          </div>
 
-          <h3 className="section-heading">Solar installs this year</h3>
-          {solarTally.count === 0 ? (
-            <p>No buildings installed solar this calendar year.</p>
-          ) : (
-            <p>
-              {solarTally.count} building{solarTally.count === 1 ? "" : "s"} installed solar this year, totaling{" "}
-              {solarTally.totalCapacityKw.toFixed(0)} kWp
-              {solarTally.batteriesWithSolar > 0 ? ` — ${solarTally.batteriesWithSolar} with a home battery` : ""}.
-              {solarTally.batteriesAdded > 0 ? ` ${solarTally.batteriesAdded} existing system${solarTally.batteriesAdded === 1 ? "" : "s"} added a battery.` : ""}
-            </p>
-          )}
+          <div className="yr-grid">
+            <section className="yr-card">
+              <h2>Emissions</h2>
+              {emissionsLoading || !emissions ? (
+                loading
+              ) : (
+                <>
+                  <PieChart title={`${year} by source`} slices={emissionSlices} formatValue={formatCO2} />
+                  <p className="yr-note">
+                    {year === BASELINE_YEAR
+                      ? "The first year of the game: every later report compares back to it."
+                      : `${formatCO2(emissions.current.totalKgCO2)} this year, against ${formatCO2(emissions.baseline.totalKgCO2)} in ${BASELINE_YEAR}.`}{" "}
+                    What is burned, or drawn from the grid less the solar fed back — not what it took to make a heat pump, a battery or a panel.
+                  </p>
+                </>
+              )}
+            </section>
 
-          <h3 className="section-heading">Construction this year</h3>
-          {development.newBuildings + development.replacementBuildings + development.demolished === 0 ? (
-            <p>Nothing was completed or demolished this calendar year.</p>
-          ) : (
-            <p>
-              {development.newBuildings} new building{development.newBuildings === 1 ? "" : "s"} and {development.replacementBuildings} replacement
-              building{development.replacementBuildings === 1 ? "" : "s"} completed ({development.dwellingsBuilt} dwellings,{" "}
-              {Math.round(development.gfaBuiltM2).toLocaleString("de-CH")} m² of floor space); {development.demolished} demolished (
-              {development.dwellingsDemolished} dwellings, {Math.round(development.gfaDemolishedM2).toLocaleString("de-CH")} m²). Net floor space{" "}
-              {development.netGrowthPct >= 0 ? "grew" : "shrank"} by {Math.abs(development.netGrowthPct).toFixed(1)}%.
-            </p>
-          )}
+            <section className="yr-card">
+              <h2>Money</h2>
+              {financesLoading || !finances ? (
+                loading
+              ) : (
+                <>
+                  <Ledger title="Income" rows={income} sign="+" />
+                  <Ledger title="Spending" rows={costs} sign="−" />
+                  <div className={`yr-ledger-total ${finances.current.netIncomeRp >= 0 ? "good" : "bad"}`}>
+                    <span>Net over the year</span>
+                    <span>{signed(finances.current.netIncomeRp)}</span>
+                  </div>
+                  <p className="yr-note">
+                    Federal and cantonal grants aren't municipal money, and gas, oil and petrol are paid to their own suppliers, so neither shows here.
+                  </p>
+                </>
+              )}
+            </section>
+
+            {headlines.length > 0 && (
+              <section className="yr-card yr-paper">
+                <h2>The year in headlines</h2>
+                <ul className="yr-headlines">
+                  {headlines.map((e) => (
+                    <li key={e.id}>
+                      <span className="yr-headline-month">{e.dateLabel.split(" ")[0]}</span>
+                      <span>{e.lead.headline}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            <section className="yr-card">
+              <h2>Electricity used</h2>
+              {overallLoading || !overallEnergy ? loading : <PieChart title="By use" slices={overallSlices} />}
+            </section>
+
+            <section className="yr-card yr-wide">
+              <h2>Heat delivered</h2>
+              <p className="yr-note">Every fuel counted, so these totals don't match the electricity figures.</p>
+              {heatingLoading || !heatingReport ? (
+                loading
+              ) : (
+                <div className="pie-chart-row">
+                  <PieChart title="Space heating" slices={spaceSlices} />
+                  <PieChart title="Hot water" slices={waterSlices} />
+                </div>
+              )}
+            </section>
+
+            <section className="yr-card yr-wide">
+              <h2>What changed</h2>
+              <div className="yr-changes">
+                <div>
+                  <h3>Heating replaced</h3>
+                  {heatingLoading || !heatingReport ? (
+                    loading
+                  ) : heatingReport.renewals.length === 0 ? (
+                    <p className="yr-empty">None this year.</p>
+                  ) : (
+                    <>
+                      <ul className="yr-tally">
+                        {heatingReport.renewals.map((r) => (
+                          <li key={`${r.previousSystem}>${r.system}`}>
+                            <span className="yr-count">{r.count}×</span>
+                            <span>
+                              {HEATING_SYSTEM_CATALOG[r.previousSystem].label} → {HEATING_SYSTEM_CATALOG[r.system].label}
+                              {r.previousSystem === r.system && <span className="yr-tag">like for like</span>}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="yr-sum">{totalRenewals} in all</p>
+                    </>
+                  )}
+                </div>
+                <div>
+                  <h3>Insulation upgraded</h3>
+                  {retrofits.total === 0 ? (
+                    <p className="yr-empty">None this year.</p>
+                  ) : (
+                    <>
+                      <ul className="yr-tally">
+                        {retrofits.entries.map((r) => (
+                          <li key={`${r.from}>${r.to}`}>
+                            <span className="yr-count">{r.count}×</span>
+                            <span>
+                              {ENERGY_CLASS_CATALOG[r.from].label} → {ENERGY_CLASS_CATALOG[r.to].label}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="yr-sum">{retrofits.total} in all</p>
+                    </>
+                  )}
+                </div>
+                <div>
+                  <h3>Solar</h3>
+                  {solarTally.count === 0 ? (
+                    <p className="yr-empty">No new panels this year.</p>
+                  ) : (
+                    <ul className="yr-tally">
+                      <li>
+                        <span className="yr-count">{solarTally.count}</span>
+                        <span>buildings put up panels, {solarTally.totalCapacityKw.toFixed(0)} kWp in all</span>
+                      </li>
+                      {solarTally.batteriesWithSolar > 0 && (
+                        <li>
+                          <span className="yr-count">{solarTally.batteriesWithSolar}</span>
+                          <span>of them with a home battery</span>
+                        </li>
+                      )}
+                      {solarTally.batteriesAdded > 0 && (
+                        <li>
+                          <span className="yr-count">{solarTally.batteriesAdded}</span>
+                          <span>existing systems added a battery</span>
+                        </li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+                <div>
+                  <h3>Building</h3>
+                  {development.newBuildings + development.replacementBuildings + development.demolished === 0 ? (
+                    <p className="yr-empty">Nothing completed or torn down this year.</p>
+                  ) : (
+                    <>
+                      <ul className="yr-tally">
+                        <li>
+                          <span className="yr-count">{development.newBuildings}</span>
+                          <span>new buildings</span>
+                        </li>
+                        <li>
+                          <span className="yr-count">{development.replacementBuildings}</span>
+                          <span>replacements</span>
+                        </li>
+                        <li>
+                          <span className="yr-count">{development.demolished}</span>
+                          <span>torn down ({development.dwellingsDemolished} homes)</span>
+                        </li>
+                        <li>
+                          <span className="yr-count">+{development.dwellingsBuilt}</span>
+                          <span>homes built, {Math.round(development.gfaBuiltM2).toLocaleString("de-CH")} m²</span>
+                        </li>
+                      </ul>
+                      <p className="yr-sum">
+                        Floor space {development.netGrowthPct >= 0 ? "grew" : "shrank"} by {Math.abs(development.netGrowthPct).toFixed(1)}%
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div className="yr-foot">
+            <button className="yr-close" onClick={onClose}>
+              Back to the map
+            </button>
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** CHF in millions once it reaches a million, so the headline figures stay on one line. */
+function millions(rp: number): string {
+  const chf = rp / 100;
+  return Math.abs(chf) >= 1_000_000 ? `CHF ${(chf / 1_000_000).toLocaleString("de-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} M` : formatCHF(rp);
+}
+
+interface LedgerRow {
+  label: string;
+  rp: number;
+}
+
+/** One side of the accounts: the lines that moved money this year, largest first. */
+function Ledger({ title, rows, sign }: { title: string; rows: LedgerRow[]; sign: "+" | "−" }) {
+  const shown = rows.filter((r) => r.rp > 0).sort((a, b) => b.rp - a.rp);
+  const total = shown.reduce((sum, r) => sum + r.rp, 0);
+  return (
+    <div className="yr-ledger">
+      <div className="yr-ledger-head">
+        <span>{title}</span>
+        <span>
+          {sign}
+          {formatCHF(total)}
+        </span>
+      </div>
+      {shown.map((r) => (
+        <div className="yr-ledger-row" key={r.label}>
+          <span>{r.label}</span>
+          <span>
+            {sign}
+            {formatCHF(r.rp)}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

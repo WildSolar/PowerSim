@@ -35,7 +35,7 @@
 }
 
 .pie-chart-total-value {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   fill: var(--ink);
 }
