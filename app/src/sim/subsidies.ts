@@ -9,12 +9,18 @@ import type { HeatingSystemId } from "./heatingSystems";
 import type { VehicleTypeId } from "./mobilitySystems";
 import { policyStore } from "./policy";
 
-/** Flat municipal grant, Rp, for installing this heating system (heat pumps only). */
-export function municipalHeatingSubsidyRp(id: HeatingSystemId): number {
-  return id === "airHeatPump" || id === "groundHeatPump" ? policyStore.get().heatPumpSubsidyRp : 0;
+/** Flat municipal grant, Rp, for installing this heating system (heat pumps only). A grant targeted
+ * at early replacements is paid only when `early` (a working boiler replaced before its time). */
+export function municipalHeatingSubsidyRp(id: HeatingSystemId, early = false): number {
+  const p = policyStore.get();
+  if (id !== "airHeatPump" && id !== "groundHeatPump") return 0;
+  return p.heatPumpGrantEarlyOnly && !early ? 0 : p.heatPumpSubsidyRp;
 }
 
-/** Flat municipal grant, Rp, for buying this vehicle (electric cars only for now). */
-export function municipalVehicleSubsidyRp(id: VehicleTypeId): number {
-  return id === "carEV" ? policyStore.get().evSubsidyRp : 0;
+/** Flat municipal grant, Rp, for buying this vehicle (electric cars only for now) — likewise only
+ * for an early switch when targeted. */
+export function municipalVehicleSubsidyRp(id: VehicleTypeId, early = false): number {
+  const p = policyStore.get();
+  if (id !== "carEV") return 0;
+  return p.evGrantEarlyOnly && !early ? 0 : p.evSubsidyRp;
 }

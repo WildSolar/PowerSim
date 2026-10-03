@@ -59,22 +59,48 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     category: "subsidy",
     subsidyCategory: "heating",
     title: "Heat pump grant",
-    summary: "A flat municipal grant, on top of the cantonal one, whenever a building replaces its heating with a heat pump.",
-    params: [{ kind: "slider", key: "amount", label: "Grant", min: 0, max: 20000, step: 500, unit: "CHF each", default: 5000 }],
+    summary:
+      "A flat municipal grant, on top of the cantonal one, for a heat pump. Paid to everyone who installs one, most of whom would have anyway — or only to owners who replace a working oil or gas boiler early, which reaches far fewer people but changes far more of what they do.",
+    params: [
+      { kind: "slider", key: "amount", label: "Grant", min: 0, max: 20000, step: 500, unit: "CHF each", default: 5000 },
+      {
+        kind: "choice",
+        key: "target",
+        label: "Who gets it",
+        options: [
+          { value: "all", label: "Every heat pump" },
+          { value: "early", label: "Only early boiler replacements" },
+        ],
+        default: "all",
+      },
+    ],
     leadTimeMonths: 1,
-    effects: (p) => ({ heatPumpSubsidyRp: num(p, "amount") * CHF }),
-    approval: () => ({ homeowners: 0.6, tenants: 0.1, business: 0.1, climate: 0.6 }),
+    effects: (p) => ({ heatPumpSubsidyRp: num(p, "amount") * CHF, heatPumpGrantEarlyOnly: p.target === "early" }),
+    approval: (p) => (p.target === "early" ? { homeowners: 0.35, tenants: 0.05, business: 0.05, climate: 0.6 } : { homeowners: 0.6, tenants: 0.1, business: 0.1, climate: 0.6 }),
   },
   {
     id: "ev-grant",
     category: "subsidy",
     subsidyCategory: "vehicle",
     title: "Electric car grant",
-    summary: "A flat municipal grant whenever a household buys an electric car.",
-    params: [{ kind: "slider", key: "amount", label: "Grant", min: 0, max: 10000, step: 500, unit: "CHF each", default: 3000 }],
+    summary:
+      "A flat municipal grant for an electric car. Paid whenever a household buys one — or only when it replaces a petrol or diesel car that still runs, which reaches few households but pulls their switch forward.",
+    params: [
+      { kind: "slider", key: "amount", label: "Grant", min: 0, max: 10000, step: 500, unit: "CHF each", default: 3000 },
+      {
+        kind: "choice",
+        key: "target",
+        label: "Who gets it",
+        options: [
+          { value: "all", label: "Every electric car" },
+          { value: "early", label: "Only early car replacements" },
+        ],
+        default: "all",
+      },
+    ],
     leadTimeMonths: 1,
-    effects: (p) => ({ evSubsidyRp: num(p, "amount") * CHF }),
-    approval: () => ({ drivers: 0.5, homeowners: 0.2, climate: 0.5 }),
+    effects: (p) => ({ evSubsidyRp: num(p, "amount") * CHF, evGrantEarlyOnly: p.target === "early" }),
+    approval: (p) => (p.target === "early" ? { drivers: 0.3, homeowners: 0.1, climate: 0.5 } : { drivers: 0.5, homeowners: 0.2, climate: 0.5 }),
   },
   {
     id: "retrofit-topup",

@@ -468,6 +468,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       ),
       list([
         "Grants make owners likelier to look into it at all, and more likely to go through with it: a heat pump grant brings boiler replacements forward. That is what money buys — speed. Laws are cheap but act only when things wear out (and can be voted down).",
+        "The heat pump grant and the electric car grant can be targeted (Control → Measures, \"Who gets it\"): paid to everyone, most of whom would have switched anyway, or only to owners who replace a working boiler or car early. Targeted, far fewer people get it — so it costs much less and is a little less popular — but almost every franc changes what someone does.",
         "Energy advice (the information measures) also gets more owners looking.",
         "Cars rarely switch early: a paid-off car only costs its fuel, so it takes a large scrappage bonus — and a charger within reach.",
       ]),

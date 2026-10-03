@@ -174,7 +174,14 @@ function chargingAccessAt(egid: string, ewid: string, atMs: number, incumbent: V
   };
 }
 
-function carCandidatesAt(tariff: Tariff, atMs: number, incumbent: VehicleTypeId, access: ChargingAccess, onElectricChosen: (atMs: number) => void): RenewalCandidate<VehicleTypeId>[] {
+function carCandidatesAt(
+  tariff: Tariff,
+  atMs: number,
+  incumbent: VehicleTypeId,
+  access: ChargingAccess,
+  onElectricChosen: (atMs: number) => void,
+  early = false,
+): RenewalCandidate<VehicleTypeId>[] {
   const annualKWh = (ANNUAL_CAR_KM / 100) * EV_CAR_KWH_PER_100KM;
   // Without a charger to rely on, an electric car is out — but its cost is still worked out as if
   // an on-street charger were close by, so the decision records whether it was wanted.
@@ -183,7 +190,7 @@ function carCandidatesAt(tariff: Tariff, atMs: number, incumbent: VehicleTypeId,
     const spec = VEHICLE_TYPE_CATALOG[id];
     const beforeMunicipalRp = Math.max(0, spec.baseInstallCostRp * priceFactor(id, atMs) - spec.subsidyRp);
     const scrappageRp = id === "carEV" && incumbent === "carICE" ? policyStore.get().iceScrappageBonusRp : 0;
-    const municipalRp = Math.min(municipalVehicleSubsidyRp(id) + scrappageRp, beforeMunicipalRp);
+    const municipalRp = Math.min(municipalVehicleSubsidyRp(id, early) + scrappageRp, beforeMunicipalRp);
     const installCostRp = beforeMunicipalRp - municipalRp;
     const runningCostRp =
       id === "carEV"
@@ -284,16 +291,23 @@ function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "c
             chanceAt: (atMs) =>
               earlySwitchChance(
                 EARLY_SWITCH.car,
-                municipalVehicleSubsidyRp("carEV") + policyStore.get().iceScrappageBonusRp,
+                municipalVehicleSubsidyRp("carEV", true) + policyStore.get().iceScrappageBonusRp,
                 VEHICLE_TYPE_CATALOG.carEV.baseInstallCostRp * priceFactor("carEV", atMs),
               ),
             candidatesAt: (atMs, incumbent, ageYears) => {
               const tariff = tariffStore.get();
               const where = chargingAccessAt(egid, ewid, atMs, incumbent);
               const access = where?.access ?? { kind: "home" };
-              const base = carCandidatesAt(tariff, atMs, incumbent, access, (chosenAtMs) => {
-                if (access.kind === "public") publicCharging.assign(key, slotHandleFor(egid, ewid, slotIndex), access.siteId, chosenAtMs);
-              });
+              const base = carCandidatesAt(
+                tariff,
+                atMs,
+                incumbent,
+                access,
+                (chosenAtMs) => {
+                  if (access.kind === "public") publicCharging.assign(key, slotHandleFor(egid, ewid, slotIndex), access.siteId, chosenAtMs);
+                },
+                true,
+              );
               const keep = (ANNUAL_CAR_KM / 100) * ICE_CAR_L_PER_100KM * tariff.petrolPriceRpPerLiter;
               return earlyCandidates(base, incumbent, keep, ageYears, EARLY_SWITCH.car);
             },

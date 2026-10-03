@@ -158,6 +158,7 @@ function candidatesAt(
   incumbent: HeatingSystemId,
   withMunicipalSubsidy = true,
   newBuild = false,
+  early = false,
 ): RenewalCandidate<HeatingSystemId>[] {
   const tariff = tariffStore.get();
   const estimate = annualHeatingEstimate(building, atMs);
@@ -186,7 +187,7 @@ function candidatesAt(
       installRp += noise.extraCostRp;
     }
     const beforeMunicipalRp = Math.max(0, installRp * scale - spec.subsidyRp);
-    const municipalRp = withMunicipalSubsidy ? Math.min(municipalHeatingSubsidyRp(id), beforeMunicipalRp) : 0;
+    const municipalRp = withMunicipalSubsidy ? Math.min(municipalHeatingSubsidyRp(id, early), beforeMunicipalRp) : 0;
     const installCostRp = beforeMunicipalRp - municipalRp;
     return {
       id,
@@ -265,12 +266,12 @@ function chainFor(building: Building, simTimeMs: number): RenewalEvent<HeatingSy
       minAgeYears: EARLY_SWITCH.heating.minAgeYears,
       chanceAt: (atMs) => {
         const priceRp = HEATING_SYSTEM_CATALOG.airHeatPump.baseInstallCostRp * priceFactor("airHeatPump", atMs) * sizeScale(building);
-        return earlySwitchChance(EARLY_SWITCH.heating, municipalHeatingSubsidyRp("airHeatPump"), priceRp);
+        return earlySwitchChance(EARLY_SWITCH.heating, municipalHeatingSubsidyRp("airHeatPump", true), priceRp);
       },
       candidatesAt: (atMs, incumbent, ageYears) => {
         const tariff = tariffStore.get();
         const keep = runningCostRpFor(incumbent, annualHeatingEstimate(building, atMs), tariff, (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2);
-        return earlyCandidates(candidatesAt(building, atMs, incumbent), incumbent, keep, ageYears, EARLY_SWITCH.heating);
+        return earlyCandidates(candidatesAt(building, atMs, incumbent, true, false, true), incumbent, keep, ageYears, EARLY_SWITCH.heating);
       },
     },
   };
