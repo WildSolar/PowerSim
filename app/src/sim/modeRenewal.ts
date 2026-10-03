@@ -147,18 +147,39 @@ export function modeAt<T extends string>(events: ModeEvent<T>[], simTimeMs: numb
 
 // --- saving (saveGame.ts) ---
 
-/** Every chain as it stands. Events are plain data. */
-export function snapshotModeChains(): Map<string, ModeChainEntry<string>> {
-  return chains;
+export interface ModeChainsSnapshot {
+  /** Chains with a history: as they are. */
+  full: Map<string, ModeChainEntry<string>>;
+  /** Chains that still hold only their first choice: just that choice (drawn from the shares of
+   * the day, so it is kept rather than drawn again). Their next life event is a seeded draw. */
+  initial: Map<string, string>;
 }
 
-/** Puts the saved chains back. Entries that already exist are updated in place, since other
- * modules keep references to them (mobility.ts's slot handles, fleet.ts's vehicles). */
-export function restoreModeChains(saved: Map<string, ModeChainEntry<string>>): void {
-  for (const [key, entry] of saved) {
-    const existing = chains.get(key);
-    if (existing) Object.assign(existing, entry);
-    else chains.set(key, entry);
+export function snapshotModeChains(): ModeChainsSnapshot {
+  const full = new Map<string, ModeChainEntry<string>>();
+  const initial = new Map<string, string>();
+  for (const [key, entry] of chains) {
+    const e = entry.events[0];
+    if (entry.events.length === 1 && e.installedAtMs === Number.NEGATIVE_INFINITY && e.previousChoice === null) initial.set(key, e.choice);
+    else full.set(key, entry);
   }
-  for (const key of [...chains.keys()]) if (!saved.has(key)) chains.delete(key);
+  return { full, initial };
+}
+
+/** Puts the saved chains back, updating existing entries in place (mobility.ts's slot handles keep them). */
+export function restoreModeChains(saved: ModeChainsSnapshot): void {
+  const put = (key: string, entry: ModeChainEntry<string>) => {
+    const existing = chains.get(key);
+    if (existing) {
+      existing.events = entry.events;
+      existing.nextDueMs = entry.nextDueMs;
+    } else {
+      chains.set(key, entry);
+    }
+  };
+  for (const [key, entry] of saved.full) put(key, entry);
+  for (const [key, choice] of saved.initial) {
+    put(key, { events: [{ installedAtMs: Number.NEGATIVE_INFINITY, choice, previousChoice: null }], nextDueMs: Number.NEGATIVE_INFINITY });
+  }
+  for (const key of [...chains.keys()]) if (!saved.full.has(key) && !saved.initial.has(key)) chains.delete(key);
 }

@@ -350,18 +350,56 @@ export function systemAt<T extends string>(events: RenewalEvent<T>[], simTimeMs:
 
 // --- saving (saveGame.ts) ---
 
-/** Every chain as it stands. Events are plain data. */
-export function snapshotRenewalChains(): Map<string, RenewalChainEntry<string>> {
-  return chains;
+export interface RenewalChainsSnapshot {
+  /** Chains with a history, or with early reviews held: as they are. */
+  full: Map<string, RenewalChainEntry<string>>;
+  /** Chains that still hold only their starting system: just that. Their next renewal date is
+   * a seeded draw, worked out again the next time they are asked. */
+  initial: Map<string, string>;
+}
+
+function isUntouched(entry: RenewalChainEntry<string>): boolean {
+  if (entry.events.length !== 1 || entry.reviewedThroughMs !== undefined) return false;
+  const e = entry.events[0];
+  return (
+    e.installedAtMs === Number.NEGATIVE_INFINITY &&
+    e.previousSystem === null &&
+    e.reasonKind === "initial" &&
+    e.bestOverallId === null &&
+    e.municipalSubsidyRp === undefined &&
+    e.exception === undefined
+  );
+}
+
+export function snapshotRenewalChains(): RenewalChainsSnapshot {
+  const full = new Map<string, RenewalChainEntry<string>>();
+  const initial = new Map<string, string>();
+  for (const [key, entry] of chains) {
+    if (isUntouched(entry)) initial.set(key, entry.events[0].system);
+    else full.set(key, entry);
+  }
+  return { full, initial };
 }
 
 /** Puts the saved chains back. Entries that already exist are updated in place, since other
  * modules keep references to them (mobility.ts's slot handles, fleet.ts's vehicles). */
-export function restoreRenewalChains(saved: Map<string, RenewalChainEntry<string>>): void {
-  for (const [key, entry] of saved) {
+export function restoreRenewalChains(saved: RenewalChainsSnapshot): void {
+  const put = (key: string, entry: RenewalChainEntry<string>) => {
     const existing = chains.get(key);
-    if (existing) Object.assign(existing, entry);
-    else chains.set(key, entry);
+    if (existing) {
+      existing.events = entry.events;
+      existing.nextDueMs = entry.nextDueMs;
+      existing.reviewedThroughMs = entry.reviewedThroughMs;
+    } else {
+      chains.set(key, entry);
+    }
+  };
+  for (const [key, entry] of saved.full) put(key, entry);
+  for (const [key, system] of saved.initial) {
+    put(key, {
+      events: [{ installedAtMs: Number.NEGATIVE_INFINITY, system, previousSystem: null, reasonKind: "initial", bestOverallId: null }],
+      nextDueMs: Number.NEGATIVE_INFINITY,
+    });
   }
-  for (const key of [...chains.keys()]) if (!saved.has(key)) chains.delete(key);
+  for (const key of [...chains.keys()]) if (!saved.full.has(key) && !saved.initial.has(key)) chains.delete(key);
 }
