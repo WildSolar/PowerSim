@@ -196,7 +196,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
       <TopBar
         dataset={liveDataset ?? dataset}
         onOpenTreasury={() => setTownHall("treasury")}
-        onOpenTownHall={() => setTownHall((open) => (open ? null : "measures"))}
+        onOpenTownHall={() => setTownHall((open) => (open ? null : "overview"))}
         onOpenInbox={() => setInboxSelection({ tab: "letters", id: null })}
         onOpenWiki={() => setShowWiki(true)}
         onMenu={returnToMenu}

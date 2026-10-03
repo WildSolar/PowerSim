@@ -20,6 +20,27 @@ export const MEASURE_CATEGORY_LABEL: Record<MeasureCategory, string> = {
   law: "Laws",
 };
 
+/** What a measure is about — how the town hall groups them. */
+export type MeasureTopic = "heating" | "buildings" | "mobility" | "grid" | "advice";
+
+export const MEASURE_TOPIC_ORDER: MeasureTopic[] = ["heating", "buildings", "mobility", "grid", "advice"];
+
+export const MEASURE_TOPIC_LABEL: Record<MeasureTopic, string> = {
+  heating: "Heating",
+  buildings: "Buildings & solar",
+  mobility: "Mobility",
+  grid: "Grid & power",
+  advice: "Advice & campaigns",
+};
+
+/** A single measure's kind, for a tag on its card. */
+export const MEASURE_CATEGORY_SINGULAR: Record<MeasureCategory, string> = {
+  subsidy: "Subsidy",
+  infrastructure: "Infrastructure",
+  information: "Information",
+  law: "Law",
+};
+
 export type ParamValue = number | boolean | string;
 export type MeasureParams = Record<string, ParamValue>;
 
@@ -36,6 +57,7 @@ export interface MeasureCostContext {
 export interface MeasureDef {
   id: string;
   category: MeasureCategory;
+  topic: MeasureTopic;
   title: string;
   /** One or two sentences for the player: what it does and what drives it. */
   summary: string;

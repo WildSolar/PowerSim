@@ -209,3 +209,7 @@
     grid-template-columns: 1fr;
   }
 }
+
+.th-page-measures {
+  max-width: 1480px;
+}

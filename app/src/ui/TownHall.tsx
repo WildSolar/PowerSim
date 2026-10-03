@@ -11,14 +11,16 @@ import { CityStatsTab } from "./CityStatsTab";
 import { DecisionLogTab } from "./DecisionLogTab";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { MeasuresTab } from "./MeasuresTab";
+import { OverviewTab } from "./OverviewTab";
 import { TreasuryTab } from "./TreasuryTab";
 import { TariffControl } from "./TariffControl";
 import { TechnologyPrices } from "./TechnologyPrices";
 import "./townHall.css";
 
-export type TownHallSection = "measures" | "treasury" | "prices" | "stats" | "log";
+export type TownHallSection = "overview" | "measures" | "treasury" | "prices" | "stats" | "log";
 
 const SECTIONS: { id: TownHallSection; title: string; blurb: string }[] = [
+  { id: "overview", title: "Overview", blurb: "Where the town stands, what the canton and the Confederation have in store, and what was decided lately." },
   { id: "measures", title: "Measures", blurb: "Subsidies, infrastructure, information and laws: what the municipality can enact, and what it has." },
   { id: "treasury", title: "Treasury", blurb: "The department's accounts, year by year, and its borrowing." },
   { id: "prices", title: "Prices", blurb: "What the municipal utility charges, and where technology prices are heading." },
@@ -99,6 +101,7 @@ export function TownHall({ dataset, transparency, section, onSection, onClose }:
               <TechnologyPrices />
             </div>
           )}
+          {current.id === "overview" && <OverviewTab dataset={dataset} onOpen={onSection} />}
           {current.id === "measures" && <MeasuresTab />}
           {current.id === "treasury" && <TreasuryTab dataset={dataset} />}
           {current.id === "stats" && (

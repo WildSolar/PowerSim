@@ -2,7 +2,6 @@
   font-family: var(--font);
   font-size: 13px;
   color: var(--ink);
-  max-width: 560px;
 }
 
 .measures-intro {
@@ -22,18 +21,6 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-3);
-}
-
-.measure-card {
-  border: 1px solid var(--line);
-  border-radius: var(--r-3);
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  background: var(--surface);
-}
-
-.measure-card.external {
-  background: var(--fill);
 }
 
 .measure-head {
@@ -67,6 +54,11 @@
 .measure-status.active {
   background: var(--good-soft);
   color: var(--good);
+}
+
+.measure-status.done {
+  background: var(--fill-2);
+  color: var(--ink-2);
 }
 
 .measure-summary {
@@ -187,14 +179,6 @@
   font-size: 12px;
 }
 
-.measure-card.unavailable > :not(.measure-head):not(.measure-note):not(.measure-actions) {
-  opacity: 0.5;
-}
-
-.measure-card.unavailable .measure-title {
-  color: var(--ink-3);
-}
-
 .measure-evidence {
   margin: 8px 0 4px;
   padding: 8px 10px;
@@ -254,7 +238,7 @@
 .survey-bar > span {
   display: block;
   height: 100%;
-  background: var(--accent);
+  background: var(--ink-2);
 }
 
 .survey-value {

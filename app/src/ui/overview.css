@@ -1,0 +1,155 @@
+.ov-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.ov-figure {
+  padding: 16px 18px;
+}
+
+.ov-figure + .ov-figure {
+  border-left: 1px solid var(--line);
+}
+
+.ov-figure.clickable {
+  cursor: pointer;
+}
+
+.ov-figure.clickable:hover {
+  background: var(--fill);
+}
+
+.ov-figure h3,
+.ov-card h3,
+.ov-card .measures-section h3 {
+  margin: 0 0 6px;
+  font-family: var(--font);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.ov-value {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-detail {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.ov-detail .bad {
+  color: var(--bad);
+}
+
+.ov-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+  align-items: start;
+}
+
+.ov-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.ov-card {
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+}
+
+.ov-card .measures-section {
+  margin: 0;
+}
+
+.ov-sectors {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ov-sector {
+  display: grid;
+  grid-template-columns: 150px 1fr 64px;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.ov-sector-bar {
+  height: 8px;
+  background: var(--fill-2);
+  border-radius: var(--r-1);
+  overflow: hidden;
+}
+
+.ov-sector-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--ink-2);
+}
+
+.ov-sector-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-votes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ov-votes li {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.ov-votes li:last-child {
+  border-bottom: none;
+}
+
+.ov-vote-date {
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-vote-poll.good {
+  color: var(--good);
+}
+
+.ov-vote-poll.bad {
+  color: var(--bad);
+}
+
+@media (max-width: 720px) {
+  .ov-figure + .ov-figure {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+  .ov-columns {
+    grid-template-columns: 1fr;
+  }
+}

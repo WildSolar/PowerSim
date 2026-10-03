@@ -18,6 +18,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "solar-subsidy",
     category: "subsidy",
+    topic: "buildings",
     subsidyCategory: "solar",
     title: "Solar subsidy",
     summary:
@@ -33,6 +34,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "home-battery-subsidy",
     category: "subsidy",
+    topic: "buildings",
     subsidyCategory: "battery",
     title: "Home battery subsidy",
     summary:
@@ -57,6 +59,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "heat-pump-grant",
     category: "subsidy",
+    topic: "heating",
     subsidyCategory: "heating",
     title: "Heat pump grant",
     summary:
@@ -81,6 +84,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "ev-grant",
     category: "subsidy",
+    topic: "mobility",
     subsidyCategory: "vehicle",
     title: "Electric car grant",
     summary:
@@ -105,6 +109,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "retrofit-topup",
     category: "subsidy",
+    topic: "buildings",
     subsidyCategory: "retrofit",
     title: "Insulation retrofit top-up",
     summary: "A municipal top-up, per m² of building envelope, on the federal building-program grant when an owner upgrades the insulation.",
@@ -118,6 +123,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "municipal-solar",
     category: "infrastructure",
+    topic: "buildings",
     title: "Solar on public buildings",
     summary:
       "The municipality puts solar on its own schools, halls and other public buildings, a few each year. The panels cost the treasury their price (less the federal payment) and generate from then on.",
@@ -130,6 +136,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "public-building-chargers",
     category: "infrastructure",
+    topic: "mobility",
     title: "Chargers at public buildings",
     summary:
       "The municipality puts public chargers in the car parks of its schools, halls and other public buildings, a few sites each year — first where most households nearby want an electric car but have no charger. They're municipal chargers like any other: bought by the treasury, selling at your public charging price.",
@@ -145,6 +152,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "heat-pump-load-control",
     category: "infrastructure",
+    topic: "grid",
     title: "Heat pump load control",
     summary:
       "The utility may switch enrolled heat pumps off for short spells when the grid peaks (ripple control, long practice in Switzerland) — in turns, so a house hardly cools down. It cuts the winter evening peak on every transformer station. A running cost for the control equipment; owners grumble a little.",
@@ -157,6 +165,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "smart-charging",
     category: "infrastructure",
+    topic: "grid",
     title: "Smart charging programme",
     summary:
       "Wallbox controls and a bonus for households that let the utility charge their electric car off-peak instead of as soon as they plug in. Moves evening charging into the night — the evening peak falls. A running cost for the programme.",
@@ -171,6 +180,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "solar-outreach",
     category: "information",
+    topic: "buildings",
     title: "Solar information campaign",
     summary: "Info events and campaigns that make owners seriously consider solar more often — up to about three times as often at full effort. A running cost, in proportion to the effort.",
     params: [{ kind: "slider", key: "level", label: "Effort", min: 0, max: 100, step: 5, unit: "%", default: 50 }],
@@ -182,6 +192,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "energy-consulting",
     category: "information",
+    topic: "advice",
     title: "Energy consulting",
     summary:
       "Independent advice for owners and households. It narrows the uncertainty every investment decision (boiler, insulation, vehicle, solar) is made under, so people act on clear savings more readily and stop chasing marginal ones.",
@@ -208,6 +219,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "solar-mandate",
     category: "law",
+    topic: "buildings",
     title: "Solar mandate for new buildings",
     summary:
       "New buildings must carry a share of their roof's usable solar capacity, on top of the building code's own minimum. You can exempt small buildings. Applies to permits from the day it takes effect.",
@@ -226,6 +238,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "insulation-standard",
     category: "law",
+    topic: "buildings",
     title: "Insulation standard for new buildings",
     summary: "A stricter envelope standard for new buildings than the building code, up to passive-house grade. Heat demand falls; construction gets no cheaper, but the heating bill does.",
     params: [{ kind: "slider", key: "level", label: "Standard", min: 0, max: 100, step: 10, unit: "% toward passive house", default: 50 }],
@@ -240,6 +253,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "retrofit-minimum",
     category: "law",
+    topic: "buildings",
     title: "Minimum standard for renovations",
     summary:
       "An owner who renovates the building envelope must bring it to at least this class — no half-measures. Owners can still leave the envelope alone, so it can slow renovation as well as deepen it.",
@@ -263,6 +277,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "fossil-heating-ban",
     category: "law",
+    topic: "heating",
     title: "Ban on new fossil heating",
     summary: "When a building replaces its heating, it may no longer install a gas or oil system. Existing systems run until they wear out.",
     params: [],
@@ -274,6 +289,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "ice-car-ban",
     category: "law",
+    topic: "mobility",
     title: "Ban on new petrol and diesel cars",
     summary: "Households may no longer buy a new petrol or diesel car. Existing cars stay on the road until they are replaced.",
     params: [],
@@ -287,6 +303,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "ice-scrappage",
     category: "subsidy",
+    topic: "mobility",
     subsidyCategory: "vehicle",
     title: "Scrappage bonus for petrol and diesel cars",
     summary: "An extra grant when a household replaces a petrol or diesel car with an electric one — on top of the ordinary electric car grant. It aims at exactly the switch you want, though it also pays households that would have gone electric anyway.",
@@ -298,6 +315,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "bike-infrastructure",
     category: "infrastructure",
+    topic: "mobility",
     title: "Bicycle network",
     summary: "Safe, connected bike lanes. Over the years it nudges more households toward the bicycle whenever they rethink how they get around — a slow, diffuse effect, not a switch. Building and maintaining it costs money every year.",
     params: [{ kind: "slider", key: "level", label: "Network", min: 0, max: 100, step: 10, unit: "% of full build-out", default: 50 }],
@@ -309,6 +327,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "public-transport",
     category: "infrastructure",
+    topic: "mobility",
     title: "Public transport service",
     summary: "More frequent, better-connected buses and trams. Households rethinking how they get around choose public transport more often; the car loses share. It is the most expensive of the mobility measures to run.",
     params: [{ kind: "slider", key: "level", label: "Service level", min: 0, max: 100, step: 10, unit: "% of full build-out", default: 50 }],
@@ -320,6 +339,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "parking-management",
     category: "law",
+    topic: "mobility",
     title: "Parking management",
     summary: "Paid and limited parking, fewer spaces. Driving becomes less convenient, so households rethinking how they get around choose the bicycle or public transport more often. Drivers dislike it, and businesses worry about customers.",
     params: [{ kind: "slider", key: "strictness", label: "Strictness", min: 0, max: 100, step: 10, unit: "%", default: 50 }],
@@ -334,6 +354,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "feed-in-limit",
     category: "law",
+    topic: "grid",
     title: "Solar feed-in limit",
     summary:
       "Solar systems may feed at most a share of their rated power into the grid. A panel rarely produces more than about 70% of its rating anyway, so little energy is lost — but the sunny-midday peak on every transformer station drops. Owners of existing and new systems lose a little yield.",
@@ -358,6 +379,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "right-to-charge",
     category: "law",
+    topic: "mobility",
     title: "Right to charge at home",
     summary:
       "Landlords and owners' associations may no longer refuse a charging point in the building's car park. Many more flat-dwellers can charge at home — the biggest barrier to an electric car in town — though never all: some buildings have no parking at all. Tenants and drivers like it; property owners bear the installation work.",
@@ -373,6 +395,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "green-power",
     category: "law",
+    topic: "grid",
     title: "Green electricity as the default",
     summary:
       "The utility supplies certified renewable power by default. Emissions attributed to grid electricity fall with the share; the certificates cost the utility a premium on every kWh it buys, which comes out of the treasury, not the households' bills.",
@@ -384,6 +407,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "climate-awareness",
     category: "information",
+    topic: "advice",
     title: "Climate awareness campaign",
     summary: "Events, school programmes, local stories. Households lean a little more toward the greener option in every decision — heating, insulation, cars, solar — when the numbers are close. A running cost, in proportion to the effort.",
     params: [{ kind: "slider", key: "level", label: "Effort", min: 0, max: 100, step: 10, unit: "%", default: 50 }],
@@ -395,6 +419,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   {
     id: "district-heat-clean",
     category: "infrastructure",
+    topic: "heating",
     title: "Clean district heating",
     summary: "The municipality converts the district heating plant to biomass, geothermal or waste heat. Emissions from every building on district heat fall in proportion. The conversion and its running costs come out of the treasury every year.",
     params: [{ kind: "slider", key: "share", label: "Share produced without fossil fuels", min: 0, max: 100, step: 10, unit: "%", default: 60 }],

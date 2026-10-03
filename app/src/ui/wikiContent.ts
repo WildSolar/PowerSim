@@ -105,7 +105,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Measures: what the municipality can decide",
     blocks: [
       p(
-        "Town hall → Measures lists everything the municipality can enact, in four kinds: subsidies (money for households that act), infrastructure (things the municipality builds itself), information (campaigns and advice that help people decide), and laws (bans, mandates and standards). Each has options you set, a cost, and a lead time.",
+        "Town hall → Measures lists everything the municipality can enact, in four kinds: subsidies (money for households that act), infrastructure (things the municipality builds itself), information (campaigns and advice that help people decide), and laws (bans, mandates and standards). Each has options you set, a cost, and a lead time. They are grouped by topic — heating, buildings and solar, mobility, grid and power, advice and campaigns — and the kinds narrow the list further; \"Enacted or on the way\" shows only your own. Each card says where the measure stands and how it is doing (or how people would take it); click it for its options, its costs, the evidence on it, and the button to enact, change or repeal it.",
       ),
       list([
         "Lead time: nothing happens the day you decide. A subsidy takes a month or two to set up; a law can take one to three years. Changing an enacted measure starts a new lead time, and the old settings stay in force until then. Repealing is immediate.",
@@ -117,7 +117,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Laws can slow things down as well as speed them up: a minimum standard for renovations, for instance, discourages owners who would have done a smaller upgrade.",
       ]),
       p(
-        "The canton and the federal government act on their own schedule too — a cantonal ban on new fossil heating, a federal end to new petrol and diesel car sales, a cantonal renovation standard. Canton Zurich's rule that a fossil heating system must be replaced with a renewable one (unless nothing else is possible) has been law since 2022, so on Easy and Normal it is in force from the start; Hard imagines it arriving later. The municipality's own fossil heating ban is redundant while the canton's is in force. You have no say and pay nothing, but they change what people decide. Each is announced some years ahead, and the Outlook at the top of Measures shows what is coming, so you can plan around it rather than duplicate it.",
+        "The canton and the federal government act on their own schedule too — a cantonal ban on new fossil heating, a federal end to new petrol and diesel car sales, a cantonal renovation standard. Canton Zurich's rule that a fossil heating system must be replaced with a renewable one (unless nothing else is possible) has been law since 2022, so on Easy and Normal it is in force from the start; Hard imagines it arriving later. The municipality's own fossil heating ban is redundant while the canton's is in force. You have no say and pay nothing, but they change what people decide. Each is announced some years ahead, and the Town hall's Overview shows what is coming on a timeline, so you can plan around it rather than duplicate it.",
       ),
       note(
         "How early the higher levels of government act depends on the difficulty you chose at the start: earlier on Easy, later (or not at all) on Hard. Solar and battery decisions are settled month by month, so a solar or battery subsidy, campaign or programme counts from the month after it takes effect.",
