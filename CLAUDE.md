@@ -18,6 +18,7 @@ where the game simplifies, matching the existing sections' style.
 
 A new section must also be listed in a group in `WIKI_GROUPS` (bottom of the
 file), which sets the wiki's contents and reading order. To link to another
-section, name it in escaped straight quotes (`\"When things wear out\"`; ordinary quotations use typographic quotes): the name must equal
-its title, or the part of the title before a colon. List items that open with
+section, name it in escaped straight quotes (`\"When things wear out\"`): the
+name must equal its title, or the part of the title before a colon. Ordinary
+quotations use typographic quotes (‘ ’, “ ”) so they never turn into links. List items that open with
 a short label (`"Cost: ..."`, `"Noise. ..."`, `"Fridge — ..."`) show it in bold.
