@@ -32,7 +32,7 @@ import { historyTimeSteps, sampleMunicipalityCategorySeries, type CategorySeries
 import { ANNUAL_CAR_KM, ICE_CAR_L_PER_100KM } from "./mobilitySystems";
 import { slotsWithVehicleAt } from "./mobility";
 import { fleets } from "./fleet";
-import { effectivePowerPlants } from "./solarAdoption";
+import { effectivePowerPlantsAt } from "./solarAdoption";
 import { spaceHeatingThermalDemandW } from "./spaceHeating";
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
@@ -86,14 +86,17 @@ function monthElectricity(buildings: Building[], realPlants: PowerPlant[], year:
   return sharedMonth(electricityByMonth, year, month, () => {
     const times = monthTimes(year, month, SAMPLES_PER_MONTH);
     const tariff: Tariff = tariffStore.get();
-    return { times, series: sampleMunicipalityCategorySeries(buildings, times, tariff, effectivePowerPlants(buildings, realPlants, year)) };
+    // The plants in service by the month's end — not the whole year's: asking for those would
+    // settle the rest of the year's solar decisions early, under whatever measures are in force now.
+    const monthEndMs = toSimTimeMs(Date.UTC(year, month + 1, 1));
+    return { times, series: sampleMunicipalityCategorySeries(buildings, times, tariff, effectivePowerPlantsAt(buildings, realPlants, monthEndMs - 1)) };
   });
 }
 
 /** Every electricity category, municipality-wide, over one calendar year, month by month — the one
  * expensive sampling pass the year-end energy pie, emissions (net grid electricity) and finances
  * (revenue, feed-in, wholesale) all read from, instead of each sampling the year on its own. Solar
- * uses that year's effective (real + adopted) plants. The tariff only shifts when within a day EVs
+ * uses the plants (real + adopted) in service by the end of each month. The tariff only shifts when within a day EVs
  * charge, never the total; each month uses whichever is current when it's sampled — normally just
  * after it ended (see yearPassPrefetch.ts). */
 export function yearElectricity(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<YearElectricityMonth[]> {

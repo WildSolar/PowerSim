@@ -117,7 +117,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "The canton and the federal government act on their own schedule too — a cantonal ban on new fossil heating, a federal end to new petrol and diesel car sales, a cantonal renovation standard. You have no say and pay nothing, but they change what people decide. Each is announced some years ahead, and the Outlook at the top of Measures shows what is coming, so you can plan around it rather than duplicate it.",
       ),
       note(
-        "How early the higher levels of government act depends on the difficulty you chose at the start: earlier on Easy, later (or not at all) on Hard. Solar decisions are settled once a year, so a solar subsidy, campaign or programme changed mid-year is picked up from the next year's round.",
+        "How early the higher levels of government act depends on the difficulty you chose at the start: earlier on Easy, later (or not at all) on Hard. Solar and battery decisions are settled month by month, so a solar or battery subsidy, campaign or programme counts from the month after it takes effect.",
       ),
     ],
   },

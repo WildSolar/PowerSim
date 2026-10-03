@@ -12,8 +12,8 @@
  *  - When: NOT a fixed-lifetime wear-out cycle like renewal.ts (heating,
  *    mobility) — the vast majority of buildings have never made this
  *    decision at all, so there's no "it broke, replace it" moment forcing
- *    the question. Modeled instead as an annual hazard-rate check per
- *    still-undecided building, combining a low spontaneous baseline, a
+ *    the question. Modeled instead as an annual hazard rate per
+ *    still-undecided building (taken a month at a time), combining a low spontaneous baseline, a
  *    temporary boost for a few years after a heating renewal (a heat-pump
  *    switch is a natural moment to reconsider solar too), a neighborhood
  *    effect (more nearby installs, more likely to seriously consider it),
@@ -31,30 +31,24 @@
  * once committed. Two functions turn this cache into a real+adopted
  * PowerPlant[] a caller can drop in anywhere dataset.powerPlants was used
  * (pv.ts itself needs no changes — see each function's own doc for which to
- * use): effectivePowerPlants() for a *completed* year's own accounting
- * (emissions.ts, finances.ts, the Year in Review report), effectivePowerPlantsAt()
- * for live "right now" state (a building/dwelling panel, the map, City
- * stats) — the distinction matters because a year's adoptions are all
- * decided in one batch (below) but individually dated across that whole
- * year, so "as of right now" and "as of the end of this year" are genuinely
- * different questions.
+ * use): effectivePowerPlantsAt() for state at a moment (a panel, the map,
+ * City stats, each month of the year-end accounting), effectivePowerPlants()
+ * for everything through the end of a *completed* year.
  *
  * Unlike a per-entity renewal chain, this can't be computed independently
  * per building — the neighborhood effect means one building's outcome
  * depends on every other building's adoption history. So the whole
- * municipality is advanced one calendar year at a time (ensureAdvancedThrough),
- * cached by a single watermark year, extended incrementally exactly like
- * every other year-keyed cache in this codebase — and, like those, using
- * whatever tariff/policy is current the moment a given year is actually
- * processed, then frozen forever (tariffStore.ts's own "retroactive but
- * never rewritten" simplification). This means every adoption for a whole
- * year — including ones dated many months out — is *decided* the instant
- * that year is first queried, but effectivePowerPlantsAt still only ever
- * *reveals* one once its own installedAtMs is actually reached (the same
- * "not yet committed, don't show it" principle renewal.ts's own chains use).
+ * municipality is advanced one calendar month at a time (ensureAdvancedThroughMonth),
+ * cached by a single watermark month, using whatever tariff/policy is
+ * current the moment a month is first reached, then frozen forever
+ * (tariffStore.ts's own "retroactive but never rewritten" simplification) —
+ * so a measure changed mid-year counts from the next month on. A month's
+ * adoptions are dated across that month, and effectivePowerPlantsAt only
+ * *reveals* one once its own installedAtMs is reached. Nothing may ask for
+ * a month before it has begun (that would settle it under today's measures).
  * solarAdoptionLog() reads the cache directly without buildings/realPlants,
  * and is only safe to call after one of the two functions above has already
- * advanced the relevant year earlier in the same render — true in practice
+ * advanced the relevant month earlier in the same render — true in practice
  * since every caller of solarAdoptionLog reaches it through
  * useLivePowerPlants.ts, which calls effectivePowerPlantsAt first.
  */
@@ -191,7 +185,7 @@ function batteryPreferenceRp(egid: string): number {
   const u = mulberry32(hashSeed(egid, "battery-preference"))();
   return (HOME_BATTERY_PREFERENCE_CHF_PER_YEAR + HOME_BATTERY_PREFERENCE_SPREAD_CHF_PER_YEAR * (2 * u - 1)) * 100;
 }
-let watermarkYear: number | null = null;
+let watermarkMonth: number | null = null; // year * 12 + month (0-based) of the last month decided
 let neighborListCache: Map<string, string[]> | null = null;
 let realPvEgidsCache: Set<string> | null = null;
 
@@ -227,9 +221,9 @@ function neighborList(buildings: Building[]): Map<string, string[]> {
   return list;
 }
 
-function isEligible(building: Building, realPlants: PowerPlant[], year: number): boolean {
+function isEligible(building: Building, realPlants: PowerPlant[], year: number, monthStartMs: number): boolean {
   if (building.footprintAreaM2 == null || building.footprintAreaM2 <= 0) return false;
-  if (!existsAt(building, toSimTimeMs(Date.UTC(year, 0, 1)))) return false; // not yet built (or already demolished) at the start of the year
+  if (!existsAt(building, monthStartMs)) return false; // not yet built (or already demolished) at the start of the month
   if (building.constructionYear != null && year - building.constructionYear > AGE_EXCLUSION_YEARS) return false;
   if (realPvEgids(realPlants).has(building.egid)) return false;
   return true;
@@ -263,9 +257,27 @@ interface YearSunlight {
   irradianceWm2: number[];
 }
 
-function yearSunlight(yearStartMs: number): YearSunlight {
-  const times = historyTimeSteps(yearStartMs + YEAR_MS, YEAR_MS, ANNUAL_SAMPLES);
-  return { times, irradianceWm2: times.map((t) => irradianceWm2(t)) };
+const sunlightByYear = new Map<number, YearSunlight>();
+
+function yearSunlight(year: number): YearSunlight {
+  let sunlight = sunlightByYear.get(year);
+  if (!sunlight) {
+    const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
+    const times = historyTimeSteps(yearStartMs + YEAR_MS, YEAR_MS, ANNUAL_SAMPLES);
+    sunlight = { times, irradianceWm2: times.map((t) => irradianceWm2(t)) };
+    sunlightByYear.set(year, sunlight);
+  }
+  return sunlight;
+}
+
+/** An annual chance as the chance of it within one month. */
+function monthlyChance(annual: number): number {
+  return 1 - Math.pow(1 - Math.min(0.999, Math.max(0, annual)), 1 / 12);
+}
+
+/** A day within the month starting at `monthStartMs`, seeded. */
+function dayInMonth(seed: number, monthStartMs: number): number {
+  return monthStartMs + Math.floor(mulberry32(seed)() * 28) * DAY_MS;
 }
 
 /** A candidate installation's annual savings for this specific building —
@@ -449,8 +461,7 @@ function evaluateAdoption(
 
   if (chosen === "none") return null;
 
-  const dayOffset = Math.floor(mulberry32(hashSeed(building.egid, "solar-install-day", String(year)))() * 365);
-  const installedAtMs = yearStartMs + dayOffset * DAY_MS;
+  const installedAtMs = dayInMonth(hashSeed(building.egid, "solar-install-day", String(yearStartMs)), yearStartMs);
   if (municipalRp > 0) recordSubsidisedDecision({ atMs: installedAtMs, category: "solar", subsidyRp: municipalRp, additional });
   if (chosen !== "solar") {
     batteryByEgid.set(building.egid, {
@@ -523,7 +534,7 @@ function considerBatteryRetrofit(building: Building, capacityKw: number, year: n
     extra: { capacityKw, batteryKwh: battery.kwh, batteryCostRp: costRp, batteryPreferenceRp: preferenceRp },
   });
   if (chosen === "none") return;
-  const installedAtMs = yearStartMs + Math.floor(mulberry32(hashSeed(building.egid, "battery-install-day", String(year)))() * 365) * DAY_MS;
+  const installedAtMs = dayInMonth(hashSeed(building.egid, "battery-install-day", String(yearStartMs)), yearStartMs);
   const subsidyRp = subsidy[chosen];
   batteryByEgid.set(building.egid, {
     installedAtMs,
@@ -566,12 +577,13 @@ function municipalBatteryFor(building: Building, capacityKw: number, atMs: numbe
  * owner's decision: full usable roof, paid for by the treasury (less the federal payment every
  * installation gets), generating from the install date. */
 function installMunicipalSolar(buildings: Building[], realPlants: PowerPlant[], year: number, yearStartMs: number): void {
-  const perYear = policyStore.get().municipalSolarBuildingsPerYear;
-  if (perYear <= 0) return;
-  const whole = Math.floor(perYear);
-  const count = whole + (mulberry32(hashSeed("municipal-solar-count", String(year)))() < perYear - whole ? 1 : 0);
+  const perMonth = policyStore.get().municipalSolarBuildingsPerYear / 12;
+  if (perMonth <= 0) return;
+  const whole = Math.floor(perMonth);
+  const count = whole + (mulberry32(hashSeed("municipal-solar-count", String(yearStartMs)))() < perMonth - whole ? 1 : 0);
+  if (count === 0) return;
   const candidates = municipalSolarCandidates(buildings, realPlants, yearStartMs).sort(
-    (a, b) => hashSeed(a.egid, "municipal-solar", String(year)) - hashSeed(b.egid, "municipal-solar", String(year)),
+    (a, b) => hashSeed(a.egid, "municipal-solar", String(yearStartMs)) - hashSeed(b.egid, "municipal-solar", String(yearStartMs)),
   );
   for (const building of candidates.slice(0, count)) {
     const usable = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
@@ -579,8 +591,7 @@ function installMunicipalSolar(buildings: Building[], realPlants: PowerPlant[], 
     if (capacityKw <= 0) continue;
     const installCostRp = capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year));
     const federalRp = federalSubsidyRp(capacityKw);
-    const dayOffset = Math.floor(mulberry32(hashSeed(building.egid, "municipal-solar-day", String(year)))() * 365);
-    const installedAtMs = yearStartMs + dayOffset * DAY_MS;
+    const installedAtMs = dayInMonth(hashSeed(building.egid, "municipal-solar-day", String(yearStartMs)), yearStartMs);
     const battery = municipalBatteryFor(building, capacityKw, yearStartMs);
     if (battery) {
       const costRp = homeBatteryCostRp(battery.kwh, installedAtMs);
@@ -654,28 +665,35 @@ export function solarStatusOf(building: Building, realPlants: PowerPlant[]): { c
   return record ? { capacityKw: record.capacityKw, installedAtMs: record.installedAtMs } : null;
 }
 
-function processYear(buildings: Building[], realPlants: PowerPlant[], year: number): void {
+/** One month's decisions, under the measures and prices in force as it begins: the municipal
+ * programme's share of its yearly count, owners who look into solar (an annual chance taken a month
+ * at a time), and owners of a system without a battery who look into adding one. */
+function processMonth(buildings: Building[], realPlants: PowerPlant[], year: number, month: number): void {
   const policy = policyStore.get();
   const tariff = tariffStore.get();
-  const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
+  const yearStartMs = toSimTimeMs(Date.UTC(year, month, 1)); // the start of this month
   installMunicipalSolar(buildings, realPlants, year, yearStartMs);
 
   let sunlight: YearSunlight | undefined;
   const priceMultiplier = Math.pow(1 / priceFactorInYear("solar", year), SOLAR_PRICE_HAZARD_ELASTICITY);
+  // The highest chance any building could have this month: most draws miss it, and skip the
+  // neighbour count and heating history.
+  const ceiling = monthlyChance(Math.min(MAX_ANNUAL_HAZARD, BASE_ANNUAL_HAZARD * RENEWAL_BOOST_MULTIPLIER * NEIGHBOR_BOOST_CAP * outreachHazardMultiplier(policy) * priceMultiplier));
   for (const building of buildings) {
     if (adoptionByEgid.has(building.egid)) continue;
-    if (!isEligible(building, realPlants, year)) continue;
+    const draw = mulberry32(hashSeed(building.egid, "solar-hazard", String(year), String(month)))();
+    if (draw >= ceiling) continue;
+    if (!isEligible(building, realPlants, year, yearStartMs)) continue;
 
     const neighborAdopters = countAdoptedNeighbors(building.egid, buildings, realPlants, yearStartMs);
     const renewalBoosted = hadRecentHeatingRenewal(building, yearStartMs);
     const renewalBoost = renewalBoosted ? RENEWAL_BOOST_MULTIPLIER : 1;
     const neighborMultiplier = 1 + Math.min(NEIGHBOR_BOOST_CAP - 1, neighborAdopters * NEIGHBOR_BOOST_PER_ADOPTER);
-    const hazard = Math.min(MAX_ANNUAL_HAZARD, BASE_ANNUAL_HAZARD * renewalBoost * neighborMultiplier * outreachHazardMultiplier(policy) * priceMultiplier);
+    const hazard = monthlyChance(Math.min(MAX_ANNUAL_HAZARD, BASE_ANNUAL_HAZARD * renewalBoost * neighborMultiplier * outreachHazardMultiplier(policy) * priceMultiplier));
 
-    const draw = mulberry32(hashSeed(building.egid, "solar-hazard", String(year)))();
     if (draw >= hazard) continue;
 
-    sunlight ??= yearSunlight(yearStartMs);
+    sunlight ??= yearSunlight(year);
     const decision = evaluateAdoption(building, year, yearStartMs, sunlight, tariff, policy, { hazard, draw, neighborAdopters, renewalBoosted });
     if (decision) {
       adoptionByEgid.set(building.egid, decision);
@@ -690,9 +708,9 @@ function processYear(buildings: Building[], realPlants: PowerPlant[], year: numb
     const adopted = adoptionByEgid.get(building.egid);
     const capacityKw = adopted && adopted.installedAtMs < yearStartMs ? adopted.capacityKw : (registered.get(building.egid)?.kw ?? 0);
     if (capacityKw <= 0 || registered.get(building.egid)?.hasBattery) continue;
-    const draw = mulberry32(hashSeed(building.egid, "battery-retrofit", String(year)))();
-    if (draw >= BATTERY_RETROFIT_ANNUAL_HAZARD * outreachHazardMultiplier(policy)) continue;
-    sunlight ??= yearSunlight(yearStartMs);
+    const draw = mulberry32(hashSeed(building.egid, "battery-retrofit", String(year), String(month)))();
+    if (draw >= monthlyChance(BATTERY_RETROFIT_ANNUAL_HAZARD * outreachHazardMultiplier(policy))) continue;
+    sunlight ??= yearSunlight(year);
     considerBatteryRetrofit(building, capacityKw, year, yearStartMs, sunlight, tariff, policy);
   }
 }
@@ -715,12 +733,24 @@ function registeredCapacityByEgid(realPlants: PowerPlant[]): Map<string, { kw: n
   return byEgid;
 }
 
-function ensureAdvancedThrough(buildings: Building[], realPlants: PowerPlant[], targetYear: number): void {
-  if (watermarkYear === null) watermarkYear = targetYear - 1;
-  for (let year = watermarkYear + 1; year <= targetYear; year++) {
-    processYear(buildings, realPlants, year);
-    watermarkYear = year;
+/** Decides every month up to and including `targetMonth` (year * 12 + month) not yet decided —
+ * each when it is first reached, so a measure changed mid-year counts from the next month. */
+function ensureAdvancedThroughMonth(buildings: Building[], realPlants: PowerPlant[], targetMonth: number): void {
+  if (watermarkMonth === null) watermarkMonth = targetMonth - 1;
+  for (let m = watermarkMonth + 1; m <= targetMonth; m++) {
+    processMonth(buildings, realPlants, Math.floor(m / 12), m % 12);
+    watermarkMonth = m;
   }
+}
+
+/** Every month through December of `targetYear` — for a completed year's accounting. */
+function ensureAdvancedThrough(buildings: Building[], realPlants: PowerPlant[], targetYear: number): void {
+  ensureAdvancedThroughMonth(buildings, realPlants, targetYear * 12 + 11);
+}
+
+function monthIndexAt(simTimeMs: number): number {
+  const d = new Date(toDateMs(simTimeMs));
+  return d.getUTCFullYear() * 12 + d.getUTCMonth();
 }
 
 const buildingLookupCache = new WeakMap<Building[], Map<string, Building>>();
@@ -803,8 +833,7 @@ export function effectivePowerPlants(buildings: Building[], realPlants: PowerPla
  * precise instant instead, the same "not yet reached, don't reveal it"
  * principle renewal.ts's own chains already use. */
 export function effectivePowerPlantsAt(buildings: Building[], realPlants: PowerPlant[], simTimeMs: number): PowerPlant[] {
-  const year = new Date(toDateMs(simTimeMs)).getUTCFullYear();
-  ensureAdvancedThrough(buildings, realPlants, year);
+  ensureAdvancedThroughMonth(buildings, realPlants, monthIndexAt(simTimeMs));
   return [...realPlantsWithDemolitions(buildings, realPlants, simTimeMs), ...synthesizedPlants(buildings, simTimeMs)];
 }
 

@@ -25,7 +25,7 @@ export function priceFactor(id: CostTrendId, simTimeMs: number): number {
   return level + (1 - level) * Math.exp(-Math.max(0, simTimeMs / YEAR_MS) / years);
 }
 
-/** The same, for a whole calendar year (its middle) — for decisions settled once a year (solar). */
+/** The same, for a whole calendar year (its middle) — for prices that are set per year (solar). */
 export function priceFactorInYear(id: CostTrendId, year: number): number {
   return priceFactor(id, toSimTimeMs(Date.UTC(year, 6, 1)));
 }
