@@ -21,7 +21,7 @@ from .. import coords
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 # Overpass answers 406 to requests without an identifying User-Agent.
-HEADERS = {"User-Agent": "grid-and-ground-pipeline/0.1 (offline data preparation)"}
+HEADERS = {"User-Agent": "commune-zero-pipeline/0.1 (offline data preparation)"}
 
 LEISURE = "pitch|sports_centre|stadium|track|playground|park|garden|golf_course|recreation_ground|dog_park|nature_reserve|swimming_pool|fitness_station"
 LANDUSE = "cemetery|recreation_ground|allotments|village_green"

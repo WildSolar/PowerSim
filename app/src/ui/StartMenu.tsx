@@ -40,9 +40,9 @@ export function StartMenu({ onStart }: Props) {
       <div className="start-menu-title">
         <span className="start-menu-mark" aria-hidden="true" />
         <h1>
-          Grid &amp;
+          Commune
           <br />
-          Ground
+          Zéro
         </h1>
         <p>A Swiss municipality, its buildings, its grid — and the road to net zero.</p>
       </div>

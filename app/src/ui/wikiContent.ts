@@ -53,7 +53,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Overview",
     blocks: [
       p(
-        "You run the energy department of a real Swiss municipality: its electricity utility, its district heating, and its say over buildings, zoning and transport. The goal is net zero by 2050 — without losing the voters or emptying the treasury on the way.",
+        "In Commune Zéro you run the energy department of a real Swiss municipality: its electricity utility, its district heating, and its say over buildings, zoning and transport. The goal is net zero by 2050 — without losing the voters or emptying the treasury on the way.",
       ),
       p(
         "The town on the map is the real one. Every building comes from the federal building register, with its real address, age, size, homes and heating; so are the solar panels, the public chargers, the share of electric cars and the businesses' vans and lorries at the start. From there the town lives on: people heat, cook, charge and commute, systems wear out and get replaced, new buildings go up. You can't decide for anyone — but your measures, prices and building projects change what people choose.",

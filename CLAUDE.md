@@ -1,4 +1,4 @@
-# Grid & Ground — project notes
+# Commune Zéro — project notes
 
 ## In-game wiki
 
