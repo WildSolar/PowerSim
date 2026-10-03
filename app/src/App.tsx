@@ -220,7 +220,16 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
       <GameOverModal />
       {showControl && <ControlPanel dataset={liveDataset ?? dataset} transparency={transparency} onClose={() => setShowControl(false)} />}
       {showWiki && <WikiPanel onClose={() => setShowWiki(false)} />}
-      {inboxSelection && <InboxPanel initial={inboxSelection} onClose={() => setInboxSelection(null)} />}
+      {inboxSelection && (
+        <InboxPanel
+          initial={inboxSelection}
+          onClose={() => setInboxSelection(null)}
+          onSelectBuilding={(egid) => {
+            setSelectedEgid(egid);
+            setSelectedEwid(null);
+          }}
+        />
+      )}
       {!inboxSelection && <InboxToast onOpen={setInboxSelection} />}
       {reportCardYear !== null && (
         <ReportCardModal dataset={liveDataset ?? dataset} year={reportCardYear} onClose={() => reportCardStore.dismiss()} />

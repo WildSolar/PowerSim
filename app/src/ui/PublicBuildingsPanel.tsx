@@ -28,20 +28,35 @@ function nameOf(b: Building): string {
 }
 
 /** What the municipality has on one of its buildings, and ordering more: solar on its roof, chargers
- * in its car park. */
-function SelectedBuilding({ building, realPlants, now, onOrdered }: { building: Building; realPlants: PowerPlant[]; now: number; onOrdered: () => void }) {
+ * in its car park. Also in the building panel of a public building (without the name, which the
+ * panel already shows). */
+export function PublicBuildingOrders({
+  building,
+  realPlants,
+  now,
+  onOrdered,
+  withName = true,
+}: {
+  building: Building;
+  realPlants: PowerPlant[];
+  now: number;
+  onOrdered: () => void;
+  withName?: boolean;
+}) {
   const { solar, chargers } = publicBuildingStatus(building, realPlants);
   const solarQuote = solar ? null : municipalSolarQuote(building, realPlants, now);
   return (
     <div className="ev-site">
-      <div className="ev-site-head">
-        <span className="ev-site-name">
-          {nameOf(building)}
-          <span className="dh-note" style={{ display: "block", margin: 0 }}>
-            {publicBuildingKind(building)}
+      {withName && (
+        <div className="ev-site-head">
+          <span className="ev-site-name">
+            {nameOf(building)}
+            <span className="dh-note" style={{ display: "block", margin: 0 }}>
+              {publicBuildingKind(building)}
+            </span>
           </span>
-        </span>
-      </div>
+        </div>
+      )}
 
       <div className="info-row">
         <span>☀️ Solar</span>
@@ -83,7 +98,13 @@ function SelectedBuilding({ building, realPlants, now, onOrdered }: { building: 
       {chargers.length === 0 ? (
         <div className="ev-sizes">
           {sizesFor("ac").map(({ points }) => (
-            <button key={points} onClick={() => publicCharging.buildAtBuilding(building, points, simClock.getSimTimeMs())}>
+            <button
+              key={points}
+              onClick={() => {
+                publicCharging.buildAtBuilding(building, points, simClock.getSimTimeMs());
+                onOrdered();
+              }}
+            >
               <span className="ev-build-name">{points} points</span>
               <span className="ev-build-detail">{shortPriceTag(buildCostRp("ac", now, points))}</span>
               <span className="ev-build-detail">{buildMonthsFor("ac", points)} months</span>
@@ -146,7 +167,7 @@ export function PublicBuildingsPanel({
 
   const pick = (b: Building) => {
     onSelectBuilding(b.egid);
-    mapFocus.request({ lon: b.lon, lat: b.lat });
+    mapFocus.focusBuilding(b);
   };
 
   return (
@@ -176,7 +197,7 @@ export function PublicBuildingsPanel({
       </p>
 
       {selected ? (
-        <SelectedBuilding building={selected} realPlants={realPlants} now={now} onOrdered={() => setSolarOrders((n) => n + 1)} />
+        <PublicBuildingOrders building={selected} realPlants={realPlants} now={now} onOrdered={() => setSolarOrders((n) => n + 1)} />
       ) : (
         <p className="dh-note">Click a public building on the map or in the list below.</p>
       )}

@@ -5,6 +5,7 @@ import { simClock } from "../sim/engine";
 import { inbox, type Edition, type Letter } from "../sim/inbox";
 import { letters, type LetterRequest } from "../sim/letters";
 import { useSimDay } from "../sim/store";
+import { stock } from "../sim/stock";
 import "./modal.css";
 import "./inbox.css";
 
@@ -27,7 +28,7 @@ function monthYear(atMs: number): string {
 }
 
 /** Letters from residents and groups, the requests among them, and the local paper. */
-export function InboxPanel({ initial, onClose }: { initial: InboxSelection; onClose: () => void }) {
+export function InboxPanel({ initial, onClose, onSelectBuilding }: { initial: InboxSelection; onClose: () => void; onSelectBuilding: (egid: string) => void }) {
   useSyncExternalStore(
     (l) => inbox.subscribe(l),
     () => inbox.getVersion(),
@@ -51,9 +52,16 @@ export function InboxPanel({ initial, onClose }: { initial: InboxSelection; onCl
   }, [selectedLetter, selectedEdition]);
   void day;
 
-  const showOnMap = (focus: { lon: number; lat: number }) => {
-    mapFocus.request({ lon: focus.lon, lat: focus.lat, minZoom: 16 });
+  // A letter about a building selects it (its panel opens) and centres it; one about a place centres that.
+  const showOnMap = (focus: { lon: number; lat: number; egid?: string }) => {
+    const building = focus.egid ? stock.lookup(focus.egid) : undefined;
     onClose();
+    if (building) {
+      onSelectBuilding(building.egid);
+      mapFocus.focusBuilding(building, 17);
+    } else {
+      mapFocus.request({ lon: focus.lon, lat: focus.lat, minZoom: 16 });
+    }
   };
 
   return (
@@ -136,7 +144,7 @@ export function InboxPanel({ initial, onClose }: { initial: InboxSelection; onCl
   );
 }
 
-function LetterView({ letter, onShowOnMap }: { letter: Letter; onShowOnMap: (focus: { lon: number; lat: number }) => void }) {
+function LetterView({ letter, onShowOnMap }: { letter: Letter; onShowOnMap: (focus: { lon: number; lat: number; egid?: string }) => void }) {
   const request = letter.requestId ? letters.getRequest(letter.requestId) : undefined;
   return (
     <article className="letter">
@@ -165,8 +173,8 @@ function LetterView({ letter, onShowOnMap }: { letter: Letter; onShowOnMap: (foc
         </div>
       )}
       {letter.focus && (
-        <button className="letter-map" onClick={() => onShowOnMap(letter.focus as { lon: number; lat: number })}>
-          📍 Show on the map
+        <button className="letter-map" onClick={() => onShowOnMap(letter.focus as { lon: number; lat: number; egid?: string })}>
+          📍 {letter.focus.egid ? "Show the building" : "Show on the map"}
         </button>
       )}
     </article>

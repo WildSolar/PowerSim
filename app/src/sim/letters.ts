@@ -322,7 +322,7 @@ class Letters {
           bloc: "homeowners",
           from: this.personName(rng),
           role: `owner, ${b.address ?? "in town"}`,
-          focus: { lon: b.lon, lat: b.lat },
+          focus: { lon: b.lon, lat: b.lat, egid: b.egid },
           ...refusedHeatPumpText(kind, detail, got, b.address ?? "our house"),
         });
       });
@@ -376,8 +376,8 @@ class Letters {
     this.listeners.forEach((l) => l());
   }
 
-  private requestOptions(atMs: number, open: LetterRequest[]): { bloc: Bloc; target: RequestTarget; ask: string; focus?: { lon: number; lat: number } }[] {
-    const options: { bloc: Bloc; target: RequestTarget; ask: string; focus?: { lon: number; lat: number } }[] = [];
+  private requestOptions(atMs: number, open: LetterRequest[]): { bloc: Bloc; target: RequestTarget; ask: string; focus?: { lon: number; lat: number; egid?: string } }[] {
+    const options: { bloc: Bloc; target: RequestTarget; ask: string; focus?: { lon: number; lat: number; egid?: string } }[] = [];
     const taken = (pred: (t: RequestTarget) => boolean) => open.some((r) => pred(r.target));
     const buildings = this.buildingsProvider().filter((b) => existsAt(b, atMs));
 
@@ -413,7 +413,7 @@ class Letters {
           bloc: "homeowners",
           target: { kind: "districtHeat", segmentId: dhBest[0], street, lon: b.lon, lat: b.lat },
           ask: `district heating along ${street}`,
-          focus: { lon: b.lon, lat: b.lat },
+          focus: { lon: b.lon, lat: b.lat, egid: b.egid },
         });
       }
     }
@@ -437,7 +437,7 @@ class Letters {
     if (roofs.length > 0) {
       const b = roofs[hashSeed(this.seed, "roof", String(atMs | 0)) % roofs.length];
       const name = `the ${publicBuildingKind(b).toLowerCase()} at ${b.address ?? "the town centre"}`;
-      options.push({ bloc: "climate", target: { kind: "publicSolar", egid: b.egid, name, lon: b.lon, lat: b.lat }, ask: `solar panels on ${name}`, focus: { lon: b.lon, lat: b.lat } });
+      options.push({ bloc: "climate", target: { kind: "publicSolar", egid: b.egid, name, lon: b.lon, lat: b.lat }, ask: `solar panels on ${name}`, focus: { lon: b.lon, lat: b.lat, egid: b.egid } });
     }
 
     // A measure the unhappiest group wants.

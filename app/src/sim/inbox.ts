@@ -19,8 +19,8 @@ export interface Letter {
   role: string;
   subject: string;
   paragraphs: string[];
-  /** A place the letter is about, to show on the map. */
-  focus?: { lon: number; lat: number };
+  /** A place the letter is about, to show on the map — a building, when it is about one. */
+  focus?: { lon: number; lat: number; egid?: string };
   requestId?: string;
 }
 

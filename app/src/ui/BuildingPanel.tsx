@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ENERGY_CLASS_CATALOG } from "../sim/energyClass";
 import { energyClassAt, retrofitLog } from "../sim/retrofit";
 import { buildingThermalProfile } from "../sim/spaceHeating";
@@ -31,6 +32,9 @@ import { BillSection } from "./BillSection";
 import { COMMERCIAL_CATEGORY_ICON, COMMERCIAL_CATEGORY_LABEL } from "./commercialDisplay";
 import { EnergyBreakdown } from "./EnergyBreakdown";
 import { FleetSection } from "./FleetSection";
+import { PublicBuildingOrders } from "./PublicBuildingsPanel";
+import { SupervisionNotice } from "./SupervisionNotice";
+import { isPublicBuilding, publicBuildingKind } from "../sim/publicBuildings";
 import { HeatPumpSiteSection } from "./HeatPumpSiteSection";
 import { energySourceLabel } from "./energySourceLabel";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
@@ -53,6 +57,7 @@ export interface BuildingPanelProps {
 export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwelling, onClose }: BuildingPanelProps) {
   const simTimeMs = useSimTime();
   const tariff = useTariff();
+  const [, setOrders] = useState(0); // re-read after ordering solar or chargers here
   const plants = useLivePowerPlants(allBuildings, realPlants, simTimeMs);
   const hasHp = hasHeatPump(building, simTimeMs);
   const heatPumpW = hasHp ? heatPumpPowerW(building, simTimeMs) : 0;
@@ -153,6 +158,16 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
           )}
         </dd>
       </dl>
+
+      {isPublicBuilding(building) && (
+        <>
+          <h2 style={{ fontSize: 14, marginTop: 14 }}>Municipal building · {publicBuildingKind(building)}</h2>
+          <SupervisionNotice />
+          <div className="public-orders">
+            <PublicBuildingOrders building={building} realPlants={realPlants} now={simTimeMs} onOrdered={() => setOrders((n) => n + 1)} withName={false} />
+          </div>
+        </>
+      )}
 
       <h2 style={{ fontSize: 14, marginTop: 14 }}>Climate control</h2>
       <div className={`device-row${hasHp ? "" : " inactive"}`}>
