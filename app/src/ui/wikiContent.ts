@@ -665,12 +665,32 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Money leaves the treasury only when a decision actually happens: the day a household installs a subsidised heat pump, buys a subsidised electric car, upgrades its insulation, or puts up solar panels, the municipal top-up is paid out. A grant nobody takes up costs nothing — but a grant also goes to everyone who would have decided the same way anyway, and finding the level that tips the undecided without overpaying the rest is the whole game of subsidy planning. The grants are set in Control → Measures.",
       ),
       p(
-        "Each completed year, the balance moves by: what consumers paid for grid electricity and district heat, plus the government allocation, plus what the municipality's own public chargers sold and the zoning levy collected, minus the solar fed in, the wholesale cost of the net electricity bought in, grid maintenance, the heat bought from the district heating source, the upkeep of the pipes and of the chargers, and every subsidy paid out that year. Extending the district heating network, building public chargers and changing the zoning plan are paid the day they're ordered. The utility costs are set in Control → Prices, under \"Municipal utility costs\".",
+        "Each completed year, the balance moves by: what consumers paid for grid electricity and district heat, plus the government allocation, plus what the municipality's own public chargers sold, the zoning levy collected and any money borrowed (see \"Borrowing & debt\"), minus the solar fed in, the wholesale cost of the net electricity bought in, grid maintenance, the heat bought from the district heating source, the upkeep of the pipes and of the chargers, and every subsidy paid out that year. Extending the district heating network, building public chargers and changing the zoning plan are paid the day they're ordered. The utility costs are set in Control → Prices, under \"Municipal utility costs\".",
       ),
       note(
         "The utility side covers electricity and district heating only — gas, oil and petrol/diesel are paid straight to an external supplier, never through the municipal utility. Federal and cantonal grants (the baseline every heat pump, EV and solar installation already gets) are not municipal money; only the municipality's own top-up is.",
       ),
       note("The government allocation and the starting cash are placeholders while the money model is still being designed. The utility's margin (a few million a year at the default prices) is small next to a serious subsidy programme, so choices about what to fund matter."),
+    ],
+  },
+  {
+    id: "borrowing",
+    icon: "🏦",
+    title: "Borrowing & debt",
+    blocks: [
+      p(
+        "Like a Swiss municipality's accounts, the department's spending comes in two kinds. Investments — grid reinforcement and batteries, district heating pipes and supply, public chargers, solar on public buildings — build something that lasts: they may be paid with borrowed money, and they don't count towards the overspending that taxpayers resent. Running spending — subsidies, campaigns, programmes, studies, zoning plans, and interest — should be covered by income.",
+      ),
+      list([
+        "Bank loans (Control → Borrowing): an amount and a term (5, 10 or 20 years), repaid in equal monthly instalments. The rate is the market rate plus a spread for the department's credit rating, fixed for the loan's life; longer loans cost a little more. Loans can be repaid early.",
+        "The overdraft: if the balance falls below zero, it is covered automatically — at a steep premium over the market, charged every month.",
+        "Green bonds: offered to the town's own residents, for ten years, with interest yearly and the money repaid at the end. Residents accept a little less than the market for a local green cause, and subscribe what they want to — more when the climate-minded are content, so a bond may raise less than offered. Offering one goes down well. The money is earmarked: within two years, as much has to go into green investment, or the paper calls it greenwashing and the climate-minded turn away. At most one a year.",
+        "Federal decarbonisation loans: 0.25% over 20 years, but only against decarbonisation investments already made — up to half of the last twelve months' — and only so much a year; the money arrives after three months.",
+      ]),
+      p(
+        "The market rate starts near today's (about 1.2%) and drifts over the years — with occasional jumps nobody sees coming, which fade over a couple of years. Borrowing when money is cheap pays off. Debt is measured against the department's income (what the utility earns, the levies and the government's allocation, from the last booked year): the more years of income it would take to repay, the lower the rating and the dearer new money. From about a year and a half of income, homeowners and businesses start to worry (approval). Beyond five years, the canton puts the department under supervision: no new borrowing, no new spending measures and no new orders — measures already in force run on, and laws and prices stay yours — until debt is back under four years.",
+      ),
+      note("Placeholders: the rate path, the spreads, the green bond's demand, the federal programme (a stand-in — the real federal climate programmes are mostly grants) and the limits. Investments aren't depreciated in the accounts; the treasury shows cash."),
     ],
   },
   {

@@ -22,6 +22,7 @@ import { measureUnavailableReason } from "./measureAvailability";
 import { MEASURE_BY_ID } from "./measureCatalog";
 import { defaultParams, sanitizeParams, type MeasureDef, type MeasureParams } from "./measureTypes";
 import { treasury } from "./treasury";
+import { spendingFrozen } from "./fiscalRules";
 
 const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
 const DAY_MS = 24 * 60 * 60_000;
@@ -56,6 +57,11 @@ export interface ExternalOutlookEntry {
   summary: string;
   startYear: number;
   inEffect: boolean;
+}
+
+/** Whether a measure costs money (a subsidy, a running or one-off cost) — what a spending freeze stops. */
+export function measureSpends(def: MeasureDef): boolean {
+  return !!(def.subsidyCategory || def.annualCostRp || def.oneOffCostRp);
 }
 
 function sameParams(a: MeasureParams, b: MeasureParams): boolean {
@@ -189,6 +195,7 @@ class MeasureEngine {
     if (!def || this.frozen) return false;
     const params = sanitizeParams(def, { ...defaultParams(def), ...rawParams });
     const now = atMsOverride ?? simClock.getSimTimeMs();
+    if (measureSpends(def) && spendingFrozen(now)) return false; // under cantonal supervision
 
     const existing = this.states.get(id);
     const latest = existing?.pending?.params ?? existing?.active ?? null;

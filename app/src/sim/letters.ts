@@ -46,6 +46,7 @@ import {
 import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
 import { approval, type ApprovalEvent, type Stances } from "./approval";
 import { toDateMs, toSimTimeMs } from "./calendar";
+import { debt } from "./debt";
 import { districtHeat } from "./districtHeat";
 import { simClock } from "./engine";
 import { grid } from "./grid";
@@ -264,7 +265,8 @@ class Letters {
       const mood: Mood | null = read < MOOD_ANGRY_BELOW ? "angry" : read < MOOD_UNHAPPY_BELOW ? "unhappy" : read >= MOOD_PLEASED_FROM ? "pleased" : null;
       if (!mood) continue;
       let cause: MoodCause = null;
-      if (mood !== "pleased" && fiscal > 3 && (b === "homeowners" || b === "business") && rng() < 0.6) cause = { kind: "spending" };
+      if (mood !== "pleased" && debt.debtYears(start) > 2.5 && (b === "homeowners" || b === "business") && rng() < 0.6) cause = { kind: "debt" };
+      else if (mood !== "pleased" && fiscal > 3 && (b === "homeowners" || b === "business") && rng() < 0.6) cause = { kind: "spending" };
       else {
         const feeling = approval.strongestFeeling(b, mood === "pleased" ? 1 : -1);
         if (feeling) cause = { kind: "measure", title: feeling.def.title, likes: feeling.stance > 0 };

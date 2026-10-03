@@ -8,6 +8,7 @@ import { CityStatsTab } from "./CityStatsTab";
 import { DecisionLogTab } from "./DecisionLogTab";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { MeasuresTab } from "./MeasuresTab";
+import { BorrowingTab } from "./BorrowingTab";
 import { TariffControl } from "./TariffControl";
 import { TechnologyPrices } from "./TechnologyPrices";
 import "./modal.css";
@@ -19,11 +20,12 @@ export interface ControlPanelProps {
   onClose: () => void;
 }
 
-type ControlTab = "prices" | "measures" | "stats" | "history" | "debug";
+type ControlTab = "prices" | "measures" | "borrowing" | "stats" | "history" | "debug";
 
 const TABS: { id: ControlTab; icon: string; title: string }[] = [
   { id: "prices", icon: "💰", title: "Prices" },
   { id: "measures", icon: "🏛️", title: "Measures" },
+  { id: "borrowing", icon: "🏦", title: "Borrowing" },
   { id: "stats", icon: "📊", title: "City stats" },
   { id: "history", icon: "📈", title: "History" },
   { id: "debug", icon: "🔎", title: "Decision log" },
@@ -78,6 +80,7 @@ export function ControlPanel({ dataset, transparency, onClose }: ControlPanelPro
             </>
           )}
           {tab === "measures" && <MeasuresTab />}
+          {tab === "borrowing" && <BorrowingTab />}
           {tab === "stats" && <CityStatsTab dataset={dataset} />}
           {tab === "history" && (
             <HistoricalEnergySection

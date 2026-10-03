@@ -12,6 +12,7 @@ import { formatCHF } from "./format";
 import { useStockBuildings } from "./useStock";
 import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
+import { SupervisionNotice } from "./SupervisionNotice";
 
 const YEAR_MS = 365.25 * 24 * 60 * 60_000;
 const QUARTER_HOUR_MS = 15 * 60_000;
@@ -284,6 +285,7 @@ export function EvChargingPanel() {
   return (
     <div className="district-heat-panel ev-charging-panel">
       <h3 className="panel-title">EV charging</h3>
+      <SupervisionNotice />
       <div className="ev-coverage" title="Show where each kind of charger reaches — everything inside the shaded area has one in reach (chargers being built included)">
         <span className="ev-coverage-label">Coverage</span>
         {(["ac", "dc", "fleet"] as ChargingKind[]).map((kind) => (

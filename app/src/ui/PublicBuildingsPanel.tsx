@@ -12,6 +12,7 @@ import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
 import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
+import { SupervisionNotice } from "./SupervisionNotice";
 
 function monthYear(simTimeMs: number): string {
   return formatDate(simTimeMs).replace(/^\d+ /, "");
@@ -151,6 +152,7 @@ export function PublicBuildingsPanel({
   return (
     <div className="district-heat-panel">
       <h3 className="panel-title">Public buildings</h3>
+      <SupervisionNotice />
       <div className="info-row">
         <span>Public buildings</span>
         <span className="info-value">{rows.length}</span>

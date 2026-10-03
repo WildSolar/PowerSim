@@ -50,6 +50,7 @@ import type { ConstructionRules } from "./constructionRules";
 import { existsAt } from "./lifetime";
 import { LocalProjection, pointInPolygon, type XY } from "./localGeo";
 import { treasury } from "./treasury";
+import { spendingFrozen } from "./fiscalRules";
 
 const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
 
@@ -447,7 +448,7 @@ class Zoning {
    * `withoutVote`: skip the politics (the scenario runner). Null if it would change nothing. */
   submit(action: ZoningAction, buildings: Building[], atMs: number, { withoutVote = false } = {}): ZoningChange | null {
     const quote = this.quote(action, buildings, atMs);
-    if (quote.parcelIds.length === 0) return null;
+    if (quote.parcelIds.length === 0 || spendingFrozen(atMs)) return null;
     const change: ZoningChange = {
       id: this.nextId++,
       parcelIds: quote.parcelIds,

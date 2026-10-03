@@ -28,6 +28,7 @@ import type { DistrictHeatSourceData, MunicipalityDataset } from "../data/types"
 import { streets } from "./streets";
 import { treasury } from "./treasury";
 import { priceFactor } from "./costTrends";
+import { spendingFrozen } from "./fiscalRules";
 
 const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
 
@@ -137,6 +138,7 @@ class DistrictHeatNetwork {
 
   /** Orders more supply for the network: paid now, in service a year on. */
   addSupply(atMs: number): void {
+    if (spendingFrozen(atMs)) return;
     this.extraSupply.push({ atMs: atMs + DH_EXTRA_SUPPLY_MONTHS * MONTH_MS, w: DH_EXTRA_SUPPLY_MW * 1e6 });
     treasury.recordPayout("districtHeat", atMs, DH_EXTRA_SUPPLY_COST_CHF * 100, "district-heat-supply");
     this.notify();
@@ -185,7 +187,7 @@ class DistrictHeatNetwork {
   /** Orders the planned extension: paid now, piped once built. Null if it doesn't connect. */
   order(atMs: number): NetworkOrder | null {
     const q = this.quote(atMs);
-    if (!q.connected) return null;
+    if (!q.connected || spendingFrozen(atMs)) return null;
     const order: NetworkOrder = {
       id: this.orders.length,
       segments: q.segments,

@@ -112,6 +112,7 @@ import {
 } from "../config/homeBattery";
 import { interpolateCurve } from "../config/curve";
 import { priceFactor } from "./costTrends";
+import { spendingFrozen } from "./fiscalRules";
 
 const DAY_MS = 24 * 60 * 60_000;
 const YEAR_MS = 365.25 * DAY_MS;
@@ -633,7 +634,7 @@ export function municipalSolarQuote(building: Building, realPlants: PowerPlant[]
  * today, generating once installed a few months on — the same as the measure does, but chosen. */
 export function installMunicipalSolarNow(building: Building, realPlants: PowerPlant[], atMs: number): boolean {
   const quote = municipalSolarQuote(building, realPlants, atMs);
-  if (!quote) return false;
+  if (!quote || spendingFrozen(atMs)) return false;
   const year = new Date(toDateMs(atMs)).getUTCFullYear();
   const installCostRp = quote.capacityKw * installCostRpPerKwp(quote.capacityKw, priceFactorInYear("solar", year));
   const installedAtMs = atMs + MUNICIPAL_SOLAR_INSTALL_MONTHS * (YEAR_MS / 12);

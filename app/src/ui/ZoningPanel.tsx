@@ -12,6 +12,7 @@ import { useStockBuildings } from "./useStock";
 import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
 import "./zoningPanel.css";
+import { SupervisionNotice } from "./SupervisionNotice";
 
 const ZONE_LABEL: Record<SiteZone, string> = { residential: "Residential", mixed: "Mixed", centre: "Centre", work: "Work", public: "Public use" };
 const ZONE_COLOR = Object.fromEntries(ZONING_LEGEND.map((l) => [l.bucket, l.color])) as Record<SiteZone, string>;
@@ -87,6 +88,7 @@ export function ZoningPanel() {
   return (
     <div className="district-heat-panel zoning-panel">
       <h3 className="panel-title">Zoning</h3>
+      <SupervisionNotice />
       <div className="zn-plan">
         {(Object.keys(ZONE_LABEL) as SiteZone[])
           .filter((z) => (plan.byZone[z] ?? 0) > 0)

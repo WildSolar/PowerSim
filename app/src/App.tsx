@@ -30,6 +30,7 @@ import { districtHeat } from "./sim/districtHeat";
 import { publicCharging } from "./sim/publicCharging";
 import { grid } from "./sim/grid";
 import { inbox } from "./sim/inbox";
+import { debt } from "./sim/debt";
 import { letters } from "./sim/letters";
 import { newspaper } from "./sim/newspaper";
 import { InboxButton, InboxPanel, InboxToast, type InboxSelection } from "./ui/InboxPanel";
@@ -138,6 +139,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
         bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building
         grid.init(loaded, () => stock.getAll()); // last: it reads every building's draw, public chargers included
         setDistrictHeatLimit((atMs) => networkFullAt(stock.getAll(), atMs));
+        debt.init(() => stock.getAll(), `rates:${loaded.bfsNumber}`);
         // Letters and the paper last: they read everything above.
         inbox.init();
         letters.init(loaded, () => stock.getAll(), `letters:${loaded.bfsNumber}`);

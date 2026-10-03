@@ -207,6 +207,12 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                     <span className="finance-value positive">+{formatCHF(finances.current.publicChargingRevenueRp)}</span>
                   </div>
                 )}
+                {finances.current.borrowedRp > 0 && (
+                  <div className="renewal-tally-row">
+                    <span className="renewal-tally-label">Borrowed (loans and bonds)</span>
+                    <span className="finance-value positive">+{formatCHF(finances.current.borrowedRp)}</span>
+                  </div>
+                )}
                 {finances.current.zoningLevyRp > 0 && (
                   <div className="renewal-tally-row">
                     <span className="renewal-tally-label">Value-capture levy (zoning)</span>

@@ -116,7 +116,7 @@ export function campaignText(bloc: Bloc, supports: boolean, title: string, when:
 // --- Moods ---
 
 export type Mood = "angry" | "unhappy" | "pleased";
-export type MoodCause = { kind: "measure"; title: string; likes: boolean } | { kind: "spending" } | null;
+export type MoodCause = { kind: "measure"; title: string; likes: boolean } | { kind: "spending" } | { kind: "debt" } | null;
 
 const MOOD_OPENING: Record<Mood, string[]> = {
   angry: [
@@ -145,6 +145,8 @@ export function moodText(bloc: Bloc, mood: Mood, cause: MoodCause, u: number): L
     );
   } else if (cause?.kind === "spending") {
     paragraphs.push("Above all, people are worried about the spending. The energy department is spending well beyond what it has been given, and taxpayers notice.");
+  } else if (cause?.kind === "debt") {
+    paragraphs.push("Above all, people are worried about the debt the energy department is piling up. Someone will have to pay it back, and it will be the taxpayers.");
   } else if (mood !== "pleased") {
     paragraphs.push(bloc === "climate" ? "Too little is happening, and too slowly." : "People feel that decisions are made over their heads.");
   }

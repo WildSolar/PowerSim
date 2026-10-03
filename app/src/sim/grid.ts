@@ -59,6 +59,7 @@ import { dailyMeanTempC } from "./weather";
 import { setGridLimits } from "./gridLimits";
 import { heatPumpPowerW } from "./heatPump";
 import { policyStore } from "./policy";
+import { spendingFrozen } from "./fiscalRules";
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
@@ -500,7 +501,7 @@ class Grid {
   /** Orders the next station size up for an area: paid now, in service once built. */
   reinforce(areaId: number, atMs: number): void {
     const area = this.areas[areaId];
-    if (!area) return;
+    if (!area || spendingFrozen(atMs)) return;
     const from = this.plannedCapacity(area);
     const pendingUntil = area.upgrades.reduce((latest, u) => Math.max(latest, u.atMs), atMs);
     area.upgrades.push({ atMs: Math.max(pendingUntil, atMs + REINFORCE_MONTHS * MONTH_MS), capacityKw: nextStationSize(from) });
@@ -512,7 +513,7 @@ class Grid {
   addBattery(areaId: number, atMs: number, sizeIndex = 0): void {
     const area = this.areas[areaId];
     const size = GRID_BATTERY_SIZES[sizeIndex];
-    if (!area || !size) return;
+    if (!area || !size || spendingFrozen(atMs)) return;
     area.batteries.push({ atMs: atMs + BATTERY_MONTHS * MONTH_MS, kw: size.kw });
     treasury.recordPayout("grid", atMs, gridBatteryCostRp(sizeIndex, atMs), `grid-battery-${areaId}`);
     this.notify();

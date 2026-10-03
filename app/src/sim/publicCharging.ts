@@ -67,6 +67,7 @@ import { tariffStore } from "./tariffStore";
 import { treasury } from "./treasury";
 import { priceFactor } from "./costTrends";
 import type { CostTrendId } from "../config/costTrends";
+import { spendingFrozen } from "./fiscalRules";
 
 const DAY_MS = 24 * 60 * 60_000;
 const MONTH_MS = (365.25 * DAY_MS) / 12;
@@ -651,6 +652,7 @@ class PublicCharging {
   /** Orders a municipal site at the street nearest to (lon, lat) — on-street with `points` charge
    * points (4, 8 or 12): paid now, open once built. */
   build(kind: ChargingKind, lon: number, lat: number, atMs: number, points = BUILD_SPEC[kind].points): ChargingSite | null {
+    if (spendingFrozen(atMs)) return null;
     const snapped = streets.snapToStreet(lon, lat) ?? { lon, lat, distanceM: 0, street: null };
     const spec = BUILD_SPEC[kind];
     points = sizeOf(kind, points).points; // only the sizes on offer
@@ -679,7 +681,7 @@ class PublicCharging {
    * still being built). */
   upgrade(siteId: string, toPoints: number, atMs: number): boolean {
     const site = this.byId.get(siteId);
-    if (!site || site.owner !== "municipal") return false;
+    if (!site || site.owner !== "municipal" || spendingFrozen(atMs)) return false;
     const planned = this.plannedPoints(site);
     if (toPoints <= planned || !sizesFor(site.kind).some((s) => s.points === toPoints)) return false;
     const readyAtMs = Math.max(atMs + (UPGRADE_MONTHS[site.kind] ?? 0) * MONTH_MS, site.openedAtMs);
@@ -722,7 +724,9 @@ class PublicCharging {
 
   /** Orders a municipal charging site in the car park of a public building: an on-street-type site
    * (same sizes, prices and upkeep), paid now, open once built. */
-  buildAtBuilding(building: Building, points: number, atMs: number, { select = true } = {}): ChargingSite {
+  buildAtBuilding(building: Building, points: number, atMs: number, { select = true } = {}): ChargingSite | null {
+    // A direct order waits out a spending freeze; the programme already in force carries on.
+    if (select && spendingFrozen(atMs)) return null;
     points = sizeOf("ac", points).points;
     const street = streets.snapToStreet(building.lon, building.lat)?.street ?? "";
     const site = this.addSite({

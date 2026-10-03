@@ -22,10 +22,46 @@ import { GOVERNMENT_ALLOCATION_CHF_PER_RESIDENT, INITIAL_TREASURY_CHF, RESIDENTS
 import type { DecisionLogKind } from "./decisionLog";
 
 // Subsidies paid as households decide, plus what the municipality itself spends: the running and
-// one-off costs of campaigns and programmes, and money put into infrastructure.
-export type PayoutCategory = "solar" | "heating" | "vehicle" | "retrofit" | "programs" | "infrastructure" | "districtHeat" | "charging" | "zoning" | "grid";
+// one-off costs of campaigns and programmes, money put into infrastructure, and the cost of debt
+// (debt.ts): interest, and repaying what was borrowed.
+export type PayoutCategory =
+  | "solar"
+  | "heating"
+  | "vehicle"
+  | "retrofit"
+  | "programs"
+  | "infrastructure"
+  | "districtHeat"
+  | "charging"
+  | "zoning"
+  | "grid"
+  | "interest"
+  | "debtRepayment";
 
-export const PAYOUT_CATEGORIES: PayoutCategory[] = ["solar", "heating", "vehicle", "retrofit", "programs", "infrastructure", "districtHeat", "charging", "zoning", "grid"];
+export const PAYOUT_CATEGORIES: PayoutCategory[] = [
+  "solar",
+  "heating",
+  "vehicle",
+  "retrofit",
+  "programs",
+  "infrastructure",
+  "districtHeat",
+  "charging",
+  "zoning",
+  "grid",
+  "interest",
+  "debtRepayment",
+];
+
+/** Investments (as Swiss municipal accounts, HRM2, set them apart): infrastructure that lasts —
+ * they may be financed with loans and don't count as running spending. */
+export const INVESTMENT_CATEGORIES: PayoutCategory[] = ["infrastructure", "districtHeat", "charging", "grid"];
+
+/** Running spending: what has to be covered by income — every payout but investments and
+ * repaying debt (interest is running spending). */
+export function isOperatingCategory(category: PayoutCategory): boolean {
+  return !INVESTMENT_CATEGORIES.includes(category) && category !== "debtRepayment";
+}
 
 export const PAYOUT_LABEL: Record<PayoutCategory, string> = {
   solar: "Solar and battery subsidies",
@@ -38,6 +74,8 @@ export const PAYOUT_LABEL: Record<PayoutCategory, string> = {
   charging: "Public chargers",
   zoning: "Zoning plans",
   grid: "Grid reinforcement and batteries",
+  interest: "Interest on debt",
+  debtRepayment: "Debt repaid",
 };
 
 /** Which ledger line a decision kind's municipal subsidy belongs on, if it has one. */
@@ -67,15 +105,18 @@ interface Payout {
 export type PayoutsByCategory = Record<PayoutCategory, number>;
 
 function zeroPayouts(): PayoutsByCategory {
-  return { solar: 0, heating: 0, vehicle: 0, retrofit: 0, programs: 0, infrastructure: 0, districtHeat: 0, charging: 0, zoning: 0, grid: 0 };
+  return { solar: 0, heating: 0, vehicle: 0, retrofit: 0, programs: 0, infrastructure: 0, districtHeat: 0, charging: 0, zoning: 0, grid: 0, interest: 0, debtRepayment: 0 };
 }
 
 /** Money coming in outside the yearly accounts: the value-capture levy on zoning gains (zoning.ts),
- * due when a project that gains from a zoning change gets its permit. */
+ * due when a project that gains from a zoning change gets its permit, and borrowed money (debt.ts). */
+export type ReceiptKind = "zoningLevy" | "borrowing";
+
 interface Receipt {
   atMs: number;
   amountRp: number;
   ref: string;
+  kind: ReceiptKind;
 }
 
 class Treasury {
@@ -113,16 +154,16 @@ class Treasury {
     this.notify();
   }
 
-  recordReceipt(atMs: number, amountRp: number, ref: string): void {
+  recordReceipt(atMs: number, amountRp: number, ref: string, kind: ReceiptKind = "zoningLevy"): void {
     if (!(amountRp > 0)) return;
-    this.receipts.push({ atMs, amountRp, ref });
+    this.receipts.push({ atMs, amountRp, ref, kind });
     this.notify();
   }
 
-  /** Levies received in `[fromMs, toMs)`. */
-  received(fromMs: number, toMs: number): number {
+  /** Received in `[fromMs, toMs)`: of one kind, or all. */
+  received(fromMs: number, toMs: number, kind?: ReceiptKind): number {
     let total = 0;
-    for (const r of this.receipts) if (r.atMs >= fromMs && r.atMs < toMs) total += r.amountRp;
+    for (const r of this.receipts) if (r.atMs >= fromMs && r.atMs < toMs && (!kind || r.kind === kind)) total += r.amountRp;
     return total;
   }
 
@@ -136,6 +177,18 @@ class Treasury {
   paidOutTotal(fromMs: number, toMs: number): number {
     const totals = this.paidOut(fromMs, toMs);
     return PAYOUT_CATEGORIES.reduce((sum, c) => sum + totals[c], 0);
+  }
+
+  /** Running spending only (no investments, no repayments) in `[fromMs, toMs)`. */
+  operatingPaidOutTotal(fromMs: number, toMs: number): number {
+    const totals = this.paidOut(fromMs, toMs);
+    return PAYOUT_CATEGORIES.filter(isOperatingCategory).reduce((sum, c) => sum + totals[c], 0);
+  }
+
+  /** Investments in `[fromMs, toMs)`. */
+  investedTotal(fromMs: number, toMs: number): number {
+    const totals = this.paidOut(fromMs, toMs);
+    return INVESTMENT_CATEGORIES.reduce((sum, c) => sum + totals[c], 0);
   }
 
   /** Cash the treasury starts the game with. */

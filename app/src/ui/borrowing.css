@@ -1,0 +1,146 @@
+.borrowing h2 {
+  margin-top: 0;
+}
+
+.borrow-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.borrow-summary > div {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.borrow-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #898781;
+}
+
+.borrow-value {
+  font-size: 18px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.borrow-note {
+  font-size: 12px;
+  color: #6b6a66;
+}
+
+.borrow-gauge {
+  height: 8px;
+  border-radius: 4px;
+  background: #eeedea;
+  overflow: hidden;
+  margin: 6px 0 4px;
+}
+
+.borrow-gauge > div {
+  height: 100%;
+}
+
+.borrow-card {
+  border: 1px solid #e4e2dc;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.borrow-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.borrow-amount {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.borrow-amount input {
+  flex: 1;
+}
+
+.borrow-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.borrow-terms button {
+  border: 1px solid #ddd;
+  background: #f8f8f8;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.borrow-terms button.active {
+  background: #2a78d6;
+  border-color: #2a78d6;
+  color: #fff;
+}
+
+.borrow-card .measure-enact {
+  align-self: flex-start;
+}
+
+.borrow-section {
+  font-size: 14px;
+  margin: 16px 0 6px;
+}
+
+.borrow-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.borrow-table th {
+  text-align: left;
+  font-size: 11px;
+  color: #6b6a66;
+  font-weight: 600;
+  border-bottom: 1px solid #eee;
+  padding: 4px;
+}
+
+.borrow-table td {
+  padding: 6px 4px;
+  border-bottom: 1px solid #f2f1ee;
+  vertical-align: top;
+}
+
+.borrow-table tr.repaid td {
+  color: #9a9893;
+}
+
+.borrow-repay {
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.borrow-repay:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

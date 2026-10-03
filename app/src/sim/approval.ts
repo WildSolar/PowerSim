@@ -107,6 +107,13 @@ export interface PublicDecision {
   onVote?: (accepted: boolean, atMs: number) => void;
 }
 
+let debtPenalty: (atMs: number) => number = () => 0;
+
+/** Registered by debt.ts: how many approval points the department's debt costs at `atMs`. */
+export function setDebtPenalty(penalty: (atMs: number) => number): void {
+  debtPenalty = penalty;
+}
+
 function clamp(x: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, x));
 }
@@ -340,14 +347,14 @@ class ApprovalEngine {
   private fiscalPenalty(atMs: number): number {
     const budget = treasury.allocationRp(measures.getDwellingCount(atMs));
     if (budget <= 0) return 0;
-    const spent = treasury.paidOutTotal(atMs - 12 * MONTH_MS, atMs);
+    const spent = treasury.operatingPaidOutTotal(atMs - 12 * MONTH_MS, atMs); // investments may be borrowed for (debt.ts)
     const overshoot = (spent / budget - 1) / (FISCAL_FULL_RATIO - 1);
     return FISCAL_MAX_PENALTY_POINTS * clamp(overshoot, 0, 1);
   }
 
   private monthlyStep(atMs: number): void {
     const k = 1 - Math.exp(-1 / RELAXATION_MONTHS);
-    const penalty = this.fiscalPenalty(atMs);
+    const penalty = this.fiscalPenalty(atMs) + debtPenalty(atMs); // overspending and debt, weighted alike
     for (const b of BLOC_ORDER) this.levels[b] += (this.restingLevel(b, penalty) - this.levels[b]) * k;
 
     const approval = this.aggregate();

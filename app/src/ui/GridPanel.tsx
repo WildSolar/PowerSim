@@ -9,6 +9,7 @@ import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
 import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
+import { SupervisionNotice } from "./SupervisionNotice";
 
 const BUCKET_COLOR = Object.fromEntries(GRID_LEGEND.map((l) => [l.bucket, l.color]));
 
@@ -141,6 +142,7 @@ export function GridPanel() {
   return (
     <div className="district-heat-panel">
       <h3 className="panel-title">Electricity grid</h3>
+      <SupervisionNotice />
       <div className="info-row">
         <span>Transformer areas</span>
         <span className="info-value">{areas.length}</span>

@@ -12,6 +12,7 @@ import { SUMMER_MEASURED_MONTH, WINTER_MEASURED_MONTH } from "../config/grid";
 import type { Building, MunicipalityDataset } from "../data/types";
 import { approval, type ApprovalEvent } from "./approval";
 import { toDateMs, toSimTimeMs } from "./calendar";
+import { debt, type DebtEvent } from "./debt";
 import { districtHeat } from "./districtHeat";
 import { simClock } from "./engine";
 import { grid } from "./grid";
@@ -63,6 +64,8 @@ class Newspaper {
   private buildingsProvider: () => Building[] = () => [];
   private measureEvents: MeasureEvent[] = [];
   private approvalEvents: ApprovalEvent[] = [];
+  private debtEvents: DebtEvent[] = [];
+  private lastRate: number | null = null;
   private lastMonth: number | null = null;
   private lastShares: { heatPump: number; ev: number } | null = null;
   private unsubscribers: (() => void)[] = [];
@@ -74,12 +77,15 @@ class Newspaper {
     this.buildingsProvider = buildingsProvider;
     this.measureEvents = [];
     this.approvalEvents = [];
+    this.debtEvents = [];
+    this.lastRate = debt.marketPct(simClock.getSimTimeMs());
     this.lastShares = null;
     this.lastMonth = monthIndex(simClock.getSimTimeMs());
     this.unsubscribers = [
       simClock.subscribe(() => this.advance(simClock.getSimTimeMs())),
       measures.onEvent((e) => this.measureEvents.push(e)),
       approval.onEvent((e) => this.approvalEvents.push(e)),
+      debt.onEvent((e) => this.debtEvents.push(e)),
     ];
   }
 
@@ -120,6 +126,7 @@ class Newspaper {
     });
     this.measureEvents = this.measureEvents.filter((e) => e.atMs >= to);
     this.approvalEvents = this.approvalEvents.filter((e) => e.atMs >= to);
+    this.debtEvents = this.debtEvents.filter((e) => e.atMs >= to);
   }
 
   private items(month: number, from: number, to: number, leaning: Leaning): Item[] {
@@ -270,6 +277,54 @@ class Newspaper {
       if (r.status === "granted") items.push({ priority: 28, headline: "Residents' wish granted", body: `They asked for ${r.ask}, and the town hall delivered.` });
       else if (r.status === "lapsed") items.push({ priority: 32, headline: "Residents left waiting", body: `They asked for ${r.ask}. Nothing came of it.` });
     }
+
+    // Money: borrowing, the rating, the canton, rates.
+    for (const e of this.debtEvents.filter((x) => inMonth(x.atMs))) {
+      const chf = (rp: number) => `CHF ${Math.round(rp / 100_000 / 10) / 100} million`;
+      if (e.kind === "loanTaken") {
+        items.push({
+          priority: 50,
+          headline: leaning === "critical" ? `Town hall borrows ${chf(e.loan.principalRp)}` : `${chf(e.loan.principalRp)} loan for the energy transition`,
+          body: `A ${e.loan.termYears}-year bank loan at ${e.loan.ratePct.toFixed(2)}%.`,
+        });
+      } else if (e.kind === "bondSubscribed") {
+        const full = e.loan.principalRp >= e.loan.requestedRp * 0.999;
+        items.push({
+          priority: 55,
+          headline: full ? "Residents snap up the green bond" : "Green bond falls short",
+          body: full
+            ? `The town's green bond raised ${chf(e.loan.principalRp)} from its own residents, at ${e.loan.ratePct.toFixed(2)}%.`
+            : `Residents subscribed ${chf(e.loan.principalRp)} of the ${chf(e.loan.requestedRp)} on offer.`,
+        });
+      } else if (e.kind === "federalLoanPaid") {
+        items.push({ priority: 40, headline: `Bern lends ${chf(e.loan.principalRp)} for decarbonisation`, body: `A federal loan at ${e.loan.ratePct.toFixed(2)}% over ${e.loan.termYears} years.` });
+      } else if (e.kind === "earmark") {
+        items.push(
+          e.met
+            ? { priority: 35, headline: "Green bond promise kept", body: "The money residents lent has gone into green investment, as promised." }
+            : { priority: 75, headline: "Greenwashing? Green bond money unspent", body: "Two years on, the town has not invested as much in green projects as residents lent it for them." },
+        );
+      } else if (e.kind === "supervision") {
+        items.push(
+          e.on
+            ? { priority: 105, headline: "Canton puts energy department under supervision", body: "Debt has passed the limit. No new borrowing, spending measures or orders until it falls back." }
+            : { priority: 80, headline: "Canton lifts its supervision", body: "Debt is back within limits; the energy department may spend again." },
+        );
+      } else if (e.kind === "rating") {
+        const order = ["AAA", "AA", "A", "BBB", "BB"];
+        const down = order.indexOf(e.to) > order.indexOf(e.from);
+        items.push({ priority: down ? 60 : 40, headline: `Credit rating ${down ? "cut" : "raised"} to ${e.to}`, body: down ? "Borrowing gets dearer as debt grows." : "Lenders take a kinder view." });
+      }
+    }
+    const rate = debt.marketPct(to);
+    if (this.lastRate !== null && Math.abs(rate - this.lastRate) >= 0.4) {
+      items.push({
+        priority: rate > this.lastRate ? 54 : 30,
+        headline: rate > this.lastRate ? `Interest rates jump to ${rate.toFixed(2)}%` : `Interest rates ease to ${rate.toFixed(2)}%`,
+        body: rate > this.lastRate ? "New borrowing gets dearer; loans already taken keep their rate." : "A good moment to borrow, for those who need to.",
+      });
+      this.lastRate = rate;
+    } else if (this.lastRate === null) this.lastRate = rate;
 
     // Spending.
     if (approval.fiscalPenaltyPoints(to) > 2) {

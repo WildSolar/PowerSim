@@ -10,6 +10,7 @@ import { DH_EXTRA_SUPPLY_COST_CHF, DH_EXTRA_SUPPLY_MONTHS, DH_EXTRA_SUPPLY_MW } 
 import { useStockBuildings } from "./useStock";
 import { zoning } from "../sim/zoning";
 import "./districtHeatPanel.css";
+import { SupervisionNotice } from "./SupervisionNotice";
 
 const SOURCE_KIND_NOTE = {
   plant: "inside the municipality",
@@ -90,6 +91,7 @@ export function DistrictHeatPanel() {
   return (
     <div className="district-heat-panel">
       <h3 className="panel-title">District heating</h3>
+      <SupervisionNotice />
       <div className="dh-source">
         🏭 {source.name}
         <div className="dh-note">{SOURCE_KIND_NOTE[source.kind]}</div>

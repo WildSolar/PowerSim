@@ -40,7 +40,7 @@
 
 import type { Building, PowerPlant } from "../data/types";
 import { consumptionSeriesW, electricityCostRp, flatCostRp } from "./billing";
-import { toSimTimeMs } from "./calendar";
+import { toDateMs, toSimTimeMs } from "./calendar";
 import { energyKWh } from "./energy";
 import { allocationApprovalFactor, approval } from "./approval";
 import { GREEN_POWER_PREMIUM_RP_PER_KWH } from "../config/policy";
@@ -66,6 +66,7 @@ export interface MunicipalFinances {
   publicChargingRevenueRp: number; // sold at the municipality's own public chargers, at the tariff's public charging prices
   publicChargingUpkeepRp: number; // keeping those chargers running
   zoningLevyRp: number; // value-capture levy on projects that gained from a zoning change (zoning.ts)
+  borrowedRp: number; // money borrowed this year (debt.ts) — cash in, not income
   governmentAllocationRp: number; // this year's allocation from the overall government (a placeholder framing, see config/treasury.ts)
   spendingRp: PayoutsByCategory; // the municipality's own top-ups, per kind, paid out as decisions happened this year — never the federal/cantonal grants
   spendingTotalRp: number;
@@ -137,7 +138,8 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
   treasury.settleThrough(yearEndMs);
   const spendingRp = treasury.paidOut(yearStartMs, yearEndMs);
   const spendingTotalRp = PAYOUT_CATEGORIES.reduce((sum, c) => sum + spendingRp[c], 0);
-  const zoningLevyRp = treasury.received(yearStartMs, yearEndMs);
+  const zoningLevyRp = treasury.received(yearStartMs, yearEndMs, "zoningLevy");
+  const borrowedRp = treasury.received(yearStartMs, yearEndMs, "borrowing");
   const dwellingsAtYearStart = buildings.reduce((sum, b) => sum + (existsAt(b, yearStartMs) ? b.dwellings.length : 0), 0);
   const governmentAllocationRp = treasury.allocationRp(dwellingsAtYearStart, allocationApprovalFactor(approval.atYearStart(year)));
   const netIncomeRp =
@@ -145,6 +147,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     districtHeatRevenueRp +
     publicChargingRevenueRp +
     zoningLevyRp +
+    borrowedRp +
     governmentAllocationRp -
     feedInPaidRp -
     wholesaleCostRp -
@@ -166,6 +169,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     publicChargingRevenueRp,
     publicChargingUpkeepRp,
     zoningLevyRp,
+    borrowedRp,
     governmentAllocationRp,
     spendingRp,
     spendingTotalRp,
@@ -208,4 +212,43 @@ export function cachedCumulativeBalanceRp(throughYear: number, baselineYear: num
     balanceRp += finances.netIncomeRp;
   }
   return balanceRp;
+}
+
+/** A year's income before any discretionary spending: what the utility earns (electricity, district
+ * heat, public charging, less what they cost to run), the levies, and the government's allocation —
+ * what debt is measured against (debt.ts). */
+export function operatingIncomeRp(f: MunicipalFinances): number {
+  return (
+    f.consumerRevenueRp +
+    f.districtHeatRevenueRp +
+    f.publicChargingRevenueRp +
+    f.zoningLevyRp +
+    f.governmentAllocationRp -
+    f.feedInPaidRp -
+    f.wholesaleCostRp -
+    f.gridMaintenanceCostRp -
+    f.districtHeatPurchaseRp -
+    f.districtHeatUpkeepRp -
+    f.publicChargingUpkeepRp
+  );
+}
+
+/** The latest year whose accounts are booked, if any. */
+export function latestBookedFinances(): MunicipalFinances | null {
+  let latest: MunicipalFinances | null = null;
+  for (const f of financesCache.values()) if (!latest || f.year > latest.year) latest = f;
+  return latest;
+}
+
+/** The treasury's balance at `atMs` — last year's closing balance (when booked), plus this year's
+ * allocation, less what has been paid out, plus what has come in. Null while last year's accounts
+ * are still being settled. The same sum the live treasury readout shows. */
+export function liveBalanceRp(buildings: Building[], atMs: number, baselineYear: number): number | null {
+  const year = new Date(toDateMs(atMs)).getUTCFullYear();
+  const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
+  const opening = year <= baselineYear ? treasury.openingBalanceRp() : cachedCumulativeBalanceRp(year - 1, baselineYear);
+  if (opening === null) return null;
+  const dwellings = buildings.reduce((sum, b) => sum + (existsAt(b, yearStartMs) ? b.dwellings.length : 0), 0);
+  const allocation = treasury.allocationRp(dwellings, allocationApprovalFactor(approval.atYearStart(year)));
+  return opening + allocation - treasury.paidOutTotal(yearStartMs, atMs) + treasury.received(yearStartMs, atMs);
 }
