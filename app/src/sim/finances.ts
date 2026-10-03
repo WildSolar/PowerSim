@@ -51,6 +51,7 @@ import { tariffStore } from "./tariffStore";
 import { PAYOUT_CATEGORIES, treasury, type PayoutsByCategory } from "./treasury";
 import { computeHeatingTechnologyBreakdown, yearElectricity } from "./yearReport";
 import { DH_NETWORK_UPKEEP_CHF_PER_M_YEAR, DH_SOURCE_HEAT_PRICE_RP_PER_KWH } from "../config/districtHeat";
+import { UTILITY_PROFIT_RETAINED_SHARE } from "../config/treasury";
 import { districtHeat } from "./districtHeat";
 import { publicCharging } from "./publicCharging";
 
@@ -65,6 +66,7 @@ export interface MunicipalFinances {
   districtHeatUpkeepRp: number; // running the pipes, per metre of piped street
   publicChargingRevenueRp: number; // sold at the municipality's own public chargers, at the tariff's public charging prices
   publicChargingUpkeepRp: number; // keeping those chargers running
+  profitTransferRp: number; // the utility's profit handed to the municipality's general account (all but the department's share)
   zoningLevyRp: number; // value-capture levy on projects that gained from a zoning change (zoning.ts)
   borrowedRp: number; // money borrowed this year (debt.ts) — cash in, not income
   governmentAllocationRp: number; // this year's allocation from the overall government (a placeholder framing, see config/treasury.ts)
@@ -142,6 +144,10 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
   const borrowedRp = treasury.received(yearStartMs, yearEndMs, "borrowing");
   const dwellingsAtYearStart = buildings.reduce((sum, b) => sum + (existsAt(b, yearStartMs) ? b.dwellings.length : 0), 0);
   const governmentAllocationRp = treasury.allocationRp(dwellingsAtYearStart, allocationApprovalFactor(approval.atYearStart(year)));
+  // The utility's profit, most of which goes to the town's general account.
+  const utilityProfitRp =
+    consumerRevenueRp + districtHeatRevenueRp + publicChargingRevenueRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - districtHeatPurchaseRp - districtHeatUpkeepRp - publicChargingUpkeepRp;
+  const profitTransferRp = Math.max(0, utilityProfitRp) * (1 - UTILITY_PROFIT_RETAINED_SHARE);
   const netIncomeRp =
     consumerRevenueRp +
     districtHeatRevenueRp +
@@ -155,6 +161,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     districtHeatPurchaseRp -
     districtHeatUpkeepRp -
     publicChargingUpkeepRp -
+    profitTransferRp -
     spendingTotalRp;
 
   const result: MunicipalFinances = {
@@ -168,6 +175,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     districtHeatUpkeepRp,
     publicChargingRevenueRp,
     publicChargingUpkeepRp,
+    profitTransferRp,
     zoningLevyRp,
     borrowedRp,
     governmentAllocationRp,
@@ -229,7 +237,8 @@ export function operatingIncomeRp(f: MunicipalFinances): number {
     f.gridMaintenanceCostRp -
     f.districtHeatPurchaseRp -
     f.districtHeatUpkeepRp -
-    f.publicChargingUpkeepRp
+    f.publicChargingUpkeepRp -
+    f.profitTransferRp
   );
 }
 

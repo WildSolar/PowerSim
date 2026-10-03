@@ -10,6 +10,7 @@ import { BorrowingTab } from "./BorrowingTab";
 import { formatCHF } from "./format";
 import { useLiveTreasury } from "./useLiveTreasury";
 import "./borrowing.css";
+import { UTILITY_PROFIT_RETAINED_SHARE } from "../config/treasury";
 
 type Section = "accounts" | "borrowing";
 
@@ -27,7 +28,7 @@ function sum(spending: PayoutsByCategory, categories: PayoutCategory[]): number 
   return categories.reduce((s, c) => s + spending[c], 0);
 }
 
-/** What the utility kept: what it sold, less what it bought and spent running the networks. */
+/** What the department kept of the utility's year: its profit, less what went to the town. */
 function utilityMarginRp(f: MunicipalFinances): number {
   return operatingIncomeRp(f) - f.governmentAllocationRp - f.zoningLevyRp;
 }
@@ -156,7 +157,15 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
               {last.publicChargingRevenueRp > 0 && <Line label="Public charging sold (municipal chargers)" value={last.publicChargingRevenueRp} />}
               {last.publicChargingUpkeepRp > 0 && <Line label="Public charger upkeep" value={-last.publicChargingUpkeepRp} />}
               <tr className="treasury-total">
-                <td>The utility's margin</td>
+                <td>The utility's profit</td>
+                <td className={utilityMarginRp(last) + last.profitTransferRp >= 0 ? "pos" : "neg"}>
+                  {utilityMarginRp(last) + last.profitTransferRp >= 0 ? "+" : "−"}
+                  {formatCHF(Math.abs(utilityMarginRp(last) + last.profitTransferRp))}
+                </td>
+              </tr>
+              {last.profitTransferRp > 0 && <Line label={`Handed to the town's general account (${Math.round((1 - UTILITY_PROFIT_RETAINED_SHARE) * 100)}%)`} value={-last.profitTransferRp} />}
+              <tr className="treasury-total">
+                <td>Kept by the energy department</td>
                 <td className={utilityMarginRp(last) >= 0 ? "pos" : "neg"}>
                   {utilityMarginRp(last) >= 0 ? "+" : "−"}
                   {formatCHF(Math.abs(utilityMarginRp(last)))}
@@ -176,7 +185,7 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
             <thead>
               <tr>
                 <th>Year</th>
-                <th title="What the utility kept">Utility</th>
+                <th title="The department's share of the utility's profit">Utility</th>
                 <th title="From the overall government">Allocation</th>
                 <th title="Zoning levy">Levies</th>
                 <th>Borrowed</th>

@@ -24,6 +24,7 @@ import {
   REINFORCE_BASE_CHF,
   REINFORCE_CHF_PER_KVA,
   REINFORCE_MONTHS,
+  ROUTINE_REINFORCEMENTS_PER_READING,
   START_HEADROOM_RANGE,
   SUMMER_MEASURED_MONTH,
   SUMMER_PEAK_DAYS,
@@ -76,7 +77,7 @@ export interface GridArea {
   y: number;
   startCapacityKw: number;
   /** Reinforcements: the capacity from `atMs` on. */
-  upgrades: { atMs: number; capacityKw: number }[];
+  upgrades: { atMs: number; capacityKw: number; byUtility?: boolean }[];
   batteries: { atMs: number; kw: number }[];
   /** The last readings: winter peak draw, summer peak feed-in (kW), and which year they're from. */
   winter: { year: number; peakKw: number } | null;
@@ -486,14 +487,33 @@ class Grid {
     if (winterDue > this.measuredWinter) {
       this.measure("winter", winterDue);
       this.measuredWinter = winterDue;
+      this.routineReinforcement(atMs);
       changed = true;
     }
     if (summerDue > this.measuredSummer) {
       this.measure("summer", summerDue);
       this.measuredSummer = summerDue;
+      this.routineReinforcement(atMs);
       changed = true;
     }
     if (changed) this.notify();
+  }
+
+  /** The utility's routine programme: after a reading, the worst overloaded areas with nothing on
+   * order get the next station size, paid from grid upkeep (no treasury cost). */
+  private routineReinforcement(atMs: number): void {
+    const overloaded = this.areas
+      .filter((a) => !a.upgrades.some((u) => u.atMs > atMs))
+      .map((a) => {
+        const { drawKw, feedInKw } = this.effectivePeaks(a, atMs);
+        return { a, ratio: Math.max(drawKw, feedInKw) / this.capacityAt(a, atMs) };
+      })
+      .filter((x) => x.ratio > 1)
+      .sort((x, y) => y.ratio - x.ratio)
+      .slice(0, ROUTINE_REINFORCEMENTS_PER_READING);
+    for (const { a } of overloaded) {
+      a.upgrades.push({ atMs: atMs + REINFORCE_MONTHS * MONTH_MS, capacityKw: nextStationSize(this.plannedCapacity(a)), byUtility: true });
+    }
   }
 
   // --- the player ---

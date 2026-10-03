@@ -13,5 +13,10 @@ export const INITIAL_TREASURY_CHF = 2_000_000;
 /** The overall government's annual allocation to the energy department, per resident. */
 export const GOVERNMENT_ALLOCATION_CHF_PER_RESIDENT = 150;
 
+/** The municipal utility hands most of its profit (electricity, district heat, public charging) to the
+ * municipality's general account, as Swiss municipal utilities do; the energy department keeps this
+ * share. A loss stays with the department. */
+export const UTILITY_PROFIT_RETAINED_SHARE = 0.25;
+
 /** Residents are not in the data; dwellings are. The Swiss average household is ~2.2 people. */
 export const RESIDENTS_PER_DWELLING = 2.2;

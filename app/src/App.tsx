@@ -135,6 +135,9 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
         setMeasureAvailability("municipal-solar", (atMs) =>
           municipalSolarCandidates(stock.getAll(), loaded.powerPlants, atMs).length === 0 ? "Every public building with a roof for it already has solar." : null,
         );
+        setMeasureAvailability("fossil-heating-ban", (atMs) =>
+          measures.externalOutlook(atMs).some((e) => e.id === "cantonal-fossil-heating-ban" && e.inEffect) ? "The canton's own ban is already in force." : null,
+        );
         setMeasureAvailability("public-building-chargers", (atMs) =>
           publicCharging.publicBuildingChargerCandidates(atMs).length === 0 ? "Every public building (campus) already has chargers." : null,
         );

@@ -83,7 +83,8 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
       )}
       {pendingUpgrade.map((u) => (
         <p className="dh-note" key={u.atMs}>
-          Reinforcing to {u.capacityKw} kVA — in service {monthYear(u.atMs)}.
+          Reinforcing to {u.capacityKw} kVA — in service {monthYear(u.atMs)}
+          {u.byUtility ? " (the utility's routine programme)" : ""}.
         </p>
       ))}
       {pendingBatteries.length > 0 && (

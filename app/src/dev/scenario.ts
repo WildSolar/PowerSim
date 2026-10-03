@@ -53,6 +53,11 @@ export interface ScenarioSpec {
   /** Run the approval model too (votes and game over included). Off by default: the physical effect of
    * a measure is easier to judge without a referendum striking it down. */
   withApproval?: boolean;
+  /** Play the DSO: after each reading, reinforce every transformer area over capacity (not already being reinforced). */
+  reinforceGrid?: boolean;
+  /** Play the charging planner: each January, build on-street chargers (8 points) where at least three
+   * households found none in the year before (up to this many sites a year). */
+  autoChargers?: number;
   /** Also compute the year's emissions (slow: a few seconds per year). */
   withEmissions?: boolean;
 }
@@ -223,14 +228,33 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     stock.advance(t);
     publicCharging.advance(t);
     grid.advance(t);
+    if (spec.reinforceGrid) {
+      for (const area of grid.getAreas()) {
+        const { drawKw, feedInKw } = grid.effectivePeaks(area, t);
+        const pending = area.upgrades.some((u) => u.atMs > t);
+        if (!pending && Math.max(drawKw, feedInKw) > grid.capacityAt(area, t)) grid.reinforce(area.id, t);
+      }
+    }
     enactDue(year, t);
     buildDue(year, t);
     zoneDue(year, t);
 
     const newYear = now.getUTCFullYear() !== previous.getUTCFullYear();
+    if (newYear && spec.autoChargers) {
+      const spots = publicCharging.unmetDemandSpots(t - 12 * MONTH_MS, t).filter((x) => x.kind === "ac");
+      const metres = (a: { lon: number; lat: number }, b: { lon: number; lat: number }) => Math.hypot((a.lon - b.lon) * 75_000, (a.lat - b.lat) * 111_320);
+      let built = 0;
+      while (built < spec.autoChargers && spots.length > 0) {
+        const best = spots.map((x) => ({ x, n: spots.filter((o) => metres(o, x) < 300).length })).sort((a, b) => b.n - a.n)[0];
+        if (best.n < 3) break;
+        publicCharging.build("ac", best.x.lon, best.x.lat, t, 8);
+        built++;
+        for (let i = spots.length - 1; i >= 0; i--) if (metres(spots[i], best.x) < 300) spots.splice(i, 1);
+      }
+    }
     // Solar adoption settles a year's round the first time that year is asked about — in the game the
     // map and the year-end report ask every year; here nothing would until the next report year.
-    if (newYear) effectivePowerPlantsAt(stock.getAll(), dataset.powerPlants, t);
+    effectivePowerPlantsAt(stock.getAll(), dataset.powerPlants, t); // solar decides month by month, as in the game
     if (newYear && spec.reportYears.includes(year)) {
       const row = snapshot(dataset, year, t);
       if (spec.withEmissions) {

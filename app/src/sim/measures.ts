@@ -96,9 +96,19 @@ class MeasureEngine {
     this.lastRetireCheckDay = null;
     this.frozen = false;
     treasury.setDifficulty(DIFFICULTY_SPECS[difficulty]);
+    // What the canton and the federal government already have in force when the game starts is the
+    // starting situation, not news.
+    const now = simClock.getSimTimeMs();
+    for (const ext of EXTERNAL_MEASURES) {
+      const startYear = ext.startYear[difficulty];
+      if (startYear === null || now < toSimTimeMs(Date.UTC(startYear, 0, 1))) continue;
+      this.externalAnnounced.add(ext.id);
+      this.externalActive.add(ext.id);
+      this.log(now, `In force since ${startYear}: ${ext.title}.`);
+    }
     this.recompute();
     this.unsubscribeClock = simClock.subscribe(() => this.advance(simClock.getSimTimeMs()));
-    this.advance(simClock.getSimTimeMs());
+    this.advance(now);
   }
 
   /** How many dwellings the municipality has at a moment — costs of campaigns scale with population. */
