@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef } from "react";
 import { Map as MlMap, Marker, NavigationControl, Popup, type GeoJSONSource, type ImageSource, type MapMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
@@ -53,6 +53,7 @@ import {
   solarColorExpression,
   type ColorMode,
   type MapExpr,
+  GROUND_HEAT_LEGEND,
   HEAT_USE_LEGEND,
   TUNNEL_COLOR,
 } from "./colorModes";
@@ -161,6 +162,7 @@ type BuildingProperties = {
   network: string; // districtHeatStats.ts's NetworkStatus
   charging: string; // colorModes.ts's evChargingBucket
   publicStatus: string; // publicBuildings.ts's publicBuildingBucket
+  groundStatus: string; // heatPumpSiting.ts's groundBucket
   gridStatus: string; // grid.ts's bucket for the building's transformer area
   powerW: number;
   solarCapacityKw: number;
@@ -222,6 +224,7 @@ function buildingsToGeoJSON(
     network: mapNetworkBucketAt(b, simTimeMs),
     charging: evChargingBucket(chargingAccess.get(b.egid)),
     publicStatus: publicBuildingBucket(b, plants),
+    groundStatus: heatPumpSiting.groundBucket(b, simTimeMs),
     gridStatus: "ok",
     powerW: previousPowerW?.get(b.egid) ?? 0,
     solarCapacityKw: solarByEgid.get(b.egid) ?? 0,
@@ -590,6 +593,7 @@ function colorExpression(mode: ColorMode, selectedEgid: string | null, scales: C
     evCharging: () => legendMatchExpression("charging", EV_CHARGING_LEGEND),
     zoning: () => ZONING_BUILDING_COLOR,
     publicBuildings: () => legendMatchExpression("publicStatus", PUBLIC_BUILDINGS_LEGEND),
+    groundHeat: () => legendMatchExpression("groundStatus", GROUND_HEAT_LEGEND),
     // With an area selected, buildings elsewhere fade so its own stand out.
     grid: () => ["case", ["==", ["get", "gridStatus"], "dimmed"], GRID_DIMMED_COLOR, legendMatchExpression("gridStatus", GRID_LEGEND)],
     age: () => legendMatchExpression("age", AGE_LEGEND),
@@ -849,8 +853,8 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         paint: { "line-color": SELECTED_COLOR, "line-width": 3.5 },
       });
 
-      // The heat-use atlas (the Heating layer's toggle): on the ground, under the buildings.
-      const heatUseVisibility = colorModeRef.current === "heating" && heatPumpSiting.isOverlayShown() ? "visible" : "none";
+      // The heat-use atlas (the Ground heat layer): on the ground, under the buildings.
+      const heatUseVisibility = colorModeRef.current === "groundHeat" ? "visible" : "none";
       map.addSource(HEAT_USE_SOURCE_ID, { type: "geojson", data: heatUseGeoJSON() as never });
       map.addLayer({
         id: HEAT_USE_FILL_LAYER_ID,
@@ -1404,17 +1408,13 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
 
   // Grid layer: every building by its area's load, and the stations; refreshed after each reading
   // and as reinforcements and batteries come into service.
-  // Heating layer: the heat-use atlas, when its toggle is on.
-  const heatUseShown = useSyncExternalStore(
-    (l) => heatPumpSiting.subscribe(l),
-    () => heatPumpSiting.isOverlayShown(),
-  );
+  // Ground heat layer: the heat-use atlas under the buildings.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.getLayer(HEAT_USE_FILL_LAYER_ID)) return;
-    const visible = colorMode === "heating" && heatUseShown ? "visible" : "none";
+    const visible = colorMode === "groundHeat" ? "visible" : "none";
     for (const id of [HEAT_USE_FILL_LAYER_ID, HEAT_USE_LINE_LAYER_ID, TUNNEL_LAYER_ID]) map.setLayoutProperty(id, "visibility", visible);
-  }, [colorMode, heatUseShown]);
+  }, [colorMode]);
 
   useEffect(() => {
     const map = mapRef.current;

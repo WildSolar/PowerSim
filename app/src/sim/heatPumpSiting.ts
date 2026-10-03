@@ -82,6 +82,7 @@ class HeatPumpSiting {
   private hasAtlas = false;
   private buildingsProvider: () => Building[] = () => [];
   private groundCache = new Map<string, GroundSource | null>();
+  private zoneCache = new Map<string, { zone: HeatUseZone; noBoreholes: boolean } | null>();
   private noiseCache = new Map<string, AirNoise>();
   private ringCache = new Map<string, XY[]>();
   private gridFor: Building[] | null = null;
@@ -102,6 +103,7 @@ class HeatPumpSiting {
     this.conditions = (heatUse?.conditions ?? []).flatMap((c) => c.rings.map(toXY));
     this.tunnels = (heatUse?.tunnels ?? []).map((line) => line.map(([lon, lat]) => this.projection.toXY(lon, lat)));
     this.groundCache = new Map();
+    this.zoneCache = new Map();
     this.noiseCache = new Map();
     this.ringCache = new Map();
     this.gridFor = null;
@@ -111,9 +113,14 @@ class HeatPumpSiting {
 
   /** The atlas zone a building stands in, or null outside the atlas (or without one). */
   zoneOf(b: Building): { zone: HeatUseZone; noBoreholes: boolean } | null {
-    const p = this.projection.toXY(b.lon, b.lat);
-    for (const z of this.zones) if (z.polygons.some((rings) => pointInPolygon(p, rings))) return { zone: z.zone, noBoreholes: z.noBoreholes };
-    return null;
+    let found = this.zoneCache.get(b.egid);
+    if (found === undefined) {
+      const p = this.projection.toXY(b.lon, b.lat);
+      const z = this.zones.find((zone) => zone.polygons.some((rings) => pointInPolygon(p, rings)));
+      found = z ? { zone: z.zone, noBoreholes: z.noBoreholes } : null;
+      this.zoneCache.set(b.egid, found);
+    }
+    return found;
   }
 
   /** What a new ground-source heat pump for this building would draw on. */
@@ -238,22 +245,11 @@ class HeatPumpSiting {
 
   // --- the map ---
 
-  private overlay = false;
-  private readonly listeners = new Set<() => void>();
-
-  /** Whether the Heating layer shows the heat-use atlas. */
-  isOverlayShown(): boolean {
-    return this.overlay;
-  }
-
-  toggleOverlay(): void {
-    this.overlay = !this.overlay;
-    this.listeners.forEach((l) => l());
-  }
-
-  subscribe(listener: () => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+  /** The Ground heat layer's colour for a building: what a new ground-source heat pump would draw on. */
+  groundBucket(b: Building, atMs: number): "borehole" | "conditions" | "groundwater" | "none" {
+    const source = this.groundSource(b, atMs);
+    if (source.kind === "borehole") return source.conditions ? "conditions" : "borehole";
+    return source.kind;
   }
 
   getZones(): ZoneShape[] {

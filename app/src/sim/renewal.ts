@@ -44,6 +44,9 @@ export interface RenewalCandidate<T extends string> {
    * renewable, negative leans fossil/conventional. Scaled by the entity's own
    * bias trait when ranking; never shown to the player. */
   greenness: number;
+  /** Available only by an exception to a rule (e.g. a fossil heating ban when nothing else is
+   * possible) — why, for the player. Carried onto the event when this candidate wins. */
+  exception?: string;
 }
 
 export type RenewalReasonKind = "initial" | "inKind" | "forcedByAvailability" | "financial";
@@ -58,6 +61,8 @@ export interface RenewalEvent<T extends string> {
   /** Only set for "forcedByAvailability": the option that would have won on
    * cost alone if it had been available. */
   bestOverallId: T | null;
+  /** The winner was allowed by an exception (its candidate's `exception`). */
+  exception?: string;
 }
 
 export interface RenewalParams<T extends string> {
@@ -222,7 +227,15 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
     const bias = params.biasStrengthRp + policyStore.get().progressiveNudgeRp;
     const { chosen, reasonKind, bestOverallId } = chooseNext(candidates, last.system, uncertaintyFraction, bias);
     const winner = candidates.find((c) => c.id === chosen);
-    const event: RenewalEvent<T> = { installedAtMs: nextInstalledAtMs, system: chosen, previousSystem: last.system, reasonKind, bestOverallId, municipalSubsidyRp: winner?.municipalSubsidyRp };
+    const event: RenewalEvent<T> = {
+      installedAtMs: nextInstalledAtMs,
+      system: chosen,
+      previousSystem: last.system,
+      reasonKind,
+      bestOverallId,
+      municipalSubsidyRp: winner?.municipalSubsidyRp,
+      ...(winner?.exception ? { exception: winner.exception } : {}),
+    };
     chain.push(event);
     params.onCommit?.(event);
     winner?.onChosen?.(nextInstalledAtMs);

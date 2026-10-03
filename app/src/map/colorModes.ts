@@ -4,7 +4,7 @@ import { currentHeatingSystemId } from "../sim/heatingRenewal";
 import type { BuildingChargingAccess } from "../sim/publicCharging";
 import type { ChargingKind } from "../config/charging";
 
-export type ColorMode = "none" | "category" | "heating" | "power" | "solar" | "age" | "insulation" | "districtHeat" | "evCharging" | "zoning" | "publicBuildings" | "grid";
+export type ColorMode = "none" | "category" | "heating" | "groundHeat" | "power" | "solar" | "age" | "insulation" | "districtHeat" | "evCharging" | "zoning" | "publicBuildings" | "grid";
 
 export interface LegendEntry {
   bucket: string;
@@ -258,7 +258,16 @@ export function evChargingBucket(access: BuildingChargingAccess | undefined): st
 // Charging sites by how full they are: room to spare -> filling up -> full.
 export const CHARGER_USE_RAMP = ["#1baf7a", "#f2b01e", "#d0342c"];
 export const CHARGER_BUILDING_COLOR = "#b6b4ac";
-// The heat-use atlas on the Heating layer: what the ground allows (heatPumpSiting.ts).
+// The Ground heat layer: what a new ground-source heat pump would draw on, building by building
+// (heatPumpSiting.ts).
+export const GROUND_HEAT_LEGEND: LegendEntry[] = [
+  { bucket: "borehole", label: "Boreholes", color: "#1baf7a" },
+  { bucket: "conditions", label: "Boreholes, with conditions", color: "#e0a030" },
+  { bucket: "groundwater", label: "Groundwater wells (large systems)", color: "#0f8fc0" },
+  { bucket: "none", label: "No ground heat pump", color: "#b0413e" },
+];
+
+// ...and the atlas zones under the buildings.
 export const HEAT_USE_LEGEND: { bucket: string; label: string; color: string }[] = [
   { bucket: "noGround", label: "Protection zone: no ground heat", color: "#c8362f" },
   { bucket: "noBoreholes", label: "Drinking-water aquifer: no boreholes", color: "#2a78d6" },

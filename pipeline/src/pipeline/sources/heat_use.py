@@ -29,7 +29,8 @@ OGD_WFS = "https://maps.zh.ch/wfs/OGDZHWFS"
 ATLAS_WFS = "https://maps.zh.ch/wfs/AwelGSWaermewwwZHWFS"
 ZONES_LAYER = "ms:ogd-0316_giszhpub_gs_waermenutzungsatlas_f"
 SIMPLIFY_M = 2.0
-MARGIN_M = 100.0
+MARGIN_M = 5.0  # just past the border, so a building on it still falls in its zone
+TUNNEL_MARGIN_M = 60.0  # tunnels: as far out as the clearance boreholes keep from them (app config), and some
 
 
 def _get_features(url: str, layer: str, bbox: tuple[float, float, float, float]) -> list[dict]:
@@ -66,7 +67,8 @@ def fetch_heat_use(boundary_lv95: list) -> dict | None:
     for the municipality (clipped to it, plus a margin), or None if the atlas can't be reached."""
     area = unary_union(boundary_lv95)
     clip = area.buffer(MARGIN_M)
-    bbox = clip.bounds
+    tunnel_clip = area.buffer(TUNNEL_MARGIN_M)
+    bbox = tunnel_clip.bounds
     try:
         zone_features = _get_features(OGD_WFS, ZONES_LAYER, bbox)
         a_features = _get_features(ATLAS_WFS, "ms:waermenutzung-zone-a", bbox)
@@ -99,7 +101,7 @@ def fetch_heat_use(boundary_lv95: list) -> dict | None:
 
     tunnels = []
     for f in tunnel_features:
-        geometry = shape(f["geometry"]).intersection(clip)
+        geometry = shape(f["geometry"]).intersection(tunnel_clip)
         lines = [geometry] if geometry.geom_type == "LineString" else [g for g in getattr(geometry, "geoms", []) if g.geom_type == "LineString"]
         for line in lines:
             simplified = line.simplify(SIMPLIFY_M)

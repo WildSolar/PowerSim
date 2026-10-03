@@ -164,7 +164,7 @@ function candidatesAt(
   const gridBlocked = gridDrawBlockedAt(building, atMs);
   const avgElecRpKWh = (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2;
 
-  return HEATING_SYSTEM_ORDER.map((id) => {
+  const candidates = HEATING_SYSTEM_ORDER.map((id) => {
     const spec = HEATING_SYSTEM_CATALOG[id];
     // Keeping the same system can be much cheaper than installing it new (see replacementInstallCostRp).
     const keeps = id === incumbent && !newBuild;
@@ -199,8 +199,35 @@ function candidatesAt(
       annualizedCostRp: installCostRp / spec.lifetimeMeanYears + runningCostRpFor(id, estimate, tariff, avgElecRpKWh) + siteRunningRp,
       lifetimeMeanYears: spec.lifetimeMeanYears,
       greenness: spec.greenness,
-    };
+    } as RenewalCandidate<HeatingSystemId>;
   });
+
+  // A fossil heating ban gives way when nothing else is possible — no heat pump can go here (the
+  // ground, the neighbours' quiet or a full grid rules them out) and no district heating reaches
+  // the building: the owner may install gas or oil as an exception, as the cantonal energy law
+  // allows when a renewable system isn't technically feasible.
+  const fossil = (id: HeatingSystemId) => id === "gasBoiler" || id === "oilBoiler";
+  if (fossilBanned && !candidates.some((c) => c.available && !fossil(c.id))) {
+    const why = heatPumpBlockers(building, atMs, incumbent, gridBlocked, newBuild);
+    for (const c of candidates) {
+      if (fossil(c.id)) {
+        c.available = true;
+        c.exception = `no heat pump could go here (${why}) and no district heating reaches it`;
+      }
+    }
+  }
+  return candidates;
+}
+
+/** Why neither heat pump is possible for this building — for the fossil ban's exception note. */
+function heatPumpBlockers(building: Building, atMs: number, incumbent: HeatingSystemId, gridBlocked: boolean, newBuild: boolean): string {
+  // A full grid rules out both, whatever the site would allow.
+  if (gridBlocked && !isHeatPump(incumbent)) return "the local grid can't take a new heat pump until it's reinforced";
+  const reasons: string[] = [];
+  const ground = heatPumpSiting.groundSource(building, atMs);
+  if (ground.kind === "none") reasons.push(`ground: ${ground.reason}`);
+  if (heatPumpSiting.airNoise(building, atMs, newBuild).step === "notPermitted") reasons.push("air: too loud for the neighbours even indoors");
+  return reasons.join("; ") || "the site rules them out";
 }
 
 function uncertaintyFraction(building: Building): number {
@@ -358,6 +385,9 @@ function renewalNote(event: RenewalEvent<HeatingSystemId>, building?: Building):
   const oldLabel = HEATING_SYSTEM_CATALOG[event.previousSystem as HeatingSystemId].label.toLowerCase();
   const base = `The old ${oldLabel} had reached the end of its service life.`;
 
+  if (event.exception) {
+    return `${base} The fossil heating ban gave way: ${event.exception}, so ${articleLabel(event.system)} was allowed as an exception.`;
+  }
   if (event.reasonKind === "inKind") {
     const again = event.system === "districtHeating" ? "district heating" : `another ${HEATING_SYSTEM_CATALOG[event.system].label.toLowerCase()}`;
     return `${base} It was replaced with ${again} — no clearly better alternative was found.`;
