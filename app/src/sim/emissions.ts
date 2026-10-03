@@ -58,6 +58,12 @@ const emissionsCache = new Map<number, EmissionsBreakdown>();
  * forever after. The expensive inputs (heating technology, net electricity)
  * are yearReport.ts's shared per-year passes, so asking for emissions while
  * the report's other sections are computing the same year costs nothing extra. */
+/** A year's emissions if they have been computed already (by the Year in Review), else null —
+ * for always-on readouts that must never trigger the computation themselves. */
+export function cachedEmissionsForYear(year: number): EmissionsBreakdown | null {
+  return emissionsCache.get(year) ?? null;
+}
+
 export async function computeEmissionsForYear(buildings: Building[], plants: PowerPlant[], year: number): Promise<EmissionsBreakdown> {
   const cached = emissionsCache.get(year);
   if (cached) return cached;

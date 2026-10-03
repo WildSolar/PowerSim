@@ -3,17 +3,16 @@ import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
 import { ControlPanel } from "./ui/ControlPanel";
 import { DwellingPanel } from "./ui/DwellingPanel";
-import { ColorModeControl } from "./ui/ColorModeControl";
+import { LayerDock, isToolLayer, layerLabel } from "./ui/LayerDock";
+import { LayerLegend } from "./ui/LayerLegend";
+import { TopBar } from "./ui/TopBar";
 import { DistrictHeatPanel } from "./ui/DistrictHeatPanel";
 import { EvChargingPanel } from "./ui/EvChargingPanel";
 import { ZoningPanel } from "./ui/ZoningPanel";
 import { GridPanel } from "./ui/GridPanel";
 import { PublicBuildingsPanel } from "./ui/PublicBuildingsPanel";
 import { ReportCardModal } from "./ui/ReportCardModal";
-import { TimeControl } from "./ui/TimeControl";
-import { ApprovalPanel } from "./ui/ApprovalPanel";
 import { GameOverModal } from "./ui/GameOverModal";
-import { TreasuryPanel } from "./ui/TreasuryPanel";
 import type { ControlTab } from "./ui/ControlPanel";
 import { StartMenu } from "./ui/StartMenu";
 import { WikiPanel } from "./ui/WikiPanel";
@@ -34,7 +33,7 @@ import { inbox } from "./sim/inbox";
 import { debt } from "./sim/debt";
 import { letters } from "./sim/letters";
 import { newspaper } from "./sim/newspaper";
-import { InboxButton, InboxPanel, InboxToast, type InboxSelection } from "./ui/InboxPanel";
+import { InboxPanel, InboxToast, type InboxSelection } from "./ui/InboxPanel";
 import { heatPumpSiting } from "./sim/heatPumpSiting";
 import { setDistrictHeatLimit } from "./sim/gridLimits";
 import { networkFullAt } from "./sim/districtHeatStats";
@@ -51,7 +50,6 @@ import { treasury } from "./sim/treasury";
 import type { Difficulty } from "./config/difficulty";
 import { startYearEndWatcher } from "./sim/yearEndWatcher";
 import { startYearPassPrefetch } from "./sim/yearPassPrefetch";
-import "./App.css";
 
 // The simulation's state lives in many module-level singletons and caches (policy,
 // tariffs, solar adoption, decision log, per-year finances/emissions...), so a page
@@ -177,50 +175,81 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
     return <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>Loading…</div>;
   }
 
+  const onSelectFromList = (egid: string) => {
+    setSelectedEgid(egid);
+    setSelectedEwid(null);
+  };
+  const toolPanel =
+    colorMode === "districtHeat" ? (
+      <DistrictHeatPanel />
+    ) : colorMode === "evCharging" ? (
+      <EvChargingPanel />
+    ) : colorMode === "zoning" ? (
+      <ZoningPanel />
+    ) : colorMode === "grid" ? (
+      <GridPanel />
+    ) : colorMode === "publicBuildings" ? (
+      <PublicBuildingsPanel buildings={stockBuildings} realPlants={dataset.powerPlants} selectedEgid={selectedEgid} onSelectBuilding={onSelectFromList} />
+    ) : null;
+
   return (
     <div style={{ position: "absolute", inset: 0 }}>
-      <MapView
-        dataset={dataset}
-        selectedEgid={selectedEgid}
-        onSelectBuilding={(egid) => {
-          setSelectedEgid(egid);
-          setSelectedEwid(null);
-        }}
-        colorMode={colorMode}
-        keyboardEnabled={keyboardEnabled}
+      <TopBar
+        dataset={liveDataset ?? dataset}
+        onOpenTreasury={() => setControlTab("treasury")}
+        onOpenTownHall={() => setControlTab("measures")}
+        onOpenInbox={() => setInboxSelection({ tab: "letters", id: null })}
+        onOpenWiki={() => setShowWiki(true)}
+        onMenu={returnToMenu}
       />
-      <div className="top-left-stack">
-        <TimeControl />
-        <TreasuryPanel dataset={liveDataset ?? dataset} onOpen={() => setControlTab("treasury")} />
-        <ApprovalPanel />
-        <ColorModeControl mode={colorMode} onChange={setColorMode} />
-      </div>
-      {colorMode === "districtHeat" && <DistrictHeatPanel />}
-      {colorMode === "evCharging" && <EvChargingPanel />}
-      {colorMode === "zoning" && <ZoningPanel />}
-      {colorMode === "grid" && <GridPanel />}
-      {colorMode === "publicBuildings" && (
-        <PublicBuildingsPanel
-          buildings={stockBuildings}
-          realPlants={dataset.powerPlants}
+      <div className="stage">
+        <MapView
+          dataset={dataset}
           selectedEgid={selectedEgid}
           onSelectBuilding={(egid) => {
             setSelectedEgid(egid);
             setSelectedEwid(null);
           }}
+          colorMode={colorMode}
+          keyboardEnabled={keyboardEnabled}
         />
-      )}
-      <div className="bottom-left-stack">
-        <button className="pill-button" onClick={() => setControlTab("prices")}>
-          ⚙️ {dataset.name} Control
-        </button>
-        <InboxButton onOpen={() => setInboxSelection({ tab: "letters", id: null })} />
-        <button className="pill-button" onClick={() => setShowWiki(true)}>
-          📖 Wiki
-        </button>
-        <button className="pill-button" onClick={returnToMenu}>
-          ☰ Main menu
-        </button>
+        <LayerDock mode={colorMode} onChange={setColorMode} />
+        {isToolLayer(colorMode) ? (
+          <aside className="tool-drawer" aria-label={layerLabel(colorMode)}>
+            {toolPanel}
+            <details className="drawer-legend" open>
+              <summary>Legend</summary>
+              <LayerLegend mode={colorMode} />
+            </details>
+          </aside>
+        ) : (
+          <div className="map-legend">
+            <h3 className="map-legend-title">{layerLabel(colorMode)}</h3>
+            <LayerLegend mode={colorMode} />
+          </div>
+        )}
+        {!inboxSelection && <InboxToast onOpen={setInboxSelection} />}
+        {selectedDwelling && selectedBuilding ? (
+          <DwellingPanel
+            building={selectedBuilding}
+            dwelling={selectedDwelling}
+            allBuildings={stockBuildings}
+            realPlants={dataset.powerPlants}
+            onBack={() => setSelectedEwid(null)}
+            onClose={() => {
+              setSelectedEgid(null);
+              setSelectedEwid(null);
+            }}
+          />
+        ) : selectedBuilding ? (
+          <BuildingPanel
+            building={selectedBuilding}
+            allBuildings={stockBuildings}
+            realPlants={dataset.powerPlants}
+            onSelectDwelling={setSelectedEwid}
+            onClose={() => setSelectedEgid(null)}
+          />
+        ) : null}
       </div>
       <GameOverModal />
       {controlTab && <ControlPanel dataset={liveDataset ?? dataset} transparency={transparency} initialTab={controlTab} onClose={() => setControlTab(null)} />}
@@ -235,31 +264,9 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
           }}
         />
       )}
-      {!inboxSelection && <InboxToast onOpen={setInboxSelection} />}
       {reportCardYear !== null && (
         <ReportCardModal dataset={liveDataset ?? dataset} year={reportCardYear} onClose={() => reportCardStore.dismiss()} />
       )}
-      {selectedDwelling && selectedBuilding ? (
-        <DwellingPanel
-          building={selectedBuilding}
-          dwelling={selectedDwelling}
-          allBuildings={stockBuildings}
-          realPlants={dataset.powerPlants}
-          onBack={() => setSelectedEwid(null)}
-          onClose={() => {
-            setSelectedEgid(null);
-            setSelectedEwid(null);
-          }}
-        />
-      ) : selectedBuilding ? (
-        <BuildingPanel
-          building={selectedBuilding}
-          allBuildings={stockBuildings}
-          realPlants={dataset.powerPlants}
-          onSelectDwelling={setSelectedEwid}
-          onClose={() => setSelectedEgid(null)}
-        />
-      ) : null}
     </div>
   );
 }

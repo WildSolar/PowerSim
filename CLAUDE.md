@@ -3,7 +3,7 @@
 ## In-game wiki
 
 `app/src/ui/wikiContent.ts` is the source of the in-game Wiki (opened via the
-"📖 Wiki" button, bottom-left). It's plain data (an array of sections, each a
+Wiki button in the top bar). It's plain data (an array of sections, each a
 list of paragraph/list/note blocks) precisely so it's cheap to keep current.
 
 **When a change adds or meaningfully alters a simulated mechanic** (a new

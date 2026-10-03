@@ -2,7 +2,7 @@
  * The simulation clock. Advances simulated time on every animation frame and notifies
  * subscribers — it holds no per-device state itself, since device power is a pure
  * function of (seed, simTimeMs) (see devices.ts). The speed multiplier is player-
- * adjustable (see ui/TimeControl.tsx); speed 0 is pause, not a special case — the
+ * adjustable (see ui/TopBar.tsx); speed 0 is pause, not a special case — the
  * loop just advances simTime by realDelta * 0.
  */
 

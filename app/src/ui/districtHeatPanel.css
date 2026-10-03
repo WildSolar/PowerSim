@@ -1,27 +1,18 @@
+/* The planning tools' panels (district heating, charging, grid, zoning, public buildings),
+ * shown inside the tool drawer beside the layer dock. */
 .district-heat-panel {
-  position: absolute;
-  top: 16px;
-  left: 272px;
-  width: 280px;
-  max-height: calc(100% - 90px);
-  overflow-y: auto;
-  background: var(--surface-glass);
-    border-radius: var(--r-3);
-  padding: 10px 12px;
-  font-family: var(--font);
+  padding: 14px 14px 12px;
   font-size: 12px;
   color: var(--ink);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-1);
 }
 
 .district-heat-panel .panel-title {
-  margin: 0 0 6px;
-  font-size: 11px;
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: 18px;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  letter-spacing: -0.01em;
+  color: var(--ink);
 }
 
 .district-heat-panel .info-row {

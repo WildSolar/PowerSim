@@ -1,3 +1,4 @@
+import { Mail } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { mapFocus } from "../map/mapFocus";
 import { formatDate } from "../sim/calendar";
@@ -253,8 +254,10 @@ export function InboxButton({ onOpen }: { onOpen: () => void }) {
   const unread = inbox.unreadCount(simClock.getSimTimeMs());
   const total = unread.letters + unread.editions;
   return (
-    <button className="pill-button" onClick={onOpen}>
-      ✉️ Inbox{total > 0 ? <span className="inbox-badge">{total}</span> : null}
+    <button className="tb-icon-button" onClick={onOpen} title="Letters and the local paper">
+      <Mail size={17} strokeWidth={1.75} aria-hidden />
+      <span>Inbox</span>
+      {total > 0 ? <span className="inbox-badge">{total}</span> : null}
     </button>
   );
 }

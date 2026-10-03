@@ -1,0 +1,239 @@
+.top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--top-bar-h);
+  display: flex;
+  align-items: stretch;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  z-index: 5;
+}
+
+.top-bar > * {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+}
+
+.top-bar > * + * {
+  border-left: 1px solid var(--line);
+}
+
+.tb-brand {
+  gap: 10px;
+}
+
+.tb-mark {
+  width: 10px;
+  height: 10px;
+  background: var(--accent);
+}
+
+.tb-name {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.tb-clock {
+  gap: 16px;
+}
+
+.tb-date {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 118px;
+}
+
+.tb-day {
+  font-size: 11px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.tb-time {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tb-weather {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.tb-speed {
+  display: flex;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-2);
+  overflow: hidden;
+}
+
+.tb-speed button {
+  min-width: 36px;
+  padding: 4px 8px;
+  border: none;
+  background: var(--surface);
+  font-size: 11px;
+  letter-spacing: -0.12em;
+  cursor: pointer;
+}
+
+.tb-speed button + button {
+  border-left: 1px solid var(--line-strong);
+}
+
+.tb-speed button:hover {
+  background: var(--fill);
+}
+
+.tb-speed button.active {
+  background: var(--selected);
+  color: var(--on-selected);
+}
+
+.tb-kpis {
+  flex: 1;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  padding: 0 20px;
+  line-height: 1.15;
+  border: none;
+  background: none;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.kpi + .kpi {
+  border-left: 1px solid var(--line);
+}
+
+.kpi-button {
+  cursor: pointer;
+}
+
+.kpi-button:hover {
+  background: var(--fill);
+}
+
+.kpi-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.kpi-value {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-value.good,
+.kpi-sub .good {
+  color: var(--good);
+}
+
+.kpi-value.bad,
+.kpi-sub .bad {
+  color: var(--bad);
+}
+
+.kpi-sub {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.kpi-flag {
+  font-weight: 600;
+}
+
+.tb-actions {
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.tb-icon-button,
+.tb-town-hall {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-2);
+  background: none;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tb-icon-button:hover {
+  background: var(--fill);
+}
+
+.tb-town-hall {
+  margin: 0 4px;
+  padding: 0 14px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.tb-town-hall:hover {
+  background: var(--accent-strong);
+}
+
+/* The map and everything floating over it sit below the bar. */
+.stage {
+  position: absolute;
+  top: var(--top-bar-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 1180px) {
+  .tb-weather,
+  .tb-icon-button span:not(.inbox-badge) {
+    display: none;
+  }
+  .kpi {
+    padding: 0 12px;
+  }
+}
+
+@media (max-width: 860px) {
+  .tb-brand,
+  .tb-day {
+    display: none;
+  }
+  .top-bar > * {
+    padding: 0 8px;
+  }
+  .tb-town-hall span {
+    display: none;
+  }
+}

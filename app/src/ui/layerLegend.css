@@ -1,0 +1,51 @@
+/* A map layer's legend: buckets as swatches, ramps as a gradient bar, and the marks a layer
+ * draws (pipes, chargers, zones). Groups are separated by a hairline. */
+
+.layer-legend {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.layer-legend .legend + .legend {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.legend-row:last-child {
+  margin-bottom: 0;
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--r-1);
+  flex-shrink: 0;
+}
+
+.swatch.line-swatch {
+  height: 4px;
+  border-radius: 2px;
+}
+
+.power-gradient {
+  height: 8px;
+  border-radius: var(--r-1);
+}
+
+.power-gradient-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: 4px;
+  margin-bottom: 4px;
+}

@@ -1,12 +1,12 @@
 .panel {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 320px;
-  max-height: calc(100% - 32px);
+  top: 12px;
+  right: 12px;
+  width: 340px;
+  max-height: calc(100% - 24px);
   overflow-y: auto;
-  background: var(--surface-glass);
-    border-radius: var(--r-3);
+  background: var(--surface);
+  border-radius: var(--r-3);
   border: 1px solid var(--line);
   box-shadow: var(--shadow-1);
   padding: 16px;

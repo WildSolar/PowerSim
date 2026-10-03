@@ -192,7 +192,7 @@ export function PublicBuildingsPanel({
       </div>
       <p className="dh-note">
         Automatically: {solarMeasure ? `solar on ${solarMeasure.perYear} a year` : "no solar programme"},{" "}
-        {chargerMeasure ? `chargers at ${chargerMeasure.perYear} a year` : "no charger programme"} (Control → Measures). Or pick a building here or on the
+        {chargerMeasure ? `chargers at ${chargerMeasure.perYear} a year` : "no charger programme"} (Town hall → Measures). Or pick a building here or on the
         map and order it directly.
       </p>
 

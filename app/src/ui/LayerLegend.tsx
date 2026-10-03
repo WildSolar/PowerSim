@@ -26,33 +26,15 @@ import {
   SOLAR_RAMP,
   type ColorMode,
 } from "../map/colorModes";
-import "./colorModeControl.css";
-
-const MODES: { key: ColorMode; label: string }[] = [
-  { key: "none", label: "Default" },
-  { key: "category", label: "Building type" },
-  { key: "heating", label: "Heating" },
-  { key: "groundHeat", label: "Ground heat" },
-  { key: "districtHeat", label: "District heat" },
-  { key: "evCharging", label: "EV charging" },
-  { key: "zoning", label: "Zoning" },
-  { key: "publicBuildings", label: "Public buildings" },
-  { key: "grid", label: "Grid" },
-  { key: "power", label: "Power draw" },
-  { key: "solar", label: "Solar" },
-  { key: "age", label: "Age" },
-  { key: "insulation", label: "Insulation" },
-];
+import "./layerLegend.css";
 
 const DIVERGING_POWER_GRADIENT = [...[...EXPORT_RAMP].reverse(), ...POWER_RAMP].join(",");
 const SOLAR_GRADIENT = SOLAR_RAMP.join(",");
 
-export interface ColorModeControlProps {
-  mode: ColorMode;
-  onChange: (mode: ColorMode) => void;
-}
-
-export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
+/** The legend for a map layer: its buckets or colour ramp, plus the marks it draws
+ * (pipes, chargers, zones). Shown as a chip on the map for a view, and inside the
+ * drawer for a planning tool. */
+export function LayerLegend({ mode }: { mode: ColorMode }) {
   const legends: Partial<Record<ColorMode, typeof CATEGORY_LEGEND>> = {
     category: CATEGORY_LEGEND,
     heating: HEATING_LEGEND,
@@ -68,15 +50,7 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
   const legend = legends[mode] ?? null;
 
   return (
-    <div className="color-mode-control">
-      <h3 className="panel-title">Layers</h3>
-      <div className="mode-buttons">
-        {MODES.map((m) => (
-          <button key={m.key} className={m.key === mode ? "active" : ""} onClick={() => onChange(m.key)}>
-            {m.label}
-          </button>
-        ))}
-      </div>
+    <div className="layer-legend">
       {legend && (
         <div className="legend">
           {legend.map((entry) => (
@@ -89,7 +63,7 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
       )}
       {mode === "groundHeat" && <HeatUseLegend />}
       {mode === "districtHeat" && (
-        <div className="legend" style={{ marginTop: 6 }}>
+        <div className="legend">
           {[
             { label: "Piped street", color: PIPE_COLOR },
             { label: "Pipes being laid", color: PIPE_UNDER_CONSTRUCTION_COLOR },
@@ -109,7 +83,7 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
         </div>
       )}
       {mode === "zoning" && (
-        <div className="legend" style={{ marginTop: 6 }}>
+        <div className="legend">
           <div className="legend-row">
             <span className="swatch" style={{ background: "#f2c14e", opacity: 0.95 }} />
             <span>Stronger colour: extra floors allowed</span>
@@ -135,7 +109,7 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
             <span>charger with room</span>
             <span>full</span>
           </div>
-          <div className="legend-row" style={{ marginTop: 6 }}>
+          <div className="legend-row">
             <span className="swatch" style={{ background: "#1baf7a", border: "2px solid #1a1a1a", borderRadius: "50%" }} />
             <span>Municipal charger (circle)</span>
           </div>
@@ -153,7 +127,7 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
           </div>
         </div>
       )}
-      <div className="legend" style={{ marginTop: 6 }}>
+      <div className="legend">
         <div className="legend-row">
           <span className="swatch" style={{ background: CONSTRUCTION_COLOR }} />
           <span>Construction site</span>
@@ -175,7 +149,7 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
             <span>0 kWp</span>
             <span>largest installation</span>
           </div>
-          <div className="legend-row" style={{ marginTop: 6 }}>
+          <div className="legend-row">
             <span className="swatch" style={{ background: "#b6b4ac" }} />
             <span>No solar</span>
           </div>
@@ -188,7 +162,7 @@ export function ColorModeControl({ mode, onChange }: ColorModeControlProps) {
 /** The Ground heat layer's second legend: the atlas zones drawn under the buildings. */
 function HeatUseLegend() {
   return (
-    <div className="legend" style={{ marginTop: 6 }} title="Canton Zurich's heat-use atlas: where heat may be taken from the ground">
+    <div className="legend" title="Canton Zurich's heat-use atlas: where heat may be taken from the ground">
       {HEAT_USE_LEGEND.map((entry) => (
         <div className="legend-row" key={entry.bucket}>
           <span className="swatch" style={{ background: entry.color, opacity: 0.45 }} />

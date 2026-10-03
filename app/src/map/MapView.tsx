@@ -578,6 +578,38 @@ function hideBasemapLabels(map: MlMap): void {
   }
 }
 
+// How much colour the basemap keeps (0 grey, 1 as swisstopo draws it): enough to tell rail,
+// road, water and green apart, quiet enough that the data layers carry the colour.
+const BASEMAP_SATURATION = 0.35;
+
+function muteColor(color: string): string {
+  const m = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(color);
+  if (!m) return color;
+  const [r, g, b] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const grey = 0.299 * r + 0.587 * g + 0.114 * b;
+  const mix = (c: number) => Math.round(grey + BASEMAP_SATURATION * (c - grey));
+  return m[4] === undefined ? `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})` : `rgba(${mix(r)}, ${mix(g)}, ${mix(b)}, ${m[4]})`;
+}
+
+function muteValue(value: unknown): unknown {
+  if (typeof value === "string") return muteColor(value);
+  if (Array.isArray(value)) return value.map(muteValue);
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, muteValue(v)]));
+  return value;
+}
+
+/** Takes most of the colour out of the basemap's areas and lines, so it reads as a quiet
+ * ground under the buildings and network layers. Labels and icons keep theirs. */
+function muteBasemapColors(map: MlMap): void {
+  for (const layer of map.getStyle().layers ?? []) {
+    if (layer.type !== "fill" && layer.type !== "line" && layer.type !== "background") continue;
+    const paint = (layer as { paint?: Record<string, unknown> }).paint ?? {};
+    for (const [key, value] of Object.entries(paint)) {
+      if (key.endsWith("color")) map.setPaintProperty(layer.id, key as "fill-color", muteValue(value) as string);
+    }
+  }
+}
+
 interface ColorScales {
   powerMinW: number;
   powerMaxW: number;
@@ -668,7 +700,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     });
     mapRef.current = map;
     if (import.meta.env.DEV) Object.assign(window, { __map: map });
-    map.addControl(new NavigationControl({ visualizePitch: true }), "top-right");
+    map.addControl(new NavigationControl({ visualizePitch: true }), "bottom-left");
 
     const geojson = buildingsToGeoJSON(stock.getAll(), effectivePowerPlantsAt(stock.getAll(), dataset.powerPlants, simClock.getSimTimeMs()), simClock.getSimTimeMs());
     polygonsRef.current = geojson.polygons;
@@ -686,6 +718,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     map.on("style.load", () => {
       hideBasemapBuildingLayers(map);
       hideBasemapLabels(map);
+      muteBasemapColors(map);
 
       if (dataset.boundary) addBoundaryMask(map, dataset.boundary);
 
@@ -1362,13 +1395,13 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       mapFocus.subscribe(({ lon, lat, minZoom = 16 }) => {
         const map = mapRef.current;
         if (!map) return;
-        // Land in the middle of the part of the map not covered by panels (the stacks and layer
-        // panels on the left, a building or dwelling panel on the right).
+        // Land in the middle of the part of the map not covered by panels (the layer dock and a tool
+        // drawer on the left, a building or dwelling panel on the right).
         const box = map.getContainer().getBoundingClientRect();
         const middle = box.left + box.width / 2;
         let left = 0;
         let right = 0;
-        for (const el of document.querySelectorAll(".top-left-stack, .district-heat-panel, .panel")) {
+        for (const el of document.querySelectorAll(".layer-dock, .tool-drawer, .panel")) {
           const r = el.getBoundingClientRect();
           if (r.width === 0) continue;
           if (r.left < middle && r.right < box.right - 40) left = Math.max(left, r.right - box.left);

@@ -222,11 +222,11 @@
 
 .inbox-badge {
   display: inline-block;
-  margin-left: 6px;
+  margin-left: 2px;
   min-width: 18px;
   padding: 0 5px;
-  border-radius: var(--r-3);
-  background: var(--bad);
+  border-radius: 9px;
+  background: var(--accent);
   color: var(--on-accent);
   font-size: 11px;
   line-height: 18px;
@@ -235,7 +235,7 @@
 
 .inbox-toast {
   position: absolute;
-  bottom: 64px;
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
   max-width: min(520px, 90vw);
