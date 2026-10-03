@@ -145,11 +145,11 @@ class MeasureEngine {
   }
 
   /** Measures that are in force right now, with the settings they are in force under. */
-  getActiveMeasures(): { def: MeasureDef; params: MeasureParams }[] {
-    const active: { def: MeasureDef; params: MeasureParams }[] = [];
+  getActiveMeasures(): { def: MeasureDef; params: MeasureParams; enactedAtMs: number }[] {
+    const active: { def: MeasureDef; params: MeasureParams; enactedAtMs: number }[] = [];
     for (const [id, state] of this.states) {
       const def = MEASURE_BY_ID.get(id);
-      if (def && state.active) active.push({ def, params: state.active });
+      if (def && state.active) active.push({ def, params: state.active, enactedAtMs: state.enactedAtMs });
     }
     return active;
   }

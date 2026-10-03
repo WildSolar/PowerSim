@@ -169,7 +169,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       ),
       list([
         "Decisions land at once: enacting a measure moves opinion straight away, in proportion to how each group feels about it. Repealing gives most of that back, but looks indecisive.",
-        "Then opinion settles: while a measure stays in force, each group drifts toward a level set by everything in force. Piling up popular measures has diminishing returns.",
+        "Then opinion settles: while a measure stays in force, each group drifts toward a level set by everything in force. Piling up popular measures has diminishing returns, and people take what they like for granted: a measure's goodwill fades to about half over the years, while resentment stays. With nothing contentious in force, every group rests at a modest 55.",
         "Votes: the big bans always go to a public vote, and other laws do when they are contested. Beforehand a poll shows where support stands (polls have an error). If the voters reject a measure it is struck down — the money already spent stays spent — and approval takes a hit. If they back you, it gets a small boost.",
         "Spending: taxpayers accept about what the government allocates to the energy department each year. Spend well beyond it and every group grows resentful, taxpayers and businesses most. Grants that mostly pay people who would have acted anyway are the usual way to overspend.",
         "Consequences: approval below 25% for six months gets you recalled, and every four years (the first in 2030) there is an election you must win with at least 45%. Either ends the game. Approval also nudges the government's yearly allocation up or down a little.",
@@ -456,6 +456,22 @@ export const WIKI_SECTIONS: WikiSection[] = [
       note(
         "Simplifications: the neighbours' distance is taken from the gaps to the two nearest buildings with homes or workplaces (sheds and garages don't count, nor buildings it's joined to), not a real placement study; sound powers and the costs of noise measures are informed placeholders, as is the concession fee. Groundwater heat pumps are counted as ground-source heat pumps, with the same efficiency. The atlas covers canton Zurich only — elsewhere, no ground restriction applies.",
       ),
+    ],
+  },
+  {
+    id: "early-switch",
+    icon: "⏩",
+    title: "Switching early",
+    blocks: [
+      p(
+        "Most owners only replace a heating system or a car when it wears out — and that is when laws act. But now and then an owner with a working oil or gas boiler, or a petrol or diesel car, looks into switching early. They compare keeping it (its running costs, and repairs that grow as it ages) with switching now (the new system's price less grants, its running costs, and the hassle of replacing something that still works); owners who are actively looking are less set in their ways than usual.",
+      ),
+      list([
+        "Grants make owners likelier to look into it at all, and more likely to go through with it: a heat pump grant brings boiler replacements forward. That is what money buys — speed. Laws are cheap but act only when things wear out (and can be voted down).",
+        "Energy advice (the information measures) also gets more owners looking.",
+        "Cars rarely switch early: a paid-off car only costs its fuel, so it takes a large scrappage bonus — and a charger within reach.",
+      ]),
+      note("Placeholders: how often owners look into it, the repair and hassle figures. Every early switch is decided once, when it happens, and logged on the building or dwelling."),
     ],
   },
   {

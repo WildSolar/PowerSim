@@ -54,6 +54,8 @@ import { priceFactor } from "./costTrends";
 import { zoning } from "./zoning";
 import { districtHeatFullAt, gridDrawBlockedAt } from "./gridLimits";
 import { heatPumpSiting } from "./heatPumpSiting";
+import { EARLY_SWITCH } from "../config/earlySwitch";
+import { earlyCandidates, earlySwitchChance } from "./earlySwitch";
 
 const DAY_MS = 24 * 60 * 60_000;
 const ANNUAL_SAMPLE_DAYS = 365;
@@ -258,6 +260,19 @@ function chainFor(building: Building, simTimeMs: number): RenewalEvent<HeatingSy
     biasStrengthRp: biasStrengthRp(building),
     lifetimeMeanYearsFor: (id) => HEATING_SYSTEM_CATALOG[id].lifetimeMeanYears,
     candidatesAt: (atMs, incumbent) => candidatesAt(building, atMs, incumbent),
+    early: {
+      eligible: (system) => system === "oilBoiler" || system === "gasBoiler",
+      minAgeYears: EARLY_SWITCH.heating.minAgeYears,
+      chanceAt: (atMs) => {
+        const priceRp = HEATING_SYSTEM_CATALOG.airHeatPump.baseInstallCostRp * priceFactor("airHeatPump", atMs) * sizeScale(building);
+        return earlySwitchChance(EARLY_SWITCH.heating, municipalHeatingSubsidyRp("airHeatPump"), priceRp);
+      },
+      candidatesAt: (atMs, incumbent, ageYears) => {
+        const tariff = tariffStore.get();
+        const keep = runningCostRpFor(incumbent, annualHeatingEstimate(building, atMs), tariff, (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2);
+        return earlyCandidates(candidatesAt(building, atMs, incumbent), incumbent, keep, ageYears, EARLY_SWITCH.heating);
+      },
+    },
   };
   return renewalEventsUpTo(params, simTimeMs);
 }
@@ -385,6 +400,10 @@ function renewalNote(event: RenewalEvent<HeatingSystemId>, building?: Building):
   const oldLabel = HEATING_SYSTEM_CATALOG[event.previousSystem as HeatingSystemId].label.toLowerCase();
   const base = `The old ${oldLabel} had reached the end of its service life.`;
 
+  if (event.reasonKind === "early") {
+    const grant = event.municipalSubsidyRp ? ", with the municipality's grant" : "";
+    return `The old ${oldLabel} still worked, but the owner replaced it early with ${articleLabel(event.system)}${grant} — cheaper to run, and repairs on the old one were adding up.`;
+  }
   if (event.exception) {
     return `${base} The fossil heating ban gave way: ${event.exception}, so ${articleLabel(event.system)} was allowed as an exception.`;
   }

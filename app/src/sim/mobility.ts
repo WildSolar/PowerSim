@@ -72,6 +72,8 @@ import { publicCharging } from "./publicCharging";
 import { existsAt } from "./lifetime";
 import { priceFactor } from "./costTrends";
 import { gridDrawBlockedAt } from "./gridLimits";
+import { EARLY_SWITCH } from "../config/earlySwitch";
+import { earlyCandidates, earlySwitchChance } from "./earlySwitch";
 
 // --- slot count --------------------------------------------------------------
 
@@ -274,6 +276,29 @@ function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "c
         if (access.kind === "public") publicCharging.assign(key, slotHandleFor(egid, ewid, slotIndex), access.siteId, chosenAtMs);
       });
     },
+    early:
+      kind === "car"
+        ? {
+            eligible: (system) => system === "carICE",
+            minAgeYears: EARLY_SWITCH.car.minAgeYears,
+            chanceAt: (atMs) =>
+              earlySwitchChance(
+                EARLY_SWITCH.car,
+                municipalVehicleSubsidyRp("carEV") + policyStore.get().iceScrappageBonusRp,
+                VEHICLE_TYPE_CATALOG.carEV.baseInstallCostRp * priceFactor("carEV", atMs),
+              ),
+            candidatesAt: (atMs, incumbent, ageYears) => {
+              const tariff = tariffStore.get();
+              const where = chargingAccessAt(egid, ewid, atMs, incumbent);
+              const access = where?.access ?? { kind: "home" };
+              const base = carCandidatesAt(tariff, atMs, incumbent, access, (chosenAtMs) => {
+                if (access.kind === "public") publicCharging.assign(key, slotHandleFor(egid, ewid, slotIndex), access.siteId, chosenAtMs);
+              });
+              const keep = (ANNUAL_CAR_KM / 100) * ICE_CAR_L_PER_100KM * tariff.petrolPriceRpPerLiter;
+              return earlyCandidates(base, incumbent, keep, ageYears, EARLY_SWITCH.car);
+            },
+          }
+        : undefined,
     // Replacing the car frees whatever charger the old one relied on; and a household that didn't
     // buy an electric car but would have with an on-street charger next door is demand a private
     // operator may meet.
@@ -514,6 +539,10 @@ function vehicleChangeNote(event: RenewalEvent<VehicleTypeId>): string {
   const oldSpec = VEHICLE_TYPE_CATALOG[event.previousSystem as VehicleTypeId];
   const newSpec = VEHICLE_TYPE_CATALOG[event.system];
   const base = `The old ${oldSpec.label.toLowerCase()} had reached the end of its life.`;
+  if (event.reasonKind === "early") {
+    const grant = event.municipalSubsidyRp ? ", helped by the municipality's grant" : "";
+    return `The ${oldSpec.label.toLowerCase()} still ran, but the household switched early to ${articleLabel(newSpec.label.toLowerCase())}${grant}.`;
+  }
   if (event.reasonKind === "inKind") {
     return `${base} It was replaced with another ${newSpec.label.toLowerCase()} — no clearly better alternative was found.`;
   }

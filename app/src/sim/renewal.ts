@@ -23,6 +23,7 @@
  */
 
 import { policyStore } from "./policy";
+import { EARLY_SWITCH_UNCERTAINTY_SHARE } from "../config/earlySwitch";
 import { subsidyCategoryForDecision, treasury } from "./treasury";
 import { logCandidateDecision, type DecisionCandidateLog, type DecisionLogKind } from "./decisionLog";
 import { hashSeed, mulberry32 } from "./rng";
@@ -49,7 +50,8 @@ export interface RenewalCandidate<T extends string> {
   exception?: string;
 }
 
-export type RenewalReasonKind = "initial" | "inKind" | "forcedByAvailability" | "financial";
+/** "early": replaced before the end of its life (EarlySwitch). */
+export type RenewalReasonKind = "initial" | "inKind" | "forcedByAvailability" | "financial" | "early";
 
 export interface RenewalEvent<T extends string> {
   installedAtMs: number;
@@ -105,7 +107,24 @@ export interface RenewalParams<T extends string> {
   candidatesAt: (atMs: number, incumbent: T) => RenewalCandidate<T>[];
   /** Called for every decision as it commits, before the winner's own onChosen. */
   onCommit?: (event: RenewalEvent<T>) => void;
+  /** Switching before the end of a system's life (config/earlySwitch.ts): once a year from a minimum
+   * age, an owner may consider it; if they do, the early candidates are compared, and a switch
+   * becomes an event of its own. */
+  early?: EarlySwitch<T>;
 }
+
+export interface EarlySwitch<T extends string> {
+  /** Whether a system is one an owner would switch away from early (the fossil ones). */
+  eligible: (system: T) => boolean;
+  minAgeYears: number;
+  /** The chance of seriously considering it in the year from `atMs`. */
+  chanceAt: (atMs: number, incumbent: T) => number;
+  /** The comparison: keeping the incumbent costs its running costs and repairs at `ageYears`; the
+   * alternatives as at a renewal, plus the hassle of switching early. */
+  candidatesAt: (atMs: number, incumbent: T, ageYears: number) => RenewalCandidate<T>[];
+}
+
+const YEAR_MS = 365.25 * 24 * 60 * 60_000;
 
 const MAX_EVENTS_PER_CALL = 1000; // defensive cap against a misconfigured/runaway chain, not a real limit
 
@@ -116,6 +135,8 @@ const MAX_EVENTS_PER_CALL = 1000; // defensive cap against a misconfigured/runaw
 export interface RenewalChainEntry<T extends string> {
   events: RenewalEvent<T>[];
   nextDueMs: number;
+  /** Early reviews already held, through this moment — decided once, never redone. */
+  reviewedThroughMs?: number;
 }
 
 const chains = new Map<string, RenewalChainEntry<string>>();
@@ -207,6 +228,53 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
   }
   const chain = entry.events;
 
+  const commit = (atMs: number, incumbent: T, candidates: RenewalCandidate<T>[], early: boolean): T => {
+    // Information measures narrow the band; an owner actively looking into an early switch is less set in their ways.
+    const uncertaintyFraction = params.uncertaintyFraction * policyStore.get().uncertaintyMultiplier * (early ? EARLY_SWITCH_UNCERTAINTY_SHARE : 1);
+    const bias = params.biasStrengthRp + policyStore.get().progressiveNudgeRp;
+    const decision = chooseNext(candidates, incumbent, uncertaintyFraction, bias);
+    const { chosen, bestOverallId } = decision;
+    const reasonKind: RenewalReasonKind = early && chosen !== incumbent ? "early" : decision.reasonKind;
+    const winner = candidates.find((c) => c.id === chosen);
+    logCandidateDecision({
+      atMs,
+      kind: params.kind,
+      egid: params.egid,
+      entityKey: params.entityKey,
+      incumbent,
+      chosen,
+      reasonKind: early ? (chosen !== incumbent ? "early" : "keptEarly") : reasonKind,
+      candidates: candidateLogEntries(candidates, params.biasStrengthRp, params.labelFor),
+      uncertaintyFraction: params.uncertaintyFraction,
+      biasStrengthRp: params.biasStrengthRp,
+    });
+    if (early && chosen === incumbent) return chosen; // considered it, kept it: no event
+    const event: RenewalEvent<T> = {
+      installedAtMs: atMs,
+      system: chosen,
+      previousSystem: incumbent,
+      reasonKind,
+      bestOverallId,
+      municipalSubsidyRp: winner?.municipalSubsidyRp,
+      ...(winner?.exception ? { exception: winner.exception } : {}),
+    };
+    chain.push(event);
+    params.onCommit?.(event);
+    winner?.onChosen?.(atMs);
+    // The money leaves the treasury now, when the decision happens — never before, never for an option nobody takes.
+    const category = subsidyCategoryForDecision(params.kind);
+    if (category && winner?.municipalSubsidyRp) {
+      treasury.recordPayout(category, atMs, winner.municipalSubsidyRp, params.egid);
+      // The ground truth for evaluation studies: the same decision without the municipality's money.
+      const without = candidates.map((c) => ({ ...c, annualizedCostRp: c.annualizedCostRp + (c.municipalSubsidyRp ?? 0) / c.lifetimeMeanYears }));
+      const counterfactual = chooseNext(without, incumbent, uncertaintyFraction, bias).chosen;
+      if (category === "heating" || category === "vehicle" || category === "retrofit" || category === "solar") {
+        recordSubsidisedDecision({ atMs, category, subsidyRp: winner.municipalSubsidyRp, additional: counterfactual !== chosen });
+      }
+    }
+    return chosen;
+  };
+
   let guard = 0;
   for (; guard < MAX_EVENTS_PER_CALL; guard++) {
     const last = chain[chain.length - 1] as RenewalEvent<T>;
@@ -217,51 +285,46 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
         ? firstRemainingLifetimeMs(params.entityKey, params.weibullShape, meanYears, params.conditionalFirstLifetime === true)
         : (eventIndex === 1 ? (params.initialInstalledAtMs as number) : last.installedAtMs) +
           nextLifetimeMs(params.entityKey, eventIndex, params.weibullShape, meanYears);
+
+    // Before it wears out: once a year from a minimum age, the owner may consider switching early.
+    const early = params.early;
+    if (early && early.eligible(last.system)) {
+      // Its age: from its install, or for a system observed at the start, as far as its expected
+      // life says it has come.
+      const installedAtMs =
+        eventIndex === 1 && params.initialInstalledAtMs === undefined
+          ? nextInstalledAtMs - meanYears * YEAR_MS
+          : eventIndex === 1
+            ? (params.initialInstalledAtMs as number)
+            : last.installedAtMs;
+      // Each owner on their own day of the year, not all at once at the start.
+      const phaseMs = mulberry32(hashSeed(params.entityKey, "early-phase"))() * YEAR_MS;
+      let review = Math.max(installedAtMs + early.minAgeYears * YEAR_MS, phaseMs);
+      const reviewed = entry.reviewedThroughMs ?? Number.NEGATIVE_INFINITY;
+      if (review <= reviewed) review += Math.ceil((reviewed - review) / YEAR_MS + 1e-9) * YEAR_MS;
+      let switched = false;
+      for (; review < nextInstalledAtMs && review <= uptoMs; review += YEAR_MS) {
+        entry.reviewedThroughMs = review;
+        const draw = mulberry32(hashSeed(params.entityKey, "early-switch", String(eventIndex), String(Math.round(review / 86_400_000))))();
+        if (draw >= early.chanceAt(review, last.system)) continue;
+        const ageYears = (review - installedAtMs) / YEAR_MS;
+        if (commit(review, last.system, early.candidatesAt(review, last.system, ageYears), true) !== last.system) {
+          switched = true;
+          break;
+        }
+      }
+      if (switched) continue;
+      if (review < nextInstalledAtMs && review > uptoMs) {
+        entry.nextDueMs = review; // the next review, before it would wear out
+        break;
+      }
+    }
+
     if (nextInstalledAtMs > uptoMs) {
       entry.nextDueMs = nextInstalledAtMs;
       break;
     }
-
-    const candidates = params.candidatesAt(nextInstalledAtMs, last.system);
-    const uncertaintyFraction = params.uncertaintyFraction * policyStore.get().uncertaintyMultiplier; // information measures narrow it
-    const bias = params.biasStrengthRp + policyStore.get().progressiveNudgeRp;
-    const { chosen, reasonKind, bestOverallId } = chooseNext(candidates, last.system, uncertaintyFraction, bias);
-    const winner = candidates.find((c) => c.id === chosen);
-    const event: RenewalEvent<T> = {
-      installedAtMs: nextInstalledAtMs,
-      system: chosen,
-      previousSystem: last.system,
-      reasonKind,
-      bestOverallId,
-      municipalSubsidyRp: winner?.municipalSubsidyRp,
-      ...(winner?.exception ? { exception: winner.exception } : {}),
-    };
-    chain.push(event);
-    params.onCommit?.(event);
-    winner?.onChosen?.(nextInstalledAtMs);
-    // The money leaves the treasury now, when the decision happens — never before, never for an option nobody takes.
-    const category = subsidyCategoryForDecision(params.kind);
-    if (category && winner?.municipalSubsidyRp) {
-      treasury.recordPayout(category, nextInstalledAtMs, winner.municipalSubsidyRp, params.egid);
-      // The ground truth for evaluation studies: the same decision without the municipality's money.
-      const without = candidates.map((c) => ({ ...c, annualizedCostRp: c.annualizedCostRp + (c.municipalSubsidyRp ?? 0) / c.lifetimeMeanYears }));
-      const counterfactual = chooseNext(without, last.system, uncertaintyFraction, bias).chosen;
-      if (category === "heating" || category === "vehicle" || category === "retrofit" || category === "solar") {
-        recordSubsidisedDecision({ atMs: nextInstalledAtMs, category, subsidyRp: winner.municipalSubsidyRp, additional: counterfactual !== chosen });
-      }
-    }
-    logCandidateDecision({
-      atMs: nextInstalledAtMs,
-      kind: params.kind,
-      egid: params.egid,
-      entityKey: params.entityKey,
-      incumbent: last.system,
-      chosen,
-      reasonKind,
-      candidates: candidateLogEntries(candidates, params.biasStrengthRp, params.labelFor),
-      uncertaintyFraction: params.uncertaintyFraction,
-      biasStrengthRp: params.biasStrengthRp,
-    });
+    commit(nextInstalledAtMs, last.system, params.candidatesAt(nextInstalledAtMs, last.system), false);
   }
   // Exhausting the guard (rather than breaking out of it) means the chain still
   // hasn't reached `uptoMs` — under engine.ts's MAX_SIM_TIME_MS clock ceiling

@@ -27,11 +27,15 @@ export const BLOC_WEIGHT: Record<Bloc, number> = {
 
 // --- Level and movement (all approval values are 0-100) ---
 
-export const BASE_APPROVAL = 60; // where every bloc rests when nothing contentious is in force
+export const BASE_APPROVAL = 55; // where every bloc rests when nothing contentious is in force: a new department starts with modest trust
 export const START_JITTER = 5; // each bloc starts within +-this of the base, by seed
-export const MAX_SWING = 35; // a bloc's resting level moves at most this far from the base
-export const STANCE_SATURATION = 0.6; // tanh steepness: piling up popular measures has diminishing returns
+export const MAX_SWING = 30; // a bloc's resting level moves at most this far from the base
+export const STANCE_SATURATION = 0.5; // tanh steepness: piling up popular measures has diminishing returns
 export const RELAXATION_MONTHS = 10; // how fast a bloc drifts toward its resting level
+// People take what they like for granted: a measure's goodwill fades to this share of itself, with
+// this many years as the time scale. Resentment doesn't fade.
+export const GOODWILL_FLOOR_SHARE = 0.5;
+export const GOODWILL_FADE_YEARS = 6;
 
 // --- Immediate reactions to a decision ---
 

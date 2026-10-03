@@ -29,6 +29,8 @@ import {
   ENACT_SHOCK_POINTS,
   FISCAL_BLOC_WEIGHT,
   FISCAL_FULL_RATIO,
+  GOODWILL_FADE_YEARS,
+  GOODWILL_FLOOR_SHARE,
   FISCAL_MAX_PENALTY_POINTS,
   MAX_SWING,
   OPTIONAL_REFERENDUM_STANCE,
@@ -336,9 +338,14 @@ class ApprovalEngine {
   }
 
   /** Where a bloc settles given the measures in force. */
-  private restingLevel(bloc: Bloc, fiscalPenalty: number): number {
+  private restingLevel(bloc: Bloc, fiscalPenalty: number, atMs: number): number {
     let stance = 0;
-    for (const { def, params } of measures.getActiveMeasures()) stance += this.stancesOf(def, params)[bloc] ?? 0;
+    for (const { def, params, enactedAtMs } of measures.getActiveMeasures()) {
+      const s = this.stancesOf(def, params)[bloc] ?? 0;
+      // Goodwill fades as people get used to a measure; resentment stays.
+      const years = Math.max(0, (atMs - enactedAtMs) / (12 * MONTH_MS));
+      stance += s > 0 ? s * (GOODWILL_FLOOR_SHARE + (1 - GOODWILL_FLOOR_SHARE) * Math.exp(-years / GOODWILL_FADE_YEARS)) : s;
+    }
     const level = BASE_APPROVAL + MAX_SWING * this.sensitivity * Math.tanh(STANCE_SATURATION * stance);
     return clamp(level - fiscalPenalty * FISCAL_BLOC_WEIGHT[bloc] * this.sensitivity, 0, 100);
   }
@@ -355,7 +362,7 @@ class ApprovalEngine {
   private monthlyStep(atMs: number): void {
     const k = 1 - Math.exp(-1 / RELAXATION_MONTHS);
     const penalty = this.fiscalPenalty(atMs) + debtPenalty(atMs); // overspending and debt, weighted alike
-    for (const b of BLOC_ORDER) this.levels[b] += (this.restingLevel(b, penalty) - this.levels[b]) * k;
+    for (const b of BLOC_ORDER) this.levels[b] += (this.restingLevel(b, penalty, atMs) - this.levels[b]) * k;
 
     const approval = this.aggregate();
     this.history.push({ atMs, approval });
