@@ -7,6 +7,7 @@ import type { MunicipalityDataset } from "../data/types";
 import { EMISSIONS_SOURCE_COLOR } from "../sim/emissions";
 import { HEATING_SYSTEM_CATALOG, HEATING_SYSTEM_ORDER, WATER_HEATING_KIND_COLOR } from "../sim/heatingSystems";
 import { solarAdoptionTallyForYear } from "../sim/solarAdoption";
+import { inbox } from "../sim/inbox";
 import { computeRetrofitTally, spaceHeatingKWhFor } from "../sim/yearReport";
 import { PAYOUT_CATEGORIES, PAYOUT_LABEL } from "../sim/treasury";
 import { CONSUMPTION_CATEGORIES } from "./deviceCategories";
@@ -41,6 +42,8 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
   const approvalChange = approval.atYearStart(year + 1) - approval.atYearStart(year);
   const retrofits = computeRetrofitTally(dataset.buildings, year);
   const solarTally = solarAdoptionTallyForYear(dataset.buildings, dataset.powerPlants, year);
+  // The local paper's lead story of each month of the year.
+  const headlines = inbox.getEditions(Number.POSITIVE_INFINITY).filter((e) => Math.floor(e.month / 12) === year).reverse();
 
   const { data: overallEnergy, loading: overallLoading } = useYearCategoryEnergy(dataset, year);
   const overallSlices: PieSlice[] = overallEnergy
@@ -112,6 +115,19 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
             {dataset.name}, {year}: {standing.length} buildings, {standing.reduce((sum, b) => sum + b.dwellings.length, 0)}{" "}
             dwellings.
           </p>
+
+          {headlines.length > 0 && (
+            <>
+              <h2 style={{ fontSize: 14, marginTop: 14 }}>The year in headlines</h2>
+              <ul className="report-headlines">
+                {headlines.map((e) => (
+                  <li key={e.id}>
+                    <span className="report-headline-month">{e.dateLabel.split(" ")[0]}</span> {e.lead.headline}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
 
           <h2 style={{ fontSize: 14, marginTop: 14 }}>Public approval</h2>
           <p>

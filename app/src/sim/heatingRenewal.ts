@@ -412,6 +412,10 @@ export interface HeatingRenewalRecord {
   installedAtMs: number;
   previousSystem: HeatingSystemId;
   system: HeatingSystemId;
+  /** The owner's first choice, when it wasn't available. */
+  preferred: HeatingSystemId | null;
+  /** Allowed only as an exception to a fossil heating ban (why). */
+  exception?: string;
 }
 
 /** Structured (not narrative) renewals in `[fromMs, toMs)` — yearReport.ts
@@ -422,5 +426,11 @@ export function heatingRenewalsInRange(building: Building, fromMs: number, toMs:
   if (!chain) return [];
   return chain
     .filter((e) => e.reasonKind !== "initial" && e.installedAtMs >= fromMs && e.installedAtMs < toMs)
-    .map((e) => ({ installedAtMs: e.installedAtMs, previousSystem: e.previousSystem as HeatingSystemId, system: e.system }));
+    .map((e) => ({
+      installedAtMs: e.installedAtMs,
+      previousSystem: e.previousSystem as HeatingSystemId,
+      system: e.system,
+      preferred: e.reasonKind === "forcedByAvailability" ? e.bestOverallId : null,
+      ...(e.exception ? { exception: e.exception } : {}),
+    }));
 }

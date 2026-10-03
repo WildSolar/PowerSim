@@ -427,6 +427,16 @@ class PublicCharging {
     this.unmet.push({ atMs, x, y, kind });
   }
 
+  /** Where those households were, between two instants. */
+  unmetDemandSpots(fromMs: number, toMs: number): { lon: number; lat: number; kind: ChargingKind }[] {
+    return this.unmet
+      .filter((d) => d.atMs >= fromMs && d.atMs < toMs)
+      .map((d) => {
+        const [lon, lat] = this.projection.toLonLat(d.x, d.y);
+        return { lon, lat, kind: d.kind };
+      });
+  }
+
   /** Households that would have bought an electric car between two instants but had no charger
    * with room in reach. */
   unmetDemandCount(fromMs: number, toMs: number): number {

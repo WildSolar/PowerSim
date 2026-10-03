@@ -29,6 +29,10 @@ import { streets } from "./sim/streets";
 import { districtHeat } from "./sim/districtHeat";
 import { publicCharging } from "./sim/publicCharging";
 import { grid } from "./sim/grid";
+import { inbox } from "./sim/inbox";
+import { letters } from "./sim/letters";
+import { newspaper } from "./sim/newspaper";
+import { InboxButton, InboxPanel, InboxToast, type InboxSelection } from "./ui/InboxPanel";
 import { heatPumpSiting } from "./sim/heatPumpSiting";
 import { setDistrictHeatLimit } from "./sim/gridLimits";
 import { networkFullAt } from "./sim/districtHeatStats";
@@ -71,9 +75,10 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
   const [colorMode, setColorMode] = useState<ColorMode>("none");
   const [showControl, setShowControl] = useState(false);
   const [showWiki, setShowWiki] = useState(false);
+  const [inboxSelection, setInboxSelection] = useState<InboxSelection | null>(null);
   const reportCardYear = useReportCardYear();
   const stockBuildings = useStockBuildings();
-  const keyboardEnabled = !showControl && !showWiki && reportCardYear === null;
+  const keyboardEnabled = !showControl && !showWiki && inboxSelection === null && reportCardYear === null;
   useTimeKeyboard(keyboardEnabled);
 
   // Escape closes whatever is on top: the Year in Review, then the Wiki or the Control window, then a
@@ -84,6 +89,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
       if (e.key !== "Escape" || e.ctrlKey || e.metaKey || e.altKey) return;
       if (approval.getGameOver()) return;
       if (reportCardYear !== null) reportCardStore.dismiss();
+      else if (inboxSelection !== null) setInboxSelection(null);
       else if (showWiki) setShowWiki(false);
       else if (showControl) setShowControl(false);
       else if (publicCharging.getPlacing()) publicCharging.startPlacing(null);
@@ -96,7 +102,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [reportCardYear, showWiki, showControl, selectedEwid, selectedEgid, colorMode]);
+  }, [reportCardYear, inboxSelection, showWiki, showControl, selectedEwid, selectedEgid, colorMode]);
 
   useEffect(() => {
     simClock.start();
@@ -132,6 +138,10 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
         bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building
         grid.init(loaded, () => stock.getAll()); // last: it reads every building's draw, public chargers included
         setDistrictHeatLimit((atMs) => networkFullAt(stock.getAll(), atMs));
+        // Letters and the paper last: they read everything above.
+        inbox.init();
+        letters.init(loaded, () => stock.getAll(), `letters:${loaded.bfsNumber}`);
+        newspaper.init(loaded, () => stock.getAll(), `paper:${loaded.bfsNumber}`);
         setDataset(loaded);
       })
       .catch((e: Error) => setError(e.message));
@@ -197,6 +207,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
         <button className="pill-button" onClick={() => setShowControl(true)}>
           ⚙️ {dataset.name} Control
         </button>
+        <InboxButton onOpen={() => setInboxSelection({ tab: "letters", id: null })} />
         <button className="pill-button" onClick={() => setShowWiki(true)}>
           📖 Wiki
         </button>
@@ -207,6 +218,8 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
       <GameOverModal />
       {showControl && <ControlPanel dataset={liveDataset ?? dataset} transparency={transparency} onClose={() => setShowControl(false)} />}
       {showWiki && <WikiPanel onClose={() => setShowWiki(false)} />}
+      {inboxSelection && <InboxPanel initial={inboxSelection} onClose={() => setInboxSelection(null)} />}
+      {!inboxSelection && <InboxToast onOpen={setInboxSelection} />}
       {reportCardYear !== null && (
         <ReportCardModal dataset={liveDataset ?? dataset} year={reportCardYear} onClose={() => reportCardStore.dismiss()} />
       )}

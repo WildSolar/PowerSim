@@ -52,3 +52,23 @@
 .finance-value.negative {
   color: #b23a2e;
 }
+
+.report-headlines {
+  margin: 4px 0 0;
+  padding-left: 0;
+  list-style: none;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+}
+
+.report-headlines li {
+  padding: 2px 0;
+}
+
+.report-headline-month {
+  display: inline-block;
+  min-width: 78px;
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  color: #6b6a66;
+}

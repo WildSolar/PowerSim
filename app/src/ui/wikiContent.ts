@@ -140,6 +140,26 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "letters",
+    icon: "✉️",
+    title: "Letters & the local paper",
+    blocks: [
+      p(
+        "The town writes to you. Letters arrive in the inbox (bottom-left; a short notice pops up when one comes in, and the game keeps running):",
+      ),
+      list([
+        "Reactions: a decision a group feels strongly about brings a letter within days — thanks or objections — and a measure going to a public vote brings letters from both camps.",
+        "Moods: now and then a group writes about how it feels, more often the further it is from content, naming what weighs on it most (a measure, or the department's spending). The tone is a fair hint at its mood, with some noise — an opinion survey (Control → Measures) is the precise tool.",
+        "Reports: what goes wrong in town reaches the town hall — a heat pump refused (the grid, the ground or the neighbours' quiet), new boilers allowed despite a fossil ban, households with nowhere to charge. Letters report; they don't move approval themselves.",
+        "Requests (📌): now and then someone asks for something concrete, by a deadline — public chargers near a street, district heating along a street next to the network, a reinforced transformer station, solar on a public building, or a measure their group wants. Answer in time and the group that asked gains goodwill (a few approval points, fading like any shock); let it lapse and it loses a little. If someone else sorts it out — a private charging operator, an owner's own panels — the problem is gone but nobody thanks you. The Requests tab lists them all with their deadlines; letters about a place can show it on the map.",
+      ]),
+      p(
+        "At the start of every month, the local paper reports on the month before: a lead story and a handful of headlines — votes and elections first, then decisions, the grid's readings, what was built, installed or refused, requests answered or ignored, milestones. It leans with the public mood: supportive when approval is high, critical when it is low, in its headlines and its editorial. The Year in Review lists the year's lead stories.",
+      ),
+      note("Letters are written from templates, and senders' names are invented; the organisations are generic stand-ins, not real associations."),
+    ],
+  },
+  {
     id: "approval",
     icon: "🗳️",
     title: "Public approval",

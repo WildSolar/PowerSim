@@ -970,3 +970,23 @@ export function solarAdoptionTallyForYear(buildings: Building[], realPlants: Pow
   }
   return { count, totalCapacityKw, batteriesWithSolar, batteriesAdded };
 }
+
+/** Whether the municipality put the solar on this building (the programme, or ordered directly). */
+export function isMunicipalSolar(egid: string): boolean {
+  return adoptionByEgid.get(egid)?.origin === "municipal";
+}
+
+/** Installations dated in `[fromMs, toMs)` — the newspaper's monthly count. Only months already
+ * decided are known; ask after the range has passed. */
+export function solarInstallsInRange(fromMs: number, toMs: number): { count: number; capacityKw: number; batteries: number } {
+  let count = 0;
+  let capacityKw = 0;
+  let batteries = 0;
+  for (const record of adoptionByEgid.values()) {
+    if (record.installedAtMs < fromMs || record.installedAtMs >= toMs) continue;
+    count++;
+    capacityKw += record.capacityKw;
+  }
+  for (const b of batteryByEgid.values()) if (b.installedAtMs >= fromMs && b.installedAtMs < toMs) batteries++;
+  return { count, capacityKw, batteries };
+}

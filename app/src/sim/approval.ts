@@ -71,6 +71,13 @@ export interface GameOver {
   text: string;
 }
 
+/** What the public side of politics did — for the newspaper and the letters. */
+export type ApprovalEvent =
+  | { kind: "voteScheduled"; key: string; title: string; atMs: number; voteAtMs: number; stances: Stances }
+  | { kind: "voteHeld"; key: string; title: string; atMs: number; accepted: boolean; yesShare: number; stances: Stances }
+  | { kind: "election"; atMs: number; reelected: boolean; approval: number }
+  | { kind: "warning"; atMs: number; approval: number };
+
 export interface MeasureReaction {
   label: string;
   tone: "good" | "neutral" | "bad";
@@ -118,6 +125,7 @@ class ApprovalEngine {
   private seed = "approval";
   private version = 0;
   private readonly listeners = new Set<() => void>();
+  private readonly eventListeners = new Set<(event: ApprovalEvent) => void>();
   private unsubscribers: (() => void)[] = [];
 
   // --- lifecycle ---
@@ -188,6 +196,39 @@ class ApprovalEngine {
     return () => this.listeners.delete(listener);
   }
 
+  onEvent(listener: (event: ApprovalEvent) => void): () => void {
+    this.eventListeners.add(listener);
+    return () => this.eventListeners.delete(listener);
+  }
+
+  private emit(event: ApprovalEvent): void {
+    this.eventListeners.forEach((l) => l(event));
+  }
+
+  /** Goodwill (or its loss) with one group — a request answered in time, or ignored (letters.ts).
+   * Like any shock it fades as the group drifts back to its resting level. */
+  goodwill(bloc: Bloc, points: number): void {
+    if (this.gameOver) return;
+    this.shift(bloc, points * this.sensitivity);
+    this.bump();
+  }
+
+  /** How many approval points overspending is costing right now (before each group's weighting). */
+  fiscalPenaltyPoints(atMs: number): number {
+    return this.fiscalPenalty(atMs);
+  }
+
+  /** The measure in force that a group feels most strongly about, in the direction given (+1 likes,
+   * -1 dislikes), with its stance; null if none. */
+  strongestFeeling(bloc: Bloc, sign: 1 | -1): { def: MeasureDef; stance: number } | null {
+    let best: { def: MeasureDef; stance: number } | null = null;
+    for (const { def, params } of measures.getActiveMeasures()) {
+      const stance = this.stancesOf(def, params)[bloc] ?? 0;
+      if (stance * sign > 0.05 && (!best || stance * sign > best.stance * sign)) best = { def, stance };
+    }
+    return best;
+  }
+
   /** Debug/test: every bloc's own approval. */
   getBlocLevels(): Record<Bloc, number> {
     return { ...this.levels };
@@ -236,6 +277,7 @@ class ApprovalEngine {
       this.votes.set(decision.key, { atMs: voteAt, title: decision.title, stances: decision.stances, resolve: (accepted, atMs) => decision.onVote?.(accepted, atMs) });
       const when = new Date(toDateMs(voteAt)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
       this.addLog(decision.atMs, `${decision.title} goes to a public vote in ${when}.`);
+      this.emit({ kind: "voteScheduled", key: decision.key, title: decision.title, atMs: decision.atMs, voteAtMs: voteAt, stances: decision.stances });
     }
     this.bump();
     return voteAt;
@@ -314,6 +356,7 @@ class ApprovalEngine {
     if (approval < WARNING_APPROVAL && !this.warned) {
       this.warned = true;
       this.addLog(atMs, `Approval has fallen to ${Math.round(approval)}%. If it stays this low the municipality will lose patience.`);
+      this.emit({ kind: "warning", atMs, approval });
     } else if (approval >= WARNING_APPROVAL + 5) {
       this.warned = false;
     }
@@ -361,6 +404,7 @@ class ApprovalEngine {
     measures.setVote(id, voteAt);
     const when = new Date(toDateMs(voteAt)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
     this.addLog(atMs, `${def.title} goes to a public vote in ${when}.`);
+    this.emit({ kind: "voteScheduled", key: id, title: def.title, atMs, voteAtMs: voteAt, stances: this.stancesOf(def, params) });
   }
 
   /** The share of voters in favour, in percent. */
@@ -382,12 +426,14 @@ class ApprovalEngine {
       this.addLog(nowMs, `Voters rejected ${vote.title} (${Math.round(yes)}% in favour). It is struck down.`);
     }
     vote.resolve(accepted, nowMs);
+    this.emit({ kind: "voteHeld", key: id, title: vote.title, atMs: nowMs, accepted, yesShare: yes, stances: vote.stances });
     this.bump();
   }
 
   private holdElection(electionMs: number): void {
     const approval = this.aggregate();
     this.electionsHeld++;
+    this.emit({ kind: "election", atMs: electionMs, reelected: approval >= ELECTION_THRESHOLD, approval });
     if (approval >= ELECTION_THRESHOLD) {
       this.addLog(electionMs, `Election: you are re-elected, with approval at ${Math.round(approval)}%.`);
       this.bump();
