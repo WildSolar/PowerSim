@@ -144,3 +144,53 @@
   opacity: 0.45;
   cursor: default;
 }
+
+.treasury-sections {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.treasury-sections button {
+  border: 1px solid #ddd;
+  background: #f8f8f8;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.treasury-sections button.active {
+  background: #2a78d6;
+  border-color: #2a78d6;
+  color: #fff;
+}
+
+.treasury-table td:last-child,
+.treasury-years td:not(:first-child),
+.treasury-years th:not(:first-child) {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.treasury-table .pos {
+  color: #0d7a52;
+}
+
+.treasury-table .neg,
+.treasury-years .neg {
+  color: #b23a2e;
+}
+
+.treasury-total td {
+  font-weight: 650;
+  border-top: 1px solid #ccc;
+}
+
+.treasury-years-wrap {
+  overflow-x: auto;
+}
+
+.treasury-years {
+  font-size: 12px;
+}

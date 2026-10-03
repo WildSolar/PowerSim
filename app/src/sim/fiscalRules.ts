@@ -15,4 +15,4 @@ export function spendingFrozen(atMs: number): boolean {
   return frozen(atMs);
 }
 
-export const SPENDING_FROZEN_NOTE = "Under cantonal supervision for too much debt: no new orders or spending measures until debt is back under the limit (Control → Borrowing).";
+export const SPENDING_FROZEN_NOTE = "Under cantonal supervision for too much debt: no new orders or spending measures until debt is back under the limit (Control → Treasury → Borrowing).";

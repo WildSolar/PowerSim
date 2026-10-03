@@ -14,6 +14,7 @@ import { TimeControl } from "./ui/TimeControl";
 import { ApprovalPanel } from "./ui/ApprovalPanel";
 import { GameOverModal } from "./ui/GameOverModal";
 import { TreasuryPanel } from "./ui/TreasuryPanel";
+import type { ControlTab } from "./ui/ControlPanel";
 import { StartMenu } from "./ui/StartMenu";
 import { WikiPanel } from "./ui/WikiPanel";
 import { loadDataset } from "./data/loadDataset";
@@ -74,7 +75,8 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
   const [selectedEgid, setSelectedEgid] = useState<string | null>(null);
   const [selectedEwid, setSelectedEwid] = useState<string | null>(null);
   const [colorMode, setColorMode] = useState<ColorMode>("none");
-  const [showControl, setShowControl] = useState(false);
+  const [controlTab, setControlTab] = useState<ControlTab | null>(null);
+  const showControl = controlTab !== null;
   const [showWiki, setShowWiki] = useState(false);
   const [inboxSelection, setInboxSelection] = useState<InboxSelection | null>(null);
   const reportCardYear = useReportCardYear();
@@ -92,7 +94,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
       if (reportCardYear !== null) reportCardStore.dismiss();
       else if (inboxSelection !== null) setInboxSelection(null);
       else if (showWiki) setShowWiki(false);
-      else if (showControl) setShowControl(false);
+      else if (showControl) setControlTab(null);
       else if (publicCharging.getPlacing()) publicCharging.startPlacing(null);
       else if (selectedEwid !== null) setSelectedEwid(null);
       else if (selectedEgid !== null) setSelectedEgid(null);
@@ -186,7 +188,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
       />
       <div className="top-left-stack">
         <TimeControl />
-        <TreasuryPanel dataset={liveDataset ?? dataset} />
+        <TreasuryPanel dataset={liveDataset ?? dataset} onOpen={() => setControlTab("treasury")} />
         <ApprovalPanel />
         <ColorModeControl mode={colorMode} onChange={setColorMode} />
       </div>
@@ -206,7 +208,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
         />
       )}
       <div className="bottom-left-stack">
-        <button className="pill-button" onClick={() => setShowControl(true)}>
+        <button className="pill-button" onClick={() => setControlTab("prices")}>
           ⚙️ {dataset.name} Control
         </button>
         <InboxButton onOpen={() => setInboxSelection({ tab: "letters", id: null })} />
@@ -218,7 +220,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
         </button>
       </div>
       <GameOverModal />
-      {showControl && <ControlPanel dataset={liveDataset ?? dataset} transparency={transparency} onClose={() => setShowControl(false)} />}
+      {controlTab && <ControlPanel dataset={liveDataset ?? dataset} transparency={transparency} initialTab={controlTab} onClose={() => setControlTab(null)} />}
       {showWiki && <WikiPanel onClose={() => setShowWiki(false)} />}
       {inboxSelection && (
         <InboxPanel

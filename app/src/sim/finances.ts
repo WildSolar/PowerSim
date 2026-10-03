@@ -252,3 +252,8 @@ export function liveBalanceRp(buildings: Building[], atMs: number, baselineYear:
   const allocation = treasury.allocationRp(dwellings, allocationApprovalFactor(approval.atYearStart(year)));
   return opening + allocation - treasury.paidOutTotal(yearStartMs, atMs) + treasury.received(yearStartMs, atMs);
 }
+
+/** Every booked year's accounts, oldest first. */
+export function bookedFinances(): MunicipalFinances[] {
+  return [...financesCache.values()].sort((a, b) => a.year - b.year);
+}

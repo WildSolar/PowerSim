@@ -66,3 +66,11 @@
   border-color: #2a78d6;
   color: #fff;
 }
+
+.treasury-card {
+  cursor: pointer;
+}
+
+.treasury-card:hover {
+  box-shadow: 0 2px 14px rgba(42, 120, 214, 0.35);
+}

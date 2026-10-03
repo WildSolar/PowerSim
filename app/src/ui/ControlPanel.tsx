@@ -8,7 +8,7 @@ import { CityStatsTab } from "./CityStatsTab";
 import { DecisionLogTab } from "./DecisionLogTab";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { MeasuresTab } from "./MeasuresTab";
-import { BorrowingTab } from "./BorrowingTab";
+import { TreasuryTab } from "./TreasuryTab";
 import { TariffControl } from "./TariffControl";
 import { TechnologyPrices } from "./TechnologyPrices";
 import "./modal.css";
@@ -18,14 +18,16 @@ export interface ControlPanelProps {
   /** Transparency mode (start menu): the decision log is open to the player. */
   transparency: boolean;
   onClose: () => void;
+  /** The tab to open on (the Treasury card opens Treasury). */
+  initialTab?: ControlTab;
 }
 
-type ControlTab = "prices" | "measures" | "borrowing" | "stats" | "history" | "debug";
+export type ControlTab = "prices" | "measures" | "treasury" | "stats" | "history" | "debug";
 
 const TABS: { id: ControlTab; icon: string; title: string }[] = [
   { id: "prices", icon: "💰", title: "Prices" },
   { id: "measures", icon: "🏛️", title: "Measures" },
-  { id: "borrowing", icon: "🏦", title: "Borrowing" },
+  { id: "treasury", icon: "🏦", title: "Treasury" },
   { id: "stats", icon: "📊", title: "City stats" },
   { id: "history", icon: "📈", title: "History" },
   { id: "debug", icon: "🔎", title: "Decision log" },
@@ -37,9 +39,9 @@ const TABS: { id: ControlTab; icon: string; title: string }[] = [
  * be a permanently-visible box that had started overlapping the building/
  * dwelling panel as it grew; City stats and History used to be
  * MunicipalityPanel, which this replaces outright. */
-export function ControlPanel({ dataset, transparency, onClose }: ControlPanelProps) {
+export function ControlPanel({ dataset, transparency, onClose, initialTab = "prices" }: ControlPanelProps) {
   const tabs = TABS.filter((t) => t.id !== "debug" || transparency);
-  const [tab, setTab] = useState<ControlTab>("prices");
+  const [tab, setTab] = useState<ControlTab>(initialTab);
   const tariff = useTariff();
   const currentDay = useSimDay();
   // Only resolved for the History tab, and only while it's actually open —
@@ -80,7 +82,7 @@ export function ControlPanel({ dataset, transparency, onClose }: ControlPanelPro
             </>
           )}
           {tab === "measures" && <MeasuresTab />}
-          {tab === "borrowing" && <BorrowingTab />}
+          {tab === "treasury" && <TreasuryTab dataset={dataset} />}
           {tab === "stats" && <CityStatsTab dataset={dataset} />}
           {tab === "history" && (
             <HistoricalEnergySection
