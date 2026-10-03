@@ -3,6 +3,11 @@
  * or edit a section without touching WikiPanel.tsx at all. Keep entries here in
  * sync with what's actually implemented: when a new device/mechanic lands, add
  * or update its section here in the same change (see CLAUDE.md).
+ *
+ * Sections are listed in WIKI_GROUPS (at the bottom), which decides where each one
+ * shows in the wiki's contents; a new section must be added to a group. A section
+ * name in escaped quotes inside a text (\"Stock renewal\") becomes a link to that
+ * section — the name must match its title, or the part of the title before a colon.
  */
 
 export interface WikiBlock {
@@ -13,9 +18,17 @@ export interface WikiBlock {
 
 export interface WikiSection {
   id: string;
-  icon: string;
   title: string;
   blocks: WikiBlock[];
+}
+
+export interface WikiGroup {
+  id: string;
+  title: string;
+  /** One line under the group's name on the wiki's front page. */
+  blurb: string;
+  /** Section ids, in reading order. */
+  sections: string[];
 }
 
 function p(text: string): WikiBlock {
@@ -31,7 +44,6 @@ function note(text: string): WikiBlock {
 export const WIKI_SECTIONS: WikiSection[] = [
   {
     id: "overview",
-    icon: "🗺️",
     title: "Overview",
     blocks: [
       p(
@@ -50,7 +62,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "controls",
-    icon: "⌨️",
     title: "Keyboard controls",
     blocks: [
       list([
@@ -66,17 +77,16 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "time",
-    icon: "🕐",
     title: "Time, weather & sun",
     blocks: [
       p(
-        "The game clock starts at today's real date and runs forward. Use the speed buttons in the Info panel to pause or pick a speed: Slow (a simulated minute a second — to watch devices switch on and off), Medium (an hour a second) or Fast (a day a second). Every device's power draw is a pure function of the exact simulated moment, so jumping speeds never breaks anything: nothing is \"remembered\" between ticks.",
+        "The game clock starts at today's real date and runs forward. Use the speed buttons in the bar across the top to pause or pick a speed: Slow (a simulated minute a second — to watch devices switch on and off), Medium (an hour a second) or Fast (a day a second). Every device's power draw is a pure function of the exact simulated moment, so jumping speeds never breaks anything: nothing is \"remembered\" between ticks.",
       ),
       note(
-        "The clock automatically pauses the instant it crosses into a new calendar year and opens that year's \"Year in Review\" report — see below — so a long fast-forward never blows straight past it.",
+        "The clock automatically pauses the instant it crosses into a new calendar year and opens that year's report (see \"Year in Review\"), so a long fast-forward never blows straight past it.",
       ),
       p(
-        "The Info panel shows the current date, weekday, and a day/night indicator that fades smoothly through Sunrise and Sunset over roughly an hour, based on the sun's actual elevation at Schlieren's latitude — not a fixed clock time, so it shifts with the seasons like the real sun does.",
+        "The top bar shows the date, the time and the weather; hover over the weather for whether it is day or night (it passes through sunrise and sunset over roughly an hour) and the sunshine, based on the sun's actual elevation at Schlieren's latitude — not a fixed clock time, so it shifts with the seasons like the real sun does.",
       ),
       p(
         "Weather (temperature, cloudiness, rain/snow) follows a seasonal curve for the time of year plus a slower-moving \"weather system\" and day-to-day wobble, so a warm or cloudy spell persists for a few days rather than flickering every reading. Insolation (solar irradiance, in W/m²) follows the sun's position and cloud cover, and is what drives solar panel output.",
@@ -85,7 +95,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "buildings",
-    icon: "🏠",
     title: "Buildings & data",
     blocks: [
       p(
@@ -101,7 +110,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "measures",
-    icon: "🏛️",
     title: "Measures: what the municipality can decide",
     blocks: [
       p(
@@ -126,7 +134,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "information",
-    icon: "🔍",
     title: "What you know — and what it takes to find out",
     blocks: [
       p(
@@ -144,7 +151,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "letters",
-    icon: "✉️",
     title: "Letters & the local paper",
     blocks: [
       p(
@@ -164,7 +170,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "approval",
-    icon: "🗳️",
     title: "Public approval",
     blocks: [
       p(
@@ -184,7 +189,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "growth",
-    icon: "🏗️",
     title: "Town growth & building renewal",
     blocks: [
       p(
@@ -209,7 +213,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "zoning",
-    icon: "🗺️",
     title: "Zoning",
     blocks: [
       p(
@@ -234,7 +237,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "grid",
-    icon: "🔌",
     title: "The electricity grid",
     blocks: [
       p(
@@ -256,7 +258,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "public-buildings",
-    icon: "🏫",
     title: "Public buildings",
     blocks: [
       p(
@@ -273,9 +274,8 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
-    id: "home-electronics",
-    icon: "🧊",
-    title: "Fridge, lighting & other plug loads",
+    id: "appliances",
+    title: "Household appliances",
     blocks: [
       p("Every dwelling has three always-on background devices, each running on its own random but realistic schedule:"),
       list([
@@ -283,13 +283,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Lighting — a probability of being on that rises at dawn and dusk and drops to near-zero overnight.",
         "Other plug loads — a smooth baseline (routers, chargers, standby power) that's a bit higher during the day than overnight.",
       ]),
-    ],
-  },
-  {
-    id: "appliances",
-    icon: "🍳",
-    title: "Cooking & laundry",
-    blocks: [
       p(
         "Cooking draws power in short bursts around breakfast, lunch, and especially dinner — dinner is both the most likely and the widest of the three windows.",
       ),
@@ -301,7 +294,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "mobility",
-    icon: "🚗",
     title: "Mobility: cars, bikes & getting around",
     blocks: [
       p(
@@ -320,7 +312,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "An electric car also needs somewhere to charge. A household that can charge at home pays household electricity prices; one that can't (most flats) has to rely on a public charger nearby, pays that charger's price and puts up with the hassle — and with no charger with room in reach, an electric car isn't an option for it at all. See \"Public charging\".",
       ),
       p(
-        "Responsive EV charging works exactly as before: about 30% of EV-owning slots delay charging until off-peak pricing begins, as long as they can still finish by morning; the rest just plug in and charge immediately. Each session needs 6-16 kWh (a day's typical driving) at a 7.4 kW home wallbox rate.",
+        "Responsive EV charging: about 30% of EV-owning slots delay charging until off-peak pricing begins, as long as they can still finish by morning; the rest just plug in and charge immediately. Each session needs 6-16 kWh (a day's typical driving) at a 7.4 kW home wallbox rate.",
       ),
       note(
         "An e-bike's charging draw is real but tiny next to a car's, so it isn't separately modeled — a bike slot never adds to a dwelling's power reading, whichever kind it is.",
@@ -332,7 +324,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "public-charging",
-    icon: "🔌",
     title: "Public charging",
     blocks: [
       p(
@@ -367,7 +358,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "fleets",
-    icon: "🚚",
     title: "Businesses' vans & lorries",
     blocks: [
       p(
@@ -391,7 +381,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "water-heating",
-    icon: "🚿",
     title: "Water heating",
     blocks: [
       p(
@@ -405,11 +394,10 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "climate-control",
-    icon: "🌡️",
     title: "Space heating & air conditioning",
     blocks: [
       p(
-        "Space heating starts from real data: a building has a heat pump if GWR's heating generator or energy source says so (including ground/water/air-source systems even when the generator field is inconsistent) — though what's actually installed can change over time now, see \"Stock renewal\" below. Its power scales with the building's own envelope area (roof + walls) and how far the outdoor temperature sits below a comfort setpoint, divided by a temperature-dependent efficiency (colder outside = less efficient, and a ground/water-source pump's efficiency barely moves with outside temperature at all — its reservoir stays close to a stable ~10°C year-round).",
+        "Space heating starts from real data: a building has a heat pump if GWR's heating generator or energy source says so (including ground/water/air-source systems even when the generator field is inconsistent) — though what's actually installed changes over time, see \"Stock renewal\". Its power scales with the building's own envelope area (roof + walls) and how far the outdoor temperature sits below a comfort setpoint, divided by a temperature-dependent efficiency (colder outside = less efficient, and a ground/water-source pump's efficiency barely moves with outside temperature at all — its reservoir stays close to a stable ~10°C year-round).",
       ),
       p(
         "How much heat a building loses per degree isn't one number for the whole municipality: it comes from a real construction-era curve (GWR's construction year again — pre-1920 masonry loses heat several times faster than a 2020s new-build), nudged down a little for internal heat gains where a building has more occupants or a recognized commercial use (people, appliances, and equipment all give off warmth for free), and finished with a small seeded per-building variation standing in for everything age alone doesn't explain — a particular building's workmanship, an unlisted renovation, general draftiness.",
@@ -424,7 +412,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "insulation",
-    icon: "🧱",
     title: "Insulation & energy classes",
     blocks: [
       p(
@@ -440,7 +427,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "heat-pump-siting",
-    icon: "📍",
     title: "Where a heat pump may go",
     blocks: [
       p(
@@ -463,7 +449,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "early-switch",
-    icon: "⏩",
     title: "Switching early",
     blocks: [
       p(
@@ -480,7 +465,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "stock-renewal",
-    icon: "🔄",
     title: "Stock renewal: when infrastructure gets replaced",
     blocks: [
       p(
@@ -499,13 +483,12 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "A renewal decision uses whatever tariff and prices are set at the moment it happens, then never changes again — moving a price slider later doesn't rewrite a past decision, only shapes whichever renewal comes next.",
       ),
       note(
-        "Heating and mobility (see \"Mobility\") both renew this way now — mobility's mode tier (car/bike/other) uses a simpler weighted-random choice instead of the four-factor one, since a life event changes what a household needs, not what's cheapest; its nested vehicle-type tier (EV vs. ICE, e-bike vs. standard) uses the identical four-factor process heating does. Solar (see \"Solar adoption\") reuses the same four-factor choice for its own if-to-install decision, but — since a building either has it or doesn't, not choosing between several system types — is triggered differently: an annual chance to reconsider, rather than a fixed service lifetime.",
+        "Heating and mobility (see \"Mobility\") both renew this way now — mobility's mode tier (car/bike/other) uses a simpler weighted-random choice instead of the four-factor one, since a life event changes what a household needs, not what's cheapest; its nested vehicle-type tier (EV vs. ICE, e-bike vs. standard) uses the identical four-factor process heating does. Solar (see \"Solar power\") reuses the same four-factor choice for its own if-to-install decision, but — since a building either has it or doesn't, not choosing between several system types — is triggered differently: an annual chance to reconsider, rather than a fixed service lifetime.",
       ),
     ],
   },
   {
     id: "technology-prices",
-    icon: "📉",
     title: "Technology prices over time",
     blocks: [
       p(
@@ -526,7 +509,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "district-heat",
-    icon: "🏭",
     title: "District heating network",
     blocks: [
       p(
@@ -560,22 +542,14 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "solar",
-    icon: "☀️",
     title: "Solar power",
     blocks: [
       p(
-        "Every solar installation present at the start is real: a registered plant from the federal/Pronovo power-plant registry, at its real recorded capacity — nothing about the initial state is simulated. From there, new installations can appear over time on any other building (see \"Solar adoption\" below).",
+        "Every solar installation present at the start is real: a registered plant from the federal/Pronovo power-plant registry, at its real recorded capacity — nothing about the initial state is simulated. From there, new installations appear over time on other buildings, as their owners decide to (below).",
       ),
       p(
         "Generation follows real solar geometry (the sun's position at Schlieren's latitude, time of day, and season) attenuated by cloud cover, including short-term flicker from passing clouds on an otherwise sunny day. Snow sitting on a panel after a snowfall blocks generation until it melts, independent of the sky clearing.",
       ),
-    ],
-  },
-  {
-    id: "solar-adoption",
-    icon: "🔆",
-    title: "Solar adoption",
-    blocks: [
       p(
         "Every building without solar already (and younger than 200 years — old enough to be presumed heritage-protected, a simple stand-in for real protection status) gets an annual chance to seriously consider it. That chance starts low, but rises for a few years after the building's own heating system is renewed (see \"Stock renewal\" — a heat-pump switch is a natural moment to think about solar too), rises further the more nearby buildings already have it (a real, observed \"my neighbor got one\" effect), can be pushed higher still by the municipality's own outreach effort (Town hall → Measures), and climbs as panels get cheaper (see \"Technology prices over time\").",
       ),
@@ -595,7 +569,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "home-batteries",
-    icon: "🔋",
     title: "Home batteries",
     blocks: [
       p(
@@ -611,13 +584,12 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "The building panel shows a battery's size, whether it runs grid-friendly, and what it's doing right now; City stats counts them.",
       ),
       note(
-        "A simplification: a battery's charge through the day is worked out from the day's sunshine and a typical building's use, not tracked kilowatt-hour by kilowatt-hour, and bills don't net the battery's shifted energy (they credit all solar at the feed-in price, as before) — the battery's value shows up in the owner's decision to buy one, and its effect on the grid in the readings.",
+        "A simplification: a battery's charge through the day is worked out from the day's sunshine and a typical building's use, not tracked kilowatt-hour by kilowatt-hour, and bills don't net the battery's shifted energy (they credit all solar at the feed-in price) — the battery's value shows up in the owner's decision to buy one, and its effect on the grid in the readings.",
       ),
     ],
   },
   {
     id: "commercial",
-    icon: "🏢",
     title: "Commercial & industrial buildings",
     blocks: [
       p(
@@ -633,26 +605,24 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "tariff",
-    icon: "💰",
     title: "Electricity tariff & prices",
     blocks: [
       p(
-        "The Town hall (top right) has a Prices section: a simple two-rate time-of-use electricity price — a cheaper off-peak rate overnight (21:00-06:00) and a more expensive peak rate during the day — plus five flat prices below it. It's the main lever you can pull directly right now.",
+        "The Town hall (top right) has a Prices section: a simple two-rate time-of-use electricity price — a cheaper off-peak rate overnight (21:00-06:00) and a more expensive peak rate during the day — plus the flat prices below it. Unlike a measure, a price change applies at once and costs nothing to make.",
       ),
       p(
-        "Only EV charging currently responds to the electricity tariff (see above) — a responsive household will wait for off-peak pricing to begin if that still gets the car charged in time.",
+        "Only EV charging responds to the time of day (see \"Mobility\") — a responsive household will wait for off-peak pricing to begin if that still gets the car charged in time.",
       ),
       p(
-        "The flat prices: what exported solar generation earns (feed-in), and what oil, gas, district heating, and petrol cost — oil and petrol per liter (how they're actually sold), the other two per kWh — plus what the municipality's own public chargers charge — on-street, fast, and at lorry charging parks (see \"Public charging\"); private operators set their own prices. The first four feed directly into the Bill sections described next; petrol (and every electricity price above) instead feeds mobility's vehicle-type renewal decision (see \"Mobility\") — moving it shifts how attractive an EV looks the next time a car in the municipality wears out, the same way changing oil or gas price shifts heating's own renewal decisions.",
+        "The flat prices: what exported solar generation earns (feed-in), and what oil, gas, district heating, and petrol cost — oil and petrol per liter (how they're actually sold), the other two per kWh — plus what the municipality's own public chargers charge — on-street, fast, and at lorry charging parks (see \"Public charging\"); private operators set their own prices. The first four feed directly into the bills (see \"Your bill\"); petrol (and every electricity price above) instead feeds mobility's vehicle-type renewal decision (see \"Mobility\") — moving it shifts how attractive an EV looks the next time a car in the municipality wears out, the same way changing oil or gas price shifts heating's own renewal decisions.",
       ),
       p(
-        "Below those is a second group, \"Municipal utility costs\": the wholesale price the local DSO itself pays for electricity, and what it costs to maintain the local grid. These never appear on a consumer's bill — they're the DSO's own cost side, see \"Municipal finances\" below.",
+        "Below those is a second group, \"Municipal utility costs\": the wholesale price the local DSO itself pays for electricity, and what it costs to maintain the local grid. These never appear on a consumer's bill — they're the DSO's own cost side, see \"Municipal finances\".",
       ),
     ],
   },
   {
     id: "finances",
-    icon: "🧾",
     title: "Your bill",
     blocks: [
       p(
@@ -675,7 +645,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "municipal-finances",
-    icon: "🏦",
     title: "Municipal finances",
     blocks: [
       p(
@@ -698,7 +667,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "borrowing",
-    icon: "🏦",
     title: "Borrowing & debt",
     blocks: [
       p(
@@ -718,7 +686,6 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "map-layers",
-    icon: "🗂️",
     title: "Map layers",
     blocks: [
       p(
@@ -732,7 +699,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Heating — colored by primary heating system, live: a stock-renewal replacement (see \"Stock renewal\") recolors the building within a few seconds, not just at the moment you happen to look at its panel.",
         "Ground heat — what a new ground-source heat pump could draw on, building by building: boreholes, boreholes with conditions, groundwater wells (large systems only) or nothing — over the canton's heat-use atlas (protection zones, the drinking-water aquifer, areas with conditions, and tunnels). See \"Where a heat pump may go\".",
         "Power draw — colored by live net power right now, on a diverging scale from exporting (solar surplus) to importing; recalculates every 1.5 real seconds.",
-        "Solar — colored by installed solar capacity, from none to the municipality's largest installation; live, the same way Heating is — a new adoption (see \"Solar adoption\") recolors the building within a few seconds.",
+        "Solar — colored by installed solar capacity, from none to the municipality's largest installation; live, the same way Heating is — a new adoption (see \"Solar power\") recolors the building within a few seconds.",
       ]),
       p("Planning tools:"),
       list([
@@ -746,20 +713,19 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "statistics",
-    icon: "📊",
     title: "Statistics & history",
     blocks: [
       p(
         "Building and dwelling panels each have a \"Daily energy\" breakdown: total kWh over the last 24h, split by category as a labeled bar list, plus a live \"Net power\" line chart.",
       ),
       p(
-        "The Town hall's City stats section shows the same idea municipality-wide as a pair of donut charts instead — one of every category, one with commercial/business use excluded (it's usually the biggest slice by far, so the second chart is where the residential categories' own relative sizes actually show up). Switch the period with Day/Week/Month/Year: Day is a live rolling last-24h reading like the building/dwelling panels; Week and Month show the most recently completed calendar week/month; Year sums the last 12 completed months.",
+        "The Town hall's Statistics section shows the same idea municipality-wide as a pair of donut charts instead — one of every category, one with commercial/business use excluded (it's usually the biggest slice by far, so the second chart is where the residential categories' own relative sizes actually show up). Switch the period with Day/Week/Month/Year: Day is a live rolling last-24h reading like the building/dwelling panels; Week and Month show the most recently completed calendar week/month; Year sums the last 12 completed months.",
       ),
       p(
         "City stats also shows how residents get around: each resident's main way of getting around (car, bicycle, public transit and walking), with the share of cars and bikes that are electric, at the start of the game and now — plus the cars, business vans and lorries in town. A municipality knows these from the federal mobility survey and the vehicle register, so they're free. The split moves as households rethink how they get around, which the mobility measures push on.",
       ),
       p(
-        "Further down (or, for the municipality, the Town hall's separate History section) is \"Historical energy\": beyond the last 24 hours, switch between Day (last 7 days), Week (last 13 weeks), or Month (last 12 months), and pick Total, a stacked breakdown of every category, or any single category (e.g. just EV charging) from the dropdown.",
+        "Further down a building's or dwelling's panel (and beside City stats in the Town hall's Statistics) is \"Historical energy\": beyond the last 24 hours, switch between Day (last 7 days), Week (last 13 weeks), or Month (last 12 months), and pick Total, a stacked breakdown of every category, or any single category (e.g. just EV charging) from the dropdown.",
       ),
       note(
         "Historical bars only ever show fully completed periods — today isn't part of \"last 7 days\" — so every bar is a fixed number computed once and cached, not something that wobbles as time passes.",
@@ -768,17 +734,16 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "emissions",
-    icon: "🌍",
     title: "Emissions & net zero",
     blocks: [
       p(
-        "The municipality's headline goal is net zero by 2050: every completed calendar year totals up operational CO₂ emissions from four sources — grid electricity, gas heating, oil heating, district heating, and petrol/diesel cars — and compares it against the very first year simulated, which is fixed forever as the baseline.",
+        "The municipality's headline goal is net zero by 2050: every completed calendar year totals up operational CO₂ emissions from five sources — grid electricity, gas heating, oil heating, district heating, and petrol and diesel vehicles — and compares it against the very first year simulated, which is fixed forever as the baseline.",
       ),
       p(
         "Grid electricity is priced on a net basis — total consumption minus solar exported — at that year's grid carbon intensity, sourced from a real Swiss industry projection (VSE) of how much cleaner the national grid gets over time as it decarbonizes. A given year's intensity is treated as constant: no single municipality's choices move the national grid, so this figure only depends on the calendar year, never on anything you do.",
       ),
       p(
-        "Gas, oil, and district heating are priced by how much of each fuel was actually burned for space heating (see \"Stock renewal\"), using standard Swiss combustion emission factors (BAFU). Mobility's contribution is petrol/diesel burned by ICE cars (see \"Mobility\") — public transit, walking, and bikes (electric or not) aren't counted, the same way they aren't billed a fuel cost.",
+        "Gas, oil, and district heating are priced by how much of each fuel was actually burned for space heating (see \"Stock renewal\"), using standard Swiss combustion emission factors (BAFU). Mobility's contribution is the petrol and diesel burned by households' cars (see \"Mobility\") and businesses' vans and lorries — public transit, walking, and bikes (electric or not) aren't counted, the same way they aren't billed a fuel cost.",
       ),
       note(
         "This is operational emissions only — what's actually burned or drawn from the grid. Manufacturing footprints (a heat pump, an EV's battery, a solar panel) aren't in scope, and neither are emissions embodied in a building itself. A future update may add these separately rather than blend them into one number.",
@@ -787,14 +752,13 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "year-in-review",
-    icon: "🎉",
     title: "Year in Review",
     blocks: [
       p(
         "The instant the clock crosses into a new calendar year, it automatically pauses and a \"Year in Review\" report card opens — a snapshot of the municipality's just-completed year, on top of whatever building or dwelling panel you happen to have open.",
       ),
       p(
-        "The report leads with the year's emissions (see \"Emissions & net zero\") — a donut chart split by source, and how it compares to the baseline year — followed by \"Municipal finances\" (see above): the treasury balance and this year's own revenue/cost breakdown. Below that comes a municipality-wide energy breakdown, then two sections specific to heating: \"Heating energy by technology\" — how much heat was actually delivered by each system (air/ground heat pump, gas, oil, district heating) for space heating, and by heat pump vs. direct electric for hot water — and \"Heating renewals this year\", a tally of every stock-renewal replacement that happened during the year (e.g. \"14× Oil boiler → Ground heat pump\"), \"like-for-like\" flagged when a building was replaced with the same kind of system it already had. Last is \"Solar installs this year\" — how many buildings adopted solar (see \"Solar adoption\") and how much capacity, in total, they added.",
+        "The report leads with the year's emissions (see \"Emissions & net zero\") — a donut chart split by source, and how it compares to the baseline year — followed by the money (see \"Municipal finances\"): the treasury balance and this year's own revenue/cost breakdown. Below that comes a municipality-wide energy breakdown, then two sections specific to heating: \"Heating energy by technology\" — how much heat was actually delivered by each system (air/ground heat pump, gas, oil, district heating) for space heating, and by heat pump vs. direct electric for hot water — and \"Heating renewals this year\", a tally of every stock-renewal replacement that happened during the year (e.g. \"14× Oil boiler → Ground heat pump\"), \"like-for-like\" flagged when a building was replaced with the same kind of system it already had. Last is \"Solar installs this year\" — how many buildings adopted solar (see \"Solar power\") and how much capacity, in total, they added.",
       ),
       note(
         "The heating-by-technology totals cover every fuel a building might use, not just electricity, so they're deliberately not directly comparable to the \"Energy by category\" pie above them, which only covers what draws grid power.",
@@ -803,5 +767,63 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Closing the report doesn't resume the clock — it stays paused exactly where the year turned over until you pick a speed again, the same as if you'd paused it yourself.",
       ),
     ],
+  },
+];
+
+/** The wiki's contents: every section, grouped by what it is about. */
+export const WIKI_GROUPS: WikiGroup[] = [
+  {
+    id: "start",
+    title: "Getting started",
+    blurb: "What the game is, how to find your way around it, and how time passes.",
+    sections: ["overview", "controls", "map-layers", "time", "year-in-review"],
+  },
+  {
+    id: "governing",
+    title: "Governing",
+    blurb: "What the municipality can decide, what people think of it, and what it is aiming for.",
+    sections: ["measures", "approval", "information", "letters", "emissions"],
+  },
+  {
+    id: "money",
+    title: "Money",
+    blurb: "The treasury, the utility, borrowing, and the prices you set.",
+    sections: ["municipal-finances", "borrowing", "tariff"],
+  },
+  {
+    id: "decisions",
+    title: "How people decide",
+    blurb: "When owners and households replace things, and what tips their choice.",
+    sections: ["stock-renewal", "early-switch", "technology-prices"],
+  },
+  {
+    id: "town",
+    title: "The town",
+    blurb: "Its buildings, how it grows, the zoning plan, and the municipality's own buildings.",
+    sections: ["buildings", "growth", "zoning", "public-buildings", "commercial"],
+  },
+  {
+    id: "heating",
+    title: "Heating",
+    blurb: "How buildings are heated and insulated, where a heat pump may go, and the district heating network.",
+    sections: ["climate-control", "water-heating", "insulation", "heat-pump-siting", "district-heat"],
+  },
+  {
+    id: "electricity",
+    title: "Electricity & solar",
+    blurb: "The local grid, rooftop solar, and the batteries that smooth both.",
+    sections: ["grid", "solar", "home-batteries"],
+  },
+  {
+    id: "mobility",
+    title: "Getting around",
+    blurb: "Households' cars and bikes, public charging, and businesses' vans and lorries.",
+    sections: ["mobility", "public-charging", "fleets"],
+  },
+  {
+    id: "households",
+    title: "Households & numbers",
+    blurb: "What runs in a home, what it pays, and the statistics that add it all up.",
+    sections: ["appliances", "finances", "statistics"],
   },
 ];

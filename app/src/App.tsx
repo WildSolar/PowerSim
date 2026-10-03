@@ -198,7 +198,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
         onOpenTreasury={() => setTownHall("treasury")}
         onOpenTownHall={() => setTownHall((open) => (open ? null : "overview"))}
         onOpenInbox={() => setInboxSelection({ tab: "letters", id: null })}
-        onOpenWiki={() => setShowWiki(true)}
+        onOpenWiki={() => setShowWiki((open) => !open)}
         onMenu={returnToMenu}
       />
       <div className="stage">

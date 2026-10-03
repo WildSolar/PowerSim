@@ -1,0 +1,448 @@
+/* The wiki: full screen below the top bar, grouped contents on the left and a reading column. */
+
+.wiki {
+  position: absolute;
+  top: var(--top-bar-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  background: var(--fill);
+  color: var(--ink);
+  z-index: 8;
+}
+
+.wiki-nav {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+}
+
+.wiki-nav-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 10px 20px;
+}
+
+.wiki-home {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+}
+
+.wiki-home::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 10px;
+  background: var(--accent);
+  vertical-align: 2px;
+}
+
+.wiki-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.wiki-close:hover {
+  background: var(--fill);
+}
+
+.wiki-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 14px 10px 20px;
+  padding: 0 10px;
+  height: 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  color: var(--ink-3);
+}
+
+.wiki-search:focus-within {
+  border-color: var(--ink);
+}
+
+.wiki-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: none;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.wiki-toc {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 10px 24px 12px;
+}
+
+.wiki-toc-group + .wiki-toc-group {
+  margin-top: 14px;
+}
+
+.wiki-toc-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 4px;
+  padding: 0 8px;
+  font-family: var(--font);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.wiki-toc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wiki-toc li button {
+  display: block;
+  width: 100%;
+  padding: 5px 8px 5px 29px;
+  border: none;
+  border-radius: var(--r-2);
+  background: none;
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.wiki-toc li button:hover {
+  background: var(--fill);
+}
+
+.wiki-toc li button.active {
+  background: var(--selected);
+  color: var(--on-selected);
+}
+
+.wiki-body {
+  overflow-y: auto;
+  min-width: 0;
+}
+
+/* --- An article ------------------------------------------------------------------------- */
+
+.wiki-article,
+.wiki-results {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 36px 40px 56px;
+}
+
+.wiki-kicker {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.wiki-article h1,
+.wiki-results h1,
+.wiki-front h1 {
+  margin: 0 0 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ink);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+
+.wiki-article p {
+  margin: 0 0 14px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--ink);
+}
+
+.wiki-list {
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.wiki-list li {
+  position: relative;
+  padding: 8px 0 8px 22px;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.wiki-list li:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.wiki-list li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 19px;
+  width: 8px;
+  height: 2px;
+  background: var(--accent);
+}
+
+.wiki-note {
+  margin: 18px 0;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ink);
+  border-radius: var(--r-1);
+}
+
+.wiki-note-label {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.wiki-article .wiki-note p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.wiki-ref {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.wiki-ref:hover {
+  color: var(--accent);
+}
+
+.wiki mark {
+  background: var(--warn-soft);
+  color: inherit;
+  padding: 0 1px;
+}
+
+.wiki-pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 36px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.wiki-pager button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 48%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--surface);
+  text-align: left;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wiki-pager button.next {
+  margin-left: auto;
+  text-align: right;
+}
+
+.wiki-pager button:hover {
+  border-color: var(--ink-3);
+}
+
+.wiki-pager small {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* --- The front page -------------------------------------------------------------------- */
+
+.wiki-front {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 36px 40px 56px;
+}
+
+.wiki-front-head p {
+  max-width: 640px;
+  margin: -6px 0 26px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.wiki-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.wiki-group-card {
+  padding: 16px 18px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+}
+
+.wiki-group-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.wiki-group-card h2 svg {
+  color: var(--accent);
+}
+
+.wiki-group-card > p {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.wiki-group-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wiki-group-card li button {
+  display: block;
+  width: 100%;
+  padding: 6px 0;
+  border: none;
+  border-top: 1px solid var(--line);
+  background: none;
+  font-size: 13.5px;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.wiki-group-card li button:hover {
+  color: var(--accent);
+}
+
+/* --- Search results ---------------------------------------------------------------------- */
+
+.wiki-results ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wiki-results li button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 12px 0;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wiki-results li button:hover .wiki-result-title {
+  color: var(--accent);
+}
+
+.wiki-result-group {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.wiki-result-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.wiki-result-snippet {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+@media (max-width: 860px) {
+  .wiki {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .wiki-nav {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    max-height: 40vh;
+  }
+  .wiki-article,
+  .wiki-results,
+  .wiki-front {
+    padding: 24px 16px 40px;
+  }
+}
+
+.wiki-list li strong {
+  font-weight: 600;
+}

@@ -13,3 +13,9 @@ same change** — add a new section if nothing existing covers it. Keep the tone
 player-facing (what it does, what drives it) rather than implementation detail;
 use a `note()` block for known simplifications worth being upfront about,
 matching the existing sections' style.
+
+A new section must also be listed in a group in `WIKI_GROUPS` (bottom of the
+file), which sets the wiki's contents and reading order. To link to another
+section, name it in escaped quotes (`\"Stock renewal\"`): the name must equal
+its title, or the part of the title before a colon. List items that open with
+a short label (`"Cost: ..."`, `"Noise. ..."`, `"Fridge — ..."`) show it in bold.
