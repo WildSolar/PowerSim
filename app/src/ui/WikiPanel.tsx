@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Banknote, Building2, Car, Compass, Flame, Landmark, Plug, Search, Users, X, Zap } from "lucide-react";
 import { WIKI_GROUPS, WIKI_SECTIONS, type WikiBlock, type WikiSection } from "./wikiContent";
+import { usePauseWhileOpen } from "./usePauseWhileOpen";
 import "./wiki.css";
 
 const GROUP_ICON: Record<string, ComponentType<{ size?: number; strokeWidth?: number; "aria-hidden"?: boolean }>> = {
@@ -80,7 +81,7 @@ function leadIn(item: string): string | null {
   const m = /^([^:.—"]{2,40}?)(:|\.| —)\s/.exec(item);
   if (!m) return null;
   const words = m[1].trim().split(/\s+/).length;
-  return words <= (m[2] === " —" ? 4 : 5) ? m[1] + m[2] : null;
+  return words <= (m[2] === " —" ? 4 : 6) ? m[1] + m[2] : null;
 }
 
 function Article({ section, query, onOpen }: { section: WikiSection; query: string; onOpen: (id: string) => void }) {
@@ -213,8 +214,10 @@ export interface WikiPanelProps {
 }
 
 /** The in-game wiki: grouped contents on the left, a front page or one section at a time on the
- * right, and a search across everything. Full screen below the top bar, like the town hall. */
+ * right, and a search across everything. Full screen below the top bar, and like the town hall it
+ * pauses the game while it's open. */
 export function WikiPanel({ onClose }: WikiPanelProps) {
+  usePauseWhileOpen();
   const [sectionId, setSectionId] = useState<string | null>(lastSectionId);
   const [query, setQuery] = useState("");
   const bodyRef = useRef<HTMLDivElement | null>(null);

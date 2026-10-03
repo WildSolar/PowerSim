@@ -1,12 +1,10 @@
-import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { MunicipalityDataset } from "../data/types";
 import { sampleMunicipalityCategorySeries } from "../sim/history";
 import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { useSimDay, useSimSpeed, useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
-import { simClock } from "../sim/engine";
-import { PAUSE_SPEED, setSpeed } from "../sim/timeControls";
+import { PAUSE_SPEED } from "../sim/timeControls";
 import { CityStatsTab } from "./CityStatsTab";
 import { DecisionLogTab } from "./DecisionLogTab";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
@@ -15,6 +13,7 @@ import { OverviewTab } from "./OverviewTab";
 import { TreasuryTab } from "./TreasuryTab";
 import { TariffControl } from "./TariffControl";
 import { TechnologyPrices } from "./TechnologyPrices";
+import { usePauseWhileOpen } from "./usePauseWhileOpen";
 import "./townHall.css";
 
 export type TownHallSection = "overview" | "measures" | "treasury" | "prices" | "stats" | "log";
@@ -47,23 +46,7 @@ export function TownHall({ dataset, transparency, section, onSection, onClose }:
   const currentDay = useSimDay();
   const speed = useSimSpeed();
 
-  // Pause on open; resume on close, if it is still the pause we made.
-  const resumeTo = useRef<number | null>(null);
-  useEffect(() => {
-    const running = simClock.getSpeed();
-    if (running !== PAUSE_SPEED) {
-      resumeTo.current = running;
-      setSpeed(PAUSE_SPEED);
-    }
-    return () => {
-      if (resumeTo.current !== null && simClock.getSpeed() === PAUSE_SPEED) setSpeed(resumeTo.current);
-    };
-  }, []);
-  // The player set a speed themselves while it was open: theirs stands.
-  const [opened] = useState(() => speed);
-  useEffect(() => {
-    if (speed !== PAUSE_SPEED && speed !== opened) resumeTo.current = null;
-  }, [speed, opened]);
+  usePauseWhileOpen();
 
   // Only resolved for Statistics, and only while it's open — effectivePowerPlantsAt locks in that
   // year's solar adoptions (once, the first time it's ever queried) under whatever policy is set
