@@ -1,4 +1,4 @@
-import { Mail } from "lucide-react";
+import { Mail, MapPin, Newspaper, Pin, X } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { mapFocus } from "../map/mapFocus";
 import { formatDate } from "../sim/calendar";
@@ -7,7 +7,6 @@ import { inbox, type Edition, type Letter } from "../sim/inbox";
 import { letters, type LetterRequest } from "../sim/letters";
 import { useSimDay } from "../sim/store";
 import { stock } from "../sim/stock";
-import "./modal.css";
 import "./inbox.css";
 
 type Tab = "letters" | "requests" | "paper";
@@ -45,7 +44,8 @@ export function InboxPanel({ initial, onClose, onSelectBuilding }: { initial: In
   const unread = inbox.unreadCount(now);
 
   // Opening an item marks it read; a tab with nothing chosen opens its newest item.
-  const selectedLetter = tab !== "paper" ? (allLetters.find((l) => l.id === selectedId) ?? null) : null;
+  const chosenLetter = tab !== "paper" ? (allLetters.find((l) => l.id === selectedId) ?? null) : null;
+  const selectedLetter = chosenLetter ?? (tab === "letters" ? (allLetters[0] ?? null) : null);
   const selectedEdition = tab === "paper" ? (editions.find((e) => e.id === selectedId) ?? editions[0] ?? null) : null;
   useEffect(() => {
     if (selectedLetter) inbox.markRead(selectedLetter.id);
@@ -65,35 +65,47 @@ export function InboxPanel({ initial, onClose, onSelectBuilding }: { initial: In
     }
   };
 
+  const openRequests = requests.filter((r) => r.status === "open").length;
+  const tabs: { id: Tab; label: string; count: number }[] = [
+    { id: "letters", label: "Letters", count: unread.letters },
+    { id: "requests", label: "Requests", count: openRequests },
+    { id: "paper", label: "Paper", count: unread.editions },
+  ];
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-shell inbox-shell" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-close" onClick={onClose} aria-label="Close">
-          ×
-        </button>
-        <nav className="modal-nav inbox-nav">
-          <div className="inbox-tabs">
-            <button className={tab === "letters" ? "active" : ""} onClick={() => setTab("letters")}>
-              Letters{unread.letters > 0 ? ` (${unread.letters})` : ""}
-            </button>
-            <button className={tab === "requests" ? "active" : ""} onClick={() => setTab("requests")}>
-              Requests{requests.some((r) => r.status === "open") ? ` (${requests.filter((r) => r.status === "open").length})` : ""}
-            </button>
-            <button className={tab === "paper" ? "active" : ""} onClick={() => setTab("paper")}>
-              Paper{unread.editions > 0 ? ` (${unread.editions})` : ""}
-            </button>
+    <div className="inbox-layer">
+      <div className="inbox-scrim" onClick={onClose} />
+      <aside className="inbox-sheet" role="dialog" aria-label="Inbox">
+        <header className="inbox-head">
+          <div className="inbox-heading">
+            <span className="inbox-kicker">Inbox</span>
+            <span className="inbox-running">The game keeps running</span>
           </div>
-          <ul>
+          <nav className="inbox-tabs" aria-label="Inbox sections">
+            {tabs.map((t) => (
+              <button key={t.id} className={tab === t.id ? "active" : ""} aria-current={tab === t.id ? "page" : undefined} onClick={() => setTab(t.id)}>
+                {t.label}
+                {t.count > 0 && <span className="inbox-count">{t.count}</span>}
+              </button>
+            ))}
+          </nav>
+          <button className="inbox-close" onClick={onClose} aria-label="Close the inbox" title="Close (Esc)">
+            <X size={18} strokeWidth={1.75} aria-hidden />
+          </button>
+        </header>
+        <div className="inbox-body">
+          <ul className="inbox-list">
             {tab === "letters" &&
               allLetters.map((l) => (
                 <li key={l.id}>
                   <button className={`inbox-item${l.id === selectedLetter?.id ? " active" : ""}${inbox.isRead(l.id) ? "" : " unread"}`} onClick={() => setSelectedId(l.id)}>
-                    <span className="inbox-item-subject">
-                      {l.requestId && l.kind === "request" ? "📌 " : ""}
-                      {l.subject}
-                    </span>
                     <span className="inbox-item-meta">
-                      {l.from} · {formatDate(l.atMs)}
+                      <span>{l.from}</span>
+                      <span>{formatDate(l.atMs)}</span>
+                    </span>
+                    <span className="inbox-item-subject">
+                      {l.requestId && l.kind === "request" && <Pin size={12} strokeWidth={2} aria-label="Request" />}
+                      {l.subject}
                     </span>
                   </button>
                 </li>
@@ -104,11 +116,11 @@ export function InboxPanel({ initial, onClose, onSelectBuilding }: { initial: In
                 return (
                   <li key={r.id}>
                     <button className={`inbox-item${letter && letter.id === selectedLetter?.id ? " active" : ""}`} onClick={() => setSelectedId(r.letterId)}>
-                      <span className="inbox-item-subject">{r.ask.charAt(0).toUpperCase() + r.ask.slice(1)}</span>
-                      <span className={`inbox-item-meta request-${r.status}`}>
-                        {STATUS_LABEL[r.status]}
-                        {r.status === "open" ? ` · by ${monthYear(r.deadlineMs)}` : ""}
+                      <span className="inbox-item-meta">
+                        <span className={`request-status request-${r.status}`}>{STATUS_LABEL[r.status]}</span>
+                        <span>{r.status === "open" ? `by ${monthYear(r.deadlineMs)}` : formatDate(r.atMs)}</span>
                       </span>
+                      <span className="inbox-item-subject">{r.ask.charAt(0).toUpperCase() + r.ask.slice(1)}</span>
                     </button>
                   </li>
                 );
@@ -117,8 +129,11 @@ export function InboxPanel({ initial, onClose, onSelectBuilding }: { initial: In
               editions.map((e) => (
                 <li key={e.id}>
                   <button className={`inbox-item${e.id === selectedEdition?.id ? " active" : ""}${inbox.isRead(e.id) ? "" : " unread"}`} onClick={() => setSelectedId(e.id)}>
-                    <span className="inbox-item-subject">{e.lead.headline}</span>
-                    <span className="inbox-item-meta">{e.dateLabel}</span>
+                    <span className="inbox-item-meta">
+                      <span>{e.title}</span>
+                      <span>{e.dateLabel}</span>
+                    </span>
+                    <span className="inbox-item-subject paper-font">{e.lead.headline}</span>
                   </button>
                 </li>
               ))}
@@ -126,21 +141,21 @@ export function InboxPanel({ initial, onClose, onSelectBuilding }: { initial: In
             {tab === "requests" && requests.length === 0 && <li className="inbox-empty">No one has asked for anything yet.</li>}
             {tab === "paper" && editions.length === 0 && <li className="inbox-empty">The first edition comes out at the start of next month.</li>}
           </ul>
-        </nav>
-        <div className="modal-content inbox-content">
-          {tab === "paper" ? (
-            selectedEdition ? (
-              <EditionView edition={selectedEdition} />
+          <div className="inbox-reader">
+            {tab === "paper" ? (
+              selectedEdition ? (
+                <EditionView edition={selectedEdition} />
+              ) : (
+                <p className="inbox-empty">No edition yet.</p>
+              )
+            ) : selectedLetter ? (
+              <LetterView letter={selectedLetter} onShowOnMap={showOnMap} />
             ) : (
-              <p className="inbox-empty">No edition yet.</p>
-            )
-          ) : selectedLetter ? (
-            <LetterView letter={selectedLetter} onShowOnMap={showOnMap} />
-          ) : (
-            <p className="inbox-empty">Pick a letter on the left.</p>
-          )}
+              <p className="inbox-empty">Pick a letter from the list.</p>
+            )}
+          </div>
         </div>
-      </div>
+      </aside>
     </div>
   );
 }
@@ -152,7 +167,7 @@ function LetterView({ letter, onShowOnMap }: { letter: Letter; onShowOnMap: (foc
       <div className="letter-head">
         <div className="letter-from">
           <strong>{letter.from}</strong>
-          {letter.role && <span>, {letter.role}</span>}
+          {letter.role && <span>{letter.role}</span>}
         </div>
         <div className="letter-date">{formatDate(letter.atMs)}</div>
       </div>
@@ -163,9 +178,10 @@ function LetterView({ letter, onShowOnMap }: { letter: Letter; onShowOnMap: (foc
       <p className="letter-sign">— {letter.from}</p>
       {request && letter.kind === "request" && (
         <div className={`letter-request request-${request.status}`}>
-          <div>
-            <strong>Request:</strong> {request.ask}
+          <div className="letter-request-label">
+            <Pin size={13} strokeWidth={2} aria-hidden /> Request · {STATUS_LABEL[request.status]}
           </div>
+          <div className="letter-request-ask">{request.ask.charAt(0).toUpperCase() + request.ask.slice(1)}</div>
           <div>
             {request.status === "open"
               ? `Open until ${monthYear(request.deadlineMs)}. Answering it in time earns goodwill with the people who asked; letting it lapse costs a little.`
@@ -175,7 +191,7 @@ function LetterView({ letter, onShowOnMap }: { letter: Letter; onShowOnMap: (foc
       )}
       {letter.focus && (
         <button className="letter-map" onClick={() => onShowOnMap(letter.focus as { lon: number; lat: number; egid?: string })}>
-          📍 {letter.focus.egid ? "Show the building" : "Show on the map"}
+          <MapPin size={15} strokeWidth={1.75} aria-hidden /> {letter.focus.egid ? "Show the building" : "Show on the map"}
         </button>
       )}
     </article>
@@ -200,7 +216,8 @@ function EditionView({ edition }: { edition: Edition }) {
         ))}
       </div>
       <div className="paper-editorial">
-        <strong>From the editor.</strong> {edition.editorial}
+        <span className="paper-editorial-label">From the editor</span>
+        {edition.editorial}
       </div>
     </article>
   );
@@ -231,15 +248,10 @@ export function InboxToast({ onOpen }: { onOpen: (selection: InboxSelection) => 
         setItem(null);
       }}
     >
-      {isEdition ? (
-        <>
-          📰 <strong>{item.title}:</strong> {item.lead.headline}
-        </>
-      ) : (
-        <>
-          ✉️ <strong>{item.from}:</strong> {item.subject}
-        </>
-      )}
+      {isEdition ? <Newspaper size={15} strokeWidth={1.75} aria-hidden /> : <Mail size={15} strokeWidth={1.75} aria-hidden />}
+      <span className="inbox-toast-text">
+        <strong>{isEdition ? item.title : item.from}</strong> {isEdition ? item.lead.headline : item.subject}
+      </span>
     </button>
   );
 }
