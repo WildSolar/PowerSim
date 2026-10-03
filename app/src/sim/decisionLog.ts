@@ -97,3 +97,16 @@ export function getDecisionLog(): DecisionLogEntry[] {
 export function clearDecisionLog(): void {
   entriesByKind.clear();
 }
+
+// --- saving (saveGame.ts) ---
+
+export function snapshotDecisionLog(): { entries: Map<DecisionLogKind, DecisionLogEntry[]>; nextSeq: number } {
+  return { entries: entriesByKind, nextSeq };
+}
+
+export function restoreDecisionLog(saved: { entries: Map<DecisionLogKind, DecisionLogEntry[]>; nextSeq: number } | null): void {
+  entriesByKind.clear();
+  if (!saved) return;
+  for (const [kind, entries] of saved.entries) entriesByKind.set(kind, entries);
+  nextSeq = saved.nextSeq;
+}

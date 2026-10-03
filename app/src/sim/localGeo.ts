@@ -221,6 +221,15 @@ export class MinHeap<T> {
       i = parent;
     }
   }
+  /** The items in heap order (for saving). */
+  toArray(): { key: number; value: T }[] {
+    return this.items.slice();
+  }
+  /** Replaces the contents with items in heap order, as toArray gave them. */
+  load(items: { key: number; value: T }[]): void {
+    this.items.length = 0;
+    this.items.push(...items);
+  }
   pop(): { key: number; value: T } | undefined {
     const items = this.items;
     if (items.length === 0) return undefined;

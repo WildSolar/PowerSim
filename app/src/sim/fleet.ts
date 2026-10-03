@@ -414,6 +414,15 @@ class Fleets {
     }
     return c;
   }
+
+  // --- saving (saveGame.ts) ---
+
+  /** After a load: the vehicles are seeded, so they simply re-derive — dropping what they cached
+   * (chain entries, charger bookings) from before. */
+  resetCaches(): void {
+    this.byEgid = new Map();
+    this.flat = new WeakMap();
+  }
 }
 
 export const fleets = new Fleets();

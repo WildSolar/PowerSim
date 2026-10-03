@@ -219,7 +219,7 @@ export function TopBar({ dataset, onOpenTreasury, onOpenTownHall, onOpenInbox, o
           <Landmark size={17} strokeWidth={1.75} aria-hidden />
           <span>Town hall</span>
         </button>
-        <button className="tb-icon-button" onClick={onMenu} title="Main menu" aria-label="Main menu">
+        <button className="tb-icon-button" onClick={onMenu} title="Game menu: save, load a save string, main menu" aria-label="Game menu">
           <Menu size={18} strokeWidth={1.75} aria-hidden />
         </button>
       </div>

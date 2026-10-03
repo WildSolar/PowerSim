@@ -24,6 +24,12 @@ class TariffStore {
     this.listeners.forEach((listener) => listener());
   }
 
+  /** A loaded game's prices (saveGame.ts). */
+  restore(tariff: Tariff): void {
+    this.tariff = { ...DEFAULT_TARIFF, ...tariff };
+    this.listeners.forEach((listener) => listener());
+  }
+
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);

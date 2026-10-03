@@ -567,6 +567,22 @@ class Grid {
     this.version++;
     this.listeners.forEach((l) => l());
   }
+
+  // --- saving (saveGame.ts) ---
+
+  snapshot() {
+    return { areas: this.areas, areaOfEgid: this.areaOfEgid, measuredWinter: this.measuredWinter, measuredSummer: this.measuredSummer };
+  }
+
+  restore(s: ReturnType<Grid["snapshot"]>): void {
+    this.areas = s.areas;
+    this.areaOfEgid = s.areaOfEgid;
+    this.measuredWinter = s.measuredWinter;
+    this.measuredSummer = s.measuredSummer;
+    this.zones = null;
+    this.selectedId = null;
+    this.notify();
+  }
 }
 
 export const grid = new Grid();

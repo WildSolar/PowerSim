@@ -266,3 +266,16 @@ export function liveBalanceRp(buildings: Building[], atMs: number, baselineYear:
 export function bookedFinances(): MunicipalFinances[] {
   return [...financesCache.values()].sort((a, b) => a.year - b.year);
 }
+
+// --- saving (saveGame.ts) ---
+
+/** The booked years: the accounts as they were settled. */
+export function snapshotFinances(): Map<number, MunicipalFinances> {
+  return financesCache;
+}
+
+export function restoreFinances(saved: Map<number, MunicipalFinances>): void {
+  financesCache.clear();
+  financesInFlight.clear();
+  for (const [year, f] of saved) financesCache.set(year, f);
+}

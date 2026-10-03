@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { loadMunicipalityIndex, type MunicipalityIndexEntry } from "../data/loadDataset";
 import { DEFAULT_DIFFICULTY, DIFFICULTY_ORDER, DIFFICULTY_SPECS, type Difficulty } from "../config/difficulty";
+import { LoadGamePanel } from "./LoadGamePanel";
+import type { SaveFile } from "../sim/saveGame";
 import "./StartMenu.css";
 
 // Case- and accent-insensitive, so "zur" finds Zürich.
@@ -12,7 +14,7 @@ function normalize(text: string): string {
 }
 
 interface Props {
-  onStart: (slug: string, difficulty: Difficulty, transparency: boolean) => void;
+  onStart: (slug: string, difficulty: Difficulty, transparency: boolean, restore?: SaveFile) => void;
 }
 
 export function StartMenu({ onStart }: Props) {
@@ -21,6 +23,7 @@ export function StartMenu({ onStart }: Props) {
   const [query, setQuery] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY);
   const [transparency, setTransparency] = useState(false);
+  const [tab, setTab] = useState<"new" | "load">("new");
 
   useEffect(() => {
     loadMunicipalityIndex()
@@ -47,6 +50,18 @@ export function StartMenu({ onStart }: Props) {
         <p>A Swiss municipality, its buildings, its grid — and the road to net zero.</p>
       </div>
       <div className="start-menu-card">
+        <div className="start-menu-tabs" role="tablist">
+          <button role="tab" aria-selected={tab === "new"} className={tab === "new" ? "active" : ""} onClick={() => setTab("new")}>
+            New game
+          </button>
+          <button role="tab" aria-selected={tab === "load"} className={tab === "load" ? "active" : ""} onClick={() => setTab("load")}>
+            Load game
+          </button>
+        </div>
+        {tab === "load" ? (
+          <LoadGamePanel municipalities={municipalities} onLoad={(file) => onStart(file.meta.slug, file.meta.difficulty, file.meta.transparency, file)} />
+        ) : (
+          <>
         <p className="start-menu-tagline">Choose a municipality to guide toward net zero.</p>
         <div className="start-menu-difficulty">
           <div className="start-menu-difficulty-buttons">
@@ -94,6 +109,8 @@ export function StartMenu({ onStart }: Props) {
               ))}
               {filtered.length === 0 && <li className="start-menu-status">No municipality matches "{query}".</li>}
             </ul>
+          </>
+        )}
           </>
         )}
       </div>

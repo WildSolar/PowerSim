@@ -537,12 +537,29 @@ class Letters {
     const buildings = this.buildingsProvider();
     return buildings.length > 0 ? (buildings[Math.floor(rng() * buildings.length)].address ?? null) : null;
   }
+
+  // --- saving (saveGame.ts) ---
+
+  snapshot() {
+    return { requests: this.requests, lastReport: this.lastReport, lastMood: this.lastMood, lastMonth: this.lastMonth, lastDay: this.lastDay, counter: this.counter };
+  }
+
+  restore(s: ReturnType<Letters["snapshot"]>): void {
+    this.requests = s.requests;
+    this.lastReport = s.lastReport;
+    this.lastMood = s.lastMood;
+    this.lastMonth = s.lastMonth;
+    this.lastDay = s.lastDay;
+    this.counter = s.counter;
+    this.listeners.forEach((l) => l());
+  }
 }
 
 function articleFor(id: HeatingSystemId): string {
   if (id === "districtHeating") return "a district heating connection";
   const label = HEATING_SYSTEM_CATALOG[id].label.toLowerCase();
   return (/^[aeiou]/.test(label) ? "an " : "a ") + label;
+
 }
 
 export const letters = new Letters();

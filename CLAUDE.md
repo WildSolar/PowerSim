@@ -22,3 +22,21 @@ section, name it in escaped straight quotes (`\"When things wear out\"`): the
 name must equal its title, or the part of the title before a colon. Ordinary
 quotations use typographic quotes (‘ ’, “ ”) so they never turn into links. List items that open with
 a short label (`"Cost: ..."`, `"Noise. ..."`, `"Fridge — ..."`) show it in bold.
+
+## Saving and loading
+
+A save (`app/src/sim/saveGame.ts`) is a snapshot of every stateful module, not a
+replay — households decide lazily under the policy of the moment, so only the
+state reproduces a run. Each module has `snapshot()`/`restore()` (or
+`snapshotX`/`restoreX` functions), called from `captureState` and `applySave`.
+
+**When a change adds state that changes during play** (a new field on a sim
+class, a module-level Map, a new building attribute set after the start),
+**add it to that module's snapshot and restore in the same change** — anything
+left out silently resets to its start value on load. State rebuilt from the
+dataset and the seeds (geometry, profiles, weather, rates, spatial indexes) and
+pure caches stay out. Check a change with the round trip: in dev, load a save
+and compare `window.__stateAfterLoad` with the saved state.
+
+Saves carry the git commit (`__GAME_VERSION__`, vite.config.ts) and only load
+into the same build; there is no migration yet.

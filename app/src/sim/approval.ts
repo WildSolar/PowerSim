@@ -477,6 +477,37 @@ class ApprovalEngine {
     this.version++;
     this.listeners.forEach((l) => l());
   }
+
+  // --- saving (saveGame.ts) ---
+
+  snapshot() {
+    return {
+      levels: this.levels,
+      history: this.history,
+      log: this.log,
+      // A ballot's verdict handler is rebuilt from its key on load.
+      votes: [...this.votes].map(([key, b]) => ({ key, atMs: b.atMs, title: b.title, stances: b.stances })),
+      gameOver: this.gameOver,
+      lowMonths: this.lowMonths,
+      warned: this.warned,
+      lastStepMonth: this.lastStepMonth,
+      electionsHeld: this.electionsHeld,
+    };
+  }
+
+  /** `resolverFor` gives back what a ballot does with its verdict, by key. */
+  restore(s: ReturnType<ApprovalEngine["snapshot"]>, resolverFor: (key: string) => (accepted: boolean, atMs: number) => void): void {
+    this.levels = s.levels;
+    this.history = s.history;
+    this.log = s.log;
+    this.votes = new Map(s.votes.map((v) => [v.key, { atMs: v.atMs, title: v.title, stances: v.stances, resolve: resolverFor(v.key) }]));
+    this.gameOver = s.gameOver;
+    this.lowMonths = s.lowMonths;
+    this.warned = s.warned;
+    this.lastStepMonth = s.lastStepMonth;
+    this.electionsHeld = s.electionsHeld;
+    this.bump();
+  }
 }
 
 export const approval = new ApprovalEngine();

@@ -139,6 +139,20 @@ class Inbox {
     this.version++;
     this.listeners.forEach((l) => l());
   }
+
+  // --- saving (saveGame.ts) ---
+
+  snapshot() {
+    return { letters: this.letters, editions: this.editions, read: this.read, shownUpTo: this.shownUpTo };
+  }
+
+  restore(s: ReturnType<Inbox["snapshot"]>): void {
+    this.letters = s.letters;
+    this.editions = s.editions;
+    this.read = s.read;
+    this.shownUpTo = s.shownUpTo;
+    this.bump();
+  }
 }
 
 export const inbox = new Inbox();

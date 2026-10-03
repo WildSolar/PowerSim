@@ -1097,6 +1097,79 @@ class StockStore {
     this.groupOf.set(b.egid, buildingGroup(b));
     if (this.groupOf.get(b.egid) !== null) this.scheduleTrigger(b, b.builtAtMs ?? atMs, this.rng("trigger", b.egid)());
   }
+
+  // --- saving (saveGame.ts) ---
+
+  snapshot() {
+    const baseCount = this.dataset?.buildings.length ?? 0;
+    const added = this.all.slice(baseCount);
+    return {
+      // The register's buildings change only by being replaced.
+      replaced: this.all
+        .slice(0, baseCount)
+        .filter((b) => b.demolishedAtMs !== undefined)
+        .map((b) => ({ egid: b.egid, demolishedAtMs: b.demolishedAtMs as number, replacedByEgid: b.replacedByEgid })),
+      added,
+      // A new building's outline as it was fitted (a replacement reuses the old one's).
+      ringsOfNew: new Map(added.filter((b) => b.origin === "new").map((b) => [b.egid, this.ringXY.get(b.egid) as XY[]])),
+      sites: this.sites.map((s) => ({ used: s.used, usedAreaM2: s.usedAreaM2, failures: s.failures, matchMisses: s.matchMisses, exhausted: s.exhausted })),
+      heap: this.heap.toArray(),
+      projects: this.projects,
+      gfaTotal: this.gfaTotal,
+      targetGrowthGfa: this.targetGrowthGfa,
+      lastArrivalScheduleMs: this.lastArrivalScheduleMs,
+      meanProjectGfa: this.meanProjectGfa,
+      egidCounter: this.egidCounter,
+      arrivalCounter: this.arrivalCounter,
+      thinCounter: this.thinCounter,
+      lastDecisionMonth: this.lastDecisionMonth,
+    };
+  }
+
+  /** Back to a saved stock, on top of a freshly initialised one (same dataset). */
+  restore(s: ReturnType<StockStore["snapshot"]>): void {
+    if (this.all.length !== (this.dataset?.buildings.length ?? 0) || this.projects.length > 0) {
+      throw new Error("stock.ts: a save can only be restored onto a freshly started stock");
+    }
+    for (const r of s.replaced) {
+      const b = this.byEgid.get(r.egid);
+      if (!b) continue;
+      b.demolishedAtMs = r.demolishedAtMs;
+      b.replacedByEgid = r.replacedByEgid;
+    }
+    for (const b of s.added) {
+      const ring = b.origin === "new" ? s.ringsOfNew.get(b.egid) : this.ringXY.get(b.replacesEgids?.[0] ?? "");
+      this.all.push(b);
+      this.byEgid.set(b.egid, b);
+      if (ring) {
+        this.ringXY.set(b.egid, ring);
+        const centroid = ringCentroid(ring);
+        this.centroidXY.set(b.egid, centroid);
+        this.grid.insert(b.egid, centroid[0], centroid[1]);
+      } else {
+        this.index(b);
+      }
+      this.groupOf.set(b.egid, buildingGroup(b));
+    }
+    this.buildStreetNumbers();
+    s.sites.forEach((saved, i) => {
+      const site = this.sites[i];
+      if (site) Object.assign(site, saved);
+    });
+    this.heap.load(s.heap);
+    this.projects = s.projects;
+    this.gfaTotal = s.gfaTotal;
+    this.targetGrowthGfa = s.targetGrowthGfa;
+    this.lastArrivalScheduleMs = s.lastArrivalScheduleMs;
+    this.meanProjectGfa = s.meanProjectGfa;
+    this.egidCounter = s.egidCounter;
+    this.arrivalCounter = s.arrivalCounter;
+    this.thinCounter = s.thinCounter;
+    this.lastDecisionMonth = s.lastDecisionMonth;
+    this.neighbourCache.clear();
+    this.orientationNearCache.clear();
+    this.commit();
+  }
 }
 
 export const stock = new StockStore();

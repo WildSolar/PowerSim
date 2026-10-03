@@ -144,3 +144,21 @@ export function modeAt<T extends string>(events: ModeEvent<T>[], simTimeMs: numb
   }
   return current;
 }
+
+// --- saving (saveGame.ts) ---
+
+/** Every chain as it stands. Events are plain data. */
+export function snapshotModeChains(): Map<string, ModeChainEntry<string>> {
+  return chains;
+}
+
+/** Puts the saved chains back. Entries that already exist are updated in place, since other
+ * modules keep references to them (mobility.ts's slot handles, fleet.ts's vehicles). */
+export function restoreModeChains(saved: Map<string, ModeChainEntry<string>>): void {
+  for (const [key, entry] of saved) {
+    const existing = chains.get(key);
+    if (existing) Object.assign(existing, entry);
+    else chains.set(key, entry);
+  }
+  for (const key of [...chains.keys()]) if (!saved.has(key)) chains.delete(key);
+}

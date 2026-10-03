@@ -33,3 +33,14 @@ export function subsidisedDecisions(category: SubsidyCategory, fromMs: number, t
 export function resetAdditionality(): void {
   decisions.length = 0;
 }
+
+// --- saving (saveGame.ts) ---
+
+export function snapshotAdditionality(): SubsidisedDecision[] {
+  return decisions;
+}
+
+export function restoreAdditionality(saved: SubsidisedDecision[]): void {
+  decisions.length = 0;
+  decisions.push(...saved);
+}

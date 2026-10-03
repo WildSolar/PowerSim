@@ -476,12 +476,7 @@ class Zoning {
         referendum: quote.referendum,
         leadTimeMonths: ZONING_LEAD_MONTHS,
         atMs,
-        onVote: (accepted) => {
-          if (!accepted) {
-            change.rejected = true;
-            this.notify();
-          }
-        },
+        onVote: (accepted) => this.voteResult(change.id, accepted),
       });
     }
     this.selection = new Set();
@@ -517,6 +512,41 @@ class Zoning {
   private notify(): void {
     this.version++;
     this.listeners.forEach((l) => l());
+  }
+
+  // --- saving (saveGame.ts) ---
+
+  /** What a lost public vote on a change does (also rebuilt for a loaded game's pending votes). */
+  voteResult(changeId: number, accepted: boolean): void {
+    const change = this.changes.find((c) => c.id === changeId);
+    if (!change || accepted) return;
+    change.rejected = true;
+    this.notify();
+  }
+
+  snapshot() {
+    return { changes: this.changes, levies: this.levies, lotByEgid: this.lotByEgid, chargedValueByLot: this.chargedValueByLot, nextId: this.nextId };
+  }
+
+  restore(s: ReturnType<Zoning["snapshot"]>): void {
+    this.changes = s.changes;
+    this.changesByParcel = new Map();
+    for (const change of this.changes) {
+      for (const id of change.parcelIds) {
+        const list = this.changesByParcel.get(id) ?? [];
+        list.push(change);
+        list.sort((a, b) => a.effectiveAtMs - b.effectiveAtMs);
+        this.changesByParcel.set(id, list);
+      }
+    }
+    this.levies = s.levies;
+    this.lotByEgid = s.lotByEgid;
+    this.chargedValueByLot = s.chargedValueByLot;
+    this.nextId = s.nextId;
+    this.parcelOfBuilding = new Map();
+    this.parcelOfSite = new Map();
+    this.selection = new Set();
+    this.notify();
   }
 }
 

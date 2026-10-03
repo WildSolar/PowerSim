@@ -368,6 +368,31 @@ class MeasureEngine {
     const d = new Date(toDateMs(simTimeMs));
     return d.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
   }
+
+  // --- saving (saveGame.ts) ---
+
+  snapshot() {
+    return {
+      states: this.states,
+      externalActive: this.externalActive,
+      externalAnnounced: this.externalAnnounced,
+      history: this.history,
+      lastChargedMonth: this.lastChargedMonth,
+      lastRetireCheckDay: this.lastRetireCheckDay,
+      frozen: this.frozen,
+    };
+  }
+
+  restore(s: ReturnType<MeasureEngine["snapshot"]>): void {
+    this.states = s.states;
+    this.externalActive = s.externalActive;
+    this.externalAnnounced = s.externalAnnounced;
+    this.history = s.history;
+    this.lastChargedMonth = s.lastChargedMonth;
+    this.lastRetireCheckDay = s.lastRetireCheckDay;
+    this.frozen = s.frozen;
+    this.recompute();
+  }
 }
 
 export const measures = new MeasureEngine();

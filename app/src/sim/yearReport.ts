@@ -388,3 +388,44 @@ export function computeRetrofitTally(buildings: Building[], year: number): Retro
   }
   return { entries: [...counts.values()].sort((a, b) => b.count - a.count), total, municipalSubsidyRp };
 }
+
+// --- saving (saveGame.ts) ---
+
+export interface YearReportSnapshot {
+  electricity: Map<number, YearElectricityMonth>;
+  heating: Map<number, HeatingTechnologyEnergyKWh>;
+  mobility: Map<number, { iceCarSlotSamples: number; fleetLitersPerYearSum: number; samples: number }>;
+}
+
+async function settled<T>(cache: Map<number, Promise<T>>, fromKey: number): Promise<Map<number, T>> {
+  const out = new Map<number, T>();
+  for (const [key, promise] of cache) {
+    if (key < fromKey) continue;
+    try {
+      out.set(key, await promise);
+    } catch {
+      // a month that failed is simply sampled again later
+    }
+  }
+  return out;
+}
+
+/** The months sampled for a year not yet booked (from `fromYear` on): each was sampled under the
+ * policy of its day, so they travel with the save. */
+export async function snapshotYearReport(fromYear: number): Promise<YearReportSnapshot> {
+  const fromKey = fromYear * 12;
+  return {
+    electricity: await settled(electricityByMonth, fromKey),
+    heating: await settled(heatingTechnologyByMonth, fromKey),
+    mobility: await settled(mobilityFuelByMonth, fromKey),
+  };
+}
+
+export function restoreYearReport(saved: YearReportSnapshot): void {
+  electricityByMonth.clear();
+  heatingTechnologyByMonth.clear();
+  mobilityFuelByMonth.clear();
+  for (const [key, v] of saved.electricity) electricityByMonth.set(key, Promise.resolve(v));
+  for (const [key, v] of saved.heating) heatingTechnologyByMonth.set(key, Promise.resolve(v));
+  for (const [key, v] of saved.mobility) mobilityFuelByMonth.set(key, Promise.resolve(v));
+}

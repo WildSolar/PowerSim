@@ -425,6 +425,21 @@ class Debt {
     this.version++;
     this.listeners.forEach((l) => l());
   }
+
+  // --- saving (saveGame.ts) ---
+
+  snapshot() {
+    return { loans: this.loans, lastMonth: this.lastMonth, supervised: this.supervised, lastRating: this.lastRating, counter: this.counter };
+  }
+
+  restore(s: ReturnType<Debt["snapshot"]>): void {
+    this.loans = s.loans;
+    this.lastMonth = s.lastMonth;
+    this.supervised = s.supervised;
+    this.lastRating = s.lastRating;
+    this.counter = s.counter;
+    this.bump();
+  }
 }
 
 export const debt = new Debt();

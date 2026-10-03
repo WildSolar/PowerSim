@@ -991,3 +991,25 @@ export function solarInstallsInRange(fromMs: number, toMs: number): { count: num
   for (const b of batteryByEgid.values()) if (b.installedAtMs >= fromMs && b.installedAtMs < toMs) batteries++;
   return { count, capacityKw, batteries };
 }
+
+// --- saving (saveGame.ts) ---
+
+export interface SolarSnapshot {
+  adoptions: Map<string, SolarAdoptionRecord>;
+  batteries: Map<string, BatteryRecord>;
+  watermarkMonth: number | null;
+}
+
+export function snapshotSolar(): SolarSnapshot {
+  return { adoptions: adoptionByEgid, batteries: batteryByEgid, watermarkMonth };
+}
+
+export function restoreSolar(saved: SolarSnapshot): void {
+  adoptionByEgid.clear();
+  for (const [egid, record] of saved.adoptions) adoptionByEgid.set(egid, record);
+  batteryByEgid.clear();
+  for (const [egid, record] of saved.batteries) batteryByEgid.set(egid, record);
+  watermarkMonth = saved.watermarkMonth;
+  neighborListCache = null;
+  neighborListFor = null;
+}

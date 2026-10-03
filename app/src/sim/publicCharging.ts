@@ -861,6 +861,38 @@ class PublicCharging {
     this.version++;
     this.listeners.forEach((l) => l());
   }
+
+  // --- saving (saveGame.ts) ---
+
+  /** `slotRef` turns a booking's household slot into saveable ids (mobility.ts). */
+  snapshot(slotRef: (slot: unknown) => unknown) {
+    return {
+      sites: this.sites,
+      bySlot: [...this.bySlot].map(([key, list]) => [key, list.map((a) => ({ ...a, slot: slotRef(a.slot) }))] as const),
+      unmet: this.unmet,
+      lastOperatorYear: this.lastOperatorYear,
+      nextId: this.nextId,
+    };
+  }
+
+  /** `slotFrom` turns the ids back into the household's slot handle. */
+  restore(s: ReturnType<PublicCharging["snapshot"]>, slotFrom: (ref: unknown) => unknown): void {
+    this.sites = s.sites;
+    this.byId = new Map(this.sites.map((site) => [site.id, site]));
+    this.bySlot = new Map();
+    this.bySite = new Map(this.sites.map((site) => [site.id, [] as Assignment[]]));
+    for (const [key, list] of s.bySlot) {
+      const assignments = list.map((a) => ({ ...a, slot: slotFrom(a.slot) }) as Assignment);
+      this.bySlot.set(key, assignments);
+      for (const a of assignments) this.bySite.get(a.siteId)?.push(a);
+    }
+    this.unmet = s.unmet;
+    this.lastOperatorYear = s.lastOperatorYear;
+    this.nextId = s.nextId;
+    this.selectedSiteId = null;
+    this.placing = null;
+    this.notify();
+  }
 }
 
 export const publicCharging = new PublicCharging();

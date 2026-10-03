@@ -1,0 +1,246 @@
+/* The game menu: a sheet from the right below the top bar, like the inbox, but pausing the game. */
+
+.game-menu-layer {
+  position: absolute;
+  top: var(--top-bar-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+}
+
+.game-menu-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--backdrop);
+}
+
+.game-menu {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(480px, 100%);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+  color: var(--ink);
+}
+
+.gm-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--ink);
+}
+
+.gm-kicker {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.gm-paused {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.gm-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.gm-section {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.gm-section h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.gm-note {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+.gm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gm-row .gm-note {
+  margin: 0;
+}
+
+.gm-spacer {
+  flex: 1;
+}
+
+.gm-input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  font-size: 13px;
+}
+
+.gm-input:focus {
+  border-color: var(--ink);
+  outline: none;
+}
+
+.gm-primary,
+.gm-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--r-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.gm-primary {
+  border: none;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.gm-primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.gm-secondary {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.gm-secondary:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.gm-primary:disabled,
+.gm-secondary:disabled,
+.gm-link:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.gm-link {
+  border: none;
+  background: none;
+  padding: 0 4px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.gm-link:hover:not(:disabled) {
+  color: var(--bad);
+}
+
+.gm-saves {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gm-saves li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.gm-save-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.gm-save-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gm-save-meta {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.gm-string {
+  width: 100%;
+  height: 92px;
+  margin-bottom: 8px;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-2);
+  background: var(--fill);
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  word-break: break-all;
+  resize: vertical;
+}
+
+.gm-message {
+  margin: 14px 20px 0;
+  padding: 10px 12px;
+  border-radius: var(--r-2);
+  font-size: 13px;
+}
+
+.gm-message.good {
+  background: var(--good-soft);
+  color: var(--good);
+}
+
+.gm-message.bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.gm-foot {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.gm-version {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}

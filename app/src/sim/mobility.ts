@@ -408,7 +408,7 @@ export function bookInitialPublicCharging(buildings: Building[]): void {
 // A publicly charged car only draws power while its household actually drives it.
 publicCharging.setDrivingCheck((slot, atMs) => slot === null || handleMode(slot as SlotHandle, atMs) === "car");
 
-const slotHandleCache = new WeakMap<Dwelling, SlotHandle[]>();
+let slotHandleCache = new WeakMap<Dwelling, SlotHandle[]>();
 
 function slotHandles(egid: string, dwelling: Dwelling): SlotHandle[] {
   let handles = slotHandleCache.get(dwelling);
@@ -619,4 +619,29 @@ export function mobilityCensus(buildings: Building[], simTimeMs: number): Mobili
     }
   }
   return census;
+}
+
+// --- saving (saveGame.ts) ---
+
+export interface SlotRef {
+  egid: string;
+  ewid: string;
+  slotIndex: number;
+}
+
+/** A household slot as saveable ids (a charger booking points at one). */
+export function slotRefOf(slot: unknown): SlotRef | null {
+  if (!slot) return null;
+  const h = slot as SlotHandle;
+  return { egid: h.egid, ewid: h.ewid, slotIndex: h.slotIndex };
+}
+
+/** The slot handle again, from its ids — after a load, once the stock is back. */
+export function slotFromRef(ref: SlotRef | null): unknown {
+  return ref ? slotHandleFor(ref.egid, ref.ewid, ref.slotIndex) : null;
+}
+
+/** After a load: the handles cached what they found before (chain entries, charger bookings). */
+export function resetMobilityHandles(): void {
+  slotHandleCache = new WeakMap();
 }

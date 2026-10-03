@@ -241,6 +241,20 @@ class DistrictHeatNetwork {
     this.version++;
     this.listeners.forEach((l) => l());
   }
+
+  // --- saving (saveGame.ts) ---
+
+  snapshot() {
+    return { builtAtMs: this.builtAtMs, orders: this.orders, extraSupply: this.extraSupply };
+  }
+
+  restore(s: ReturnType<DistrictHeatNetwork["snapshot"]>): void {
+    this.builtAtMs = s.builtAtMs;
+    this.orders = s.orders;
+    this.extraSupply = s.extraSupply;
+    this.selection = new Set();
+    this.notify();
+  }
 }
 
 export const districtHeat = new DistrictHeatNetwork();

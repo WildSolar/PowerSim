@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
 import { TownHall, type TownHallSection } from "./ui/TownHall";
@@ -15,6 +15,9 @@ import { ReportCardModal } from "./ui/ReportCardModal";
 import { GameOverModal } from "./ui/GameOverModal";
 import { StartMenu } from "./ui/StartMenu";
 import { WikiPanel } from "./ui/WikiPanel";
+import { GameMenu } from "./ui/GameMenu";
+import { applySave, captureSave, stateJson, type SaveFile } from "./sim/saveGame";
+import { AUTOSAVE_ID, putSave } from "./sim/saveStore";
 import { loadDataset } from "./data/loadDataset";
 import type { MunicipalityDataset } from "./data/types";
 import type { ColorMode } from "./map/colorModes";
@@ -53,20 +56,19 @@ import { startYearPassPrefetch } from "./sim/yearPassPrefetch";
 // The simulation's state lives in many module-level singletons and caches (policy,
 // tariffs, solar adoption, decision log, per-year finances/emissions...), so a page
 // reload is the one reliable way to get a clean slate for the next municipality. The
-// app always opens on the start menu, so reloading lands there. There's no save
-// system yet, so the current run is lost — hence the confirm.
+// app always opens on the start menu, so reloading lands there. (The game menu asks first.)
 function returnToMenu() {
-  if (window.confirm("Return to the main menu? Your current run will be lost.")) {
-    window.location.reload();
-  }
+  window.location.reload();
 }
 
 // Dev-only handle for inspecting the simulation from the browser console.
 if (import.meta.env.DEV) import("./dev/scenario").then((m) => Object.assign(window, { __scenario: m.runScenario }));
 if (import.meta.env.DEV) import("./dev/perf").then((m) => Object.assign(window, { __perf: m.runPerf, __perfYearEnd: m.timeYearEndReport, __perfNewYear: m.timeNewYearPieces, __perfMapTick: m.timeMapPowerTick, __perfRolling: m.timeRollingChart }));
-if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval } });
+if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore } });
+if (import.meta.env.DEV) import("./sim/saveGame").then((m) => Object.assign(window, { __save: m }));
 
-function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Difficulty; transparency: boolean }) {
+/** A run: a new game of `slug`, or — with `restore` — a saved one picked up where it was left. */
+function Game({ slug, difficulty, transparency, restore }: { slug: string; difficulty: Difficulty; transparency: boolean; restore?: SaveFile }) {
   const [dataset, setDataset] = useState<MunicipalityDataset | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedEgid, setSelectedEgid] = useState<string | null>(null);
@@ -76,9 +78,10 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
   const showTownHall = townHall !== null;
   const [showWiki, setShowWiki] = useState(false);
   const [inboxSelection, setInboxSelection] = useState<InboxSelection | null>(null);
+  const [showMenu, setShowMenu] = useState(false);
   const reportCardYear = useReportCardYear();
   const stockBuildings = useStockBuildings();
-  const keyboardEnabled = !showTownHall && !showWiki && inboxSelection === null && reportCardYear === null;
+  const keyboardEnabled = !showTownHall && !showWiki && !showMenu && inboxSelection === null && reportCardYear === null;
   useTimeKeyboard(keyboardEnabled);
 
   // Escape closes whatever is on top: the Year in Review, then the Wiki or the town hall, then a
@@ -89,6 +92,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
       if (e.key !== "Escape" || e.ctrlKey || e.metaKey || e.altKey) return;
       if (approval.getGameOver()) return;
       if (reportCardYear !== null) reportCardStore.dismiss();
+      else if (showMenu) setShowMenu(false);
       else if (inboxSelection !== null) setInboxSelection(null);
       else if (showWiki) setShowWiki(false);
       else if (showTownHall) setTownHall(null);
@@ -102,9 +106,11 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [reportCardYear, inboxSelection, showWiki, showTownHall, selectedEwid, selectedEgid, colorMode]);
+  }, [reportCardYear, showMenu, inboxSelection, showWiki, showTownHall, selectedEwid, selectedEgid, colorMode]);
 
   useEffect(() => {
+    // A loaded game stays still until it is put back (applySave), then waits, paused.
+    if (restore) simClock.setSpeed(0);
     simClock.start();
     const stopWatcher = startYearEndWatcher();
     return () => {
@@ -114,8 +120,11 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
   }, []);
 
   useEffect(() => {
+    // Set up once: React may run this effect twice (StrictMode), and the modules are singletons.
+    let cancelled = false;
     loadDataset(`/data/${slug}.json`)
       .then((loaded) => {
+        if (cancelled) return;
         measures.init(difficulty); // before the stock: it registers the town size the measures' costs scale with
         approval.init(difficulty, `approval:${loaded.bfsNumber}`);
         studies.init(`studies:${loaded.bfsNumber}`);
@@ -146,10 +155,32 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
         inbox.init();
         letters.init(loaded, () => stock.getAll(), `letters:${loaded.bfsNumber}`);
         newspaper.init(loaded, () => stock.getAll(), `paper:${loaded.bfsNumber}`);
+        if (restore) {
+          applySave(restore);
+          // Dev check: the state right after loading, to compare with the save (see saveGame.ts).
+          if (import.meta.env.DEV) Object.assign(window, { __stateAfterLoad: stateJson(transparency) });
+        }
         setDataset(loaded);
       })
       .catch((e: Error) => setError(e.message));
-  }, [slug, difficulty]);
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, difficulty, restore]);
+
+  // Each time a Year in Review is closed, the run is saved to this browser's one autosave slot.
+  const shownReport = useRef<number | null>(null);
+  useEffect(() => {
+    if (reportCardYear !== null) {
+      shownReport.current = reportCardYear;
+      return;
+    }
+    if (shownReport.current === null || !dataset) return;
+    shownReport.current = null;
+    captureSave({ slug, municipality: dataset.name, difficulty, transparency }, "Autosave")
+      .then(({ meta, bytes }) => putSave(AUTOSAVE_ID, meta, bytes))
+      .catch((e: Error) => console.warn("Autosave failed:", e.message));
+  }, [reportCardYear, dataset, slug, difficulty, transparency]);
 
   // Samples each finished month for the year-end report in the background, so the report opens fast.
   useEffect(() => (dataset ? startYearPassPrefetch(dataset.powerPlants) : undefined), [dataset]);
@@ -199,7 +230,7 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
         onOpenTownHall={() => setTownHall((open) => (open ? null : "overview"))}
         onOpenInbox={() => setInboxSelection((open) => (open ? null : { tab: "letters", id: null }))}
         onOpenWiki={() => setShowWiki((open) => !open)}
-        onMenu={returnToMenu}
+        onMenu={() => setShowMenu((open) => !open)}
       />
       <div className="stage">
         <MapView
@@ -255,6 +286,9 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
         <TownHall dataset={liveDataset ?? dataset} transparency={transparency} section={townHall} onSection={setTownHall} onClose={() => setTownHall(null)} />
       )}
       {showWiki && <WikiPanel onClose={() => setShowWiki(false)} />}
+      {showMenu && (
+        <GameMenu run={{ slug, municipality: dataset.name, difficulty, transparency }} onClose={() => setShowMenu(false)} onMainMenu={returnToMenu} />
+      )}
       {inboxSelection && (
         <InboxPanel
           initial={inboxSelection}
@@ -273,10 +307,10 @@ function Game({ slug, difficulty, transparency }: { slug: string; difficulty: Di
 }
 
 export default function App() {
-  const [choice, setChoice] = useState<{ slug: string; difficulty: Difficulty; transparency: boolean } | null>(null);
+  const [choice, setChoice] = useState<{ slug: string; difficulty: Difficulty; transparency: boolean; restore?: SaveFile } | null>(null);
   return choice ? (
-    <Game slug={choice.slug} difficulty={choice.difficulty} transparency={choice.transparency} />
+    <Game slug={choice.slug} difficulty={choice.difficulty} transparency={choice.transparency} restore={choice.restore} />
   ) : (
-    <StartMenu onStart={(slug, difficulty, transparency) => setChoice({ slug, difficulty, transparency })} />
+    <StartMenu onStart={(slug, difficulty, transparency, restore) => setChoice({ slug, difficulty, transparency, restore })} />
   );
 }

@@ -70,6 +70,28 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "saving",
+    title: "Saving your game",
+    blocks: [
+      p(
+        "The game menu (☰, top right) saves your run. The game pauses while the menu is open. There are two ways to keep a run:",
+      ),
+      list([
+        "In this browser: give the save a name and save it; it appears under Load game on the start screen. You can overwrite a save with the current state, or delete it. These saves live in this browser on this device only — clearing the browser's site data deletes them.",
+        "As a save string: the whole run as a block of text, to copy or download as a file and keep anywhere. Paste it, or open the file, under Load game on the start screen — on any device.",
+      ]),
+      p(
+        "Every time you close a Year in Review, the game also saves itself to an autosave, which the next one replaces.",
+      ),
+      p(
+        "A loaded game picks up exactly where it was saved, paused: the same town, the same households and their pending decisions, the same accounts, votes, letters and paper.",
+      ),
+      note(
+        "For now a save only loads into the version of the game that made it (the version is shown in the game menu and on the start screen). A save from another version is listed but can't be loaded.",
+      ),
+    ],
+  },
+  {
     id: "controls",
     title: "Keyboard controls",
     blocks: [
@@ -79,7 +101,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "W A S D — move the map, relative to the way you're facing.",
         "Q / E — turn the view left or right.",
         "R / F — tilt the view toward the horizon or toward straight down.",
-        "Esc — close whatever is on top: the Year in Review, the wiki, the inbox or the Town hall, a charger you're placing, a home (back to its building), a building, a selected charger, and finally the map layer (back to the plain map).",
+        "Esc — close whatever is on top: the Year in Review, the game menu, the wiki, the inbox or the Town hall, a charger you're placing, a home (back to its building), a building, a selected charger, and finally the map layer (back to the plain map).",
       ]),
       note("The keys do nothing while a window is open or while you're typing in a text field."),
     ],
@@ -748,7 +770,7 @@ export const WIKI_GROUPS: WikiGroup[] = [
     id: "start",
     title: "Getting started",
     blurb: "What the game is, how to find your way around, and how time passes.",
-    sections: ["overview", "controls", "map-layers", "time", "year-in-review"],
+    sections: ["overview", "controls", "map-layers", "time", "year-in-review", "saving"],
   },
   {
     id: "governing",

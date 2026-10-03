@@ -183,6 +183,19 @@ class Studies {
     this.version++;
     this.listeners.forEach((l) => l());
   }
+
+  // --- saving (saveGame.ts) ---
+
+  snapshot() {
+    return { evaluations: this.evaluations, surveys: this.surveys, nextId: this.nextId };
+  }
+
+  restore(s: ReturnType<Studies["snapshot"]>): void {
+    this.evaluations = s.evaluations;
+    this.surveys = s.surveys;
+    this.nextId = s.nextId;
+    this.notify();
+  }
 }
 
 export const studies = new Studies();

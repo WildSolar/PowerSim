@@ -93,3 +93,15 @@ export async function computeEmissionsForYear(buildings: Building[], plants: Pow
   emissionsCache.set(year, result);
   return result;
 }
+
+// --- saving (saveGame.ts) ---
+
+/** Counted years: fixed once counted (under the green-power share of the day), so they are kept. */
+export function snapshotEmissions(): Map<number, EmissionsBreakdown> {
+  return emissionsCache;
+}
+
+export function restoreEmissions(saved: Map<number, EmissionsBreakdown>): void {
+  emissionsCache.clear();
+  for (const [year, e] of saved) emissionsCache.set(year, e);
+}

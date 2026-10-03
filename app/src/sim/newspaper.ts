@@ -20,6 +20,7 @@ import { currentHeatingSystemId, heatingRenewalsInRange } from "./heatingRenewal
 import { inbox, type NewsStory } from "./inbox";
 import { letters } from "./letters";
 import { existsAt } from "./lifetime";
+import { MEASURE_BY_ID } from "./measureCatalog";
 import { measures, type MeasureEvent } from "./measures";
 import { mobilityCensus } from "./mobility";
 import { publicCharging } from "./publicCharging";
@@ -368,6 +369,32 @@ class Newspaper {
     if (leaning === "supportive") return `The energy department has the town behind it: ${pct}% approve of its work. Good will is capital — the question is what it will be spent on.${electionNote}`;
     if (leaning === "critical") return `Only ${pct}% approve of the energy department's work. It would do well to listen before it decides.${electionNote}`;
     return `Opinion on the energy department is divided, with ${pct}% approving. Neither cheers nor jeers — yet.${electionNote}`;
+  }
+
+  // --- saving (saveGame.ts) ---
+
+  snapshot() {
+    return {
+      // A measure's definition is code: it travels as its id.
+      measureEvents: this.measureEvents.map((e) => ({ ...e, def: e.def.id })),
+      approvalEvents: this.approvalEvents,
+      debtEvents: this.debtEvents,
+      lastRate: this.lastRate,
+      lastMonth: this.lastMonth,
+      lastShares: this.lastShares,
+    };
+  }
+
+  restore(s: ReturnType<Newspaper["snapshot"]>): void {
+    this.measureEvents = s.measureEvents.flatMap((e) => {
+      const def = MEASURE_BY_ID.get(e.def);
+      return def ? [{ ...e, def } as MeasureEvent] : [];
+    });
+    this.approvalEvents = s.approvalEvents;
+    this.debtEvents = s.debtEvents;
+    this.lastRate = s.lastRate;
+    this.lastMonth = s.lastMonth;
+    this.lastShares = s.lastShares;
   }
 }
 

@@ -44,3 +44,8 @@ function checkYearBoundary(): void {
 export function startYearEndWatcher(): () => void {
   return simClock.subscribe(checkYearBoundary);
 }
+
+/** After a game is loaded: the clock has jumped, which is not a year ending. */
+export function resetYearEndWatcher(): void {
+  lastCheckedYear = null;
+}

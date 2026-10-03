@@ -230,6 +230,19 @@ class Treasury {
     this.version++;
     this.listeners.forEach((l) => l());
   }
+
+  // --- saving (saveGame.ts) ---
+
+  snapshot() {
+    return { payouts: this.payouts, receipts: this.receipts };
+  }
+
+  restore(s: ReturnType<Treasury["snapshot"]>): void {
+    this.payouts = s.payouts;
+    this.receipts = s.receipts;
+    this.bookedVersion++;
+    this.notify();
+  }
 }
 
 export const treasury = new Treasury();
