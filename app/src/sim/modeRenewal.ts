@@ -17,6 +17,7 @@
  * affects renewals still to come, never rewrites one already decided.
  */
 
+import { groupByBuilding, ungroup, type ChainsByBuilding } from "./chainKeys";
 import { logWeightedDecision, type DecisionCandidateLog } from "./decisionLog";
 import { hashSeed, mulberry32 } from "./rng";
 import { weibullAgedRemainder, weibullSample } from "./weibull";
@@ -154,10 +155,10 @@ type SavedEntry = [SavedEvent[]];
 
 export interface ModeChainsSnapshot {
   /** Chains with a history. */
-  full: Map<string, SavedEntry>;
+  full: ChainsByBuilding<SavedEntry>;
   /** Chains that still hold only their first choice: just that choice (drawn from the shares of
    * the day, so it is kept rather than drawn again). Their next life event is a seeded draw. */
-  initial: Map<string, string>;
+  initial: ChainsByBuilding<string>;
 }
 
 export function snapshotModeChains(): ModeChainsSnapshot {
@@ -168,11 +169,12 @@ export function snapshotModeChains(): ModeChainsSnapshot {
     if (entry.events.length === 1 && e.installedAtMs === Number.NEGATIVE_INFINITY && e.previousChoice === null) initial.set(key, e.choice);
     else full.set(key, [entry.events.map((ev) => [ev.installedAtMs === Number.NEGATIVE_INFINITY ? null : ev.installedAtMs, ev.choice, ev.previousChoice])]);
   }
-  return { full, initial };
+  return { full: groupByBuilding(full), initial: groupByBuilding(initial) };
 }
 
 /** Puts the saved chains back, updating existing entries in place (mobility.ts's slot handles keep them). */
 export function restoreModeChains(saved: ModeChainsSnapshot): void {
+  const kept = new Set<string>();
   const put = (key: string, events: ModeEvent<string>[], nextDueMs: number) => {
     const existing = chains.get(key);
     if (existing) {
@@ -182,13 +184,21 @@ export function restoreModeChains(saved: ModeChainsSnapshot): void {
       chains.set(key, { events, nextDueMs });
     }
   };
-  for (const [key, [events]] of saved.full) {
+  for (const [key, [events]] of ungroupInto(saved.full, kept)) {
     put(
       key,
       events.map(([installedAtMs, choice, previousChoice]) => ({ installedAtMs: installedAtMs ?? Number.NEGATIVE_INFINITY, choice, previousChoice })),
       Number.NEGATIVE_INFINITY,
     );
   }
-  for (const [key, choice] of saved.initial) put(key, [{ installedAtMs: Number.NEGATIVE_INFINITY, choice, previousChoice: null }], Number.NEGATIVE_INFINITY);
-  for (const key of [...chains.keys()]) if (!saved.full.has(key) && !saved.initial.has(key)) chains.delete(key);
+  for (const [key, choice] of ungroupInto(saved.initial, kept)) put(key, [{ installedAtMs: Number.NEGATIVE_INFINITY, choice, previousChoice: null }], Number.NEGATIVE_INFINITY);
+  for (const key of [...chains.keys()]) if (!kept.has(key)) chains.delete(key);
+}
+
+/** The grouped entries, noting each key as it goes. */
+function* ungroupInto<V>(grouped: ChainsByBuilding<V>, kept: Set<string>): Generator<[string, V]> {
+  for (const [key, value] of ungroup(grouped)) {
+    kept.add(key);
+    yield [key, value];
+  }
 }

@@ -22,6 +22,7 @@
  * does.
  */
 
+import { groupByBuilding, ungroup, type ChainsByBuilding } from "./chainKeys";
 import { policyStore } from "./policy";
 import { EARLY_SWITCH_UNCERTAINTY_SHARE } from "../config/earlySwitch";
 import { subsidyCategoryForDecision, treasury } from "./treasury";
@@ -361,10 +362,10 @@ type SavedEntry = [SavedEvent[], number?];
 
 export interface RenewalChainsSnapshot {
   /** Chains with a history, or with early reviews held. */
-  full: Map<string, SavedEntry>;
+  full: ChainsByBuilding<SavedEntry>;
   /** Chains that still hold only their starting system: just that. Their next renewal date is
    * a seeded draw, worked out again the next time they are asked. */
-  initial: Map<string, string>;
+  initial: ChainsByBuilding<string>;
 }
 
 function isUntouched(entry: RenewalChainEntry<string>): boolean {
@@ -407,12 +408,13 @@ export function snapshotRenewalChains(): RenewalChainsSnapshot {
       full.set(key, saved);
     }
   }
-  return { full, initial };
+  return { full: groupByBuilding(full), initial: groupByBuilding(initial) };
 }
 
 /** Puts the saved chains back. Entries that already exist are updated in place, since other
  * modules keep references to them (mobility.ts's slot handles, fleet.ts's vehicles). */
 export function restoreRenewalChains(saved: RenewalChainsSnapshot): void {
+  const kept = new Set<string>();
   const put = (key: string, events: RenewalEvent<string>[], nextDueMs: number, reviewedThroughMs: number | undefined) => {
     const existing = chains.get(key);
     if (existing) {
@@ -425,9 +427,17 @@ export function restoreRenewalChains(saved: RenewalChainsSnapshot): void {
       chains.set(key, entry);
     }
   };
-  for (const [key, [events, reviewedThroughMs]] of saved.full) put(key, events.map(unpackEvent), Number.NEGATIVE_INFINITY, reviewedThroughMs);
-  for (const [key, system] of saved.initial) {
+  for (const [key, [events, reviewedThroughMs]] of ungroupInto(saved.full, kept)) put(key, events.map(unpackEvent), Number.NEGATIVE_INFINITY, reviewedThroughMs);
+  for (const [key, system] of ungroupInto(saved.initial, kept)) {
     put(key, [{ installedAtMs: Number.NEGATIVE_INFINITY, system, previousSystem: null, reasonKind: "initial", bestOverallId: null }], Number.NEGATIVE_INFINITY, undefined);
   }
-  for (const key of [...chains.keys()]) if (!saved.full.has(key) && !saved.initial.has(key)) chains.delete(key);
+  for (const key of [...chains.keys()]) if (!kept.has(key)) chains.delete(key);
+}
+
+/** The grouped entries, noting each key as it goes. */
+function* ungroupInto<V>(grouped: ChainsByBuilding<V>, kept: Set<string>): Generator<[string, V]> {
+  for (const [key, value] of ungroup(grouped)) {
+    kept.add(key);
+    yield [key, value];
+  }
 }
