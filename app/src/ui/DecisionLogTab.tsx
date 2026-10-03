@@ -159,7 +159,7 @@ export function DecisionLogTab({ dataset }: DecisionLogTabProps) {
   return (
     <div className="panel-typography">
       <h2 style={{ fontSize: 14, marginTop: 0 }}>🐛 Decision log</h2>
-      <p style={{ fontSize: 12, color: "#888", margin: "0 0 10px" }}>
+      <p style={{ fontSize: 12, color: "var(--ink-3)", margin: "0 0 10px" }}>
         Every stock-renewal/solar-adoption decision actually committed — a development tool for calibration, not something players see.
       </p>
 
@@ -193,7 +193,7 @@ export function DecisionLogTab({ dataset }: DecisionLogTabProps) {
         </button>
       </div>
 
-      <p style={{ fontSize: 11, color: "#898781", margin: "6px 0" }}>
+      <p style={{ fontSize: 11, color: "var(--ink-3)", margin: "6px 0" }}>
         {filtered.length === 0
           ? "No matching decisions yet."
           : `Showing ${shown.length} of ${filtered.length} matching (${allEntries.length} total, most recent first)${

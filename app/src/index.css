@@ -1,9 +1,142 @@
-html, body, #root {
+/*
+ * Design tokens. Every UI colour, font, radius and shadow comes from here, so the
+ * look can be tuned in one place and dark mode is a second set of values.
+ *
+ * The direction: a Swiss civic look — one grotesk with tabular figures, white and
+ * warm-grey paper, hairline rules rather than floating cards, black for what is
+ * selected and a single red for what you can act on. Data colours (map layers,
+ * chart series) are not tokens here; they belong to the data.
+ */
+
+:root {
+  --font: "Inter Variable", "Inter", system-ui, sans-serif;
+  --font-display: "Inter Tight Variable", "Inter Variable", system-ui, sans-serif;
+  --font-paper: Georgia, "Times New Roman", serif;
+
+  --ink: #15171a;
+  --ink-2: #4b4e55;
+  --ink-3: #7d8088;
+  --ink-4: #a9abb0;
+
+  --surface: #ffffff;
+  --surface-glass: rgba(255, 255, 255, 0.95);
+  --fill: #f4f4f1;
+  --fill-2: #ebeae6;
+  --line: #e4e3df;
+  --line-strong: #cfcec8;
+
+  --accent: #d8232a;
+  --accent-strong: #b51c22;
+  --accent-soft: #fcebea;
+  --on-accent: #ffffff;
+  --selected: #15171a;
+  --on-selected: #ffffff;
+
+  --good: #0d7a52;
+  --good-soft: #e2f2ea;
+  --good-line: #8fd0b2;
+  --warn: #8f5a00;
+  --warn-soft: #fdf2d9;
+  --warn-line: #f0c060;
+  --bad: #b23a2e;
+  --bad-soft: #fbecea;
+  --bad-line: #e3a5a3;
+
+  --tooltip: rgba(21, 23, 26, 0.94);
+  --on-tooltip: #ffffff;
+  --on-tooltip-2: #c6c8cc;
+  --backdrop: rgba(12, 13, 15, 0.5);
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 14px rgba(0, 0, 0, 0.08);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.08), 0 18px 48px rgba(0, 0, 0, 0.2);
+
+  --r-1: 2px;
+  --r-2: 4px;
+  --r-3: 6px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #ecedef;
+    --ink-2: #b9bbc0;
+    --ink-3: #8b8e95;
+    --ink-4: #62656c;
+
+    --surface: #1b1d21;
+    --surface-glass: rgba(27, 29, 33, 0.95);
+    --fill: #24272c;
+    --fill-2: #2e3137;
+    --line: #33363c;
+    --line-strong: #4a4d54;
+
+    --accent: #f0474c;
+    --accent-strong: #ff6a6e;
+    --accent-soft: #3a1f21;
+    --selected: #ecedef;
+    --on-selected: #15171a;
+
+    --good: #4cc08f;
+    --good-soft: #17322a;
+    --good-line: #2f6f55;
+    --warn: #e7a940;
+    --warn-soft: #372b15;
+    --warn-line: #7a5a1c;
+    --bad: #f07a6e;
+    --bad-soft: #3a2220;
+    --bad-line: #7d3a35;
+
+    --tooltip: rgba(236, 237, 239, 0.96);
+    --on-tooltip: #15171a;
+    --on-tooltip-2: #4b4e55;
+    --backdrop: rgba(0, 0, 0, 0.6);
+
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.35);
+    --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.4), 0 18px 48px rgba(0, 0, 0, 0.55);
+
+    color-scheme: dark;
+  }
+}
+
+html,
+body,
+#root {
   height: 100%;
   margin: 0;
   padding: 0;
 }
 
+body {
+  background: var(--fill);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 13px;
+  font-feature-settings: "tnum" 1, "cv11" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
 * {
   box-sizing: border-box;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }

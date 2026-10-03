@@ -21,15 +21,15 @@
 .bar-chart-detail {
   margin-top: 6px;
   padding: 6px 8px;
-  background: #f8f8f8;
-  border: 1px solid #eee;
-  border-radius: 6px;
+  background: var(--fill);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
   font-size: 11px;
 }
 
 .bar-chart-detail-label {
   display: block;
-  color: #52514e;
+  color: var(--ink-2);
   margin-bottom: 3px;
 }
 
@@ -45,12 +45,12 @@
 }
 
 .bar-chart-detail-name {
-  color: #52514e;
+  color: var(--ink-2);
 }
 
 .bar-chart-detail-value {
   margin-left: auto;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: #1a1a1a;
+  color: var(--ink);
 }

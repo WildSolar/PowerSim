@@ -36,7 +36,7 @@ export function ModalSplitSection({ buildings, simDayMs }: { buildings: Building
 
   return (
     <>
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Getting around</h2>
+      <h3 className="section-heading">Getting around</h3>
       <p className="modal-split-note">Residents by their main way of getting around — from the federal mobility survey and the vehicle register.</p>
       <div className="modal-split-bar" role="img" aria-label={MOBILITY_MODE_ORDER.map((m) => `${MOBILITY_MODE_CATALOG[m].label} ${pct(now.byMode[m], nowTotal)}`).join(", ")}>
         {MOBILITY_MODE_ORDER.map((m) => (

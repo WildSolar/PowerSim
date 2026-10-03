@@ -89,7 +89,7 @@ export function CityStatsTab({ dataset }: CityStatsTabProps) {
 
       <ModalSplitSection buildings={dataset.buildings} simDayMs={currentDay} />
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Energy breakdown</h2>
+      <h3 className="section-heading">Energy breakdown</h3>
       <div className="tier-buttons">
         {GRANULARITIES.map((g) => (
           <button key={g.value} className={g.value === granularity ? "active" : ""} onClick={() => setGranularity(g.value)}>
@@ -106,13 +106,13 @@ export function CityStatsTab({ dataset }: CityStatsTabProps) {
         </div>
       )}
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Net power — last 24h</h2>
+      <h3 className="section-heading">Net power — last 24h</h3>
       <HistoryChart
         times={history.times}
         series={[{ key: "total", label: "Net", color: "#2a78d6", values: history.totalW }]}
       />
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Solar generation — last 24h</h2>
+      <h3 className="section-heading">Solar generation — last 24h</h3>
       <HistoryChart times={history.times} series={[{ key: "pv", label: "Solar", color: "#eda100", values: history.pvW }]} />
     </div>
   );

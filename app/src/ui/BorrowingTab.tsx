@@ -75,7 +75,7 @@ export function BorrowingTab() {
         </div>
       </div>
       <div className="borrow-gauge" title={`The canton's limit: debt worth ${DEBT_LIMIT_YEARS} years of income (${formatCHF(limitRp)})`}>
-        <div style={{ width: `${Math.min(100, (debtRp / Math.max(1, limitRp)) * 100)}%`, background: years >= DEBT_LIMIT_YEARS ? "#b0413e" : years >= 3 ? "#e0a030" : "#2a78d6" }} />
+        <div style={{ width: `${Math.min(100, (debtRp / Math.max(1, limitRp)) * 100)}%`, background: years >= DEBT_LIMIT_YEARS ? "var(--bad)" : years >= 3 ? "#e0a030" : "var(--ink-3)" }} />
       </div>
       <div className="borrow-note" style={{ marginBottom: 8 }}>
         Limit {formatCHF(limitRp)} ({DEBT_LIMIT_YEARS} years of income: {formatCHF(debt.incomeRp(now))} a year).

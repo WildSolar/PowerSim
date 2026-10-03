@@ -20,18 +20,18 @@ export function TreasuryPanel({ dataset, onOpen }: { dataset: MunicipalityDatase
   return (
     <div className="time-control treasury-card" title="Click for the accounts and borrowing" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => e.key === "Enter" && onOpen()}>
       <h3 className="panel-title">Treasury</h3>
-      <div className="clock-readout" style={{ fontWeight: 700, color: balanceRp !== null && balanceRp < 0 ? "#b23a2e" : "#1a1a1a" }}>
+      <div className="clock-readout" style={{ fontWeight: 700, color: balanceRp !== null && balanceRp < 0 ? "var(--bad)" : "var(--ink)" }}>
         {balanceRp === null ? "…" : formatCHF(balanceRp)}
       </div>
       <div className="info-row">
         <span>Budget this year</span>
-        <span className="info-value" style={{ color: "#1baf7a" }}>
+        <span className="info-value" style={{ color: "var(--good)" }}>
           +{formatCHF(budgetRp)}
         </span>
       </div>
       <div className="info-row">
         <span>Paid out so far</span>
-        <span className="info-value" style={{ color: paidOutRp > 0 ? "#b23a2e" : undefined }}>
+        <span className="info-value" style={{ color: paidOutRp > 0 ? "var(--bad)" : undefined }}>
           −{formatCHF(paidOutRp)}
         </span>
       </div>
@@ -44,7 +44,7 @@ export function TreasuryPanel({ dataset, onOpen }: { dataset: MunicipalityDatase
       {owedRp > 0 && (
         <div className="info-row" title="Loans and bonds outstanding (Control → Treasury → Borrowing)">
           <span>Debt · {debt.rating(now).label}</span>
-          <span className="info-value" style={{ color: debt.isSupervised() ? "#b23a2e" : undefined }}>
+          <span className="info-value" style={{ color: debt.isSupervised() ? "var(--bad)" : undefined }}>
             {formatCHF(owedRp)}
           </span>
         </div>
@@ -52,7 +52,7 @@ export function TreasuryPanel({ dataset, onOpen }: { dataset: MunicipalityDatase
       {receivedRp > 0 && (
         <div className="info-row" title="Value-capture levy on projects that gained from a zoning change">
           <span>Zoning levy so far</span>
-          <span className="info-value" style={{ color: "#1baf7a" }}>
+          <span className="info-value" style={{ color: "var(--good)" }}>
             +{formatCHF(receivedRp)}
           </span>
         </div>

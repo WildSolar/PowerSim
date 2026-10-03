@@ -8,21 +8,21 @@
 }
 
 .ev-bar-fill.full {
-  background: #d0342c;
+  background: var(--bad);
 }
 
 .ev-access {
   margin: 8px 0 4px;
   padding-top: 6px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--line);
 }
 
 .ev-site {
   margin-top: 10px;
   padding: 8px;
   border: 1px solid #f97316;
-  border-radius: 8px;
-  background: #fffaf5;
+  border-radius: var(--r-2);
+  background: var(--warn-soft);
 }
 
 .ev-site-head {
@@ -40,7 +40,7 @@
 .ev-close {
   border: none;
   background: none;
-  color: #898781;
+  color: var(--ink-3);
   cursor: pointer;
   padding: 0 2px;
   font-size: 12px;
@@ -50,7 +50,7 @@
   margin: 10px 0 4px;
   font-size: 11px;
   font-weight: 400;
-  color: #898781;
+  color: var(--ink-3);
 }
 
 .ev-history {
@@ -79,22 +79,22 @@
   bottom: 0;
   left: 0;
   right: 0;
-  border-radius: 3px 3px 0 0;
+  border-radius: var(--r-1) var(--r-1) 0 0;
 }
 
 .ev-history-capacity {
-  background: #eeece8;
+  background: var(--fill-2);
 }
 
 .ev-history-users {
   left: 3px;
   right: 3px;
-  background: #2a78d6;
+  background: var(--accent);
 }
 
 .ev-history-year {
   font-size: 10px;
-  color: #898781;
+  color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
 
@@ -109,9 +109,9 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  border: 1px solid #ddd;
-  background: #f8f8f8;
-  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--fill);
+  border-radius: var(--r-2);
   padding: 6px 10px;
   font-size: 12px;
   cursor: pointer;
@@ -119,7 +119,7 @@
 }
 
 .ev-build button:hover {
-  border-color: #2a78d6;
+  border-color: var(--accent);
 }
 
 .ev-build-name {
@@ -128,7 +128,7 @@
 
 .ev-build-detail {
   font-size: 11px;
-  color: #52514e;
+  color: var(--ink-2);
 }
 
 .ev-list-row {
@@ -140,16 +140,16 @@
   background: none;
   padding: 3px 4px;
   margin: 0 -4px 1px;
-  border-radius: 4px;
+  border-radius: var(--r-1);
   font: inherit;
-  color: #52514e;
+  color: var(--ink-2);
   cursor: pointer;
   text-align: left;
 }
 
 .ev-list-row:hover,
 .ev-list-row.selected {
-  background: #f3f1ec;
+  background: var(--fill);
 }
 
 .ev-list-name {
@@ -161,9 +161,9 @@
 
 .charger-popup .maplibregl-popup-content {
   padding: 4px 8px;
-  font-family: system-ui, sans-serif;
+  font-family: var(--font);
   font-size: 12px;
-  border-radius: 6px;
+  border-radius: var(--r-2);
 }
 
 .ev-coverage {
@@ -176,7 +176,7 @@
 
 .ev-coverage-label {
   font-size: 11px;
-  color: #898781;
+  color: var(--ink-3);
   margin-right: 2px;
 }
 
@@ -184,19 +184,19 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid #ddd;
-  background: #f8f8f8;
-  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--fill);
+  border-radius: var(--r-3);
   padding: 2px 8px;
   font-size: 11px;
-  color: #52514e;
+  color: var(--ink-2);
   cursor: pointer;
 }
 
 .ev-coverage-toggle.on {
-  border-color: #1a1a1a;
-  background: #fff;
-  color: #1a1a1a;
+  border-color: var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
   font-weight: 600;
 }
 
@@ -215,9 +215,9 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  border: 1px solid #ddd;
-  background: #f8f8f8;
-  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--fill);
+  border-radius: var(--r-2);
   padding: 6px 10px 8px;
   font-size: 12px;
 }
@@ -234,9 +234,9 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 1px;
-  border: 1px solid #ddd;
-  background: #fff;
-  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: var(--r-2);
   padding: 4px 6px;
   font-size: 11px;
   cursor: pointer;
@@ -244,7 +244,7 @@
 }
 
 .ev-sizes button:hover {
-  border-color: #2a78d6;
+  border-color: var(--accent);
 }
 
 .ev-coverage-toggle:disabled {
@@ -260,18 +260,18 @@
 }
 
 .ev-filter {
-  border: 1px solid #ddd;
-  background: #f8f8f8;
-  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--fill);
+  border-radius: var(--r-3);
   padding: 1px 7px;
   font-size: 11px;
-  color: #52514e;
+  color: var(--ink-2);
   cursor: pointer;
 }
 
 .ev-filter.on {
-  border-color: #1a1a1a;
-  background: #fff;
-  color: #1a1a1a;
+  border-color: var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
   font-weight: 600;
 }

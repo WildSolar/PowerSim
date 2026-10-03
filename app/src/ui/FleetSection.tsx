@@ -57,7 +57,7 @@ export function FleetSection({ building, simTimeMs }: { building: Building; simT
 
   return (
     <>
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Vans &amp; lorries ({vehicles.length})</h2>
+      <h3 className="section-heading">Vans &amp; lorries ({vehicles.length})</h3>
       {rows.map((r) => (
         <div className="device-row" key={`${r.id}|${r.where}`}>
           <span className="device-name">

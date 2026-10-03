@@ -20,7 +20,7 @@ export function RenewalLogSection({ title, entries }: RenewalLogSectionProps) {
   const mostRecentFirst = [...entries].reverse();
   return (
     <>
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>{title}</h2>
+      <h3 className="section-heading">{title}</h3>
       <div className="renewal-log">
         {mostRecentFirst.map((entry) => (
           <div className="renewal-log-entry" key={entry.installedAtMs}>

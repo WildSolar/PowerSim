@@ -234,7 +234,7 @@ export function MeasuresTab() {
         What the municipality can decide. Money leaves the treasury only when something actually happens — a subsidy when a household takes it up, a
         campaign month by month. Laws and programmes take months to years to come into effect.
       </p>
-      <p className="measures-intro" style={{ color: spentRp > budgetRp ? "#b23a2e" : undefined }}>
+      <p className="measures-intro" style={{ color: spentRp > budgetRp ? "var(--bad)" : undefined }}>
         Running spending over the last 12 months (subsidies, programmes, interest — not investments): {formatCHF(spentRp)}, against a yearly government
         allocation of {formatCHF(budgetRp)}. Spending well beyond the allocation costs you approval with taxpayers.
       </p>

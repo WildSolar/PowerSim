@@ -4,40 +4,74 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
-  background: linear-gradient(160deg, #1d3b5c, #2a78d6);
-  font-family: system-ui, sans-serif;
+  gap: 72px;
+  padding: 32px 16px;
+  background: var(--fill);
+  font-family: var(--font);
   overflow-y: auto;
+}
+
+.start-menu-title {
+  max-width: 380px;
+}
+
+.start-menu-mark {
+  display: block;
+  width: 56px;
+  height: 8px;
+  margin-bottom: 22px;
+  background: var(--accent);
+}
+
+.start-menu-title h1 {
+  margin: 0 0 18px;
+  font-size: clamp(44px, 7vw, 76px);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+  color: var(--ink);
+}
+
+.start-menu-title p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink-2);
 }
 
 .start-menu-card {
   width: 100%;
   max-width: 420px;
-  background: #fff;
-  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
   padding: 28px;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-1);
 }
 
-.start-menu-card h1 {
-  margin: 0 0 4px;
-  font-size: 26px;
+@media (max-width: 860px) {
+  .start-menu {
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 28px;
+  }
 }
 
 .start-menu-tagline {
-  margin: 0 0 20px;
-  color: #555;
+  margin: 0 0 16px;
+  font-weight: 600;
+  color: var(--ink-2);
   font-size: 14px;
 }
 
 .start-menu-status,
 .start-menu-error {
   font-size: 14px;
-  color: #555;
+  color: var(--ink-2);
 }
 
 .start-menu-error {
-  color: #b3261e;
+  color: var(--bad);
 }
 
 .start-menu-search {
@@ -45,14 +79,14 @@
   box-sizing: border-box;
   margin-bottom: 10px;
   padding: 10px 12px;
-  border: 1px solid #ccc;
-  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-3);
   font-family: inherit;
   font-size: 14px;
 }
 
 .start-menu-search:focus {
-  outline: 2px solid #2a78d6;
+  outline: 2px solid var(--accent);
   border-color: transparent;
 }
 
@@ -77,9 +111,9 @@
   justify-content: space-between;
   gap: 12px;
   padding: 0 14px;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  background: #fff;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-3);
+  background: var(--surface);
   font-family: inherit;
   text-align: left;
   cursor: pointer;
@@ -87,8 +121,8 @@
 }
 
 .start-menu-item:hover {
-  background: #f0f4fa;
-  border-color: #2a78d6;
+  background: var(--fill-2);
+  border-color: var(--accent);
 }
 
 .start-menu-name {
@@ -98,7 +132,7 @@
 
 .start-menu-meta {
   font-size: 12px;
-  color: #666;
+  color: var(--ink-2);
   white-space: nowrap;
 }
 
@@ -114,24 +148,24 @@
 .start-menu-difficulty-buttons button {
   flex: 1;
   padding: 6px 0;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-2);
+  background: var(--surface);
   font-family: inherit;
   font-size: 13px;
   cursor: pointer;
 }
 
 .start-menu-difficulty-buttons button.active {
-  background: #2a78d6;
-  border-color: #2a78d6;
-  color: #fff;
+  background: var(--selected);
+  border-color: var(--selected);
+  color: var(--on-selected);
 }
 
 .start-menu-difficulty p {
   margin: 6px 0 0;
   font-size: 12px;
-  color: #666;
+  color: var(--ink-2);
 }
 
 .start-menu-transparency {
@@ -140,7 +174,7 @@
   align-items: flex-start;
   margin: 0 0 14px;
   font-size: 12px;
-  color: #52514e;
+  color: var(--ink-2);
   cursor: pointer;
 }
 

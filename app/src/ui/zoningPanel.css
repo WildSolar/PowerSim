@@ -20,7 +20,7 @@
 
 .zn-action-label {
   font-size: 11px;
-  color: #898781;
+  color: var(--ink-3);
   margin-top: 2px;
 }
 
@@ -28,8 +28,8 @@
   margin-top: 6px;
   padding: 8px;
   border: 1px solid #f97316;
-  border-radius: 8px;
-  background: #fffaf5;
+  border-radius: var(--r-2);
+  background: var(--warn-soft);
 }
 
 .zn-quote-title {
@@ -44,37 +44,37 @@
 }
 
 .zn-reaction.good {
-  color: #0d7a52;
+  color: var(--good);
 }
 
 .zn-reaction.bad {
-  color: #b23a2e;
+  color: var(--bad);
 }
 
 .zn-reaction.neutral {
-  color: #52514e;
+  color: var(--ink-2);
 }
 
 .zn-change {
   display: flex;
   flex-direction: column;
   padding: 4px 0;
-  border-bottom: 1px solid #f1efea;
+  border-bottom: 1px solid var(--fill);
 }
 
 .zn-change-title {
-  color: #1a1a1a;
+  color: var(--ink);
 }
 
 .zn-status {
   font-size: 11px;
-  color: #898781;
+  color: var(--ink-3);
 }
 
 .zn-status.good {
-  color: #0d7a52;
+  color: var(--good);
 }
 
 .zn-status.bad {
-  color: #b23a2e;
+  color: var(--bad);
 }

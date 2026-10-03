@@ -161,7 +161,7 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
 
       {isPublicBuilding(building) && (
         <>
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Municipal building · {publicBuildingKind(building)}</h2>
+          <h3 className="section-heading">Municipal building · {publicBuildingKind(building)}</h3>
           <SupervisionNotice />
           <div className="public-orders">
             <PublicBuildingOrders building={building} realPlants={realPlants} now={simTimeMs} onOrdered={() => setOrders((n) => n + 1)} withName={false} />
@@ -169,7 +169,7 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
         </>
       )}
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Climate control</h2>
+      <h3 className="section-heading">Climate control</h3>
       <div className={`device-row${hasHp ? "" : " inactive"}`}>
         <span className="device-name">
           🌡️ Space heating
@@ -198,7 +198,7 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
       {heatingSystemId && <HeatPumpSiteSection building={building} simTimeMs={simTimeMs} />}
       <RenewalLogSection title="Insulation history" entries={retrofitLog(building, simTimeMs)} />
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Hot water</h2>
+      <h3 className="section-heading">Hot water</h3>
       <div className={`device-row${hasElectricWater ? "" : " inactive"}`}>
         <span className="device-name">🚿 Water heating</span>
         {hasElectricWater ? (
@@ -210,7 +210,7 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
 
       {commCategory && (
         <>
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Commercial</h2>
+          <h3 className="section-heading">Commercial</h3>
           <div className="device-row">
             <span className="device-name">
               {COMMERCIAL_CATEGORY_ICON[commCategory]} {COMMERCIAL_CATEGORY_LABEL[commCategory]}
@@ -223,7 +223,7 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
 
       <FleetSection building={building} simTimeMs={simTimeMs} />
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Solar</h2>
+      <h3 className="section-heading">Solar</h3>
       <div className={`device-row${hasSolar ? "" : " inactive"}`}>
         <span className="device-name">
           ☀️ Generation
@@ -255,13 +255,13 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
       )}
       <RenewalLogSection title="Solar history" entries={solarLog} />
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Daily energy — last 24h</h2>
+      <h3 className="section-heading">Daily energy — last 24h</h3>
       <EnergyBreakdown energy={history.energy} />
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Bill</h2>
+      <h3 className="section-heading">Bill</h3>
       <BillSection summary={billSummary} />
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Net power — last 24h</h2>
+      <h3 className="section-heading">Net power — last 24h</h3>
       <HistoryChart
         times={history.times}
         series={[{ key: "total", label: "Net", color: "#2a78d6", values: history.totalW }]}
@@ -269,7 +269,7 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
 
       {hasSolar && (
         <>
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Solar generation — last 24h</h2>
+          <h3 className="section-heading">Solar generation — last 24h</h3>
           <HistoryChart
             times={history.times}
             series={[{ key: "pv", label: "Solar", color: "#eda100", values: history.pvW }]}
@@ -283,7 +283,7 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
         tariffKey={tariffKey(tariff)}
       />
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Dwellings ({building.dwellings.length})</h2>
+      <h3 className="section-heading">Dwellings ({building.dwellings.length})</h3>
       <ul>
         {building.dwellings.map((dwelling) => (
           <li key={dwelling.ewid}>
@@ -294,7 +294,7 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
             </button>
           </li>
         ))}
-        {building.dwellings.length === 0 && <li style={{ color: "#888", fontSize: 13 }}>No dwellings on record.</li>}
+        {building.dwellings.length === 0 && <li style={{ color: "var(--ink-3)", fontSize: 13 }}>No dwellings on record.</li>}
       </ul>
     </div>
   );

@@ -8,7 +8,7 @@
 .modal-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(11, 11, 11, 0.45);
+  background: var(--backdrop);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -19,11 +19,11 @@
   position: relative;
   width: min(720px, 92vw);
   height: min(560px, 86vh);
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.3);
-  font-family: system-ui, sans-serif;
-  color: #1a1a1a;
+  background: var(--surface);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-2);
+  font-family: var(--font);
+  color: var(--ink);
   display: flex;
   overflow: hidden;
 }
@@ -36,7 +36,7 @@
   background: none;
   font-size: 20px;
   line-height: 1;
-  color: #666;
+  color: var(--ink-2);
   cursor: pointer;
   z-index: 1;
 }
@@ -44,8 +44,8 @@
 .modal-nav {
   width: 220px;
   flex-shrink: 0;
-  background: #f8f8f6;
-  border-right: 1px solid #eee;
+  background: var(--fill);
+  border-right: 1px solid var(--line);
   padding: 16px 0;
   overflow-y: auto;
 }
@@ -55,9 +55,9 @@
   padding: 0 16px;
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #898781;
+  color: var(--ink-3);
 }
 
 .modal-nav ul {
@@ -76,17 +76,17 @@
   background: none;
   padding: 9px 16px;
   font-size: 13px;
-  color: #1a1a1a;
+  color: var(--ink);
   cursor: pointer;
 }
 
 .modal-nav button:hover {
-  background: #eef2ff;
+  background: var(--fill-2);
 }
 
 .modal-nav button.active {
-  background: #2a78d6;
-  color: #fff;
+  background: var(--selected);
+  color: var(--on-selected);
 }
 
 .modal-nav-icon {
@@ -107,7 +107,7 @@
 .modal-content p {
   font-size: 13px;
   line-height: 1.6;
-  color: #2a2a28;
+  color: var(--ink);
   margin: 0 0 12px;
 }
 
@@ -116,7 +116,7 @@
   padding-left: 20px;
   font-size: 13px;
   line-height: 1.6;
-  color: #2a2a28;
+  color: var(--ink);
 }
 
 .modal-list li {
@@ -126,11 +126,11 @@
 .modal-note {
   font-size: 12px;
   line-height: 1.5;
-  color: #52514e;
-  background: #f8f8f8;
-  border: 1px solid #eee;
-  border-left: 3px solid #2a78d6;
-  border-radius: 4px;
+  color: var(--ink-2);
+  background: var(--fill);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-1);
   padding: 8px 10px;
   margin: 0 0 12px;
 }

@@ -58,7 +58,7 @@ export function HistoricalEnergySection({ entityId, sampler, tariffKey }: Histor
 
   return (
     <>
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Historical energy</h2>
+      <h3 className="section-heading">Historical energy</h3>
       <div className="tier-buttons">
         {TIERS.map((t) => (
           <button key={t.value} className={t.value === tier ? "active" : ""} onClick={() => setTier(t.value)}>

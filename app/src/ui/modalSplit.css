@@ -1,6 +1,6 @@
 .modal-split-note {
   font-size: 11px;
-  color: #6b6a66;
+  color: var(--ink-2);
   margin: 0 0 6px;
 }
 
@@ -8,7 +8,7 @@
   display: flex;
   gap: 2px;
   height: 12px;
-  border-radius: 4px;
+  border-radius: var(--r-1);
   overflow: hidden;
   margin-bottom: 6px;
 }
@@ -22,7 +22,7 @@
 
 .modal-split-table th {
   font-weight: 600;
-  color: #6b6a66;
+  color: var(--ink-2);
   text-align: right;
   padding: 2px 4px;
 }
@@ -30,7 +30,7 @@
 .modal-split-table td {
   padding: 2px 4px;
   text-align: right;
-  color: #1a1a1a;
+  color: var(--ink);
 }
 
 .modal-split-table td:first-child {
@@ -38,7 +38,7 @@
 }
 
 .modal-split-table tr.sub td {
-  color: #6b6a66;
+  color: var(--ink-2);
   font-size: 11px;
 }
 

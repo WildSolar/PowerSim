@@ -15,7 +15,7 @@
   gap: 12px;
   margin-bottom: 4px;
   font-size: 11px;
-  color: #52514e;
+  color: var(--ink-2);
 }
 
 .legend-item {
@@ -32,18 +32,18 @@
 }
 
 .grid-line {
-  stroke: #e1e0d9;
+  stroke: var(--line);
   stroke-width: 1;
 }
 
 .zero-line {
-  stroke: #c3c2b7;
+  stroke: var(--line-strong);
   stroke-width: 1;
 }
 
 .axis-label {
   font-size: 8px;
-  fill: #898781;
+  fill: var(--ink-3);
 }
 
 .series-line {
@@ -54,32 +54,32 @@
 }
 
 .end-dot {
-  stroke: #fff;
+  stroke: var(--surface);
   stroke-width: 2;
 }
 
 .end-label {
   font-size: 9px;
   font-weight: 600;
-  fill: #0b0b0b;
+  fill: var(--ink);
 }
 
 .crosshair {
-  stroke: #c3c2b7;
+  stroke: var(--line-strong);
   stroke-width: 1;
 }
 
 .hover-dot {
-  stroke: #fff;
+  stroke: var(--surface);
   stroke-width: 2;
 }
 
 .chart-tooltip {
   position: absolute;
   transform: translate(-50%, -110%);
-  background: #0b0b0bee;
-  color: #fff;
-  border-radius: 6px;
+  background: var(--tooltip);
+  color: var(--on-tooltip);
+  border-radius: var(--r-2);
   padding: 6px 8px;
   font-size: 11px;
   pointer-events: none;
@@ -88,7 +88,7 @@
 }
 
 .tooltip-time {
-  color: #c3c2b7;
+  color: var(--on-tooltip-2);
   margin-bottom: 3px;
 }
 
@@ -99,7 +99,7 @@
 }
 
 .tooltip-label {
-  color: #c3c2b7;
+  color: var(--on-tooltip-2);
 }
 
 .tooltip-value {

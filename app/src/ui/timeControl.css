@@ -1,25 +1,25 @@
 .time-control {
-  background: #ffffffee;
-  backdrop-filter: blur(6px);
-  border-radius: 10px;
+  background: var(--surface-glass);
+    border-radius: var(--r-3);
   padding: 8px 10px;
-  font-family: system-ui, sans-serif;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  font-family: var(--font);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
 }
 
 .time-control .panel-title {
   margin: 0 0 6px;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #898781;
+  color: var(--ink-3);
 }
 
 .time-control .clock-readout {
   font-size: 13px;
   font-variant-numeric: tabular-nums;
-  color: #1a1a1a;
+  color: var(--ink);
   white-space: nowrap;
   margin-bottom: 6px;
 }
@@ -29,7 +29,7 @@
   align-items: center;
   gap: 5px;
   font-size: 12px;
-  color: #52514e;
+  color: var(--ink-2);
   margin-bottom: 4px;
   white-space: nowrap;
 }
@@ -38,7 +38,7 @@
   margin-left: auto;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: #1a1a1a;
+  color: var(--ink);
 }
 
 .time-control .speed-buttons {
@@ -49,9 +49,9 @@
 }
 
 .time-control .speed-buttons button {
-  border: 1px solid #ddd;
-  background: #f8f8f8;
-  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--fill);
+  border-radius: var(--r-2);
   padding: 4px 7px;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -62,9 +62,9 @@
 }
 
 .time-control .speed-buttons button.active {
-  background: #2a78d6;
-  border-color: #2a78d6;
-  color: #fff;
+  background: var(--selected);
+  border-color: var(--selected);
+  color: var(--on-selected);
 }
 
 .treasury-card {

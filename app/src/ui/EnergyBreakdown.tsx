@@ -14,7 +14,7 @@ export interface EnergyBreakdownProps {
 export function EnergyBreakdown({ energy, minKWh = 0.01 }: EnergyBreakdownProps) {
   const rows = DEVICE_CATEGORIES.filter((c) => energy[c.key] >= minKWh);
   if (rows.length === 0) {
-    return <p style={{ fontSize: 12, color: "#888", margin: "4px 0" }}>No measurable draw over the last 24h.</p>;
+    return <p style={{ fontSize: 12, color: "var(--ink-3)", margin: "4px 0" }}>No measurable draw over the last 24h.</p>;
   }
 
   const maxKWh = Math.max(...rows.map((c) => energy[c.key]));

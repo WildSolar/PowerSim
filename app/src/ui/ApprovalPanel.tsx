@@ -19,7 +19,7 @@ export function ApprovalPanel() {
   const delta = past ? current - past.approval : 0;
   const election = approval.nextElectionMs();
 
-  const color = current >= 60 ? "#1baf7a" : current >= 40 ? "#1a1a1a" : "#b23a2e";
+  const color = current >= 60 ? "var(--good)" : current >= 40 ? "var(--ink)" : "var(--bad)";
   const trend = Math.abs(delta) < 1 ? "steady" : `${delta > 0 ? "▲" : "▼"} ${Math.abs(Math.round(delta))} pts`;
 
   return (
@@ -27,7 +27,7 @@ export function ApprovalPanel() {
       <h3 className="panel-title">Approval</h3>
       <div className="clock-readout" style={{ fontWeight: 700, color }}>
         {Math.round(current)}%
-        <span style={{ marginLeft: 8, fontWeight: 400, fontSize: 12, color: delta < -1 ? "#b23a2e" : delta > 1 ? "#1baf7a" : "#898781" }}>{trend}</span>
+        <span style={{ marginLeft: 8, fontWeight: 400, fontSize: 12, color: delta < -1 ? "var(--bad)" : delta > 1 ? "var(--good)" : "var(--ink-3)" }}>{trend}</span>
       </div>
       {election !== null && (
         <div className="info-row">

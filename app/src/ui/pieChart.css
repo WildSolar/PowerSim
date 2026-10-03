@@ -7,12 +7,12 @@
   margin: 0 0 6px;
   font-size: 12px;
   font-weight: 600;
-  color: #52514e;
+  color: var(--ink-2);
 }
 
 .pie-chart-empty {
   font-size: 12px;
-  color: #888;
+  color: var(--ink-3);
   margin: 4px 0;
 }
 
@@ -25,7 +25,7 @@
 }
 
 .pie-slice {
-  stroke: #fff;
+  stroke: var(--surface);
   stroke-width: 2;
   transition: opacity 0.1s;
 }
@@ -37,12 +37,12 @@
 .pie-chart-total-value {
   font-size: 15px;
   font-weight: 600;
-  fill: #1a1a1a;
+  fill: var(--ink);
 }
 
 .pie-chart-total-label {
   font-size: 9px;
-  fill: #898781;
+  fill: var(--ink-3);
 }
 
 .pie-chart-legend {
@@ -54,13 +54,13 @@
   align-items: center;
   gap: 6px;
   padding: 2px 4px;
-  border-radius: 4px;
+  border-radius: var(--r-1);
   font-size: 11px;
-  color: #333;
+  color: var(--ink);
 }
 
 .pie-legend-row.hovered {
-  background: #f0f0f0;
+  background: var(--fill-2);
 }
 
 .legend-swatch {
@@ -79,7 +79,7 @@
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--ink);
 }
 
 .pie-chart-row {

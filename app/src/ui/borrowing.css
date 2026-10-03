@@ -12,16 +12,16 @@
 .borrow-summary > div {
   display: flex;
   flex-direction: column;
-  border: 1px solid #eee;
-  border-radius: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
   padding: 8px 10px;
 }
 
 .borrow-label {
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #898781;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
 }
 
 .borrow-value {
@@ -32,13 +32,13 @@
 
 .borrow-note {
   font-size: 12px;
-  color: #6b6a66;
+  color: var(--ink-2);
 }
 
 .borrow-gauge {
   height: 8px;
-  border-radius: 4px;
-  background: #eeedea;
+  border-radius: var(--r-1);
+  background: var(--fill-2);
   overflow: hidden;
   margin: 6px 0 4px;
 }
@@ -48,8 +48,8 @@
 }
 
 .borrow-card {
-  border: 1px solid #e4e2dc;
-  border-radius: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
   padding: 10px 12px;
   margin: 10px 0;
   display: flex;
@@ -82,18 +82,18 @@
 }
 
 .borrow-terms button {
-  border: 1px solid #ddd;
-  background: #f8f8f8;
-  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--fill);
+  border-radius: var(--r-2);
   padding: 4px 8px;
   font-size: 12px;
   cursor: pointer;
 }
 
 .borrow-terms button.active {
-  background: #2a78d6;
-  border-color: #2a78d6;
-  color: #fff;
+  background: var(--selected);
+  border-color: var(--selected);
+  color: var(--on-selected);
 }
 
 .borrow-card .measure-enact {
@@ -101,8 +101,15 @@
 }
 
 .borrow-section {
-  font-size: 14px;
-  margin: 16px 0 6px;
+  margin: 20px 0 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-family: var(--font);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 
 .borrow-table {
@@ -115,26 +122,26 @@
 .borrow-table th {
   text-align: left;
   font-size: 11px;
-  color: #6b6a66;
+  color: var(--ink-2);
   font-weight: 600;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--line);
   padding: 4px;
 }
 
 .borrow-table td {
   padding: 6px 4px;
-  border-bottom: 1px solid #f2f1ee;
+  border-bottom: 1px solid var(--fill);
   vertical-align: top;
 }
 
 .borrow-table tr.repaid td {
-  color: #9a9893;
+  color: var(--ink-3);
 }
 
 .borrow-repay {
-  border: 1px solid #ddd;
-  background: #fff;
-  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: var(--r-2);
   padding: 3px 8px;
   font-size: 12px;
   cursor: pointer;
@@ -152,18 +159,18 @@
 }
 
 .treasury-sections button {
-  border: 1px solid #ddd;
-  background: #f8f8f8;
-  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--fill);
+  border-radius: var(--r-2);
   padding: 5px 12px;
   font-size: 13px;
   cursor: pointer;
 }
 
 .treasury-sections button.active {
-  background: #2a78d6;
-  border-color: #2a78d6;
-  color: #fff;
+  background: var(--selected);
+  border-color: var(--selected);
+  color: var(--on-selected);
 }
 
 .treasury-table td:last-child,
@@ -174,17 +181,17 @@
 }
 
 .treasury-table .pos {
-  color: #0d7a52;
+  color: var(--good);
 }
 
 .treasury-table .neg,
 .treasury-years .neg {
-  color: #b23a2e;
+  color: var(--bad);
 }
 
 .treasury-total td {
   font-weight: 650;
-  border-top: 1px solid #ccc;
+  border-top: 1px solid var(--line-strong);
 }
 
 .treasury-years-wrap {

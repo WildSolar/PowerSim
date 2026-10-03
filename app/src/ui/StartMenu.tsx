@@ -37,8 +37,16 @@ export function StartMenu({ onStart }: Props) {
 
   return (
     <div className="start-menu">
+      <div className="start-menu-title">
+        <span className="start-menu-mark" aria-hidden="true" />
+        <h1>
+          Grid &amp;
+          <br />
+          Ground
+        </h1>
+        <p>A Swiss municipality, its buildings, its grid — and the road to net zero.</p>
+      </div>
       <div className="start-menu-card">
-        <h1>Grid &amp; Ground</h1>
         <p className="start-menu-tagline">Choose a municipality to guide toward net zero.</p>
         <div className="start-menu-difficulty">
           <div className="start-menu-difficulty-buttons">

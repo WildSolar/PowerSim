@@ -81,14 +81,14 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
       <div className="borrow-summary">
         <div>
           <span className="borrow-label">Balance now</span>
-          <span className="borrow-value" style={{ color: live.balanceRp !== null && live.balanceRp < 0 ? "#b23a2e" : undefined }}>
+          <span className="borrow-value" style={{ color: live.balanceRp !== null && live.balanceRp < 0 ? "var(--bad)" : undefined }}>
             {live.balanceRp === null ? "…" : formatCHF(live.balanceRp)}
           </span>
           <span className="borrow-note">electricity and heat settle at year end</span>
         </div>
         <div>
           <span className="borrow-label">Running spending, 12 months</span>
-          <span className="borrow-value" style={{ color: running12 > live.budgetRp ? "#b23a2e" : undefined }}>
+          <span className="borrow-value" style={{ color: running12 > live.budgetRp ? "var(--bad)" : undefined }}>
             {formatCHF(running12)}
           </span>
           <span className="borrow-note">against an allocation of {formatCHF(live.budgetRp)}</span>

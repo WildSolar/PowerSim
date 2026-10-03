@@ -17,9 +17,9 @@
   gap: 8px;
   padding: 6px 8px;
   margin-bottom: 4px;
-  border-radius: 6px;
-  background: #f8f8f8;
-  border: 1px solid #eee;
+  border-radius: var(--r-2);
+  background: var(--fill);
+  border: 1px solid var(--line);
   font-size: 12px;
 }
 
@@ -27,7 +27,7 @@
   flex-shrink: 0;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: #2a78d6;
+  color: var(--accent);
   min-width: 28px;
 }
 
@@ -46,18 +46,18 @@
 }
 
 .finance-value.positive {
-  color: #1baf7a;
+  color: var(--good);
 }
 
 .finance-value.negative {
-  color: #b23a2e;
+  color: var(--bad);
 }
 
 .report-headlines {
   margin: 4px 0 0;
   padding-left: 0;
   list-style: none;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-paper);
   font-size: 13px;
 }
 
@@ -68,7 +68,7 @@
 .report-headline-month {
   display: inline-block;
   min-width: 78px;
-  font-family: system-ui, sans-serif;
+  font-family: var(--font);
   font-size: 11px;
-  color: #6b6a66;
+  color: var(--ink-2);
 }

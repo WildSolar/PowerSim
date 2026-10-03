@@ -1,13 +1,13 @@
 .measures-tab {
-  font-family: system-ui, sans-serif;
+  font-family: var(--font);
   font-size: 13px;
-  color: #1a1a1a;
+  color: var(--ink);
   max-width: 560px;
 }
 
 .measures-intro {
   font-size: 12px;
-  color: #898781;
+  color: var(--ink-3);
   margin: 0 0 12px;
 }
 
@@ -19,21 +19,21 @@
   margin: 0 0 8px;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #898781;
+  color: var(--ink-3);
 }
 
 .measure-card {
-  border: 1px solid #e4e2dc;
-  border-radius: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
   padding: 10px 12px;
   margin-bottom: 8px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .measure-card.external {
-  background: #f7f6f2;
+  background: var(--fill);
 }
 
 .measure-head {
@@ -50,34 +50,34 @@
 .measure-status {
   font-size: 11px;
   padding: 1px 8px;
-  border-radius: 10px;
+  border-radius: var(--r-3);
   white-space: nowrap;
 }
 
 .measure-status.off {
-  background: #eee;
-  color: #777;
+  background: var(--fill-2);
+  color: var(--ink-3);
 }
 
 .measure-status.pending {
-  background: #fdf0cc;
-  color: #7a5200;
+  background: var(--warn-soft);
+  color: var(--warn);
 }
 
 .measure-status.active {
-  background: #d9f2e6;
-  color: #0d5b44;
+  background: var(--good-soft);
+  color: var(--good);
 }
 
 .measure-summary {
   margin: 6px 0 8px;
   font-size: 12px;
-  color: #52514e;
+  color: var(--ink-2);
 }
 
 .measure-note {
   font-size: 11px;
-  color: #898781;
+  color: var(--ink-3);
   margin: 2px 0;
 }
 
@@ -101,8 +101,8 @@
 .measure-param select {
   flex: 1;
   padding: 3px 5px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-2);
   font-size: 12px;
 }
 
@@ -115,7 +115,7 @@
 
 .measure-param-value small {
   font-weight: 400;
-  color: #898781;
+  color: var(--ink-3);
 }
 
 .measure-meta {
@@ -123,7 +123,7 @@
   flex-wrap: wrap;
   gap: 4px 14px;
   font-size: 11px;
-  color: #898781;
+  color: var(--ink-3);
   margin: 8px 0;
 }
 
@@ -133,18 +133,18 @@
 }
 
 .measure-actions button {
-  border: 1px solid #ccc;
-  background: #fff;
-  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: var(--r-2);
   padding: 4px 12px;
   font-size: 12px;
   cursor: pointer;
 }
 
 .measure-actions .measure-enact {
-  background: #2a78d6;
-  border-color: #2a78d6;
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
 }
 
 .measure-actions button:disabled {
@@ -161,29 +161,29 @@
 
 .measure-log li {
   padding: 3px 0;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--line);
 }
 
 .measure-log-date {
-  color: #898781;
+  color: var(--ink-3);
   margin-right: 6px;
   font-variant-numeric: tabular-nums;
 }
 
 .measure-reaction.good {
-  color: #0d5b44;
+  color: var(--good);
 }
 
 .measure-reaction.bad {
-  color: #b23a2e;
+  color: var(--bad);
 }
 
 .measure-vote {
   margin: 0 0 8px;
   padding: 5px 9px;
-  border-radius: 8px;
-  background: #fdf0cc;
-  color: #7a5200;
+  border-radius: var(--r-2);
+  background: var(--warn-soft);
+  color: var(--warn);
   font-size: 12px;
 }
 
@@ -192,16 +192,16 @@
 }
 
 .measure-card.unavailable .measure-title {
-  color: #898781;
+  color: var(--ink-3);
 }
 
 .measure-evidence {
   margin: 8px 0 4px;
   padding: 8px 10px;
-  border-radius: 8px;
-  background: #f6f5f1;
+  border-radius: var(--r-2);
+  background: var(--fill);
   font-size: 12px;
-  color: #3d3c39;
+  color: var(--ink);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -213,9 +213,9 @@
 
 .measure-study {
   align-self: flex-start;
-  border: 1px solid #ccc;
-  background: #fff;
-  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: var(--r-2);
   padding: 4px 10px;
   font-size: 12px;
   cursor: pointer;
@@ -246,15 +246,15 @@
 
 .survey-bar {
   height: 6px;
-  border-radius: 3px;
-  background: #eeece8;
+  border-radius: var(--r-1);
+  background: var(--fill-2);
   overflow: hidden;
 }
 
 .survey-bar > span {
   display: block;
   height: 100%;
-  background: #2a78d6;
+  background: var(--accent);
 }
 
 .survey-value {

@@ -5,30 +5,30 @@
   width: 280px;
   max-height: calc(100% - 90px);
   overflow-y: auto;
-  background: #ffffffee;
-  backdrop-filter: blur(6px);
-  border-radius: 10px;
+  background: var(--surface-glass);
+    border-radius: var(--r-3);
   padding: 10px 12px;
-  font-family: system-ui, sans-serif;
+  font-family: var(--font);
   font-size: 12px;
-  color: #1a1a1a;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
 }
 
 .district-heat-panel .panel-title {
   margin: 0 0 6px;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #898781;
+  color: var(--ink-3);
 }
 
 .district-heat-panel .info-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #52514e;
+  color: var(--ink-2);
   margin-bottom: 4px;
 }
 
@@ -36,7 +36,7 @@
   margin-left: auto;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: #1a1a1a;
+  color: var(--ink);
   white-space: nowrap;
 }
 
@@ -48,22 +48,26 @@
 .dh-note {
   font-weight: 400;
   font-size: 11px;
-  color: #898781;
+  color: var(--ink-3);
   margin: 2px 0 6px;
 }
 
 .dh-warning {
   font-size: 11px;
-  color: #b23a2e;
+  color: var(--bad);
   margin: 4px 0;
 }
 
 .dh-subtitle {
-  margin: 12px 0 6px;
-  padding-top: 8px;
-  border-top: 1px solid #eee;
-  font-size: 12px;
+  margin: 14px 0 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-family: var(--font);
+  font-size: 10.5px;
   font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 
 .dh-coverage {
@@ -73,13 +77,13 @@
   row-gap: 3px;
   margin: 8px 0 4px;
   padding: 6px 0;
-  border-top: 1px solid #eee;
-  color: #52514e;
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
 }
 
 .dh-coverage-head {
   font-size: 11px;
-  color: #898781;
+  color: var(--ink-3);
   text-align: right;
 }
 
@@ -87,7 +91,7 @@
   text-align: right;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: #1a1a1a;
+  color: var(--ink);
 }
 
 .dh-capacity {
@@ -96,8 +100,8 @@
 
 .dh-bar {
   height: 6px;
-  border-radius: 3px;
-  background: #eeece8;
+  border-radius: var(--r-1);
+  background: var(--fill-2);
   overflow: hidden;
 }
 
@@ -107,7 +111,7 @@
 }
 
 .dh-bar-fill.over {
-  background: #b23a2e;
+  background: var(--bad);
 }
 
 .dh-actions {
@@ -117,9 +121,9 @@
 }
 
 .dh-actions button {
-  border: 1px solid #ddd;
-  background: #f8f8f8;
-  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--fill);
+  border-radius: var(--r-2);
   padding: 6px 10px;
   font-size: 12px;
   cursor: pointer;
@@ -127,9 +131,9 @@
 
 .dh-actions button.dh-order {
   flex: 1;
-  background: #2a78d6;
-  border-color: #2a78d6;
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
 }
 
 .dh-actions button:disabled {
@@ -138,14 +142,15 @@
 }
 
 .district-heat-source-label {
-  background: #ffffffee;
-  border-radius: 6px;
+  background: var(--surface-glass);
+  border-radius: var(--r-2);
   padding: 3px 7px;
-  font-family: system-ui, sans-serif;
+  font-family: var(--font);
   font-size: 12px;
   font-weight: 600;
-  color: #1a1a1a;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
   white-space: nowrap;
   pointer-events: none;
 }

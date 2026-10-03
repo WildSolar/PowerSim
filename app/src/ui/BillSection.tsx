@@ -48,7 +48,7 @@ export function BillSection({ summary }: BillSectionProps) {
       {bill.solarCreditRp > 0 && (
         <div className="device-row">
           <span className="device-name">☀️ Solar credit (feed-in)</span>
-          <span className="device-watts" style={{ color: "#b8860b" }}>
+          <span className="device-watts" style={{ color: "var(--warn)" }}>
             -{formatCHF(bill.solarCreditRp)}
           </span>
         </div>

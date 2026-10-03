@@ -82,7 +82,7 @@ export function DwellingPanel({ building, dwelling, allBuildings, realPlants, on
         <dd>{dwelling.areaM2 ? `${dwelling.areaM2} m²` : "Unknown"}</dd>
       </dl>
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Devices</h2>
+      <h3 className="section-heading">Devices</h3>
       <div className="device-row">
         <span className="device-name">🧊 Fridge</span>
         <span className={`device-watts${fridgeW === 0 ? " off" : ""}`}>{formatWatts(fridgeW)}</span>
@@ -108,7 +108,7 @@ export function DwellingPanel({ building, dwelling, allBuildings, realPlants, on
         <span>{formatWatts(totalW)}</span>
       </div>
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Mobility</h2>
+      <h3 className="section-heading">Mobility</h3>
       {mobilitySlots.map((slot) => {
         const isCarEV = slot.vehicleType === "carEV";
         const slotW = slotChargingPowerW(building.egid, dwelling, slot.slotIndex, slot.mode, slot.vehicleType, simTimeMs, tariff);
@@ -143,10 +143,10 @@ export function DwellingPanel({ building, dwelling, allBuildings, realPlants, on
       })}
       <RenewalLogSection title="Mobility history" entries={mobilityLog} />
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Bill</h2>
+      <h3 className="section-heading">Bill</h3>
       <BillSection summary={billSummary} />
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Power — last 24h</h2>
+      <h3 className="section-heading">Power — last 24h</h3>
       <HistoryChart
         times={history.times}
         series={[
@@ -156,7 +156,7 @@ export function DwellingPanel({ building, dwelling, allBuildings, realPlants, on
         ]}
       />
 
-      <h2 style={{ fontSize: 14, marginTop: 14 }}>Appliances — last 24h</h2>
+      <h3 className="section-heading">Appliances — last 24h</h3>
       <HistoryChart
         times={history.times}
         series={[
@@ -167,7 +167,7 @@ export function DwellingPanel({ building, dwelling, allBuildings, realPlants, on
 
       {hasCarEV && (
         <>
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>EV charging — last 24h</h2>
+          <h3 className="section-heading">EV charging — last 24h</h3>
           <HistoryChart times={history.times} series={[{ key: "ev", label: "EV", color: colorOf("ev"), values: history.evW }]} />
         </>
       )}

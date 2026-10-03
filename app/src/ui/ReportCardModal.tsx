@@ -118,7 +118,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
 
           {headlines.length > 0 && (
             <>
-              <h2 style={{ fontSize: 14, marginTop: 14 }}>The year in headlines</h2>
+              <h3 className="section-heading">The year in headlines</h3>
               <ul className="report-headlines">
                 {headlines.map((e) => (
                   <li key={e.id}>
@@ -129,13 +129,13 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
             </>
           )}
 
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Public approval</h2>
+          <h3 className="section-heading">Public approval</h3>
           <p>
             Approval stands at {Math.round(approval.getApproval())}%
             {Math.abs(approvalChange) >= 1 ? `, ${approvalChange > 0 ? "up" : "down"} ${Math.abs(Math.round(approvalChange))} points over the year` : ", about where it was a year ago"}.
           </p>
 
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Emissions</h2>
+          <h3 className="section-heading">Emissions</h3>
           {emissionsLoading || !emissions ? (
             <div className="loading-note">Computing…</div>
           ) : (
@@ -152,22 +152,22 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                 )}{" "}
                 Target: net zero by {NET_ZERO_TARGET_YEAR} — {Math.max(0, NET_ZERO_TARGET_YEAR - year)} years left.
               </p>
-              <p style={{ fontSize: 12, color: "#888", margin: "4px 0 0" }}>
+              <p style={{ fontSize: 12, color: "var(--ink-3)", margin: "4px 0 0" }}>
                 Operational emissions only — what's actually burned or drawn from the grid, net of solar exported. Manufacturing a heat pump, an
                 EV's battery, or a solar panel isn't counted.
               </p>
             </>
           )}
 
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Municipal finances</h2>
+          <h3 className="section-heading">Municipal finances</h3>
           {financesLoading || !finances ? (
             <div className="loading-note">Computing…</div>
           ) : (
             <>
-              <p style={{ fontSize: 20, fontWeight: 700, margin: "0 0 2px", color: finances.balanceRp >= 0 ? "#1baf7a" : "#b23a2e" }}>
+              <p style={{ fontSize: 20, fontWeight: 700, margin: "0 0 2px", color: finances.balanceRp >= 0 ? "var(--good)" : "var(--bad)" }}>
                 {formatCHF(finances.balanceRp)}
               </p>
-              <p style={{ fontSize: 12, color: "#888", margin: "0 0 8px" }}>Treasury balance, accumulated since {BASELINE_YEAR}.</p>
+              <p style={{ fontSize: 12, color: "var(--ink-3)", margin: "0 0 8px" }}>Treasury balance, accumulated since {BASELINE_YEAR}.</p>
               <div className="renewal-tally">
                 <div className="renewal-tally-row">
                   <span className="renewal-tally-label">Consumer electricity revenue</span>
@@ -251,7 +251,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                   </span>
                 </div>
               </div>
-              <p style={{ fontSize: 12, color: "#888", margin: "8px 0 0" }}>
+              <p style={{ fontSize: 12, color: "var(--ink-3)", margin: "8px 0 0" }}>
                 Electricity and district heat operations settle once a year; gas, oil and petrol/diesel are paid straight to their own
                 suppliers, never through the municipal utility. Subsidies leave the treasury only when a household actually makes the decision — including households
                 that would have made it anyway. Federal and cantonal grants are not municipal money.
@@ -259,15 +259,15 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
             </>
           )}
 
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Energy by category</h2>
+          <h3 className="section-heading">Energy by category</h3>
           {overallLoading || !overallEnergy ? (
             <div className="loading-note">Computing…</div>
           ) : (
             <PieChart title="All categories" slices={overallSlices} />
           )}
 
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Heating energy by technology</h2>
-          <p style={{ fontSize: 12, color: "#888", margin: "0 0 6px" }}>
+          <h3 className="section-heading">Heating energy by technology</h3>
+          <p style={{ fontSize: 12, color: "var(--ink-3)", margin: "0 0 6px" }}>
             Heat actually delivered, across every fuel — not just the electricity "Energy by category" above covers, so the two totals aren't
             directly comparable.
           </p>
@@ -280,7 +280,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
             </div>
           )}
 
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Heating renewals this year</h2>
+          <h3 className="section-heading">Heating renewals this year</h3>
           {heatingLoading || !heatingReport ? (
             <div className="loading-note">Computing…</div>
           ) : heatingReport.renewals.length === 0 ? (
@@ -306,7 +306,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
             </>
           )}
 
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Insulation retrofits this year</h2>
+          <h3 className="section-heading">Insulation retrofits this year</h3>
           {retrofits.total === 0 ? (
             <p>No building had its envelope upgraded this calendar year.</p>
           ) : (
@@ -329,7 +329,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
             </>
           )}
 
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Solar installs this year</h2>
+          <h3 className="section-heading">Solar installs this year</h3>
           {solarTally.count === 0 ? (
             <p>No buildings installed solar this calendar year.</p>
           ) : (
@@ -341,7 +341,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
             </p>
           )}
 
-          <h2 style={{ fontSize: 14, marginTop: 14 }}>Construction this year</h2>
+          <h3 className="section-heading">Construction this year</h3>
           {development.newBuildings + development.replacementBuildings + development.demolished === 0 ? (
             <p>Nothing was completed or demolished this calendar year.</p>
           ) : (

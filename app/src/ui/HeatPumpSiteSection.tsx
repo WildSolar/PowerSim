@@ -35,11 +35,11 @@ export function HeatPumpSiteSection({ building, simTimeMs }: { building: Buildin
       <div style={{ fontWeight: 600, marginBottom: 2 }}>For a new heat pump</div>
       <div>
         🌍 Ground: {groundText}
-        {zone && heatPumpSiting.hasHeatUseAtlas() ? <span style={{ color: "#6b6a66" }}> ({zone})</span> : null}
+        {zone && heatPumpSiting.hasHeatUseAtlas() ? <span style={{ color: "var(--ink-2)" }}> ({zone})</span> : null}
       </div>
       <div>
         🌬️ Air: {airText}
-        <span style={{ color: "#6b6a66" }}>
+        <span style={{ color: "var(--ink-2)" }}>
           {" "}
           (neighbours ~{Math.round(noise.distanceM)} m away, noise level {noise.sensitivity}
           {noise.excessDb > 0 ? `, ${Math.round(noise.excessDb)} dB over the night limit` : ""})
