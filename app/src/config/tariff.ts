@@ -18,6 +18,8 @@ export const DEFAULT_SHEET: TariffSheet = {
   publicChargingAcRpKWh: 45,
   publicChargingDcRpKWh: 55,
   publicChargingFleetRpKWh: 40,
+  // No dynamic tariff at the start (config/dynamicTariff.ts).
+  dynamicSpreadRpKWh: 0,
 };
 
 // What a typical household pays elsewhere in Switzerland (ElCom's reference household, about

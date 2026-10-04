@@ -350,6 +350,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Solar feed-in: what panels earn for power fed back into the grid. A higher price makes solar pay for more owners — and costs the utility.",
         "District heating: what the network’s heat costs its customers, and earns the utility.",
         "Public charging: what the municipality’s own chargers charge — on-street, fast and at lorry charging parks. Private operators set their own (see \"Public charging\").",
+        "Dynamic tariff: whether households may choose a price that follows the grid’s load through the day, and how far it swings (see \"The dynamic tariff\").",
       ]),
       p(
         "Before you publish, the page shows what a typical household would pay for its electricity in a year, against this year and against the Swiss average, and how people are likely to take it.",
@@ -363,6 +364,31 @@ export const WIKI_SECTIONS: WikiSection[] = [
       p("The same page shows the market prices now and a year ago, and where technology prices are heading (see \"Technology prices over time\")."),
       note(
         "A decision is made at the prices of its day and never revisited: a change only affects the decisions that follow. The grid’s upkeep per kWh is a fixed cost of the utility, not something you set. People judge the tariff by its typical bill, not by what each of them actually pays.",
+      ),
+    ],
+  },
+
+  {
+    id: "dynamic-tariff",
+    title: "The dynamic tariff",
+    blocks: [
+      p(
+        "Next to the time-of-use tariff you can offer a dynamic one (Town hall → Prices). Its price changes through the day by a rule fixed in advance: dearest when the town’s grid is expected to be busiest — the evening peak — and cheapest when it’s quiet: at night and, in summer, at midday when the panels are producing. Over a day it averages out to the time-of-use tariff; you choose how far it swings either side. The page shows a winter and a summer day of it before you publish.",
+      ),
+      p(
+        "Nobody has to take it. On 1 January each household weighs what it would save against the bother of switching, and each building’s owner does the same for its heat pump, which has its own meter. The page estimates how many would sign up.",
+      ),
+      list([
+        "Electric cars: the car charges itself in the cheapest hours of the night, full by morning. A household whose car charges as soon as it’s plugged in saves the most — this is who signs up first.",
+        "Heat pumps: they run harder while power is cheap and ease off when it’s dear; the house holds the warmth. It pays most for large buildings.",
+        "Washing machines: some loads are started by timer in the cheapest hour of the day.",
+        "Everyone else: a household with nothing to shift pays about the same either way, so few bother.",
+      ]),
+      p(
+        "What it does: load moves out of the evening peak into the night, which eases the grid where it’s tightest (see \"The electricity grid\"). What it costs: the utility earns less from the households who shift, since they buy when power is cheap. A wider swing moves more load and wins more households — and widens that gap. Each home’s panel says whether it is on the dynamic tariff.",
+      ),
+      note(
+        "The price follows the expected load, not what the town actually draws. If very many cars charge in the same cheap hours, those hours get busy — the price won’t notice. Businesses stay on the time-of-use tariff.",
       ),
     ],
   },
@@ -774,9 +800,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Every building and home has a bill: for the last day, the last full month, or the last twelve months — finished periods only, like a real bill.",
       ),
       list([
-        "Electricity: each kWh at the rate of its hour, so a household that charges its car at night pays less.",
+        "Electricity: each kWh at the rate of its hour, so a household that charges its car at night pays less. A home on the dynamic tariff pays the dynamic price of each moment instead (see \"The dynamic tariff\").",
         "Solar: power fed into the grid is credited at the feed-in price, usually lower than the price of power drawn.",
-        "Heating fuel: a building heated with oil, gas or district heat gets its own line — litres of oil, kWh of gas or heat — at the prices you set. A heat pump shows up as electricity.",
+        "Heating fuel: a building heated with oil, gas or district heat gets its own line — litres of oil, kWh of gas or heat — at the market price of oil and gas and the district heating price you set. A heat pump shows up as electricity.",
         "Shared costs: a home pays for its own appliances plus its share, by floor area, of the building's heating, cooling and solar — the way a Swiss service-charge statement splits them. A shop's energy is billed to the building, never to the flats.",
       ]),
       note("Bills cover electricity, heating fuel and district heat. Petrol, public transport, wood and public charging don't appear on them."),
@@ -815,7 +841,7 @@ export const WIKI_GROUPS: WikiGroup[] = [
     id: "money",
     title: "Money",
     blurb: "The treasury, the utility, borrowing, and the prices you set.",
-    sections: ["municipal-finances", "borrowing", "tariff"],
+    sections: ["municipal-finances", "borrowing", "tariff", "dynamic-tariff"],
   },
   {
     id: "decisions",

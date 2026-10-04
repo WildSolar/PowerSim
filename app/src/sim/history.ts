@@ -11,6 +11,7 @@
  * (~11k dwellings, ~2.5k buildings) cheap to repeat on every chart refresh.
  */
 
+import { dynamicTariff } from "./dynamicTariff";
 import type { Building, Dwelling, PowerPlant } from "../data/types";
 import {
   cookingPowerW,
@@ -46,6 +47,7 @@ interface DwellingProfiles {
   building: Building;
   egid: string;
   dwelling: Dwelling;
+  key: string; // `${egid}:${ewid}`, as dynamicTariff.ts keys households
   fridge: FridgeProfile;
   lighting: LightingProfile;
   cooking: CookingProfile;
@@ -69,6 +71,7 @@ function getDwellingProfiles(building: Building, dwelling: Dwelling): DwellingPr
       building,
       egid: building.egid,
       dwelling,
+      key,
       fridge: makeFridgeProfile(hashSeed(building.egid, dwelling.ewid, "fridge")),
       lighting: makeLightingProfile(hashSeed(building.egid, dwelling.ewid, "lighting")),
       cooking: makeCookingProfile(hashSeed(building.egid, dwelling.ewid, "cooking")),
@@ -103,7 +106,7 @@ export function sampleDwellingSeries(building: Building, dwelling: Dwelling, tim
     fridgeW: times.map((t) => fridgePowerW(p.fridge, t)),
     lightingW: times.map((t) => lightingPowerW(p.lighting, t)),
     cookingW: times.map((t) => cookingPowerW(p.cooking, t)),
-    laundryW: times.map((t) => laundryPowerWFrom(p.laundrySeed, t)),
+    laundryW: times.map((t) => laundryPowerWFrom(p.laundrySeed, t, dynamicTariff.onDynamicKey(p.key, t))),
     plugLoadW: times.map((t) => plugLoadPowerW(p.plugLoad, t)),
     evW: times.map((t) => mobilityChargingPowerW(p.egid, p.dwelling, t, tariff)),
   };
@@ -141,7 +144,7 @@ function dwellingCategoryTotals(profileSets: DwellingProfiles[], times: number[]
       fridge += fridgePowerW(p.fridge, t);
       lighting += lightingPowerW(p.lighting, t);
       cooking += cookingPowerW(p.cooking, t);
-      laundry += laundryPowerWFrom(p.laundrySeed, t);
+      laundry += laundryPowerWFrom(p.laundrySeed, t, dynamicTariff.onDynamicKey(p.key, t));
       plugLoad += plugLoadPowerW(p.plugLoad, t);
       ev += mobilityChargingPowerW(p.egid, p.dwelling, t, tariff);
     }
@@ -363,6 +366,22 @@ export function netTotalFromCategorySeries(series: CategorySeries): number[] {
       series.solarW[i];
   }
   return total;
+}
+
+/** What the households and heat pumps on the dynamic tariff draw, summed — the part of the town's
+ * consumption billed at the dynamic price (finances.ts). `times` must lie within one calendar
+ * year: who is on it is decided once a year. */
+export function sampleDynamicConsumptionW(buildings: Building[], times: number[], tariff: Tariff): number[] {
+  if (times.length === 0) return [];
+  const uptake = dynamicTariff.uptakeAt(times[0]);
+  if (uptake.dwellings.size === 0 && uptake.heatPumps.size === 0) return times.map(() => 0);
+  const households = dwellingProfileSets(buildings).filter((p) => uptake.dwellings.has(p.key));
+  const d = dwellingCategoryTotals(households, times, tariff);
+  const { heatPumpW } = climateControlCategorySeries(
+    buildings.filter((b) => uptake.heatPumps.has(b.egid)),
+    times,
+  );
+  return times.map((_, i) => d.fridgeW[i] + d.lightingW[i] + d.cookingW[i] + d.laundryW[i] + d.plugLoadW[i] + d.evW[i] + heatPumpW[i]);
 }
 
 export function sampleBuildingSeries(building: Building, times: number[], tariff: Tariff, plants: PowerPlant[]): number[] {

@@ -29,6 +29,7 @@ import { zoning, type ZoningAction } from "../sim/zoning";
 import { fleets } from "../sim/fleet";
 import { tariffStore } from "../sim/tariffStore";
 import { market } from "../sim/market";
+import { dynamicTariff } from "../sim/dynamicTariff";
 import { initTariffApproval } from "../sim/tariffApproval";
 import { setCostTrendsEnabled } from "../sim/costTrends";
 import { bookInitialPublicCharging } from "../sim/mobility";
@@ -175,6 +176,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   const difficulty = spec.difficulty ?? "normal";
   market.init(`market:${dataset.bfsNumber}`);
   tariffStore.init();
+  dynamicTariff.init(() => stock.getAll());
   measures.init(difficulty);
   if (spec.withApproval) {
     approval.init(difficulty, `approval:${dataset.bfsNumber}`);

@@ -45,6 +45,7 @@ export const CHANGELOG: Release[] = [
       "Carbon removal contracts, to balance the emissions a town can't avoid — counting once its own emissions are down to a tenth of what they were.",
       "A yearly tariff: publish next year's electricity, feed-in, district heating and charging prices by the end of August. People react to the change, and keep comparing your prices with the Swiss average.",
       "Energy markets: heating oil, gas, petrol and wholesale power follow world prices, including the CO₂ levy, with the odd supply crisis sending them soaring.",
+      "A dynamic tariff households can choose: its price follows the grid's expected load through the day. Cars on it charge in the cheapest night hours, heat pumps run ahead of the evening peak, and some washing machines wait for a cheap hour.",
     ],
   },
 ];

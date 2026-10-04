@@ -1,4 +1,5 @@
 import type { Building, Dwelling, PowerPlant } from "../data/types";
+import { dynamicTariff } from "../sim/dynamicTariff";
 import { dwellingDevicePowerW } from "../sim/devices";
 import { mobilityChargingPowerW, mobilityRenewalLog, mobilitySlotSummaries, evSessionForSlot, slotChargingPowerW } from "../sim/mobility";
 import { isOffPeakHour, tariffKey } from "../sim/tariff";
@@ -56,6 +57,7 @@ export function DwellingPanel({ building, dwelling, allBuildings, realPlants, on
   const mobilityLog = mobilityRenewalLog(building.egid, dwelling, simTimeMs);
   const dayIndex = Math.floor(simTimeMs / DAY_MS);
   const hasCarEV = mobilitySlots.some((s) => s.vehicleType === "carEV");
+  const onDynamic = dynamicTariff.onDynamicDwelling(building.egid, dwelling.ewid, simTimeMs);
 
   const history = useHistorySeries(
     () => {
@@ -135,7 +137,7 @@ export function DwellingPanel({ building, dwelling, allBuildings, realPlants, on
             {session && (
               <div className="ev-session-note">
                 Tonight: {formatHourOfDay(session.startMs)}–{formatHourOfDay(session.endMs)}
-                {sessionStartsOffPeak ? " (off-peak)" : " (peak)"}
+                {onDynamic ? " (the cheapest hours)" : sessionStartsOffPeak ? " (off-peak)" : " (peak)"}
               </div>
             )}
           </div>
@@ -144,6 +146,11 @@ export function DwellingPanel({ building, dwelling, allBuildings, realPlants, on
       <RenewalLogSection title="Mobility history" entries={mobilityLog} />
 
       <h3 className="section-heading">Bill</h3>
+      {onDynamic && (
+        <div className="ev-session-note">
+          On the dynamic tariff this year: {hasCarEV ? "its car charges, and some of its laundry runs," : "some of its laundry runs"} when power is cheapest.
+        </div>
+      )}
       <BillSection summary={billSummary} />
 
       <h3 className="section-heading">Power — last 24h</h3>

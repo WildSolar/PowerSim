@@ -19,6 +19,7 @@
  * nights draw more).
  */
 
+import { dynamicTariff, heatPumpShiftFactor } from "./dynamicTariff";
 import type { Building } from "../data/types";
 import { currentHeatingSystemId } from "./heatingRenewal";
 import { copAt, spaceHeatingThermalDemandW } from "./spaceHeating";
@@ -37,7 +38,9 @@ export function heatPumpPowerWWithWeather(building: Building, dailyMeanC: number
   if (id !== "airHeatPump" && id !== "groundHeatPump") return 0;
   const thermalPowerW = spaceHeatingThermalDemandW(building, dailyMeanC, outsideTempC, simTimeMs);
   if (thermalPowerW === 0) return 0;
-  return thermalPowerW / copAt(outsideTempC, id === "groundHeatPump" ? "ground" : "air");
+  const electricW = thermalPowerW / copAt(outsideTempC, id === "groundHeatPump" ? "ground" : "air");
+  // On the dynamic tariff it runs harder while power is cheap, storing the heat in the house.
+  return dynamicTariff.onDynamicHeatPump(building.egid, simTimeMs) ? electricW * heatPumpShiftFactor(simTimeMs) : electricW;
 }
 
 export function heatPumpPowerW(building: Building, simTimeMs: number): number {

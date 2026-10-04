@@ -28,7 +28,7 @@ import { toSimTimeMs } from "./calendar";
 import { categoryEnergyFromSeries, energyKWh, ZERO_CATEGORY_ENERGY_KWH, type CategoryEnergyKWh } from "./energy";
 import { currentHeatingSystemId, heatingRenewalsInRange } from "./heatingRenewal";
 import type { HeatingSystemId } from "./heatingSystems";
-import { historyTimeSteps, sampleMunicipalityCategorySeries, type CategorySeries } from "./history";
+import { historyTimeSteps, sampleDynamicConsumptionW, sampleMunicipalityCategorySeries, type CategorySeries } from "./history";
 import { ANNUAL_CAR_KM, ICE_CAR_L_PER_100KM } from "./mobilitySystems";
 import { slotsWithVehicleAt } from "./mobility";
 import { fleets } from "./fleet";
@@ -78,6 +78,8 @@ function monthTimes(year: number, month: number, samples: number): number[] {
 export interface YearElectricityMonth {
   times: number[];
   series: CategorySeries;
+  /** The part of the consumption on the dynamic tariff (dynamicTariff.ts). */
+  dynamicW: number[];
 }
 
 const electricityByMonth = new Map<number, Promise<YearElectricityMonth>>();
@@ -89,7 +91,11 @@ function monthElectricity(buildings: Building[], realPlants: PowerPlant[], year:
     // The plants in service by the month's end — not the whole year's: asking for those would
     // settle the rest of the year's solar decisions early, under whatever measures are in force now.
     const monthEndMs = toSimTimeMs(Date.UTC(year, month + 1, 1));
-    return { times, series: sampleMunicipalityCategorySeries(buildings, times, tariff, effectivePowerPlantsAt(buildings, realPlants, monthEndMs - 1)) };
+    return {
+      times,
+      series: sampleMunicipalityCategorySeries(buildings, times, tariff, effectivePowerPlantsAt(buildings, realPlants, monthEndMs - 1)),
+      dynamicW: sampleDynamicConsumptionW(buildings, times, tariff),
+    };
   });
 }
 

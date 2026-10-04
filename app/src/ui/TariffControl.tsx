@@ -1,12 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { MAX_SPREAD_RP_KWH, SUGGESTED_SPREAD_RP_KWH } from "../config/dynamicTariff";
 import type { Commodity } from "../config/market";
 import { approval } from "../sim/approval";
 import { toDateMs } from "../sim/calendar";
+import { estimateUptake } from "../sim/dynamicTariff";
 import { market } from "../sim/market";
+import { stock } from "../sim/stock";
 import { useSimDay, useTariff } from "../sim/store";
 import type { TariffSheet } from "../sim/tariff";
 import { householdBillChf, previewReaction } from "../sim/tariffApproval";
 import { tariffStore } from "../sim/tariffStore";
+import { DynamicPriceChart } from "./DynamicPriceChart";
 import "./tariffControl.css";
 
 const YEAR_MS = 365.25 * 24 * 3_600_000;
@@ -48,7 +52,7 @@ function signedPct(pct: number): string {
 }
 
 function sameSheet(a: TariffSheet, b: TariffSheet): boolean {
-  return FIELDS.every(({ key }) => a[key] === b[key]);
+  return FIELDS.every(({ key }) => a[key] === b[key]) && a.dynamicSpreadRpKWh === b.dynamicSpreadRpKWh;
 }
 
 /** The utility's prices: the tariff in force, next year's to publish, and the market prices it
@@ -99,6 +103,14 @@ export function TariffControl() {
           />
         ))}
       </div>
+
+      <DynamicTariffDraft
+        draft={draft}
+        inForce={inForce}
+        year={targetYear}
+        atMs={simDay}
+        onSpread={(v) => setDraft((d) => ({ ...d, dynamicSpreadRpKWh: v }))}
+      />
 
       <div className="tariff-preview">
         <div className="tariff-preview-bill">
@@ -170,6 +182,71 @@ function TariffRow({
       />
       <span className="tariff-unit">Rp/kWh</span>
     </>
+  );
+}
+
+/** The dynamic tariff on next year's sheet: whether it's offered, how far its price swings, what a
+ * day of it looks like and who would sign up. */
+function DynamicTariffDraft({
+  draft,
+  inForce,
+  year,
+  atMs,
+  onSpread,
+}: {
+  draft: TariffSheet;
+  inForce: TariffSheet;
+  year: number;
+  atMs: number;
+  onSpread: (v: number) => void;
+}) {
+  const offered = draft.dynamicSpreadRpKWh > 0;
+  // Who would sign up, with the town as it is today (it pauses while the town hall is open).
+  const uptake = useMemo(
+    () => (offered ? estimateUptake(stock.getAll(), draft, year, atMs) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [offered, draft.dynamicSpreadRpKWh, draft.offPeakPriceRpKWh, draft.peakPriceRpKWh, year, Math.floor(atMs / 86_400_000)],
+  );
+  return (
+    <div className="dyn-draft">
+      <div className="dyn-draft-head">
+        <label className="dyn-draft-toggle">
+          <input type="checkbox" checked={offered} onChange={(e) => onSpread(e.target.checked ? SUGGESTED_SPREAD_RP_KWH : 0)} />
+          <span>Offer a dynamic tariff</span>
+        </label>
+        <span className="tariff-unit">{inForce.dynamicSpreadRpKWh > 0 ? `Now: ±${inForce.dynamicSpreadRpKWh} Rp/kWh` : "Not offered now"}</span>
+      </div>
+      <p className="tech-prices-note">
+        Households may choose it instead of the time-of-use tariff. Its price follows the expected load on the grid hour by hour, around the same daily average: dearer in the evening peak, cheapest at night and, in summer, at midday.
+      </p>
+      {offered && (
+        <>
+          <div className="dyn-draft-spread">
+            <span className="tariff-label">Price swing, either side</span>
+            <input
+              type="number"
+              min={1}
+              max={MAX_SPREAD_RP_KWH}
+              step={1}
+              value={draft.dynamicSpreadRpKWh}
+              className={draft.dynamicSpreadRpKWh !== inForce.dynamicSpreadRpKWh ? "changed" : ""}
+              aria-label="Dynamic tariff price swing"
+              onChange={(e) => onSpread(Math.max(1, Math.min(MAX_SPREAD_RP_KWH, Math.round(Number(e.target.value) || 1))))}
+            />
+            <span className="tariff-unit">Rp/kWh</span>
+          </div>
+          <DynamicPriceChart sheet={draft} year={year} />
+          {uptake && (
+            <div className="tariff-preview-line dyn-uptake">
+              <span>Likely to sign up</span>
+              <span>
+                {uptake.dwellings.size.toLocaleString("en-GB")} of {uptake.dwellingCount.toLocaleString("en-GB")} households · {uptake.heatPumps.size} of {uptake.heatPumpCount} heat pumps
+              </span>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 

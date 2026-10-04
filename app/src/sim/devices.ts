@@ -7,6 +7,7 @@
  * with on-demand per-entity detail.
  */
 
+import { dynamicTariff, smartLaundryStartMs } from "./dynamicTariff";
 import { mulberry32, bucketRandom, hashSeed, hashSeedFrom } from "./rng";
 import { noiseChannelSeed, valueNoiseFrom } from "./valueNoise";
 import type { Dwelling } from "../data/types";
@@ -111,9 +112,10 @@ export interface LaundrySession {
 /** Whether/when a washer or dryer load runs on the given calendar day — redrawn per
  * day like ev.ts's charging session, rather than tracked as ongoing state. Confined
  * to daytime hours (08:00-20:00 start, <=2.5h long) so a session never needs to check
- * the neighboring day the way EV's overnight charging does. */
+ * the neighboring day the way EV's overnight charging does — a load on the dynamic
+ * tariff that waits for a cheaper hour still finishes by midnight. */
 export function laundryDailySession(egid: string, dwelling: Dwelling, dayIndex: number): LaundrySession | null {
-  return laundrySessionFrom(laundrySeed(egid, dwelling), dayIndex);
+  return laundrySessionFrom(laundrySeed(egid, dwelling), dayIndex, dynamicTariff.onDynamicDwelling(egid, dwelling.ewid, dayIndex * LAUNDRY_DAY_MS + LAUNDRY_DAY_MS / 2));
 }
 
 /** A dwelling's laundry seed, for laundryPowerWFrom — hashed once per dwelling rather than per call. */
@@ -121,24 +123,27 @@ export function laundrySeed(egid: string, dwelling: Dwelling): number {
   return hashSeed(egid, dwelling.ewid, "laundry");
 }
 
-function laundrySessionFrom(seed: number, dayIndex: number): LaundrySession | null {
+/** `smart`: the household is on the dynamic tariff, and a share of its loads wait for the cheapest hour. */
+function laundrySessionFrom(seed: number, dayIndex: number, smart = false): LaundrySession | null {
   const rng = mulberry32(hashSeedFrom(seed, String(dayIndex)));
   if (rng() >= LAUNDRY_DAY_PROBABILITY) return null;
   const startHour = 8 + rng() * 12;
   const durationHours = 1.5 + rng() * 1;
   const wattage = 1500 + rng() * 1500; // washer/dryer average, heating-phase-weighted
   const dayStartMs = dayIndex * LAUNDRY_DAY_MS;
-  const startMs = dayStartMs + startHour * 3_600_000;
-  return { startMs, endMs: startMs + durationHours * 3_600_000, wattage };
+  const durationMs = durationHours * 3_600_000;
+  let startMs = dayStartMs + startHour * 3_600_000;
+  if (smart) startMs = smartLaundryStartMs(startMs, durationMs, rng());
+  return { startMs, endMs: startMs + durationMs, wattage };
 }
 
 export function laundryPowerW(egid: string, dwelling: Dwelling, simTimeMs: number): number {
-  return laundryPowerWFrom(laundrySeed(egid, dwelling), simTimeMs);
+  return laundryPowerWFrom(laundrySeed(egid, dwelling), simTimeMs, dynamicTariff.onDynamicDwelling(egid, dwelling.ewid, simTimeMs));
 }
 
-export function laundryPowerWFrom(seed: number, simTimeMs: number): number {
+export function laundryPowerWFrom(seed: number, simTimeMs: number, smart = false): number {
   const dayIndex = Math.floor(simTimeMs / LAUNDRY_DAY_MS);
-  const session = laundrySessionFrom(seed, dayIndex);
+  const session = laundrySessionFrom(seed, dayIndex, smart);
   if (session && simTimeMs >= session.startMs && simTimeMs < session.endMs) return session.wattage;
   return 0;
 }

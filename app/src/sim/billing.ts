@@ -39,6 +39,7 @@
  * TOU rate lookup this module already does for a real bill.
  */
 
+import { dynamicPriceRpKWh, dynamicTariff } from "./dynamicTariff";
 import type { Building, Dwelling } from "../data/types";
 import { toDateMs } from "./calendar";
 import { energyKWh } from "./energy";
@@ -107,16 +108,18 @@ export function hourOfDayAt(simTimeMs: number): number {
 
 /** Trapezoidal energy integration, same as energy.ts's energyKWh, but pricing
  * each interval at whichever tariff rate applies at its midpoint instead of
- * returning raw kWh — see module docs for why that distinction matters. */
-export function electricityCostRp(times: number[], powerW: number[], tariff: Tariff): number {
+ * returning raw kWh — see module docs for why that distinction matters.
+ * `dynamicW`, if given, is the part of `powerW` on the dynamic tariff (dynamicTariff.ts),
+ * priced at the dynamic price of the moment instead. */
+export function electricityCostRp(times: number[], powerW: number[], tariff: Tariff, dynamicW?: number[]): number {
   let costRp = 0;
   for (let i = 1; i < times.length; i++) {
     const dtHours = (times[i] - times[i - 1]) / HOUR_MS;
-    const avgW = (powerW[i] + powerW[i - 1]) / 2;
-    const kWh = (avgW * dtHours) / 1000;
+    const kWh = (((powerW[i] + powerW[i - 1]) / 2) * dtHours) / 1000;
+    const dynamicKWh = dynamicW ? (((dynamicW[i] + dynamicW[i - 1]) / 2) * dtHours) / 1000 : 0;
     const midMs = (times[i] + times[i - 1]) / 2;
     const rate = isOffPeakHour(tariff, hourOfDayAt(midMs)) ? tariff.offPeakPriceRpKWh : tariff.peakPriceRpKWh;
-    costRp += kWh * rate;
+    costRp += (kWh - dynamicKWh) * rate + (dynamicKWh > 0 ? dynamicKWh * dynamicPriceRpKWh(tariff, midMs) : 0);
   }
   return costRp;
 }
@@ -166,8 +169,8 @@ export function consumptionSeriesW(series: CategorySeries): number[] {
  * solar credit. No heating-fuel line: that's a building-wide add-on (below),
  * since a bare CategorySeries (e.g. a single dwelling's) doesn't carry enough
  * building context to know the heating fuel type. */
-export function ownBillFromSeries(series: CategorySeries, times: number[], tariff: Tariff): BillBreakdown {
-  const electricityRp = electricityCostRp(times, consumptionSeriesW(series), tariff);
+export function ownBillFromSeries(series: CategorySeries, times: number[], tariff: Tariff, dynamicW?: number[]): BillBreakdown {
+  const electricityRp = electricityCostRp(times, consumptionSeriesW(series), tariff, dynamicW);
   const solarCreditRp = flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh);
   return {
     electricityRp,
@@ -184,7 +187,19 @@ export function ownBillFromSeries(series: CategorySeries, times: number[], tarif
  * is "the one meter the grid/gas utility actually bills," before any internal
  * allocation to tenants. */
 export function buildingBillRp(building: Building, series: CategorySeries, times: number[], tariff: Tariff): BillBreakdown {
-  const own = ownBillFromSeries(series, times, tariff);
+  // On the dynamic tariff: its heat pump, if signed up, and the share of its households that are.
+  const at = times[times.length - 1];
+  const heatPump = dynamicTariff.onDynamicHeatPump(building.egid, at);
+  const households = building.dwellings.length > 0 ? building.dwellings.filter((d) => dynamicTariff.onDynamicDwelling(building.egid, d.ewid, at)).length / building.dwellings.length : 0;
+  const dynamicW =
+    heatPump || households > 0
+      ? series.fridgeW.map(
+          (_, i) =>
+            (heatPump ? series.heatPumpW[i] : 0) +
+            households * (series.fridgeW[i] + series.lightingW[i] + series.cookingW[i] + series.laundryW[i] + series.plugLoadW[i] + series.evW[i]),
+        )
+      : undefined;
+  const own = ownBillFromSeries(series, times, tariff, dynamicW);
   const fuel = heatingFuelType(building, times[times.length - 1]);
   const { costRp: heatingFuelRp, quantity: heatingFuelQuantity } = heatingFuelCostAndQuantity(building, fuel, times, tariff);
   return { ...own, heatingFuel: fuel, heatingFuelRp, heatingFuelQuantity, netRp: own.netRp + heatingFuelRp };
@@ -195,7 +210,8 @@ export function buildingBillRp(building: Building, series: CategorySeries, times
  * commercial tenant's own use) that one dwelling owes, by floor-area share. */
 function sharedBuildingBillRp(building: Building, buildingSeries: CategorySeries, times: number[], tariff: Tariff): BillBreakdown {
   const sharedElectricW = buildingSeries.heatPumpW.map((_, i) => buildingSeries.heatPumpW[i] + buildingSeries.acW[i]);
-  const electricityRp = electricityCostRp(times, sharedElectricW, tariff);
+  const heatPumpDynamic = dynamicTariff.onDynamicHeatPump(building.egid, times[times.length - 1]);
+  const electricityRp = electricityCostRp(times, sharedElectricW, tariff, heatPumpDynamic ? buildingSeries.heatPumpW : undefined);
   const solarCreditRp = flatCostRp(times, buildingSeries.solarW, tariff.feedInPriceRpKWh);
   const fuel = heatingFuelType(building, times[times.length - 1]);
   const { costRp: heatingFuelRp, quantity: heatingFuelQuantity } = heatingFuelCostAndQuantity(building, fuel, times, tariff);
@@ -254,7 +270,8 @@ export function dwellingBillRp(
   times: number[],
   tariff: Tariff,
 ): BillBreakdown {
-  const own = ownBillFromSeries(ownSeries, times, tariff);
+  const onDynamic = dynamicTariff.onDynamicDwelling(building.egid, dwelling.ewid, times[times.length - 1]);
+  const own = ownBillFromSeries(ownSeries, times, tariff, onDynamic ? consumptionSeriesW(ownSeries) : undefined);
   const shareFraction = dwellingAreaShareFraction(building, dwelling);
   const share = scaleBill(sharedBuildingBillRp(building, buildingSeries, times, tariff), shareFraction);
   return addBills(own, share);

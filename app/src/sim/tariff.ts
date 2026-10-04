@@ -5,7 +5,8 @@
  *  - The utility's tariff sheet (TariffSheet), published once a year: a simple time-of-use
  *    electricity price — a cheaper off-peak rate overnight (21:00-06:00) and a dearer peak rate —
  *    plus what solar feed-in earns, what district heat costs, and the municipality's own charging
- *    prices. See tariffStore.ts for the yearly publication.
+ *    prices, and whether households may opt for a dynamic tariff instead (dynamicTariff.ts). See
+ *    tariffStore.ts for the yearly publication.
  *  - Market prices (market.ts), which nobody in the game sets: heating oil (per litre, as it is
  *    sold), gas, petrol and diesel, and the wholesale electricity the utility buys.
  *  - The utility's grid upkeep per kWh (config/market.ts), a cost, not a price.
@@ -24,6 +25,7 @@ export interface TariffSheet {
   publicChargingAcRpKWh: number; // at the municipality's own on-street chargers — see publicCharging.ts
   publicChargingDcRpKWh: number; // at the municipality's own fast-charging hubs
   publicChargingFleetRpKWh: number; // at the municipality's own lorry charging parks
+  dynamicSpreadRpKWh: number; // the dynamic tariff's swing either side of the daily average; 0: not offered — see dynamicTariff.ts
 }
 
 /** Every price at one moment: the year's sheet plus the month's market prices and the grid upkeep. */
@@ -41,10 +43,10 @@ export function isOffPeakHour(tariff: Tariff, hourOfDay: number): boolean {
   return hourOfDay >= tariff.offPeakStartHour || hourOfDay < tariff.offPeakEndHour;
 }
 
-/** A cache/effect key for "the tariff prices that affect EV-charging timing" —
- * only the two prices matter for that (the off-peak window is fixed), so this
- * deliberately ignores offPeakStartHour/offPeakEndHour rather than invalidating
- * a cache over a value that never actually changes. */
+/** A cache/effect key for "the tariff prices that affect when power is drawn" —
+ * the two time-of-use prices and the dynamic tariff's spread (the off-peak window
+ * is fixed), so this deliberately ignores offPeakStartHour/offPeakEndHour rather
+ * than invalidating a cache over a value that never actually changes. */
 export function tariffKey(tariff: Tariff): string {
-  return `${tariff.offPeakPriceRpKWh}:${tariff.peakPriceRpKWh}`;
+  return `${tariff.offPeakPriceRpKWh}:${tariff.peakPriceRpKWh}:${tariff.dynamicSpreadRpKWh}`;
 }

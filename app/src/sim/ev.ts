@@ -24,6 +24,7 @@
 
 import { hashSeed, hashSeedFrom, mulberry32 } from "./rng";
 import type { Tariff } from "./tariff";
+import { smartChargeStartMs } from "./dynamicTariff";
 import { policyStore } from "./policy";
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -53,8 +54,8 @@ export interface EvSession {
 /** The charging session for a given calendar day (dayIndex = floor(simTimeMs / dayMs)),
  * exported for inspection UI that wants to show "tonight's session" rather than just
  * an instantaneous on/off reading. */
-export function evDailySession(egid: string, sessionKey: string, dayIndex: number, responsive: boolean, tariff: Tariff): EvSession {
-  return evDailySessionFrom(evSessionSeed(egid, sessionKey), dayIndex, responsive, tariff);
+export function evDailySession(egid: string, sessionKey: string, dayIndex: number, responsive: boolean, tariff: Tariff, smart = false): EvSession {
+  return evDailySessionFrom(evSessionSeed(egid, sessionKey), dayIndex, responsive, tariff, smart);
 }
 
 /** A car's session seed, for the *From variants — hashed once per car rather than per call. */
@@ -62,7 +63,8 @@ export function evSessionSeed(egid: string, sessionKey: string): number {
   return hashSeed(egid, sessionKey, "ev-session");
 }
 
-function evDailySessionFrom(seed: number, dayIndex: number, responsive: boolean, tariff: Tariff): EvSession {
+/** `smart`: the household is on the dynamic tariff, and the car charges in the night's cheapest hours. */
+function evDailySessionFrom(seed: number, dayIndex: number, responsive: boolean, tariff: Tariff, smart: boolean): EvSession {
   const rng = mulberry32(hashSeedFrom(seed, String(dayIndex)));
   const plugInHour = 18.5 + (rng() - 0.5) * 3; // arrive home ~17:00-20:00
   const deadlineHour = 7 + (rng() - 0.5) * 1; // need to leave ~06:30-07:30 next morning
@@ -72,6 +74,11 @@ function evDailySessionFrom(seed: number, dayIndex: number, responsive: boolean,
   const dayStartMs = dayIndex * DAY_MS;
   const plugInMs = dayStartMs + plugInHour * 3_600_000;
   const deadlineMs = dayStartMs + DAY_MS + deadlineHour * 3_600_000;
+
+  if (smart) {
+    const startMs = smartChargeStartMs(dayIndex, plugInMs, Math.max(plugInMs, deadlineMs - durationMs), durationMs, rng());
+    return { startMs, endMs: startMs + durationMs };
+  }
 
   // Only worth shifting if off-peak is actually cheaper — a household isn't
   // "responsive" in the abstract, it responds to the real price signal. If the
@@ -93,15 +100,15 @@ function evDailySessionFrom(seed: number, dayIndex: number, responsive: boolean,
 /** Zero unless `simTimeMs` falls inside that car's session for today or
  * yesterday evening (a session can run past midnight, so a query time can
  * belong to either day's session — check both rather than assuming). */
-export function evChargingPowerW(egid: string, sessionKey: string, simTimeMs: number, tariff: Tariff): number {
-  return evChargingPowerWFrom(evSessionSeed(egid, sessionKey), isResponsive(egid, sessionKey), simTimeMs, tariff);
+export function evChargingPowerW(egid: string, sessionKey: string, simTimeMs: number, tariff: Tariff, smart = false): number {
+  return evChargingPowerWFrom(evSessionSeed(egid, sessionKey), isResponsive(egid, sessionKey), simTimeMs, tariff, smart);
 }
 
 /** The same, for a caller that keeps the car's session seed and (seeded, fixed) responsiveness. */
-export function evChargingPowerWFrom(sessionSeed: number, responsive: boolean, simTimeMs: number, tariff: Tariff): number {
+export function evChargingPowerWFrom(sessionSeed: number, responsive: boolean, simTimeMs: number, tariff: Tariff, smart = false): number {
   const dayIndex = Math.floor(simTimeMs / DAY_MS);
   for (let d = dayIndex - 1; d <= dayIndex; d++) {
-    const session = evDailySessionFrom(sessionSeed, d, responsive, tariff);
+    const session = evDailySessionFrom(sessionSeed, d, responsive, tariff, smart);
     if (simTimeMs >= session.startMs && simTimeMs < session.endMs) {
       return CHARGING_POWER_KW * 1000;
     }

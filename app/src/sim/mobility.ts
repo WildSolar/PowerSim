@@ -20,6 +20,7 @@
  * mobilityRenewalLog for how that stays invisible to the player.
  */
 
+import { dynamicTariff } from "./dynamicTariff";
 import type { Dwelling } from "../data/types";
 import {
   MOBILITY_TWO_SLOT_BASE_PROBABILITY,
@@ -459,13 +460,15 @@ export function slotsWithVehicleAt(egid: string, dwelling: Dwelling, vehicle: Ve
  * wasn't worth the added complexity (see mobilitySystems.ts). */
 export function mobilityChargingPowerW(egid: string, dwelling: Dwelling, simTimeMs: number, tariff: Tariff): number {
   let totalW = 0;
+  let smart: boolean | undefined; // on the dynamic tariff: looked up only for a home with an electric car
   for (const h of slotHandles(egid, dwelling)) {
     if (handleMode(h, simTimeMs) !== "car" || handleVehicle(h, "car", simTimeMs) !== "carEV") continue;
     // A car relying on a public charger draws its power there, not at home (publicCharging.ts).
     h.publicCharging ??= publicCharging.assignmentsFor(vehicleEntityKey(egid, h.ewid, h.slotIndex, "car"));
     if (h.publicCharging.length > 0 && publicCharging.chargesPubliclyAt(h.publicCharging, simTimeMs)) continue;
     h.ev ??= { seed: evSessionSeed(egid, h.sessionKey), responsiveDraw: responsiveDraw(egid, h.sessionKey) };
-    totalW += evChargingPowerWFrom(h.ev.seed, h.ev.responsiveDraw < responsiveShare(), simTimeMs, tariff);
+    smart ??= dynamicTariff.onDynamicDwelling(egid, dwelling.ewid, simTimeMs);
+    totalW += evChargingPowerWFrom(h.ev.seed, h.ev.responsiveDraw < responsiveShare(), simTimeMs, tariff, smart);
   }
   return totalW;
 }
@@ -475,7 +478,8 @@ export function mobilityChargingPowerW(egid: string, dwelling: Dwelling, simTime
  * slot is currently car+EV before asking. */
 export function evSessionForSlot(egid: string, dwelling: Dwelling, slotIndex: number, dayIndex: number, tariff: Tariff): EvSession {
   const sessionKey = `${dwelling.ewid}:${slotIndex}`;
-  return evDailySession(egid, sessionKey, dayIndex, isResponsive(egid, sessionKey), tariff);
+  const smart = dynamicTariff.onDynamicDwelling(egid, dwelling.ewid, dayIndex * 24 * 3_600_000 + 12 * 3_600_000);
+  return evDailySession(egid, sessionKey, dayIndex, isResponsive(egid, sessionKey), tariff, smart);
 }
 
 /** One slot's own charging draw — zero unless it's currently car+EV. For a
@@ -491,7 +495,7 @@ export function slotChargingPowerW(
   tariff: Tariff,
 ): number {
   if (mode !== "car" || vehicleType !== "carEV") return 0;
-  return evChargingPowerW(egid, `${dwelling.ewid}:${slotIndex}`, simTimeMs, tariff);
+  return evChargingPowerW(egid, `${dwelling.ewid}:${slotIndex}`, simTimeMs, tariff, dynamicTariff.onDynamicDwelling(egid, dwelling.ewid, simTimeMs));
 }
 
 // --- UI summary ------------------------------------------------------------

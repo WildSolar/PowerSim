@@ -104,9 +104,9 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
   let wholesaleCostRp = 0;
 
   const months = await yearElectricity(buildings, realPlants, year);
-  months.forEach(({ times, series }, month) => {
+  months.forEach(({ times, series, dynamicW }, month) => {
     const consumptionW = consumptionSeriesW(series);
-    consumerRevenueRp += electricityCostRp(times, consumptionW, tariff);
+    consumerRevenueRp += electricityCostRp(times, consumptionW, tariff, dynamicW);
     feedInPaidRp += flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh);
     grossConsumptionKWh += energyKWh(times, consumptionW);
     const netKWh = energyKWh(times, consumptionW) - energyKWh(times, series.solarW);

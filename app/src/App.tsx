@@ -51,6 +51,7 @@ import { bookInitialPublicCharging } from "./sim/mobility";
 import { policyStore } from "./sim/policy";
 import { approval } from "./sim/approval";
 import { market } from "./sim/market";
+import { dynamicTariff } from "./sim/dynamicTariff";
 import { initTariffApproval } from "./sim/tariffApproval";
 import { tariffStore } from "./sim/tariffStore";
 import { measures } from "./sim/measures";
@@ -70,8 +71,9 @@ function returnToMenu() {
 // Dev-only handle for inspecting the simulation from the browser console.
 if (import.meta.env.DEV) import("./dev/scenario").then((m) => Object.assign(window, { __scenario: m.runScenario }));
 if (import.meta.env.DEV) import("./dev/perf").then((m) => Object.assign(window, { __perf: m.runPerf, __perfYearEnd: m.timeYearEndReport, __perfNewYear: m.timeNewYearPieces, __perfMapTick: m.timeMapPowerTick, __perfRolling: m.timeRollingChart }));
-if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore, tariffStore, market, inbox } });
+if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore, tariffStore, market, inbox, dynamicTariff } });
 if (import.meta.env.DEV) import("./sim/saveGame").then((m) => Object.assign(window, { __save: m }));
+if (import.meta.env.DEV) import("./sim/history").then((m) => Object.assign(window, { __history: m }));
 if (import.meta.env.DEV) import("./dev/par").then((m) => Object.assign(window, { __computePar: m.computePar }));
 
 /** A run: a new game of `slug`, or — with `restore` — a saved one picked up where it was left. */
@@ -142,6 +144,7 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
         measures.init(difficulty); // before the stock: it registers the town size the measures' costs scale with
         market.init(`market:${loaded.bfsNumber}`); // before anything prices: the shocks of the whole game
         tariffStore.init();
+        dynamicTariff.init(() => stock.getAll());
         approval.init(difficulty, `approval:${loaded.bfsNumber}`);
         initTariffApproval();
         studies.init(`studies:${loaded.bfsNumber}`);
