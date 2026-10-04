@@ -24,6 +24,11 @@ import "./panels.css";
 import "./pieChart.css";
 import "./reportCard.css";
 
+/** "3 years to go", "1 year to go", or the last one. */
+function yearsToGo(left: number): string {
+  return left <= 0 ? "the last scored year" : left === 1 ? "1 year to go" : `${left} years to go`;
+}
+
 export interface ReportCardModalProps {
   dataset: MunicipalityDataset;
   year: number;
@@ -213,7 +218,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                             {Math.abs(Math.round(pts))} this year
                           </span>
                           {par !== null && ` · ${total - Math.round(par) >= 0 ? "+" : "−"}${Math.abs(total - Math.round(par))} vs par`}
-                          {` · ${Math.max(0, NET_ZERO_TARGET_YEAR - year)} years to go`}
+                          {` · ${yearsToGo(NET_ZERO_TARGET_YEAR - year)}`}
                         </>
                       );
                     })()}
