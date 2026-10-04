@@ -40,6 +40,9 @@ export const CHANGELOG: Release[] = [
       "Evaluation studies, opinion surveys, and a transparency mode that shows every decision households make and why.",
       "The Town hall, the Year in Review, statistics, and a wiki explaining how everything works.",
       "Saving: in this browser, as an autosave each year, or as a save string to keep anywhere.",
+      "A score: every year from the second on scores its cut in emissions per resident against the first, through 2050 — shown against par, what doing nothing would score.",
+      "Winning and losing: reach net zero by 2050 to win; lose an election (below 50%) or a recall and the run ends. Either way, an end screen shows how it went.",
+      "Carbon removal contracts, to balance the emissions a town can't avoid — counting once its own emissions are down to a tenth of what they were.",
     ],
   },
 ];

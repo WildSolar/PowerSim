@@ -58,3 +58,19 @@ start a new in-progress entry above it with the next version and `date: null`.
 To release: set the entry's `date` (YYYY-MM-DD), set `version` in
 `app/package.json` to match, commit as "Release X.Y.Z", and tag it `vX.Y.Z`.
 Saves still check the exact build (git commit), not the public version.
+
+## Score and par
+
+The score (`app/src/sim/score.ts`) sums each year's cut in net emissions per
+resident against the starting year, 2027–2050; net zero by 2050 wins.
+Par (`app/src/sim/par.ts`) is the do-nothing run, shipped per municipality in
+`app/public/data/par/<slug>.json` for each difficulty, and only used by games
+that started in the same year (`baselineYear`).
+
+**When a change alters the simulation's outcome** (balance, a mechanic, new
+data), **recompute par** for the shipped municipalities: from the start
+screen's console, one difficulty per page load,
+`window.__x = null; __computePar("schlieren", "normal").then((r) => (window.__x = r))`
+(it runs for minutes; poll `window.__x`), then write the three results into the
+par file. Par also has to be recomputed when the calendar year changes, since
+a game always starts in the current year.

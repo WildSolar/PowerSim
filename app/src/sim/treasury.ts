@@ -36,6 +36,7 @@ export type PayoutCategory =
   | "zoning"
   | "grid"
   | "interest"
+  | "removals"
   | "debtRepayment";
 
 export const PAYOUT_CATEGORIES: PayoutCategory[] = [
@@ -50,6 +51,7 @@ export const PAYOUT_CATEGORIES: PayoutCategory[] = [
   "zoning",
   "grid",
   "interest",
+  "removals",
   "debtRepayment",
 ];
 
@@ -75,6 +77,7 @@ export const PAYOUT_LABEL: Record<PayoutCategory, string> = {
   zoning: "Zoning plans",
   grid: "Grid reinforcement and batteries",
   interest: "Interest on debt",
+  removals: "Carbon removal contracts",
   debtRepayment: "Debt repaid",
 };
 
@@ -105,7 +108,7 @@ interface Payout {
 export type PayoutsByCategory = Record<PayoutCategory, number>;
 
 function zeroPayouts(): PayoutsByCategory {
-  return { solar: 0, heating: 0, vehicle: 0, retrofit: 0, programs: 0, infrastructure: 0, districtHeat: 0, charging: 0, zoning: 0, grid: 0, interest: 0, debtRepayment: 0 };
+  return { solar: 0, heating: 0, vehicle: 0, retrofit: 0, programs: 0, infrastructure: 0, districtHeat: 0, charging: 0, zoning: 0, grid: 0, interest: 0, removals: 0, debtRepayment: 0 };
 }
 
 /** Money coming in outside the yearly accounts: the value-capture levy on zoning gains (zoning.ts),

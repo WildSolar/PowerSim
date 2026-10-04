@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
 import { TownHall, type TownHallSection } from "./ui/TownHall";
@@ -12,7 +12,9 @@ import { ZoningPanel } from "./ui/ZoningPanel";
 import { GridPanel } from "./ui/GridPanel";
 import { PublicBuildingsPanel } from "./ui/PublicBuildingsPanel";
 import { ReportCardModal } from "./ui/ReportCardModal";
-import { GameOverModal } from "./ui/GameOverModal";
+import { EndScreen } from "./ui/EndScreen";
+import { loadPar } from "./sim/par";
+import { NET_ZERO_TARGET_YEAR } from "./sim/score";
 import { StartMenu } from "./ui/StartMenu";
 import { WikiPanel } from "./ui/WikiPanel";
 import { GameMenu } from "./ui/GameMenu";
@@ -22,6 +24,7 @@ import { loadDataset } from "./data/loadDataset";
 import type { MunicipalityDataset } from "./data/types";
 import type { ColorMode } from "./map/colorModes";
 import { simClock } from "./sim/engine";
+import { setEpoch } from "./sim/calendar";
 import { reportCardStore } from "./sim/reportCardStore";
 import { useReportCardYear } from "./sim/store";
 import { useTimeKeyboard } from "./ui/useTimeKeyboard";
@@ -66,6 +69,7 @@ if (import.meta.env.DEV) import("./dev/scenario").then((m) => Object.assign(wind
 if (import.meta.env.DEV) import("./dev/perf").then((m) => Object.assign(window, { __perf: m.runPerf, __perfYearEnd: m.timeYearEndReport, __perfNewYear: m.timeNewYearPieces, __perfMapTick: m.timeMapPowerTick, __perfRolling: m.timeRollingChart }));
 if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore } });
 if (import.meta.env.DEV) import("./sim/saveGame").then((m) => Object.assign(window, { __save: m }));
+if (import.meta.env.DEV) import("./dev/par").then((m) => Object.assign(window, { __computePar: m.computePar }));
 
 /** A run: a new game of `slug`, or — with `restore` — a saved one picked up where it was left. */
 function Game({ slug, difficulty, transparency, restore }: { slug: string; difficulty: Difficulty; transparency: boolean; restore?: SaveFile }) {
@@ -79,6 +83,12 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
   const [showWiki, setShowWiki] = useState(false);
   const [inboxSelection, setInboxSelection] = useState<InboxSelection | null>(null);
   const [showMenu, setShowMenu] = useState(false);
+  // The run's end: 2050's Year in Review closed (`finished`), or approval ended it.
+  const [finished, setFinished] = useState(false);
+  const gameOver = useSyncExternalStore(
+    (l) => approval.subscribe(l),
+    () => approval.getGameOver(),
+  );
   const reportCardYear = useReportCardYear();
   const stockBuildings = useStockBuildings();
   const keyboardEnabled = !showTownHall && !showWiki && !showMenu && inboxSelection === null && reportCardYear === null;
@@ -125,6 +135,7 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
     loadDataset(`/data/${slug}.json`)
       .then((loaded) => {
         if (cancelled) return;
+        loadPar(slug, difficulty); // what doing nothing scores here, if computed
         measures.init(difficulty); // before the stock: it registers the town size the measures' costs scale with
         approval.init(difficulty, `approval:${loaded.bfsNumber}`);
         studies.init(`studies:${loaded.bfsNumber}`);
@@ -176,6 +187,7 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
       return;
     }
     if (shownReport.current === null || !dataset) return;
+    if (shownReport.current === NET_ZERO_TARGET_YEAR) setFinished(true);
     shownReport.current = null;
     captureSave({ slug, municipality: dataset.name, difficulty, transparency }, "Autosave")
       .then(({ meta, bytes }) => putSave(AUTOSAVE_ID, meta, bytes))
@@ -281,7 +293,11 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
           />
         ) : null}
       </div>
-      <GameOverModal />
+      {gameOver ? (
+        <EndScreen municipality={dataset.name} over={gameOver} onMainMenu={returnToMenu} />
+      ) : finished ? (
+        <EndScreen municipality={dataset.name} over={null} onMainMenu={returnToMenu} onKeepPlaying={() => setFinished(false)} />
+      ) : null}
       {townHall && (
         <TownHall dataset={liveDataset ?? dataset} transparency={transparency} section={townHall} onSection={setTownHall} onClose={() => setTownHall(null)} />
       )}
@@ -311,6 +327,12 @@ export default function App() {
   return choice ? (
     <Game slug={choice.slug} difficulty={choice.difficulty} transparency={choice.transparency} restore={choice.restore} />
   ) : (
-    <StartMenu onStart={(slug, difficulty, transparency, restore) => setChoice({ slug, difficulty, transparency, restore })} />
+    <StartMenu
+      onStart={(slug, difficulty, transparency, restore) => {
+        // A saved run keeps its own calendar: set before anything starts counting time.
+        if (restore) setEpoch(restore.meta.epochMs);
+        setChoice({ slug, difficulty, transparency, restore });
+      }}
+    />
   );
 }

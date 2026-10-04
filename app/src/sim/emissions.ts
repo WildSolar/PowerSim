@@ -18,6 +18,12 @@
  */
 
 import { GREEN_POWER_MAX_EMISSION_REDUCTION } from "../config/policy";
+import { REMOVAL_CAP_SHARE, REMOVAL_PRICE_CHF_PER_T } from "../config/removals";
+import { RESIDENTS_PER_DWELLING } from "../config/treasury";
+import { interpolateCurve } from "../config/curve";
+import { BASELINE_YEAR, toSimTimeMs } from "./calendar";
+import { existsAt } from "./lifetime";
+import { treasury } from "./treasury";
 import { policyStore } from "./policy";
 import type { Building, PowerPlant } from "../data/types";
 import {
@@ -37,7 +43,14 @@ export interface EmissionsBreakdown {
   oilKgCO2: number;
   districtHeatingKgCO2: number;
   mobilityKgCO2: number; // ICE car petrol/diesel — e-bikes and non-electric water heating aren't priced/modeled at all, same boundary billing.ts already draws
+  /** Everything emitted (the five sources above). */
   totalKgCO2: number;
+  /** Removals credited against it (carbon removal contracts; none in the baseline year). */
+  removalsKgCO2: number;
+  /** What counts: emitted less removed. */
+  netKgCO2: number;
+  /** Residents at the end of the year (homes standing then, at the usual household size). */
+  residents: number;
 }
 
 // Validated (dataviz skill's validate_palette.js, light mode, all-PASS) —
@@ -53,6 +66,8 @@ export const EMISSIONS_SOURCE_COLOR = {
 } as const;
 
 const emissionsCache = new Map<number, EmissionsBreakdown>();
+// A year being counted: a second caller waits for the same count (and the removals are paid once).
+const inFlight = new Map<number, Promise<EmissionsBreakdown>>();
 
 /** Every completed calendar year's emissions, computed once and cached
  * forever after. The expensive inputs (heating technology, net electricity)
@@ -64,9 +79,25 @@ export function cachedEmissionsForYear(year: number): EmissionsBreakdown | null 
   return emissionsCache.get(year) ?? null;
 }
 
-export async function computeEmissionsForYear(buildings: Building[], plants: PowerPlant[], year: number): Promise<EmissionsBreakdown> {
+export function computeEmissionsForYear(buildings: Building[], plants: PowerPlant[], year: number): Promise<EmissionsBreakdown> {
   const cached = emissionsCache.get(year);
-  if (cached) return cached;
+  if (cached) return Promise.resolve(cached);
+  let pending = inFlight.get(year);
+  if (!pending) {
+    pending = countYear(buildings, plants, year).finally(() => inFlight.delete(year));
+    inFlight.set(year, pending);
+  }
+  return pending;
+}
+
+/** What a tonne removed costs in a year (CHF). */
+export function removalPriceChfPerT(year: number): number {
+  return interpolateCurve(REMOVAL_PRICE_CHF_PER_T, year);
+}
+
+async function countYear(buildings: Building[], plants: PowerPlant[], year: number): Promise<EmissionsBreakdown> {
+  // The baseline first: removals are capped against it.
+  const baseline = year > BASELINE_YEAR ? await computeEmissionsForYear(buildings, plants, BASELINE_YEAR) : null;
 
   const [heatingTechnology, netElectricityKWh, iceCarLiters] = await Promise.all([
     computeHeatingTechnologyBreakdown(buildings, year),
@@ -89,7 +120,31 @@ export async function computeEmissionsForYear(buildings: Building[], plants: Pow
   const mobilityKgCO2 = iceCarLiters * ICE_CAR_FUEL_KG_CO2_PER_LITER;
 
   const totalKgCO2 = electricityKgCO2 + gasKgCO2 + oilKgCO2 + districtHeatingKgCO2 + mobilityKgCO2;
-  const result: EmissionsBreakdown = { year, electricityKgCO2, gasKgCO2, oilKgCO2, districtHeatingKgCO2, mobilityKgCO2, totalKgCO2 };
+
+  // Removal contracts in force at the year's end count only once the town's own emissions are down
+  // to a tenth of the baseline — they are for the hard-to-avoid rest. Then they buy for what is
+  // left, up to their share of the baseline, and are paid in January; until then, nothing is bought.
+  const residualLine = baseline ? REMOVAL_CAP_SHARE * baseline.totalKgCO2 : 0;
+  const contracted = baseline ? (Math.min(policyStore.get().removalShareOfBaseline / 100, REMOVAL_CAP_SHARE) * baseline.totalKgCO2) : 0;
+  const removalsKgCO2 = baseline && totalKgCO2 <= residualLine ? Math.max(0, Math.min(contracted, totalKgCO2)) : 0;
+  if (removalsKgCO2 > 0) {
+    treasury.recordPayout("removals", toSimTimeMs(Date.UTC(year + 1, 0, 1)), (removalsKgCO2 / 1000) * removalPriceChfPerT(year) * 100, `removals-${year}`);
+  }
+
+  const yearEndMs = toSimTimeMs(Date.UTC(year + 1, 0, 1)) - 1;
+  const dwellings = buildings.reduce((sum, b) => sum + (existsAt(b, yearEndMs) ? b.dwellings.length : 0), 0);
+  const result: EmissionsBreakdown = {
+    year,
+    electricityKgCO2,
+    gasKgCO2,
+    oilKgCO2,
+    districtHeatingKgCO2,
+    mobilityKgCO2,
+    totalKgCO2,
+    removalsKgCO2,
+    netKgCO2: totalKgCO2 - removalsKgCO2,
+    residents: dwellings * RESIDENTS_PER_DWELLING,
+  };
   emissionsCache.set(year, result);
   return result;
 }

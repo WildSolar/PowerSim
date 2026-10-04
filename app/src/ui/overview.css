@@ -153,3 +153,7 @@
     grid-template-columns: 1fr;
   }
 }
+
+.ov-score {
+  margin-top: 20px;
+}

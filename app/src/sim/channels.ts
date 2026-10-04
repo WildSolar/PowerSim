@@ -49,6 +49,9 @@ export interface Channels {
   greenPowerShare: number; // 0-100: share of the utility's supply covered by certified renewable power
   districtHeatCleanShare: number; // 0-100: how much of the district heat is now produced without fossil fuels
 
+  // Carbon removal
+  removalShareOfBaseline: number; // 0-10: removals bought each year, as a % of the town's starting emissions (at most what is left)
+
   // New buildings and growth
   newBuildSolarMandatePct: number; // 0-100: share of a new roof's usable capacity it must carry
   newBuildSolarMandateMinFootprintM2: number; // buildings with a smaller footprint are exempt from the mandate
@@ -86,6 +89,7 @@ export const CHANNEL_DEFAULTS: Channels = {
   feedInLimitPct: 100,
   greenPowerShare: 0,
   districtHeatCleanShare: 0,
+  removalShareOfBaseline: 0,
   newBuildSolarMandatePct: 0,
   newBuildSolarMandateMinFootprintM2: 0,
   newBuildInsulationLevel: 0,
@@ -133,6 +137,7 @@ const COMBINERS: { [K in keyof Channels]: Combiner<Channels[K]> } = {
   feedInLimitPct: min,
   greenPowerShare: max,
   districtHeatCleanShare: max,
+  removalShareOfBaseline: max,
   newBuildSolarMandatePct: max,
   newBuildSolarMandateMinFootprintM2: latest,
   newBuildInsulationLevel: max,

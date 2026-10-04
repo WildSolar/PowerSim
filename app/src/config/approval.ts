@@ -76,7 +76,7 @@ export const RECALL_MONTHS = 6;
 export const ELECTION_FIRST_YEAR = 2030;
 export const ELECTION_INTERVAL_YEARS = 4;
 export const ELECTION_MONTH = 2; // March (0-based)
-export const ELECTION_THRESHOLD = 45; // re-elected at or above this
+export const ELECTION_THRESHOLD = 50; // re-elected at or above this: a majority
 
 /** The government's yearly allocation moves by this fraction of (approval - base) / 100: a well-regarded
  * department gets more to work with. */

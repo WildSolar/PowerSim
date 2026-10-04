@@ -10,7 +10,16 @@
 
 const DAY_MS = 24 * 60 * 60_000;
 
-export const EPOCH_MS = Math.floor(Date.now() / DAY_MS) * DAY_MS;
+export let EPOCH_MS = Math.floor(Date.now() / DAY_MS) * DAY_MS;
+
+/** The calendar year the game starts in: the baseline every later year's emissions are measured against. */
+export let BASELINE_YEAR = new Date(EPOCH_MS).getUTCFullYear();
+
+/** A loaded game starts on the day its run started, not today: set before anything is set up. */
+export function setEpoch(epochMs: number): void {
+  EPOCH_MS = epochMs;
+  BASELINE_YEAR = new Date(EPOCH_MS).getUTCFullYear();
+}
 
 export function toDateMs(simTimeMs: number): number {
   return EPOCH_MS + simTimeMs;

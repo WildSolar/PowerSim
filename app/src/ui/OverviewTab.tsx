@@ -9,12 +9,21 @@ import { studies } from "../sim/studies";
 import { treasury } from "../sim/treasury";
 import { useReportCardYear, useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
+import { scoreSoFar, yearPoints } from "../sim/score";
+import { parThrough, parYears } from "../sim/par";
+import { ScoreChart } from "./ScoreChart";
 import { ExternalOutlook, PublicOpinion, RecentDecisions } from "./MeasuresTab";
 import { useLiveTreasury } from "./useLiveTreasury";
 import { BASELINE_YEAR, NET_ZERO_TARGET_YEAR } from "./useYearEmissions";
 import "./overview.css";
 
 const DAY_MS = 24 * 60 * 60_000;
+
+/** CHF in millions once it reaches a million, so the figure stays on one line. */
+function millions(rp: number): string {
+  const chf = rp / 100;
+  return Math.abs(chf) >= 1_000_000 ? `CHF ${(chf / 1_000_000).toLocaleString("de-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} M` : formatCHF(rp);
+}
 const YEAR_MS = 365.25 * DAY_MS;
 
 function monthYear(simTimeMs: number): string {
@@ -61,7 +70,11 @@ export function OverviewTab({ dataset, onOpen }: { dataset: MunicipalityDataset;
   const year = new Date(toDateMs(nowMs)).getUTCFullYear();
   const last = year - 1 >= BASELINE_YEAR ? cachedEmissionsForYear(year - 1) : null;
   const baseline = cachedEmissionsForYear(BASELINE_YEAR);
-  const change = last && baseline && last.year > BASELINE_YEAR ? (last.totalKgCO2 / baseline.totalKgCO2 - 1) * 100 : null;
+  // The cut in net emissions per resident against the start (the year's points).
+  const cut = last && baseline && last.year > BASELINE_YEAR ? yearPoints(last, baseline) : null;
+  const score = scoreSoFar();
+  const scoredThrough = score.years[score.years.length - 1]?.year ?? null;
+  const par = scoredThrough !== null ? parThrough(scoredThrough) : null;
 
   const inEffect = MEASURE_CATALOG.filter((d) => measures.getState(d.id)?.active);
   const onTheWay = MEASURE_CATALOG.filter((d) => measures.getState(d.id)?.pending);
@@ -74,23 +87,38 @@ export function OverviewTab({ dataset, onOpen }: { dataset: MunicipalityDataset;
   return (
     <div className="overview">
       <div className="ov-figures">
-        <Figure label="Treasury" value={balanceRp === null ? "…" : formatCHF(balanceRp)} onClick={() => onOpen("treasury")}>
+        <Figure label="Treasury" value={balanceRp === null ? "…" : millions(balanceRp)} onClick={() => onOpen("treasury")}>
           Running spending in the last 12 months <strong className={spentRp > budgetRp ? "bad" : undefined}>{formatCHF(spentRp)}</strong> against an
           allocation of {formatCHF(budgetRp)} a year.
         </Figure>
         <Figure label="Approval" value={`${Math.round(approval.getApproval())}%`}>
           {election !== null ? `Next election ${monthYear(election)}.` : "No election scheduled."} Very low approval ends the game.
         </Figure>
-        <Figure label={last ? `CO₂ in ${last.year}` : "CO₂"} value={last ? `${(last.totalKgCO2 / 1_000_000).toLocaleString("de-CH", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kt` : "—"}>
+        <Figure label={last ? `CO₂ in ${last.year}` : "CO₂"} value={last ? `${(last.netKgCO2 / 1_000_000).toLocaleString("de-CH", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kt` : "—"}>
           {last
-            ? `${change === null ? "The baseline year." : `${change > 0 ? "+" : "−"}${Math.abs(Math.round(change))}% against ${BASELINE_YEAR}.`} The goal: net zero by ${NET_ZERO_TARGET_YEAR}.`
+            ? `${cut === null ? "The baseline year." : `${cut > 0 ? "−" : "+"}${Math.abs(Math.round(cut))}% per resident against ${BASELINE_YEAR}.`} The goal: net zero by ${NET_ZERO_TARGET_YEAR}.`
             : `Counted at the end of each year — the first count comes in January ${BASELINE_YEAR + 1}.`}
+        </Figure>
+        <Figure label="Score" value={score.years.length > 0 ? String(Math.round(score.total)) : "—"}>
+          {score.years.length === 0
+            ? `Each year from ${BASELINE_YEAR + 1} scores its cut in emissions per resident, in percent.`
+            : par !== null
+              ? `${Math.round(score.total) - Math.round(par) >= 0 ? "+" : "−"}${Math.abs(Math.round(score.total) - Math.round(par))} against par — what doing nothing would have scored by now.`
+              : `${score.years.length} year${score.years.length === 1 ? "" : "s"} scored.`}
+          {score.netZeroYear !== null && ` Net zero since ${score.netZeroYear}.`}
         </Figure>
         <Figure label="Measures" value={`${inEffect.length} in effect`} onClick={() => onOpen("measures")}>
           {onTheWay.length > 0 ? `${onTheWay.length} on the way. ` : ""}
           {votes.length > 0 ? `${votes.length} public vote${votes.length === 1 ? "" : "s"} ahead.` : "No votes ahead."}
         </Figure>
       </div>
+
+      {score.years.length > 0 && (
+        <section className="ov-card ov-score">
+          <h3>The cut, year by year</h3>
+          <ScoreChart years={score.years} par={parYears()} firstYear={BASELINE_YEAR + 1} lastYear={NET_ZERO_TARGET_YEAR} />
+        </section>
+      )}
 
       <div className="ov-columns">
         <div className="ov-column">

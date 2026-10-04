@@ -428,6 +428,21 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     annualCostRp: (p, ctx) => (num(p, "share") / 100) * ctx.residents * 35 * CHF,
     approval: () => ({ climate: 0.4, tenants: 0.05, homeowners: 0.05, business: -0.05 }),
   },
+
+  // --- Carbon removal ---------------------------------------------------------------------
+  {
+    id: "carbon-removal",
+    category: "infrastructure",
+    topic: "removal",
+    title: "Carbon removal contracts",
+    summary:
+      "The municipality pays for CO2 to be taken out of the air — biochar, direct air capture, capture at a waste-to-energy plant — to balance the emissions it can't avoid. Removals count only for the hard-to-avoid rest: once the town's own emissions are down to a tenth of 2026's. From then on they are bought each year for what is left, up to the share set here, at the price of the day — around CHF 450 a tonne today, getting cheaper — and paid each January for the year before. Until then the contract costs nothing.",
+    params: [{ kind: "slider", key: "share", label: "Cover up to", min: 1, max: 10, step: 1, unit: "% of 2026's emissions", default: 5 }],
+    leadTimeMonths: 6,
+    effects: (p) => ({ removalShareOfBaseline: num(p, "share") }),
+    costCategory: "removals",
+    approval: () => ({ climate: 0.25, business: -0.05 }),
+  },
 ];
 
 export const MEASURE_BY_ID = new Map(MEASURE_CATALOG.map((m) => [m.id, m]));

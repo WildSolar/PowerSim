@@ -14,13 +14,15 @@ import {
 import type { MunicipalityDataset } from "../data/types";
 import { PAUSE_LABEL, PAUSE_SPEED, RUNNING_SPEEDS, setSpeed } from "../sim/timeControls";
 import { ghiWm2 } from "../sim/pv";
-import { useReportCardYear, useSimSpeed, useSimTime } from "../sim/store";
+import { useReportCardYear, useSimDay, useSimSpeed, useSimTime } from "../sim/store";
 import { formatDate, formatTime, formatWeekday, toDateMs } from "../sim/calendar";
 import { weatherAt, type WeatherCondition } from "../sim/weather";
 import { approval } from "../sim/approval";
 import { debt } from "../sim/debt";
 import { simClock } from "../sim/engine";
 import { cachedEmissionsForYear } from "../sim/emissions";
+import { scoreSoFar, yearPoints } from "../sim/score";
+import { parThrough } from "../sim/par";
 import { dayNightStatus } from "./dayNightDisplay";
 import { CONDITION_LABEL } from "./weatherDisplay";
 import { formatCHF } from "./format";
@@ -173,14 +175,37 @@ function EmissionsKpi() {
   if (!current) {
     return <Kpi label="CO₂" value="—" sub={`first count Jan ${BASELINE_YEAR + 1}`} title="The town's emissions are counted at the end of each year, in the Year in Review." />;
   }
-  const kt = current.totalKgCO2 / 1_000_000;
-  const change = baseline && lastYear > BASELINE_YEAR ? (current.totalKgCO2 / baseline.totalKgCO2 - 1) * 100 : null;
+  const kt = current.netKgCO2 / 1_000_000;
+  // The year's cut per resident against the start — the points it scored.
+  const cut = baseline && lastYear > BASELINE_YEAR ? yearPoints(current, baseline) : null;
   return (
     <Kpi
       label={`CO₂ ${lastYear}`}
       value={`${kt.toLocaleString("de-CH", { maximumFractionDigits: 1, minimumFractionDigits: 1 })} kt`}
-      sub={change === null ? "the baseline" : <span className={change < 0 ? "good" : "bad"}>{`${change > 0 ? "+" : "−"}${Math.abs(Math.round(change))}% vs ${BASELINE_YEAR}`}</span>}
-      title={`Emissions in ${lastYear}; the goal is net zero by 2050.`}
+      sub={cut === null ? "the baseline" : <span className={cut > 0 ? "good" : "bad"}>{`${cut > 0 ? "−" : "+"}${Math.abs(Math.round(cut))}% per resident`}</span>}
+      title={`Net emissions in ${lastYear}${current.removalsKgCO2 > 0 ? ` (after ${(current.removalsKgCO2 / 1_000_000).toLocaleString("de-CH", { maximumFractionDigits: 1 })} kt removed)` : ""}; per resident against ${BASELINE_YEAR}. The goal: net zero by 2050.`}
+    />
+  );
+}
+
+/** The score so far, against par (what doing nothing would have scored by now). */
+function ScoreKpi() {
+  useSimDay();
+  useReportCardYear(); // a new year counted
+  const score = scoreSoFar();
+  if (score.years.length === 0) {
+    return <Kpi label="Score" value="—" sub={`first year Jan ${BASELINE_YEAR + 2}`} title="Each year from the second on scores its cut in emissions per resident against the first, in percent." />;
+  }
+  const last = score.years[score.years.length - 1].year;
+  const par = parThrough(last);
+  const total = Math.round(score.total);
+  const vsPar = par === null ? null : total - Math.round(par);
+  return (
+    <Kpi
+      label="Score"
+      value={String(total)}
+      sub={vsPar === null ? `${score.years.length} year${score.years.length === 1 ? "" : "s"}` : <span className={vsPar >= 0 ? "good" : "bad"}>{`${vsPar >= 0 ? "+" : "−"}${Math.abs(vsPar)} vs par`}</span>}
+      title={`Each year scores its cut in emissions per resident against ${BASELINE_YEAR}, in percent.${par !== null ? ` Par — what doing nothing would have scored by now — is ${Math.round(par)}.` : ""}${score.netZeroYear !== null ? ` Net zero reached in ${score.netZeroYear}.` : ""}`}
     />
   );
 }
@@ -208,6 +233,7 @@ export function TopBar({ dataset, onOpenTreasury, onOpenTownHall, onOpenInbox, o
         <TreasuryKpi dataset={dataset} onOpen={onOpenTreasury} />
         <ApprovalKpi />
         <EmissionsKpi />
+        <ScoreKpi />
       </div>
       <div className="tb-actions">
         <InboxButton onOpen={onOpenInbox} />

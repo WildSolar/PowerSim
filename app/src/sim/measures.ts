@@ -61,7 +61,7 @@ export interface ExternalOutlookEntry {
 
 /** Whether a measure costs money (a subsidy, a running or one-off cost) — what a spending freeze stops. */
 export function measureSpends(def: MeasureDef): boolean {
-  return !!(def.subsidyCategory || def.annualCostRp || def.oneOffCostRp);
+  return !!(def.subsidyCategory || def.annualCostRp || def.oneOffCostRp || def.costCategory);
 }
 
 function sameParams(a: MeasureParams, b: MeasureParams): boolean {

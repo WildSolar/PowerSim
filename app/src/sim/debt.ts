@@ -51,7 +51,7 @@ import {
 import { RESIDENTS_PER_DWELLING } from "../config/treasury";
 import type { Building } from "../data/types";
 import { allocationApprovalFactor, approval, setDebtPenalty } from "./approval";
-import { toDateMs, toSimTimeMs } from "./calendar";
+import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { simClock } from "./engine";
 import { latestBookedFinances, liveBalanceRp, operatingIncomeRp } from "./finances";
 import { setSpendingFreeze } from "./fiscalRules";
@@ -60,7 +60,6 @@ import { existsAt } from "./lifetime";
 import { treasury } from "./treasury";
 
 const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
-const BASELINE_YEAR = new Date(toDateMs(0)).getUTCFullYear();
 
 export type LoanKind = "bank" | "greenBond" | "federal";
 

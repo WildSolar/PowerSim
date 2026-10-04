@@ -1,15 +1,10 @@
 import { useEffect, useState } from "react";
 import type { MunicipalityDataset } from "../data/types";
-import { EPOCH_MS } from "../sim/calendar";
+import { BASELINE_YEAR } from "../sim/calendar";
 import { computeEmissionsForYear, type EmissionsBreakdown } from "../sim/emissions";
 
-/** The calendar year simulated time started in — "the initial state's
- * emissions" the design calls for as the net-zero baseline. */
-export const BASELINE_YEAR = new Date(EPOCH_MS).getUTCFullYear();
-
-// A single end-goal for now — no interim checkpoints or difficulty-setting
-// yet (both still genuinely undecided), just the headline target.
-export const NET_ZERO_TARGET_YEAR = 2050;
+export { BASELINE_YEAR };
+export { NET_ZERO_TARGET_YEAR } from "../sim/score";
 
 export interface YearEmissions {
   current: EmissionsBreakdown;

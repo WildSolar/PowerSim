@@ -177,7 +177,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Measures",
     blocks: [
       p(
-        "Town hall → Measures lists everything the municipality can enact, in four kinds: subsidies (money for households and owners that act), infrastructure (things the municipality builds itself), information (campaigns and advice that help people decide), and laws (bans, mandates and standards). They are grouped by topic — heating, buildings and solar, mobility, grid and power, advice and campaigns — and the kinds narrow the list further; ‘Enacted or on the way’ shows only your own.",
+        "Town hall → Measures lists everything the municipality can enact, in four kinds: subsidies (money for households and owners that act), infrastructure (things the municipality builds itself), information (campaigns and advice that help people decide), and laws (bans, mandates and standards). They are grouped by topic — heating, buildings and solar, mobility, grid and power, advice and campaigns, carbon removal — and the kinds narrow the list further; ‘Enacted or on the way’ shows only your own.",
       ),
       p(
         "Each card says where a measure stands and how it is doing, or how people would take it. Click it for its options, its costs, what is known about its effect, and the button to enact, change or repeal it.",
@@ -211,7 +211,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Then opinion settles: while a measure is in force, each group drifts toward a level set by everything in force. Popular measures add up less and less, and people take what they like for granted — goodwill fades to about half over the years, while resentment stays. With nothing contentious in force, every group rests at a modest 55.",
         "Votes: the big bans always go to a public vote, and other laws do when they are contested. Beforehand, polls show where support stands (polls can be wrong). If the voters reject a measure, it is struck down — money already spent stays spent — and approval takes a hit. If they back you, it gets a small boost.",
         "Spending: taxpayers accept about what the government allocates to the energy department each year. Spend well beyond it and every group grows resentful, taxpayers and businesses most. Grants that mostly pay people who would have acted anyway are the usual way to overspend.",
-        "Consequences: approval below 25% for six months gets you recalled, and every four years (the first in 2030) there is an election you must win with at least 45%. Either ends the game. Approval also nudges the government's yearly allocation up or down a little.",
+        "Consequences: approval below 25% for six months gets you recalled, and every four years (the first in 2030) there is an election: below 50% on election day, the voters choose someone else. Either ends the game. Elections are announced: the Overview shows when the next one is, and the paper follows the mood. Approval also nudges the government's yearly allocation up or down a little.",
       ]),
       note(
         "Approval reacts to what you decide, not to how things turn out: nobody thanks you for falling emissions or blames you for rising bills. Measures imposed by the canton or the Confederation cost you nothing. The difficulty sets how strongly opinion moves.",
@@ -257,7 +257,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Emissions & net zero",
     blocks: [
       p(
-        "The goal is net zero by 2050. At the end of each year the town's CO₂ is added up from five sources, and compared with the first year of the game — the baseline every later year is measured against.",
+        "The goal is net zero by 2050. At the end of each year the town's CO₂ is added up from five sources, less any carbon removed, and compared with the first year of the game — the baseline every later year is measured against.",
       ),
       list([
         "Electricity: what the town draws from the grid, less the solar it feeds back, times how clean Swiss electricity is that year. The national grid gets cleaner over the decades whatever you do; your levers are how much the town draws, and green power as the default for its customers.",
@@ -265,8 +265,32 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "District heating: the heat delivered, unless the network's heat is made clean.",
         "Transport: the petrol and diesel burned by households' cars and businesses' vans and lorries. Public transport, cycling and walking count as zero.",
       ]),
+      p(
+        "Some emissions can't be avoided within a town's reach: the national grid is still not clean in 2050, a few buildings have no alternative to their boiler, and old cars and lorries run on for years. As in Swiss climate law, that rest is balanced with carbon removal — CO₂ taken back out of the air by biochar, direct air capture or capture at a waste-to-energy plant. The ‘Carbon removal contracts’ measure buys them, but only for that rest: removals count once the town's own emissions are down to a tenth of what they were at the start. From then on the contract buys each year for whatever is left, up to the share you choose. Before that it costs nothing — the first nine tenths have to be cut. They are paid each January for the year before, at the price of the day: around CHF 450 a tonne today, about CHF 200 by 2050.",
+      ),
+      p(
+        "Net zero is reached in the first year whose emissions, less removals, come to nothing — and reaching it by 2050 is winning the game (see \"Score & the end of the game\").",
+      ),
       note(
-        "Only what is burned or drawn from the grid counts — not what it took to make a heat pump, a battery or a building.",
+        "Only what is burned or drawn from the grid counts — not what it took to make a heat pump, a battery or a building. Removal prices are estimates; the technologies are young.",
+      ),
+    ],
+  },
+  {
+    id: "score",
+    title: "Score & the end of the game",
+    blocks: [
+      p(
+        "Every year from the second on scores points: its cut in emissions per resident — net of carbon removal — against the first year, in percent. A year 40% below the start scores 40; a year above it scores below zero. The score is the sum through 2050. So an early cut counts in every year after it, and towns of any size compare, since it is measured per resident.",
+      ),
+      list([
+        "Par: what the town would score if you did nothing at all — the grid getting cleaner, things wearing out and being replaced, technology getting cheaper. The top bar, the Overview and the Year in Review show your score against par so far: that difference is what your decisions did.",
+        "Winning: reach net zero by 2050. The Year in Review marks the year it happens; every year after it scores in full as long as it holds.",
+        "Losing: below 50% approval on election day, or below 25% for six months on end (see \"Public approval\"). The score so far stands; the years you didn't get to score nothing.",
+        "The end: after the Year in Review of 2050 the run is over, and you see how it went — the score, par, the year of net zero, and the cut year by year. You can keep exploring the town afterwards; nothing more is scored.",
+      ]),
+      note(
+        "Par is worked out for each town and difficulty with the game itself, for games that start in the same year. Where there isn't one, the score is shown on its own.",
       ),
     ],
   },
@@ -776,7 +800,7 @@ export const WIKI_GROUPS: WikiGroup[] = [
     id: "governing",
     title: "Governing",
     blurb: "What you can decide, what people think of it, and what you are aiming for.",
-    sections: ["measures", "approval", "information", "letters", "emissions"],
+    sections: ["measures", "approval", "information", "letters", "emissions", "score"],
   },
   {
     id: "money",

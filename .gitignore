@@ -25,3 +25,5 @@ Thumbs.db
 app/public/data/*
 !app/public/data/schlieren.json
 !app/public/data/index.json
+# Par (sim/par.ts): computed with the game, not the pipeline — committed.
+!app/public/data/par/

@@ -16,7 +16,7 @@
 import type { Difficulty } from "../config/difficulty";
 import { snapshotAdditionality, restoreAdditionality } from "./additionality";
 import { approval } from "./approval";
-import { toDateMs } from "./calendar";
+import { EPOCH_MS, toDateMs } from "./calendar";
 import { debt } from "./debt";
 import { restoreDecisionLog, snapshotDecisionLog } from "./decisionLog";
 import { districtHeat } from "./districtHeat";
@@ -67,6 +67,8 @@ export interface SaveMeta {
   difficulty: Difficulty;
   transparency: boolean;
   simTimeMs: number;
+  /** The real day the run started on: its calendar is counted from it. */
+  epochMs: number;
   /** For the list: the in-game date, approval and treasury. */
   dateLabel: string;
   approval: number;
@@ -134,6 +136,7 @@ export async function captureSave(run: RunInfo, name: string): Promise<{ meta: S
     difficulty: run.difficulty,
     transparency: run.transparency,
     simTimeMs,
+    epochMs: EPOCH_MS,
     dateLabel: dateLabel(simTimeMs),
     approval: Math.round(approval.getApproval()),
   };

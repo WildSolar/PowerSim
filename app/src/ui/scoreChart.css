@@ -1,0 +1,125 @@
+.score-chart {
+  margin: 0;
+}
+
+.score-chart-legend {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.score-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.score-chart-legend i {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 2px solid var(--chart-own);
+}
+
+.score-chart-legend i.par {
+  border-top: 2px dashed var(--ink-3);
+}
+
+.score-chart-plot {
+  position: relative;
+}
+
+.score-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.score-chart {
+  --chart-own: #2a78d6;
+}
+
+.score-chart .grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.score-chart .zero {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+
+.score-chart .tick {
+  font-size: 10px;
+  fill: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.score-chart .own-area {
+  fill: var(--chart-own);
+  opacity: 0.12;
+}
+
+.score-chart .own-line {
+  fill: none;
+  stroke: var(--chart-own);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.score-chart .par-line {
+  fill: none;
+  stroke: var(--ink-3);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+
+.score-chart .end-label {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--ink);
+}
+
+.score-chart .end-label.par {
+  font-weight: 500;
+  fill: var(--ink-3);
+}
+
+.score-chart .crosshair {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+}
+
+.score-chart .hit {
+  fill: transparent;
+}
+
+.score-chart-tip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 9px;
+  border-radius: var(--r-2);
+  background: var(--tooltip);
+  color: var(--on-tooltip);
+  font-size: 11.5px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .score-chart {
+    --chart-own: #5b9cf0;
+  }
+}
+
+.score-chart .own-dot {
+  fill: var(--chart-own);
+  stroke: var(--surface);
+  stroke-width: 2;
+}

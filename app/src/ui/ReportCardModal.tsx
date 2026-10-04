@@ -1,4 +1,5 @@
 import { approval } from "../sim/approval";
+import { measures } from "../sim/measures";
 import { ENERGY_CLASS_CATALOG } from "../sim/energyClass";
 import { existsAt } from "../sim/lifetime";
 import { toSimTimeMs } from "../sim/calendar";
@@ -17,6 +18,8 @@ import { useYearCategoryEnergy } from "./useYearCategoryEnergy";
 import { useYearEmissions, BASELINE_YEAR, NET_ZERO_TARGET_YEAR } from "./useYearEmissions";
 import { useYearFinances } from "./useYearFinances";
 import { useYearHeatingReport } from "./useYearHeatingReport";
+import { scoreSoFar, yearPoints } from "../sim/score";
+import { parThrough } from "../sim/par";
 import "./panels.css";
 import "./pieChart.css";
 import "./reportCard.css";
@@ -95,10 +98,8 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
         { key: "oil", label: "Oil heating", icon: "🛢️", color: EMISSIONS_SOURCE_COLOR.oil, valueKWh: emissions.current.oilKgCO2 },
       ]
     : [];
-  const vsBaselinePct =
-    emissions && emissions.baseline.totalKgCO2 > 0
-      ? ((emissions.current.totalKgCO2 - emissions.baseline.totalKgCO2) / emissions.baseline.totalKgCO2) * 100
-      : 0;
+  // The change in net emissions per resident against the start (negative: a cut).
+  const vsBaselinePct = emissions ? -yearPoints(emissions.current, emissions.baseline) : 0;
 
   const { data: finances, loading: financesLoading } = useYearFinances(dataset, year);
 
@@ -148,10 +149,16 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
             </button>
           </header>
 
+          {emissions && year > BASELINE_YEAR && year <= NET_ZERO_TARGET_YEAR && scoreSoFar(year).netZeroYear === year && (
+            <div className="yr-netzero">
+              <strong>Net zero.</strong> In {year}, {dataset.name} took out of the air as much as it still emitted — {NET_ZERO_TARGET_YEAR - year > 0 ? `${NET_ZERO_TARGET_YEAR - year} years before the deadline` : "just in time"}. Every year from here on scores in full as long as it stays there.
+            </div>
+          )}
+
           <div className="yr-figures">
             <section>
               <h3>CO₂</h3>
-              <div className="yr-value">{emissions ? `${(emissions.current.totalKgCO2 / 1_000_000).toLocaleString("de-CH", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kt` : "…"}</div>
+              <div className="yr-value">{emissions ? `${(emissions.current.netKgCO2 / 1_000_000).toLocaleString("de-CH", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kt` : "…"}</div>
               <div className="yr-detail">
                 {!emissions ? (
                   "Counting…"
@@ -160,7 +167,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                 ) : (
                   <span className={vsBaselinePct <= 0 ? "good" : "bad"}>
                     {vsBaselinePct <= 0 ? "−" : "+"}
-                    {Math.abs(vsBaselinePct).toFixed(1)}% against {BASELINE_YEAR}
+                    {Math.abs(vsBaselinePct).toFixed(1)}% per resident against {BASELINE_YEAR}
                   </span>
                 )}
               </div>
@@ -186,9 +193,33 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
               </div>
             </section>
             <section>
-              <h3>Net zero</h3>
-              <div className="yr-value">{Math.max(0, NET_ZERO_TARGET_YEAR - year)} years</div>
-              <div className="yr-detail">left until {NET_ZERO_TARGET_YEAR}</div>
+              <h3>Score</h3>
+              <div className="yr-value">{emissions && year > BASELINE_YEAR ? Math.round(scoreSoFar(year).total) : "—"}</div>
+              <div className="yr-detail">
+                {!emissions ? (
+                  "Counting…"
+                ) : year === BASELINE_YEAR ? (
+                  `Scoring starts with ${year + 1}`
+                ) : (
+                  <>
+                    {(() => {
+                      const pts = yearPoints(emissions.current, emissions.baseline);
+                      const par = parThrough(year);
+                      const total = Math.round(scoreSoFar(year).total);
+                      return (
+                        <>
+                          <span className={pts >= 0 ? "good" : "bad"}>
+                            {pts >= 0 ? "+" : "−"}
+                            {Math.abs(Math.round(pts))} this year
+                          </span>
+                          {par !== null && ` · ${total - Math.round(par) >= 0 ? "+" : "−"}${Math.abs(total - Math.round(par))} vs par`}
+                          {` · ${Math.max(0, NET_ZERO_TARGET_YEAR - year)} years to go`}
+                        </>
+                      );
+                    })()}
+                  </>
+                )}
+              </div>
             </section>
           </div>
 
@@ -204,6 +235,12 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                     {year === BASELINE_YEAR
                       ? "The first year of the game: every later report compares back to it."
                       : `${formatCO2(emissions.current.totalKgCO2)} this year, against ${formatCO2(emissions.baseline.totalKgCO2)} in ${BASELINE_YEAR}.`}{" "}
+                    {emissions.current.removalsKgCO2 > 0 &&
+                      ` Carbon removal contracts took ${formatCO2(emissions.current.removalsKgCO2)} back out, leaving ${formatCO2(emissions.current.netKgCO2)}. `}
+                    {emissions.current.removalsKgCO2 === 0 &&
+                      year > BASELINE_YEAR &&
+                      measures.getState("carbon-removal")?.active &&
+                      ` Carbon removal doesn't count yet: it is for the last tenth, and emissions are still at ${Math.round((emissions.current.totalKgCO2 / emissions.baseline.totalKgCO2) * 100)}% of ${BASELINE_YEAR}'s. `}
                     What is burned, or drawn from the grid less the solar fed back — not what it took to make a heat pump, a battery or a panel.
                   </p>
                 </>

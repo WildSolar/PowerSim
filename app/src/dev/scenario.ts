@@ -36,6 +36,8 @@ import type { Difficulty } from "../config/difficulty";
 const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
 
 export interface ScenarioSpec {
+  /** The municipality (its dataset's slug); Schlieren if not given. */
+  slug?: string;
   difficulty?: Difficulty;
   /** Measures to enact, and in which calendar year (1 January; 2026 = at the start). */
   enact: { id: string; params?: Record<string, number | boolean | string>; year?: number }[];
@@ -167,7 +169,7 @@ function snapshot(dataset: MunicipalityDataset, year: number, atMs: number): Sce
 }
 
 export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string) => void): Promise<ScenarioRow[]> {
-  const dataset = (await (await fetch("/data/schlieren.json")).json()) as MunicipalityDataset;
+  const dataset = (await (await fetch(`/data/${spec.slug ?? "schlieren"}.json`)).json()) as MunicipalityDataset;
   const difficulty = spec.difficulty ?? "normal";
   measures.init(difficulty);
   if (spec.withApproval) approval.init(difficulty, `approval:${dataset.bfsNumber}`);
