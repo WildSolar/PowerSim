@@ -98,12 +98,13 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Space — pause or resume (at the speed you paused from).",
         "Tab — the next speed (Slow → Medium → Fast, then Slow again); while paused, resumes at the next speed.",
+        "1 / 2 / 3 — Slow, Medium or Fast.",
         "W A S D — move the map, relative to the way you're facing.",
         "Q / E — turn the view left or right.",
         "R / F — tilt the view toward the horizon or toward straight down.",
         "Esc — close whatever is on top: the Year in Review, the game menu, the wiki, the inbox or the Town hall, a charger you're placing, a home (back to its building), a building, a selected charger, and finally the map layer (back to the plain map).",
       ]),
-      note("The keys do nothing while a window is open or while you're typing in a text field."),
+      note("The time keys work everywhere except over the Year in Review; the map keys only on the map. None of them do anything while you're typing in a text field."),
     ],
   },
   {
@@ -209,7 +210,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Decisions land at once: enacting a measure moves opinion straight away, in proportion to how each group feels about it. Repealing gives most of that back, but looks indecisive.",
         "Then opinion settles: while a measure is in force, each group drifts toward a level set by everything in force. Popular measures add up less and less, and people take what they like for granted — goodwill fades to about half over the years, while resentment stays. With nothing contentious in force, every group rests at a modest 55.",
-        "Votes: the big bans always go to a public vote, and other laws do when they are contested. Beforehand, polls show where support stands (polls can be wrong). If the voters reject a measure, it is struck down — money already spent stays spent — and approval takes a hit. If they back you, it gets a small boost.",
+        "Votes: the big bans always go to a public vote, and other laws do when they are contested. Beforehand, polls show where support stands (polls can be wrong). On the day, the town clerk writes to you with the result, and the measure shows it. If the voters reject a measure, it is struck down — money already spent stays spent — approval takes a hit, and you can't put it forward again for two years. If they back you, it gets a small boost.",
         "Spending: taxpayers accept about what the government allocates to the energy department each year. Spend well beyond it and every group grows resentful, taxpayers and businesses most. Grants that mostly pay people who would have acted anyway are the usual way to overspend.",
         "Consequences: approval below 25% for six months gets you recalled, and every four years (the first in 2030) there is an election: below 50% on election day, the voters choose someone else. Either ends the game. Elections are announced: the Overview shows when the next one is, and the paper follows the mood. Approval also nudges the government's yearly allocation up or down a little.",
       ]),
@@ -327,11 +328,11 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Bank loans: an amount and a term of 5, 10 or 20 years, repaid in equal monthly instalments (Town hall → Treasury → Borrowing). The rate is the market rate plus a margin for the department's credit rating, fixed for the life of the loan; longer loans cost a little more. Loans can be repaid early.",
         "The overdraft: if the balance falls below zero, it is covered automatically — at a steep premium, charged every month.",
-        "Green bonds: sold to the town's own residents for ten years, with interest every year and the money repaid at the end. Residents accept a little less interest for a local green cause, and buy as much as they want — more when the climate-minded are content, so a bond may raise less than offered. Offering one goes down well. The money is earmarked: within two years as much has to go into green investment, or the paper calls it greenwashing and the climate-minded turn away. At most one a year.",
+        "Green bonds: sold to the town's own residents for ten years, with interest every year and the money repaid at the end. Residents accept a little less interest for a local green cause, and buy as much as they want — a couple of hundred francs each at most, more when the climate-minded are content, so a bond may raise less than offered. They only hold so much of the town's green bonds at once: until earlier ones are repaid, each new one raises less. Offering one goes down well. The money is earmarked: within two years as much has to go into green investment, or the paper calls it greenwashing and the climate-minded turn away. At most one a year.",
         "Federal decarbonisation loans: 0.25% over 20 years, but only against decarbonisation investments already made — up to half of the last twelve months' — and only so much a year; the money arrives after three months.",
       ]),
       p(
-        "The market rate starts near today's (about 1.2%) and drifts over the years, with the occasional jump nobody sees coming. Borrowing when money is cheap pays off. Debt is measured in years of income: the more years it would take to repay, the lower the rating and the dearer new money. From about a year and a half of income, homeowners and businesses start to worry. Beyond five years, the canton puts the department under supervision: no new borrowing, no new spending measures and no new orders until debt is back under four years — measures already in force run on, and laws and prices stay yours.",
+        "The market rate starts near today's (about 1.2%) and drifts over the years, with the occasional jump nobody sees coming. Borrowing when money is cheap pays off. Debt is measured in years of income: the more years it would take to repay, the lower the rating and the dearer new money. Lenders are quick to downgrade and slow to forgive: the rating falls as soon as debt rises, but climbs back only a notch at a time, each once debt has stayed low enough for a year. From about a year and a half of income, homeowners and businesses start to worry. Beyond five years, the canton puts the department under supervision: no new borrowing, no new spending measures and no new orders until debt is back under four years — measures already in force run on, and laws and prices stay yours.",
       ),
       note(
         "The federal loan programme is invented for the game; the real federal climate programmes are mostly grants. The treasury shows cash: what you build isn't written down in value over the years.",
@@ -343,7 +344,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Tariffs & energy prices",
     blocks: [
       p(
-        "Town hall → Prices is where the municipal utility’s tariff is set. Like a Swiss utility, you publish it once a year: next year’s tariff by the end of August, taking effect on 1 January. Until the deadline you can publish again; publish nothing, and this year’s prices carry over. In your first year you have until the end of December.",
+        "Town hall → Prices is where the municipal utility’s tariff is set. Like a Swiss utility, you publish it once a year: next year’s tariff by the end of August, taking effect on 1 January. Until the deadline you can publish again. If you haven’t published one when the deadline comes, the game stops and asks: keep this year’s prices, or set new ones there and then. In your first year you have until the end of December.",
       ),
       list([
         "Electricity: a day rate and a cheaper night rate (21:00–06:00). Households who can wait — about a third of electric car owners — charge their car at night.",

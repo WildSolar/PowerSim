@@ -249,7 +249,7 @@ export function applySave(file: SaveFile): void {
   fleets.resetCaches();
   publicCharging.restore(s.publicCharging, (ref) => slotFromRef(ref as SlotRef | null));
   approval.restore(s.approval, (key) =>
-    key.startsWith("zoning:") ? (accepted) => zoning.voteResult(Number(key.slice("zoning:".length)), accepted) : (accepted, atMs) => measures.resolveVote(key, accepted, atMs),
+    key.startsWith("zoning:") ? (accepted) => zoning.voteResult(Number(key.slice("zoning:".length)), accepted) : (accepted, atMs, yes) => measures.resolveVote(key, accepted, atMs, yes),
   );
   debt.restore(s.debt);
   studies.restore(s.studies);

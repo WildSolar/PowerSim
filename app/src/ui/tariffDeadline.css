@@ -1,0 +1,87 @@
+/* The tariff deadline: a small dialog over the map; the game waits at the deadline. */
+
+.td-layer {
+  position: absolute;
+  top: var(--top-bar-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.td-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--backdrop);
+}
+
+.td-dialog {
+  position: relative;
+  width: min(440px, 100%);
+  padding: 22px 24px 18px;
+  border-radius: var(--r-3);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-2), inset 0 3px 0 var(--accent);
+  font-family: var(--font);
+}
+
+.td-kicker {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.td-dialog h2 {
+  margin: 6px 0 8px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+
+.td-dialog p {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.td-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.td-primary,
+.td-secondary {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: var(--r-2);
+  cursor: pointer;
+}
+
+.td-primary {
+  border: none;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.td-secondary {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.td-dialog .td-note {
+  margin: 12px 0 0;
+  font-size: 11px;
+  color: var(--ink-3);
+}

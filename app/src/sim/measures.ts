@@ -12,6 +12,7 @@
  * some years ahead, and feed the same channels.
  */
 
+import { VOTE_MORATORIUM_YEARS } from "../config/approval";
 import { DEFAULT_DIFFICULTY, DIFFICULTY_SPECS, type Difficulty } from "../config/difficulty";
 import { EXTERNAL_MEASURES, type ExternalMeasureDef } from "../config/externalMeasures";
 import { RESIDENTS_PER_DWELLING } from "../config/treasury";
@@ -45,6 +46,13 @@ export type MeasureEvent =
   | { kind: "retired"; id: string; def: MeasureDef; params: MeasureParams; atMs: number; reason: string }
   | { kind: "activated"; id: string; def: MeasureDef; params: MeasureParams; atMs: number };
 
+/** How the voters decided on a measure, the last time they did. */
+export interface VoteResult {
+  atMs: number;
+  accepted: boolean;
+  yesShare: number;
+}
+
 export interface MeasureLogEntry {
   atMs: number;
   text: string;
@@ -69,6 +77,7 @@ function sameParams(a: MeasureParams, b: MeasureParams): boolean {
 }
 
 class MeasureEngine {
+  private voteResults = new Map<string, VoteResult>();
   private difficulty: Difficulty = DEFAULT_DIFFICULTY;
   private states = new Map<string, MeasureState>();
   private externalActive = new Set<string>();
@@ -144,6 +153,19 @@ class MeasureEngine {
     return this.states.get(id);
   }
 
+  /** The last public vote on a measure, if there was one. */
+  lastVote(id: string): VoteResult | undefined {
+    return this.voteResults.get(id);
+  }
+
+  /** Until when a measure the voters rejected can't be put forward again, or null if it can. */
+  moratoriumUntilMs(id: string, nowMs: number): number | null {
+    const vote = this.voteResults.get(id);
+    if (!vote || vote.accepted) return null;
+    const until = vote.atMs + VOTE_MORATORIUM_YEARS * 12 * MONTH_MS;
+    return nowMs < until ? until : null;
+  }
+
   /** Measures that are in force right now, with the settings they are in force under. */
   getActiveMeasures(): { def: MeasureDef; params: MeasureParams; enactedAtMs: number }[] {
     const active: { def: MeasureDef; params: MeasureParams; enactedAtMs: number }[] = [];
@@ -205,6 +227,7 @@ class MeasureEngine {
     if (!def || this.frozen) return false;
     const params = sanitizeParams(def, { ...defaultParams(def), ...rawParams });
     const now = atMsOverride ?? simClock.getSimTimeMs();
+    if (this.moratoriumUntilMs(id, now) !== null) return false; // the voters said no, not long ago
     if (measureSpends(def) && spendingFrozen(now)) return false; // under cantonal supervision
 
     const existing = this.states.get(id);
@@ -246,15 +269,17 @@ class MeasureEngine {
     this.bump();
   }
 
-  /** approval.ts: the vote is in. A measure the voters reject is struck down (its one-off cost stays spent). */
-  resolveVote(id: string, accepted: boolean, atMs: number): void {
+  /** approval.ts: the vote is in. A measure the voters reject is struck down (its one-off cost stays
+   * spent) and can't be put forward again for a while. */
+  resolveVote(id: string, accepted: boolean, atMs: number, yesShare: number): void {
     const state = this.states.get(id);
     const def = MEASURE_BY_ID.get(id);
     if (!state || !def) return;
     state.vote = null;
+    this.voteResults.set(id, { atMs, accepted, yesShare });
     if (!accepted) {
       this.states.delete(id);
-      this.log(atMs, `Struck down by the voters: ${def.title}.`);
+      this.log(atMs, `Struck down by the voters: ${def.title}. It can't be put forward again before ${this.formatDate(atMs + VOTE_MORATORIUM_YEARS * 12 * MONTH_MS)}.`);
       this.recompute();
       return;
     }
@@ -380,6 +405,7 @@ class MeasureEngine {
       lastChargedMonth: this.lastChargedMonth,
       lastRetireCheckDay: this.lastRetireCheckDay,
       frozen: this.frozen,
+      voteResults: this.voteResults,
     };
   }
 
@@ -391,6 +417,7 @@ class MeasureEngine {
     this.lastChargedMonth = s.lastChargedMonth;
     this.lastRetireCheckDay = s.lastRetireCheckDay;
     this.frozen = s.frozen;
+    this.voteResults = s.voteResults;
     this.recompute();
   }
 }

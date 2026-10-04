@@ -27,6 +27,7 @@ import {
   BANK_LOAN_TERMS_YEARS,
   BANK_TERM_PREMIUM_PCT,
   DEBT_LIMIT_YEARS,
+  RATING_UPGRADE_MONTHS,
   DEBT_MAX_PENALTY_POINTS,
   DEBT_WORRY_FROM_YEARS,
   FEDERAL_LOAN_CHF_PER_RESIDENT_YEAR,
@@ -38,6 +39,7 @@ import {
   GREEN_BOND_DEMAND_RANGE,
   GREEN_BOND_DISCOUNT_PCT,
   GREEN_BOND_EARMARK_MONTHS,
+  GREEN_BOND_HOLDINGS_CHF_PER_RESIDENT,
   GREEN_BOND_GREENWASHING_POINTS,
   GREEN_BOND_ISSUE_GOODWILL,
   GREEN_BOND_MIN_MONTHS_APART,
@@ -107,7 +109,10 @@ class Debt {
   private buildingsProvider: () => Building[] = () => [];
   private lastMonth: number | null = null;
   private supervised = false;
-  private lastRating: string | null = null;
+  /** The rating lenders give now (an index into RATINGS, best first), and since when debt has
+   * earned a better one. */
+  private ratingIndex = 0;
+  private betterSinceMs: number | null = null;
   private counter = 0;
   private version = 0;
   private readonly listeners = new Set<() => void>();
@@ -123,7 +128,8 @@ class Debt {
     const now = simClock.getSimTimeMs();
     interestRates.init(seed, now);
     this.lastMonth = monthIndex(now);
-    this.lastRating = this.rating(now).label;
+    this.ratingIndex = this.earnedRatingIndex(now);
+    this.betterSinceMs = null;
     setSpendingFreeze(() => this.supervised);
     setDebtPenalty((atMs) => this.penaltyPoints(atMs));
     this.unsubscribeClock = simClock.subscribe(() => this.advance(simClock.getSimTimeMs()));
@@ -186,21 +192,33 @@ class Debt {
     return DEBT_LIMIT_YEARS * this.incomeRp(atMs);
   }
 
-  rating(atMs: number): { label: string; spreadPct: number } {
+  /** The credit rating lenders give the department now. */
+  rating(): { label: string; spreadPct: number } {
+    return RATINGS[this.ratingIndex];
+  }
+
+  /** The next notch up and when it comes, if debt stays where it is (null: not on the way up). */
+  nextUpgrade(): { label: string; atMs: number } | null {
+    if (this.betterSinceMs === null || this.ratingIndex === 0) return null;
+    return { label: RATINGS[this.ratingIndex - 1].label, atMs: this.betterSinceMs + RATING_UPGRADE_MONTHS * MONTH_MS };
+  }
+
+  private earnedRatingIndex(atMs: number): number {
     const years = this.debtYears(atMs);
-    return RATINGS.find((r) => years < r.uptoYears) ?? RATINGS[RATINGS.length - 1];
+    const index = RATINGS.findIndex((r) => years < r.uptoYears);
+    return index < 0 ? RATINGS.length - 1 : index;
   }
 
   bankRatePct(termYears: number, atMs: number): number {
-    return this.marketPct(atMs) + this.rating(atMs).spreadPct + (BANK_TERM_PREMIUM_PCT[termYears] ?? 0);
+    return this.marketPct(atMs) + this.rating().spreadPct + (BANK_TERM_PREMIUM_PCT[termYears] ?? 0);
   }
 
   overdraftRatePct(atMs: number): number {
-    return this.marketPct(atMs) + this.rating(atMs).spreadPct + OVERDRAFT_PREMIUM_PCT;
+    return this.marketPct(atMs) + this.rating().spreadPct + OVERDRAFT_PREMIUM_PCT;
   }
 
   greenBondRatePct(atMs: number): number {
-    return Math.max(0.05, this.marketPct(atMs) + this.rating(atMs).spreadPct - GREEN_BOND_DISCOUNT_PCT);
+    return Math.max(0.05, this.marketPct(atMs) + this.rating().spreadPct - GREEN_BOND_DISCOUNT_PCT);
   }
 
   /** How much more can be borrowed before the limit. */
@@ -215,16 +233,20 @@ class Debt {
     return null;
   }
 
-  /** What residents would subscribe to a green bond now (CHF in Rp), and whether one can be issued. */
-  greenBondOffer(atMs: number): { maxRp: number; ratePct: number; blocked: string | null } {
+  /** What residents would subscribe to a green bond now (CHF in Rp), and whether one can be issued:
+   * an issue's worth, but no more than they are still willing to add to the green bonds they hold. */
+  greenBondOffer(atMs: number): { maxRp: number; ratePct: number; blocked: string | null; heldRp: number } {
     const residents = this.residents(atMs);
     const climate = approval.getBlocLevels().climate;
     const demand = GREEN_BOND_DEMAND_RANGE[0] + (GREEN_BOND_DEMAND_RANGE[1] - GREEN_BOND_DEMAND_RANGE[0]) * Math.min(1, Math.max(0, (climate - 30) / 50));
-    const maxRp = round1000(Math.min(this.headroomRp(atMs), residents * GREEN_BOND_CHF_PER_RESIDENT * demand * 100));
+    const heldRp = this.loans.filter((l) => l.kind === "greenBond" && l.status !== "repaid").reduce((sum, l) => sum + (l.status === "active" ? l.outstandingRp : l.principalRp), 0);
+    const appetiteRp = Math.max(0, residents * GREEN_BOND_HOLDINGS_CHF_PER_RESIDENT * demand * 100 - heldRp);
+    const maxRp = round1000(Math.min(this.headroomRp(atMs), residents * GREEN_BOND_CHF_PER_RESIDENT * demand * 100, appetiteRp));
     const last = this.loans.filter((l) => l.kind === "greenBond").reduce((m, l) => Math.max(m, l.orderedAtMs), Number.NEGATIVE_INFINITY);
     let blocked = this.borrowingBlocked(atMs);
     if (!blocked && atMs - last < GREEN_BOND_MIN_MONTHS_APART * MONTH_MS) blocked = "A green bond was offered less than a year ago; residents need time before the next.";
-    return { maxRp, ratePct: this.greenBondRatePct(atMs), blocked };
+    if (!blocked && maxRp <= 0) blocked = "Residents already hold as many of the town's green bonds as they want; the next can be sold once earlier ones are repaid.";
+    return { maxRp, ratePct: this.greenBondRatePct(atMs), blocked, heldRp };
   }
 
   /** How much federal decarbonisation money can be drawn now: half the investments of the last
@@ -365,9 +387,22 @@ class Debt {
     if (balance !== null && balance < 0) treasury.recordPayout("interest", atMs, (-balance * this.overdraftRatePct(atMs)) / 100 / 12, "overdraft");
 
     // The rating, and the canton.
-    const rating = this.rating(atMs).label;
-    if (this.lastRating !== null && rating !== this.lastRating) this.emit({ kind: "rating", from: this.lastRating, to: rating, atMs });
-    this.lastRating = rating;
+    // Down at once; up a notch only after a year of earning better.
+    const earned = this.earnedRatingIndex(atMs);
+    const before = this.ratingIndex;
+    if (earned > this.ratingIndex) {
+      this.ratingIndex = earned;
+      this.betterSinceMs = null;
+    } else if (earned < this.ratingIndex) {
+      this.betterSinceMs ??= atMs;
+      if (atMs - this.betterSinceMs >= RATING_UPGRADE_MONTHS * MONTH_MS - MONTH_MS / 2) {
+        this.ratingIndex--;
+        this.betterSinceMs = earned < this.ratingIndex ? atMs : null;
+      }
+    } else {
+      this.betterSinceMs = null;
+    }
+    if (this.ratingIndex !== before) this.emit({ kind: "rating", from: RATINGS[before].label, to: RATINGS[this.ratingIndex].label, atMs });
     const years = this.debtYears(atMs);
     if (!this.supervised && years >= DEBT_LIMIT_YEARS) {
       this.supervised = true;
@@ -428,14 +463,15 @@ class Debt {
   // --- saving (saveGame.ts) ---
 
   snapshot() {
-    return { loans: this.loans, lastMonth: this.lastMonth, supervised: this.supervised, lastRating: this.lastRating, counter: this.counter };
+    return { loans: this.loans, lastMonth: this.lastMonth, supervised: this.supervised, ratingIndex: this.ratingIndex, betterSinceMs: this.betterSinceMs, counter: this.counter };
   }
 
   restore(s: ReturnType<Debt["snapshot"]>): void {
     this.loans = s.loans;
     this.lastMonth = s.lastMonth;
     this.supervised = s.supervised;
-    this.lastRating = s.lastRating;
+    this.ratingIndex = s.ratingIndex;
+    this.betterSinceMs = s.betterSinceMs;
     this.counter = s.counter;
     this.bump();
   }

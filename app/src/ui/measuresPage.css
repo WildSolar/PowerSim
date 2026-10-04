@@ -384,3 +384,18 @@
 .outlook-timeline .measure-summary {
   margin: 2px 0 0;
 }
+
+.measure-vote-result {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r-2);
+  font-size: 12px;
+  border-left: 3px solid var(--good);
+  background: var(--good-soft);
+  color: var(--ink);
+}
+
+.measure-vote-result.rejected {
+  border-left-color: var(--bad);
+  background: var(--bad-soft);
+}

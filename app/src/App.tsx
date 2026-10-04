@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
 import { TownHall, type TownHallSection } from "./ui/TownHall";
+import { TariffDeadlineDialog, useTariffDeadline } from "./ui/TariffDeadlineDialog";
+import { tariffDeadline } from "./sim/tariffDeadline";
 import { DwellingPanel } from "./ui/DwellingPanel";
 import { LayerDock, isToolLayer, layerLabel } from "./ui/LayerDock";
 import { LayerLegend } from "./ui/LayerLegend";
@@ -97,7 +99,10 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
   const reportCardYear = useReportCardYear();
   const stockBuildings = useStockBuildings();
   const keyboardEnabled = !showTownHall && !showWiki && !showMenu && inboxSelection === null && reportCardYear === null;
-  useTimeKeyboard(keyboardEnabled);
+  // Time keys work over the windows too (the inbox, the town hall, the wiki), but not over the
+  // Year in Review or the tariff deadline, which hold the game where it is.
+  const tariffDue = useTariffDeadline();
+  useTimeKeyboard(reportCardYear === null && tariffDue === null);
 
   // Escape closes whatever is on top: the Year in Review, then the Wiki or the town hall, then a
   // charger being placed, then a dwelling (back to its building), a building, a selected charger,
@@ -180,6 +185,7 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
           // Dev check: the state right after loading, to compare with the save (see saveGame.ts).
           if (import.meta.env.DEV) Object.assign(window, { __stateAfterLoad: stateJson(transparency) });
         }
+        tariffDeadline.init(); // after a load, so it watches from the saved moment on
         setDataset(loaded);
       })
       .catch((e: Error) => setError(e.message));
@@ -323,6 +329,9 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
             setSelectedEwid(null);
           }}
         />
+      )}
+      {tariffDue !== null && reportCardYear === null && !townHall && !gameOver && (
+        <TariffDeadlineDialog year={tariffDue} onOpenPrices={() => setTownHall("prices")} />
       )}
       {reportCardYear !== null && (
         <ReportCardModal dataset={liveDataset ?? dataset} year={reportCardYear} onClose={() => reportCardStore.dismiss()} />

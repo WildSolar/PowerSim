@@ -113,6 +113,26 @@ export function campaignText(bloc: Bloc, supports: boolean, title: string, when:
       };
 }
 
+/** The town clerk's notice of a vote's result. `againFrom`: when a rejected measure may be put forward again. */
+export function voteResultText(title: string, accepted: boolean, yesShare: number, againFrom: string | null): LetterText {
+  const yes = Math.round(yesShare);
+  return accepted
+    ? {
+        subject: `Vote result: ${title} accepted`,
+        paragraphs: [
+          `The voters have accepted “${title}”, with ${yes}% in favour and ${100 - yes}% against.`,
+          "The decision stands, and the council may carry on as planned. A clear win at the ballot box also does the council's standing some good.",
+        ],
+      }
+    : {
+        subject: `Vote result: ${title} rejected`,
+        paragraphs: [
+          `The voters have rejected “${title}”: only ${yes}% voted in favour, ${100 - yes}% against.`,
+          `The decision is struck down with immediate effect; money already spent on it stays spent. A defeat at the ballot box costs the council some standing.${againFrom ? ` By custom, the council will not put the same proposal to the voters again before ${againFrom}.` : ""}`,
+        ],
+      };
+}
+
 // --- Moods ---
 
 export type Mood = "angry" | "unhappy" | "pleased";

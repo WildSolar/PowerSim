@@ -46,6 +46,7 @@ export const REPEAL_PENALTY_POINTS = 1.5; // and looks indecisive: everyone lose
 // --- Referendums ---
 
 export const VOTE_DELAY_MONTHS = 6; // enactment -> vote
+export const VOTE_MORATORIUM_YEARS = 2; // a measure the voters rejected can't be put forward again this soon
 export const OPTIONAL_REFERENDUM_STANCE = -0.05; // a law whose net stance is below this gets challenged
 export const VOTE_STANCE_SENSITIVITY = 0.9; // net stance -> yes share
 export const VOTE_MOOD_SENSITIVITY = 0.25; // overall approval above/below 50 -> yes share

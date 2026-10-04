@@ -228,10 +228,17 @@ export function InboxToast({ onOpen }: { onOpen: (selection: InboxSelection) => 
   const [item, setItem] = useState<Letter | Edition | null>(null);
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let showingImportant = false;
     const unsubscribe = inbox.onArrival((arrived) => {
+      const important = "kind" in arrived && arrived.kind === "voteResult";
+      if (showingImportant && !important) return; // a vote result isn't pushed aside by the paper
+      showingImportant = important;
       setItem(arrived);
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => setItem(null), 7000);
+      timer = setTimeout(() => {
+        showingImportant = false;
+        setItem(null);
+      }, important ? 15000 : 7000);
     });
     return () => {
       unsubscribe();
@@ -242,7 +249,7 @@ export function InboxToast({ onOpen }: { onOpen: (selection: InboxSelection) => 
   const isEdition = "lead" in item;
   return (
     <button
-      className="inbox-toast"
+      className={`inbox-toast${!isEdition && item.kind === "voteResult" ? " important" : ""}`}
       onClick={() => {
         onOpen({ tab: isEdition ? "paper" : "letters", id: item.id });
         setItem(null);

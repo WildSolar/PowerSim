@@ -92,7 +92,7 @@ interface Ballot {
   atMs: number;
   title: string;
   stances: Stances;
-  resolve: (accepted: boolean, atMs: number) => void;
+  resolve: (accepted: boolean, atMs: number, yesShare: number) => void;
 }
 
 /** A one-off decision outside the measure catalog (zoning.ts) that the public reacts to and may
@@ -429,7 +429,7 @@ class ApprovalEngine {
     if (!this.wouldGoToVote(this.stancesOf(def, params), def.referendum)) return;
     const delayMonths = Math.max(1, Math.min(VOTE_DELAY_MONTHS, def.leadTimeMonths - 1));
     const voteAt = atMs + delayMonths * MONTH_MS;
-    this.votes.set(id, { atMs: voteAt, title: def.title, stances: this.stancesOf(def, params), resolve: (accepted, when) => measures.resolveVote(id, accepted, when) });
+    this.votes.set(id, { atMs: voteAt, title: def.title, stances: this.stancesOf(def, params), resolve: (accepted, when, yes) => measures.resolveVote(id, accepted, when, yes) });
     measures.setVote(id, voteAt);
     const when = new Date(toDateMs(voteAt)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
     this.addLog(atMs, `${def.title} goes to a public vote in ${when}.`);
@@ -454,7 +454,7 @@ class ApprovalEngine {
       this.shiftAll(-VOTE_LOST_POINTS * this.sensitivity);
       this.addLog(nowMs, `Voters rejected ${vote.title} (${Math.round(yes)}% in favour). It is struck down.`);
     }
-    vote.resolve(accepted, nowMs);
+    vote.resolve(accepted, nowMs, yes);
     this.emit({ kind: "voteHeld", key: id, title: vote.title, atMs: nowMs, accepted, yesShare: yes, stances: vote.stances });
     this.bump();
   }
@@ -511,7 +511,7 @@ class ApprovalEngine {
   }
 
   /** `resolverFor` gives back what a ballot does with its verdict, by key. */
-  restore(s: ReturnType<ApprovalEngine["snapshot"]>, resolverFor: (key: string) => (accepted: boolean, atMs: number) => void): void {
+  restore(s: ReturnType<ApprovalEngine["snapshot"]>, resolverFor: (key: string) => (accepted: boolean, atMs: number, yesShare: number) => void): void {
     this.levels = s.levels;
     this.history = s.history;
     this.log = s.log;

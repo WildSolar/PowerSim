@@ -561,3 +561,10 @@
     display: none;
   }
 }
+
+/* A vote result: the town has spoken. */
+.inbox-toast.important {
+  padding: 12px 18px;
+  font-size: 14px;
+  box-shadow: var(--shadow-2), inset 4px 0 0 var(--accent);
+}

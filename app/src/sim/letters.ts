@@ -66,6 +66,7 @@ import {
   refusedHeatPumpText,
   requestText,
   resolvedByOthersText,
+  voteResultText,
   welcomeText,
   type LetterText,
   type Mood,
@@ -221,6 +222,11 @@ class Letters {
   }
 
   private onApprovalEvent(e: ApprovalEvent): void {
+    if (e.kind === "voteHeld") {
+      const until = measures.moratoriumUntilMs(e.key, e.atMs + 1);
+      this.post({ atMs: e.atMs, kind: "voteResult", bloc: null, from: `The Town Clerk of ${this.town}`, role: "", ...voteResultText(e.title, e.accepted, e.yesShare, until !== null ? monthYearLabel(until) : null) });
+      return;
+    }
     if (e.kind !== "voteScheduled") return;
     const ranked = BLOC_ORDER.map((b) => ({ b, s: e.stances[b] ?? 0 })).sort((x, y) => x.s - y.s);
     const when = monthYearLabel(e.voteAtMs);

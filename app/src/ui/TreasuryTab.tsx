@@ -96,7 +96,7 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
           <span className="borrow-label">Debt</span>
           <span className="borrow-value">{formatCHF(owed)}</span>
           <span className="borrow-note">
-            rating {debt.rating(now).label}
+            rating {debt.rating().label}
             {debt.isSupervised() ? " · under supervision" : ""}
           </span>
         </div>

@@ -42,7 +42,8 @@ export function BorrowingTab() {
   const now = simClock.getSimTimeMs();
   const market = debt.marketPct(now);
   const yearAgo = interestRates.history(now, 12)[0]?.pct ?? market;
-  const rating = debt.rating(now);
+  const rating = debt.rating();
+  const upgrade = debt.nextUpgrade();
   const debtRp = debt.debtRp(now);
   const limitRp = debt.limitRp(now);
   const years = debt.debtYears(now);
@@ -66,7 +67,10 @@ export function BorrowingTab() {
         <div>
           <span className="borrow-label">Credit rating</span>
           <span className="borrow-value">{rating.label}</span>
-          <span className="borrow-note">+{pct(rating.spreadPct)} on the market</span>
+          <span className="borrow-note">
+            +{pct(rating.spreadPct)} on the market
+            {upgrade && ` · ${upgrade.label} from ${monthYear(upgrade.atMs)} if debt stays this low`}
+          </span>
         </div>
         <div>
           <span className="borrow-label">Debt</span>
@@ -165,7 +169,7 @@ function GreenBond({ now }: { now: number }) {
         <>
           <AmountSlider value={amount} max={max} onChange={setAmount} />
           <div className="borrow-note">
-            At {pct(offer.ratePct)}. Residents are expected to subscribe about {formatCHF(offer.maxRp)} — the more content the climate-minded, the more.
+            At {pct(offer.ratePct)}. Residents are expected to subscribe about {formatCHF(offer.maxRp)} — the more content the climate-minded, the more{offer.heldRp > 0 ? `, and less while they still hold ${formatCHF(offer.heldRp)} of earlier green bonds` : ""}.
             {requested > offer.maxRp ? ` Offering more than that raises only what they subscribe (${formatCHF(raised)}).` : ""} The subscription runs{" "}
             {GREEN_BOND_SUBSCRIPTION_MONTHS} months. The money is earmarked: as much has to go into green investment within {GREEN_BOND_EARMARK_MONTHS / 12} years,
             or it will be called greenwashing.

@@ -140,7 +140,7 @@ export function TariffControl() {
             ? unchanged
               ? `Published. You can revise it until ${dayLabel(tariffStore.deadlineMs(targetYear))}.`
               : `Replaces the one already published.`
-            : `If you publish nothing by ${dayLabel(tariffStore.deadlineMs(targetYear))}, this year’s prices carry over.`}
+            : `Due by ${dayLabel(tariffStore.deadlineMs(targetYear))}. If none is published by then, the game stops there and asks whether to keep this year’s prices.`}
         </span>
       </div>
 
@@ -204,7 +204,6 @@ function DynamicTariffDraft({
   // Who would sign up, with the town as it is today (it pauses while the town hall is open).
   const uptake = useMemo(
     () => (offered ? estimateUptake(stock.getAll(), draft, year, atMs) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [offered, draft.dynamicSpreadRpKWh, draft.offPeakPriceRpKWh, draft.peakPriceRpKWh, year, Math.floor(atMs / 86_400_000)],
   );
   return (

@@ -26,6 +26,9 @@ export const RATINGS: { label: string; uptoYears: number; spreadPct: number }[] 
   { label: "BBB", uptoYears: 4, spreadPct: 1 },
   { label: "BB", uptoYears: Number.POSITIVE_INFINITY, spreadPct: 2 },
 ];
+// A downgrade comes as soon as debt calls for it; an upgrade only once debt has stayed low enough
+// for this long, one notch at a time — lenders want to see it last.
+export const RATING_UPGRADE_MONTHS = 12;
 
 // --- The canton's limits ---
 
@@ -55,8 +58,12 @@ export const OVERDRAFT_PREMIUM_PCT = 3;
 export const GREEN_BOND_TERM_YEARS = 10;
 // Residents accept a little less than the market for a local, green cause.
 export const GREEN_BOND_DISCOUNT_PCT = 0.4;
-// How much residents subscribe: up to this much per resident, more when the climate-minded are happy.
-export const GREEN_BOND_CHF_PER_RESIDENT = 400;
+// How much residents subscribe to one issue: about this much per resident (scaled by the range
+// below, more when the climate-minded are happy) — a citizens' bond of a Swiss town of 20,000 raises
+// a couple of million. And how much of the town's green bonds they are willing to hold at once, on
+// the same scale: what's still outstanding leaves less room for the next issue.
+export const GREEN_BOND_CHF_PER_RESIDENT = 120;
+export const GREEN_BOND_HOLDINGS_CHF_PER_RESIDENT = 300;
 export const GREEN_BOND_DEMAND_RANGE: [number, number] = [0.5, 1.3];
 export const GREEN_BOND_SUBSCRIPTION_MONTHS = 2;
 export const GREEN_BOND_MIN_MONTHS_APART = 12;

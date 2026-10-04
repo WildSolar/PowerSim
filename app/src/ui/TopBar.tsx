@@ -19,7 +19,6 @@ import { formatDate, formatTime, formatWeekday, toDateMs } from "../sim/calendar
 import { weatherAt, type WeatherCondition } from "../sim/weather";
 import { approval } from "../sim/approval";
 import { debt } from "../sim/debt";
-import { simClock } from "../sim/engine";
 import { cachedEmissionsForYear } from "../sim/emissions";
 import { scoreSoFar, yearPoints } from "../sim/score";
 import { parThrough } from "../sim/par";
@@ -93,13 +92,13 @@ function Clock() {
       </div>
       <div className="tb-weather" title={`${dayNight.label} · ${CONDITION_LABEL[weather.condition]} · insolation ${insolation} W/m²`}>
         <WeatherIcon condition={weather.condition} night={dayNight.dayFraction < 0.5} />
-        <span>{Math.round(weather.tempC)}°C</span>
+        <span className="tb-temp">{Math.round(weather.tempC)}°C</span>
       </div>
       <div className="tb-speed" role="group" aria-label="Speed">
         {SPEEDS.map((s) => (
           <button
             key={s.value}
-            title={s.value === PAUSE_SPEED ? `${s.name} (${s.hint})` : `${s.name}: ${s.hint} (Tab cycles the speeds)`}
+            title={s.value === PAUSE_SPEED ? `${s.name} (${s.hint})` : `${s.name}: ${s.hint} (key ${RUNNING_SPEEDS.indexOf(s as (typeof RUNNING_SPEEDS)[number]) + 1}; Tab cycles the speeds)`}
             aria-label={s.name}
             aria-pressed={s.value === speed}
             className={s.value === speed ? "active" : ""}
@@ -126,7 +125,7 @@ function TreasuryKpi({ dataset, onOpen }: { dataset: MunicipalityDataset; onOpen
     `Paid out so far: −${formatCHF(paidOutRp)}`,
     ...(borrowedRp > 0 ? [`Borrowed this year: +${formatCHF(borrowedRp)}`] : []),
     ...(receivedRp > 0 ? [`Zoning levy so far: +${formatCHF(receivedRp)}`] : []),
-    ...(owedRp > 0 ? [`Debt (${debt.rating(simClock.getSimTimeMs()).label}): ${formatCHF(owedRp)}`] : []),
+    ...(owedRp > 0 ? [`Debt (${debt.rating().label}): ${formatCHF(owedRp)}`] : []),
     "Click for the accounts and borrowing",
   ];
   return (

@@ -73,6 +73,13 @@
   white-space: nowrap;
 }
 
+/* Room for "−12°C", so nothing to the right shifts as the temperature changes. */
+.tb-temp {
+  display: inline-block;
+  min-width: 5ch;
+  font-variant-numeric: tabular-nums;
+}
+
 .tb-speed {
   display: flex;
   border: 1px solid var(--line-strong);

@@ -131,6 +131,8 @@ function MeasureDetail({ def, nowMs, onClose }: { def: MeasureDef; nowMs: number
   const unavailable = measureUnavailableReason(def.id, nowMs);
 
   const status = measureStatus(def, nowMs);
+  const lastVote = measures.lastVote(def.id);
+  const moratoriumUntil = measures.moratoriumUntilMs(def.id, nowMs);
 
   return (
     <div className={`measure-detail${unavailable ? " unavailable" : ""}`}>
@@ -204,9 +206,15 @@ function MeasureDetail({ def, nowMs, onClose }: { def: MeasureDef; nowMs: number
           Public vote in {formatDate(vote.atMs).replace(/^\w+, \d+ /, "")} — latest poll: {Math.round(vote.pollYes)}% in favour
         </div>
       )}
+      {!vote && lastVote && (
+        <div className={`measure-vote-result ${lastVote.accepted ? "accepted" : "rejected"}`}>
+          {lastVote.accepted ? "Accepted" : "Rejected"} by the voters in {monthYear(lastVote.atMs)}: {Math.round(lastVote.yesShare)}% yes, {100 - Math.round(lastVote.yesShare)}% no.
+          {moratoriumUntil !== null && ` It can't be put forward again before ${monthYear(moratoriumUntil)}.`}
+        </div>
+      )}
 
       <div className="measure-actions">
-        <button className="measure-enact" disabled={!changed || unavailable !== null} onClick={() => measures.enact(def.id, draft)}>
+        <button className="measure-enact" disabled={!changed || unavailable !== null || moratoriumUntil !== null} onClick={() => measures.enact(def.id, draft)}>
           {latest === null ? "Enact" : "Apply change"}
         </button>
         {latest !== null && unavailable === null && (
@@ -226,6 +234,7 @@ function measureStatus(def: MeasureDef, nowMs: number): { label: string; tone: S
   const state = measures.getState(def.id);
   const latest = state?.pending?.params ?? state?.active ?? null;
   if (measureUnavailableReason(def.id, nowMs)) return { label: latest !== null ? "Winding up" : "Not available", tone: "done" };
+  if (latest === null && measures.moratoriumUntilMs(def.id, nowMs) !== null) return { label: "Rejected by voters", tone: "done" };
   if (state?.pending) return { label: `${state.active ? "Change" : "Takes effect"} ${monthYear(state.pending.activeFromMs)}`, tone: "pending" };
   if (state?.active) return { label: "In effect", tone: "active" };
   return { label: "Not enacted", tone: "off" };
@@ -235,6 +244,9 @@ function measureStatus(def: MeasureDef, nowMs: number): { label: string; tone: S
 function cardFooter(def: MeasureDef, nowMs: number): { text: string; tone?: "good" | "bad" | "warn" } {
   const vote = approval.getVoteInfo(def.id, def, nowMs);
   if (vote) return { text: `Public vote ${monthYear(vote.atMs)} · poll ${Math.round(vote.pollYes)}% yes`, tone: "warn" };
+  const until = measures.moratoriumUntilMs(def.id, nowMs);
+  const lastVote = measures.lastVote(def.id);
+  if (until !== null && lastVote) return { text: `Rejected ${monthYear(lastVote.atMs)} (${Math.round(lastVote.yesShare)}% yes) · again from ${monthYear(until)}`, tone: "bad" };
   const state = measures.getState(def.id);
   const params = state?.pending?.params ?? state?.active ?? null;
   if (state?.active && def.subsidyCategory) {

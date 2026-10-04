@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import { cycleSpeed, togglePause } from "../sim/timeControls";
+import { cycleSpeed, RUNNING_SPEEDS, setSpeed, togglePause } from "../sim/timeControls";
 import { hasModifier, isTypingTarget } from "./keyboard";
 
-/** Tab cycles the running speeds; Space pauses/resumes. */
+/** Tab cycles the running speeds; 1/2/3 pick one; Space pauses/resumes. */
 export function useTimeKeyboard(enabled: boolean): void {
   useEffect(() => {
     if (!enabled) return;
@@ -15,6 +15,9 @@ export function useTimeKeyboard(enabled: boolean): void {
       } else if (e.key === " ") {
         e.preventDefault();
         if (!e.repeat) togglePause();
+      } else if (/^[1-9]$/.test(e.key) && Number(e.key) <= RUNNING_SPEEDS.length) {
+        e.preventDefault();
+        setSpeed(RUNNING_SPEEDS[Number(e.key) - 1].value);
       }
     };
     // A focused button activates on Space *release*, so a click on a UI button followed

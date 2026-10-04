@@ -7,7 +7,7 @@
 import type { Bloc } from "../config/approval";
 import { simClock } from "./engine";
 
-export type LetterKind = "welcome" | "reaction" | "campaign" | "mood" | "report" | "request" | "followUp";
+export type LetterKind = "welcome" | "reaction" | "campaign" | "mood" | "report" | "request" | "followUp" | "voteResult";
 
 export interface Letter {
   id: string;
