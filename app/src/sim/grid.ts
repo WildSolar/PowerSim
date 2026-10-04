@@ -1,9 +1,10 @@
 /**
  * The local electricity grid: transformer areas, each fed by a station of limited capacity. Where
- * the real stations are isn't public, so the areas are drawn from the buildings: grouped by
- * location, weighted by their winter evening load, so each serves about one station's worth
- * (config/grid.ts). Each station was sized with some headroom over the peak it served when the game
- * starts.
+ * the real stations are isn't public, so they are placed from the buildings: grouped by location,
+ * weighted by their winter evening load, so each serves about one station's worth (config/grid.ts),
+ * and set on the nearest street. Each building then hangs off the station nearest to it by road
+ * (gridAreas.ts) — cables follow the streets. Each station was sized with some headroom over the
+ * peak it served when the game starts.
  *
  * Twice a year the utility reads its meters: after the winter (the coldest January and February
  * evenings — heat pumps, cooking, cars plugging in) and after the summer (the sunniest middays, when
@@ -40,14 +41,8 @@ import { buildingPowerW } from "./buildingPower";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { simClock } from "./engine";
 import { existsAt } from "./lifetime";
-import {
-  clipRingToHalfPlanes,
-  clipSegmentToHalfPlanes,
-  type HalfPlane,
-  LocalProjection,
-  segmentInsideRings,
-  type XY,
-} from "./localGeo";
+import { buildingCellZones, RoadAssignment } from "./gridAreas";
+import { LocalProjection, type XY } from "./localGeo";
 import { ghiWm2 } from "./pv";
 import { publicCharging } from "./publicCharging";
 import { hashSeed, mulberry32 } from "./rng";
@@ -100,6 +95,18 @@ function nextStationSize(kw: number): number {
   return (Math.floor(kw / MULTI_TRANSFORMER_STEP_KVA) + 1) * MULTI_TRANSFORMER_STEP_KVA;
 }
 
+/** The street most of these buildings are addressed on. */
+function mostCommonStreet(buildings: Building[]): string | null {
+  const counts = new Map<string, number>();
+  for (const b of buildings) {
+    const street = b.address?.replace(/\s+\S+$/, "").trim();
+    if (street) counts.set(street, (counts.get(street) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  for (const [street, n] of counts) if (best === null || n > (counts.get(best) ?? 0)) best = street;
+  return best;
+}
+
 export function reinforceCostRp(fromKw: number): number {
   const toKw = nextStationSize(fromKw);
   return (REINFORCE_BASE_CHF + REINFORCE_CHF_PER_KVA * toKw) * 100;
@@ -121,6 +128,10 @@ class Grid {
   private zones: GridZone[] | null = null;
   private boundary: XY[][][] | null = null; // the municipality, in local metres: parts, then rings
   private areaOfEgid = new Map<string, number>();
+  /** The road network with every junction's nearest station, for buildings that come later. */
+  private road: RoadAssignment | null = null;
+  private zonesVersion = 0;
+  private siteAreas = new Map<string, number>(); // derived from the road: no need to save
   private projection = new LocalProjection(8.4, 47.4);
   private realPlants: PowerPlant[] = [];
   private buildingsProvider: () => Building[] = () => [];
@@ -161,7 +172,9 @@ class Grid {
       const snow = snowDepthCm(t);
       for (const b of buildings) load.set(b.egid, (load.get(b.egid) ?? 0) + Math.max(0, buildingPowerW(b, t, plants, snow)) / 1000 / winterTimes.length);
     }
+    this.siteAreas = new Map();
     this.areas = this.cluster(buildings, load);
+    this.road = this.roadFor(this.areas.map((a) => [a.x, a.y] as XY));
 
     // The readings of the year before the game, and stations sized with headroom over them.
     this.measure("winter", startYear);
@@ -224,19 +237,12 @@ class Grid {
         return sw > 0 ? { x: sx / sw, y: sy / sw } : c;
       });
     }
-    // A last pass against the final stations, so every building is in its nearest station's area —
-    // the areas are then exactly the zones drawn on the map (zonePolygons).
+    // The stations onto the streets, and every building to the station nearest by road.
+    const road = this.roadFor(centres.map((c) => [c.x, c.y] as XY));
+    const placed = road.stationPositions();
+    centres = placed.map(([x, y]) => ({ x, y }));
     points.forEach((p, i) => {
-      let best = 0;
-      let bestD = Infinity;
-      centres.forEach((c, j) => {
-        const d = (c.x - p.x) ** 2 + (c.y - p.y) ** 2;
-        if (d < bestD) {
-          bestD = d;
-          best = j;
-        }
-      });
-      assignment[i] = best;
+      assignment[i] = road.stationFor(p.b);
     });
     const used = [...new Set(assignment)].sort((a, c) => a - c);
     const names = new Map<string, number>();
@@ -245,7 +251,7 @@ class Grid {
       points.forEach((p, i) => {
         if (assignment[i] === j) this.areaOfEgid.set(p.b.egid, id);
       });
-      const street = streets.snapToStreet(lon, lat)?.street ?? "Area";
+      const street = mostCommonStreet(points.filter((_, i) => assignment[i] === j).map((p) => p.b)) ?? streets.snapToStreet(lon, lat)?.street ?? "Area";
       const n = (names.get(street) ?? 0) + 1;
       names.set(street, n);
       return {
@@ -264,109 +270,51 @@ class Grid {
     });
   }
 
-  private nearestAreaId(lon: number, lat: number): number {
-    const [x, y] = this.projection.toXY(lon, lat);
-    let best = 0;
-    let bestD = Infinity;
-    for (const a of this.areas) {
-      const d = (a.x - x) ** 2 + (a.y - y) ** 2;
-      if (d < bestD) {
-        bestD = d;
-        best = a.id;
-      }
-    }
-    return best;
+  /** The road network, with each junction's nearest station (by index into `stations`). */
+  private roadFor(stations: XY[]): RoadAssignment {
+    return new RoadAssignment(streets.all(), (id) => streets.nodesOf(id), this.projection, stations);
   }
 
-  /** The area a building is in (a new one joins its nearest station). */
+  /** The area a building is in (a new one joins the station nearest by road). */
   areaIdOf(b: Building): number {
     let id = this.areaOfEgid.get(b.egid);
     if (id === undefined) {
-      id = this.nearestAreaId(b.lon, b.lat);
-      this.areaOfEgid.set(b.egid, id);
+      id = this.road ? this.road.stationFor(b) : 0;
+      this.areaOfEgid.set(b.egid, id); // its cell joins the map with the next reading
     }
     return id;
   }
 
-  /** The zone each station serves: the part of the town closer to it than to any other station —
-   * which is exactly where its buildings are (each joins its nearest station) — cut to the municipal
-   * boundary. `fill` is a multipolygon; `edges` are its outlines as lines, drawn only inside the town
-   * (a cut along the boundary would otherwise leave seams outside it). [lon, lat], by area id;
-   * computed once. */
+  /** The area a public charger on the street draws from (by road, like a building). */
+  private siteAreaId(lon: number, lat: number): number {
+    const key = `${lon},${lat}`;
+    let id = this.siteAreas.get(key);
+    if (id === undefined) {
+      id = this.road ? this.road.stationAt(lon, lat) : 0;
+      this.siteAreas.set(key, id);
+    }
+    return id;
+  }
+
+  /** Changes whenever the zones are redrawn (a new building joined an area). */
+  getZonesVersion(): number {
+    return this.zonesVersion;
+  }
+
+  /** The zone each station serves, for the map: its buildings' cells (gridAreas.ts), cut to the
+   * municipal boundary. `fill` is a multipolygon; `edges` its borders with other areas and with
+   * the open land, inside the town. [lon, lat], by area id; redrawn with each reading, taking in
+   * the buildings that have joined since. */
   zonePolygons(): GridZone[] {
     if (this.zones) return this.zones;
-    const boundary = this.boundary;
-    // The extent the cells are cut from: the municipality, or without one the buildings, plus a margin.
-    const extent = boundary ? boundary.flat(2) : this.buildingsProvider().map((b) => this.projection.toXY(b.lon, b.lat));
-    const margin = 300;
-    const minX = Math.min(...extent.map((p) => p[0])) - margin;
-    const maxX = Math.max(...extent.map((p) => p[0])) + margin;
-    const minY = Math.min(...extent.map((p) => p[1])) - margin;
-    const maxY = Math.max(...extent.map((p) => p[1])) + margin;
-    const box: XY[] = [
-      [minX, minY],
-      [maxX, minY],
-      [maxX, maxY],
-      [minX, maxY],
-    ];
-    const allRings = boundary?.flat() ?? [];
-    const toLonLat = (p: XY) => this.projection.toLonLat(p[0], p[1]);
-    const lerp = (p: XY, q: XY, t: number): XY => [p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])];
-    const close = (ring: XY[]) => [...ring, ring[0]].map(toLonLat);
-
-    this.zones = this.areas.map((a) => {
-      // Keep the side of each midline between this station and another that is closer to this one.
-      const planes: HalfPlane[] = this.areas
-        .filter((o) => o.id !== a.id)
-        .map((o) => {
-          const mx = (a.x + o.x) / 2;
-          const my = (a.y + o.y) / 2;
-          const nx = o.x - a.x;
-          const ny = o.y - a.y;
-          return (p: XY) => (p[0] - mx) * nx + (p[1] - my) * ny;
-        });
-      const cell = clipRingToHalfPlanes(box, planes);
-      if (!boundary) {
-        return cell.length >= 3 ? { fill: [[close(cell)]], edges: [close(cell)] } : { fill: [], edges: [] };
-      }
-
-      // The fill: each part of the municipality (with any enclaves as holes), cut to the cell.
-      const fill: [number, number][][][] = [];
-      for (const rings of boundary) {
-        const outer = clipRingToHalfPlanes(rings[0], planes);
-        if (outer.length < 3) continue;
-        const holes = rings.slice(1).map((r) => clipRingToHalfPlanes(r, planes)).filter((r) => r.length >= 3);
-        fill.push([outer, ...holes].map(close));
-      }
-
-      // The outline: the cell's sides where they run inside the town, and the town's border where it
-      // runs through the cell. Consecutive pieces are joined into one line.
-      const lines: XY[][] = [];
-      let line: XY[] | null = null;
-      const add = (p: XY, q: XY) => {
-        const end = line?.[line.length - 1];
-        if (line && end && end[0] === p[0] && end[1] === p[1]) line.push(q);
-        else {
-          line = [p, q];
-          lines.push(line);
-        }
-      };
-      for (let i = 0; i < cell.length; i++) {
-        const p = cell[i];
-        const q = cell[(i + 1) % cell.length];
-        for (const [t0, t1] of segmentInsideRings(p, q, allRings)) add(lerp(p, q, t0), lerp(p, q, t1));
-      }
-      for (const ring of allRings) {
-        line = null;
-        for (let i = 0; i < ring.length; i++) {
-          const p = ring[i];
-          const q = ring[(i + 1) % ring.length];
-          const kept = clipSegmentToHalfPlanes(p, q, planes);
-          if (kept) add(lerp(p, q, kept[0]), lerp(p, q, kept[1]));
-        }
-      }
-      return { fill, edges: lines.map((l) => l.map(toLonLat)) };
-    });
+    const now = simClock.getSimTimeMs();
+    const points = this.buildingsProvider()
+      .filter((b) => existsAt(b, now))
+      .map((b) => {
+        const [x, y] = this.projection.toXY(b.lon, b.lat);
+        return { x, y, area: this.areaIdOf(b) };
+      });
+    this.zones = buildingCellZones(points, this.areas.length, this.boundary, (p) => this.projection.toLonLat(p[0], p[1]));
     return this.zones;
   }
 
@@ -465,7 +413,7 @@ class Grid {
         if (!existsAt(b, t)) continue;
         sums[this.areaIdOf(b)] += buildingPowerW(b, t, plants, snow) - (controlled > 0 ? controlled * heatPumpPowerW(b, t) : 0);
       }
-      for (const site of publicCharging.getSites()) sums[this.nearestAreaId(site.lon, site.lat)] += publicCharging.siteLoadW(site, t);
+      for (const site of publicCharging.getSites()) sums[this.siteAreaId(site.lon, site.lat)] += publicCharging.siteLoadW(site, t);
       sums.forEach((w, i) => {
         const kw = season === "winter" ? w / 1000 : -w / 1000;
         if (kw > peaks[i]) peaks[i] = kw;
@@ -496,7 +444,11 @@ class Grid {
       this.routineReinforcement(atMs);
       changed = true;
     }
-    if (changed) this.notify();
+    if (changed) {
+      this.zones = null;
+      this.zonesVersion++;
+      this.notify();
+    }
   }
 
   /** The utility's routine programme: after a reading, the worst overloaded areas with nothing on
@@ -579,7 +531,10 @@ class Grid {
     this.areaOfEgid = s.areaOfEgid;
     this.measuredWinter = s.measuredWinter;
     this.measuredSummer = s.measuredSummer;
+    this.road = this.roadFor(this.areas.map((a) => [a.x, a.y] as XY));
+    this.siteAreas = new Map();
     this.zones = null;
+    this.zonesVersion++;
     this.selectedId = null;
     this.notify();
   }

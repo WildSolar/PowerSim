@@ -48,6 +48,7 @@ export const CHANGELOG: Release[] = [
       "Keys 1, 2 and 3 pick a speed; the time keys now work while the inbox, the Town hall or the wiki is open.",
       "The treasury fills month by month: the government's allocation comes in twelve instalments, and the utility settles each month's electricity and heat as soon as it's over, instead of everything at the turn of the year.",
       "In the grid layer, areas with a bigger station or a battery on the way are marked in the list of the most loaded.",
+      "Transformer areas follow the streets: each building hangs off the station nearest by road, and the map outlines the areas around their buildings.",
       "Mark every letter and paper as read; the approval figure counts down to the next election.",
       "Energy markets: heating oil, gas, petrol and wholesale power follow world prices, including the CO₂ levy, with the odd supply crisis sending them soaring.",
       "A dynamic tariff households can choose: its price follows the grid's expected load through the day. Cars on it charge in the cheapest night hours, heat pumps run ahead of the evening peak, and some washing machines wait for a cheap hour.",

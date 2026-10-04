@@ -216,7 +216,7 @@ function gridStatusFn(simTimeMs: number): (b: Building) => string {
 
 /** What the grid layer shows right now, as a key — to redraw only when it changes. */
 function gridLayerKey(simTimeMs: number): string {
-  return `${grid.getSelectedId()}|${grid.getAreas().map((a) => `${grid.bucket(a, simTimeMs)}:${grid.capacityAt(a, simTimeMs)}`).join(",")}`;
+  return `${grid.getSelectedId()}|${grid.getZonesVersion()}|${grid.getAreas().map((a) => `${grid.bucket(a, simTimeMs)}:${grid.capacityAt(a, simTimeMs)}`).join(",")}`;
 }
 
 function buildingsToGeoJSON(
@@ -885,7 +885,12 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         source: GRID_ZONE_SOURCE_ID,
         filter: ["==", ["get", "part"], "fill"],
         layout: { visibility: gridVisibility },
-        paint: { "fill-color": ml(legendMatchExpression("bucket", GRID_LEGEND)), "fill-opacity": ["case", ["==", ["get", "selected"], 1], 0.3, 0.14] },
+        // Without antialiasing: a zone is many small cells side by side, which would show hairline seams.
+        paint: {
+          "fill-color": ml(legendMatchExpression("bucket", GRID_LEGEND)),
+          "fill-opacity": ["case", ["==", ["get", "selected"], 1], 0.3, 0.14],
+          "fill-antialias": false,
+        },
       });
       map.addLayer({
         id: GRID_ZONE_LINE_LAYER_ID,

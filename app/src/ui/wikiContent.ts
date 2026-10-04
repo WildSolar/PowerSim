@@ -638,7 +638,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "The electricity grid",
     blocks: [
       p(
-        "Power reaches every building through the transformer station serving its neighbourhood, and each station can carry only so much. Each area is served by a station of standard size with some headroom over the town's demand at the start.",
+        "Power reaches every building through the transformer station serving its neighbourhood, and each station can carry only so much. The cables run along the streets, so a building hangs off the station nearest to it by road — not necessarily the nearest as the crow flies — and an area follows its streets. Each area is served by a station of standard size with some headroom over the town's demand at the start.",
       ),
       p(
         "Twice a year the utility reads its meters: after the winter (the highest draw, on the coldest evenings when heat pumps, cooking and cars plugging in come together) and after the summer (the highest feed-in, on the sunniest middays when rooftop solar pushes power back up the line). The Grid tool colours every building by how loaded its station was at the last reading, marks the stations and outlines the area each one serves; pick a station or any building to highlight its area. The drawer ranks the areas and shows each one's peaks against its capacity.",
@@ -658,7 +658,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Reinforcing everywhere is expensive, so three measures buy time by shaving the peaks: heat pump load control lets the utility switch enrolled heat pumps off in turns at peak times (half of them off at any one moment, briefly, hardly noticed); a smart charging programme has electric cars charge at night rather than as soon as they are plugged in; and a solar feed-in limit caps what panels deliver at 70% (or less) of their rating, which costs little energy but shaves the sunny-midday peak. A battery subsidy tied to grid-friendly operation does the same for the systems it pays for. They slow overloading down; in the long run, reinforcement is the answer.",
       ),
       note(
-        "Where the real stations stand isn't public, so the areas are drawn from the buildings themselves; their sizes and the costs are estimates. The grid is checked at the two readings only — voltage and cables aren't modelled.",
+        "Where the real stations stand isn't public, so they are placed from the buildings themselves, on the nearest street; their sizes and the costs are estimates. A new building joins its area's outline on the map with the next reading. The grid is checked at the two readings only — voltage and cables aren't modelled.",
       ),
     ],
   },
