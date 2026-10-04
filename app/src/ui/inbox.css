@@ -568,3 +568,35 @@
   font-size: 14px;
   box-shadow: var(--shadow-2), inset 4px 0 0 var(--accent);
 }
+
+.inbox-mark-read {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.inbox-mark-read:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.inbox-mark-read:disabled {
+  color: var(--ink-4);
+  cursor: default;
+}
+
+@media (max-width: 760px) {
+  .inbox-mark-read span {
+    display: none;
+  }
+}

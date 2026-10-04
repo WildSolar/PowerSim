@@ -204,6 +204,21 @@ const CONSTRUCTION_SITE_HEIGHT_M = 4;
  * which at high speed, with the stock changing every few seconds, reads as flicker.
  * Power draw isn't recomputed here (the power layer's own tick does that); each
  * building keeps its last reading from `previousPowerW` meanwhile. */
+/** Each building's grid colour: its area's load, or dimmed when another area is selected. */
+function gridStatusFn(simTimeMs: number): (b: Building) => string {
+  const buckets = grid.getAreas().map((a) => grid.bucket(a, simTimeMs));
+  const selected = grid.getSelectedId();
+  return (b) => {
+    const areaId = grid.areaIdOf(b);
+    return selected !== null && areaId !== selected ? "dimmed" : (buckets[areaId] ?? "ok");
+  };
+}
+
+/** What the grid layer shows right now, as a key — to redraw only when it changes. */
+function gridLayerKey(simTimeMs: number): string {
+  return `${grid.getSelectedId()}|${grid.getAreas().map((a) => `${grid.bucket(a, simTimeMs)}:${grid.capacityAt(a, simTimeMs)}`).join(",")}`;
+}
+
 function buildingsToGeoJSON(
   allBuildings: Building[],
   plants: PowerPlant[],
@@ -213,6 +228,9 @@ function buildingsToGeoJSON(
   const solarByEgid = solarCapacityByEgid(plants);
   const buildings = allBuildings.filter((b) => visibleAt(b, simTimeMs));
   const chargingAccess = publicCharging.householdAccess(buildings, simTimeMs);
+  // Set here too, not only by the grid layer's refresh: a rebuild (the stock changed) must not
+  // flash every building back to "room to spare" until the next refresh.
+  const gridStatusOf = gridStatusFn(simTimeMs);
 
   const properties = (b: Building): BuildingProperties => ({
     egid: b.egid,
@@ -225,7 +243,7 @@ function buildingsToGeoJSON(
     charging: evChargingBucket(chargingAccess.get(b.egid)),
     publicStatus: publicBuildingBucket(b, plants),
     groundStatus: heatPumpSiting.groundBucket(b, simTimeMs),
-    gridStatus: "ok",
+    gridStatus: gridStatusOf(b),
     powerW: previousPowerW?.get(b.egid) ?? 0,
     solarCapacityKw: solarByEgid.get(b.egid) ?? 0,
   });
@@ -1457,8 +1475,14 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
     }
     if (!visible) return;
+    // Redrawn only when something shows differently: re-sending the same data makes the map
+    // re-tile, which flickers.
+    let shown = "";
     const tick = () => {
       const simTimeMs = simClock.getSimTimeMs();
+      const key = gridLayerKey(simTimeMs);
+      if (key === shown) return;
+      shown = key;
       (map.getSource(STATION_SOURCE_ID) as GeoJSONSource | undefined)?.setData(stationsGeoJSON(simTimeMs));
       (map.getSource(GRID_ZONE_SOURCE_ID) as GeoJSONSource | undefined)?.setData(gridZonesGeoJSON(simTimeMs));
       const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
@@ -1466,13 +1490,10 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       const polyData = polygonsRef.current;
       const pointData = pointsRef.current;
       if (!polySource || !pointSource || !polyData || !pointData) return;
-      const buckets = grid.getAreas().map((a) => grid.bucket(a, simTimeMs));
-      const selected = grid.getSelectedId();
+      const gridStatusOf = gridStatusFn(simTimeMs);
       for (const f of [...polyData.features, ...pointData.features]) {
         const b = stock.lookup(f.properties.egid);
-        if (!b) continue;
-        const areaId = grid.areaIdOf(b);
-        f.properties.gridStatus = selected !== null && areaId !== selected ? "dimmed" : (buckets[areaId] ?? "ok");
+        if (b) f.properties.gridStatus = gridStatusOf(b);
       }
       polySource.setData(polyData);
       pointSource.setData(pointData);

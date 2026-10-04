@@ -18,6 +18,7 @@ import { useReportCardYear, useSimDay, useSimSpeed, useSimTime } from "../sim/st
 import { formatDate, formatTime, formatWeekday, toDateMs } from "../sim/calendar";
 import { weatherAt, type WeatherCondition } from "../sim/weather";
 import { approval } from "../sim/approval";
+import { simClock } from "../sim/engine";
 import { debt } from "../sim/debt";
 import { cachedEmissionsForYear } from "../sim/emissions";
 import { scoreSoFar, yearPoints } from "../sim/score";
@@ -113,7 +114,7 @@ function Clock() {
 }
 
 function TreasuryKpi({ dataset, onOpen }: { dataset: MunicipalityDataset; onOpen: () => void }) {
-  const { balanceRp, budgetRp, paidOutRp, receivedRp, borrowedRp } = useLiveTreasury(dataset);
+  const { balanceRp, budgetRp, allocationSoFarRp, utilityRp, utilityMonths, paidOutRp, receivedRp, borrowedRp } = useLiveTreasury(dataset);
   useSyncExternalStore(
     (l) => debt.subscribe(l),
     () => debt.getVersion(),
@@ -121,7 +122,8 @@ function TreasuryKpi({ dataset, onOpen }: { dataset: MunicipalityDataset; onOpen
   const owedRp = debt.getLoans().reduce((sum, l) => sum + (l.status === "active" ? l.outstandingRp : 0), 0);
   const supervised = debt.isSupervised();
   const lines = [
-    `Budget this year: +${formatCHF(budgetRp)}`,
+    `Allocation so far: +${formatCHF(allocationSoFarRp)} of ${formatCHF(budgetRp)}`,
+    ...(utilityMonths > 0 ? [`Utility, ${utilityMonths} month${utilityMonths === 1 ? "" : "s"} settled: ${utilityRp >= 0 ? "+" : "−"}${formatCHF(Math.abs(utilityRp))}`] : []),
     `Paid out so far: −${formatCHF(paidOutRp)}`,
     ...(borrowedRp > 0 ? [`Borrowed this year: +${formatCHF(borrowedRp)}`] : []),
     ...(receivedRp > 0 ? [`Zoning levy so far: +${formatCHF(receivedRp)}`] : []),
@@ -140,6 +142,13 @@ function TreasuryKpi({ dataset, onOpen }: { dataset: MunicipalityDataset; onOpen
   );
 }
 
+/** "in 16 months", "next month", "this month". */
+function electionIn(months: number): string {
+  if (months <= 0) return "this month";
+  if (months === 1) return "next month";
+  return `in ${months} months`;
+}
+
 function ApprovalKpi() {
   useSyncExternalStore(
     (listener) => approval.subscribe(listener),
@@ -151,14 +160,21 @@ function ApprovalKpi() {
   const past = latest ? ([...history].reverse().find((p) => p.atMs <= latest.atMs - TREND_MONTHS * MONTH_MS) ?? history[0]) : undefined;
   const delta = past ? current - past.approval : 0;
   const election = approval.nextElectionMs();
+  const monthsToElection = election !== null ? Math.max(0, Math.ceil((election - simClock.getSimTimeMs()) / MONTH_MS)) : Infinity;
+  useSimDay(); // the countdown moves on
   const trend = Math.abs(delta) < 1 ? "steady" : `${delta > 0 ? "▲" : "▼"} ${Math.abs(Math.round(delta))} pts`;
   return (
     <Kpi
       label="Approval"
       value={`${Math.round(current)}%`}
       tone={current >= 60 ? "good" : current < 40 ? "bad" : undefined}
-      sub={<span className={delta < -1 ? "bad" : delta > 1 ? "good" : undefined}>{trend}</span>}
-      title={`Public approval of the municipality's energy policy; very low approval ends the game.${election !== null ? `\nNext election: ${formatDate(election).replace(/^\w+, \d+ /, "")}` : ""}`}
+      sub={
+        <>
+          <span className={delta < -1 ? "bad" : delta > 1 ? "good" : undefined}>{trend}</span>
+          {election !== null && <span className={monthsToElection <= 6 ? "warn" : undefined}> · election {electionIn(monthsToElection)}</span>}
+        </>
+      }
+      title={`Public approval of the municipality's energy policy; below 50% on election day, or below 25% for six months, ends the game.${election !== null ? `\nNext election: ${formatDate(election).replace(/^\w+, \d+ /, "")}` : ""}`}
     />
   );
 }

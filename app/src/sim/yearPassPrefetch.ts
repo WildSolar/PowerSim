@@ -1,6 +1,7 @@
 /**
  * Samples each calendar month's share of the year-end report's passes (yearReport.ts's electricity,
- * heating-technology and mobility-fuel samples) in the background as soon as the month is over,
+ * heating-technology and mobility-fuel samples) in the background as soon as the month is over —
+ * and with them settles the utility's accounts for the month (finances.ts) —
  * instead of all twelve at once when the year ends — the report then only has December left to do
  * when it opens. A finished month never changes, so computing it early gives the same numbers as
  * computing it at New Year: renewal chains are only read up to the month's own end, and a year's
@@ -18,6 +19,7 @@ import type { PowerPlant } from "../data/types";
 import { toDateMs } from "./calendar";
 import { simClock } from "./engine";
 import { stock } from "./stock";
+import { settleUtilityMonth } from "./finances";
 import { prefetchMonth } from "./yearReport";
 
 const START_DELAY_MS = 5000;
@@ -49,6 +51,8 @@ export function startYearPassPrefetch(realPlants: PowerPlant[]): () => void {
     while (queue.length > 0 && !stopped) {
       const monthIndex = queue.shift() as number;
       await prefetchMonth(stock.getAll(), realPlants, Math.floor(monthIndex / 12), monthIndex % 12);
+      await settleUtilityMonth(stock.getAll(), realPlants, Math.floor(monthIndex / 12), monthIndex % 12); // the utility settles the month
+
       await new Promise((resolve) => setTimeout(resolve, PAUSE_BETWEEN_MONTHS_MS));
     }
     working = false;

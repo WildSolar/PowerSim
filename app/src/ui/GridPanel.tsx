@@ -1,3 +1,4 @@
+import { BatteryCharging, Wrench } from "lucide-react";
 import { useMemo, useSyncExternalStore } from "react";
 import { BATTERY_MONTHS, GRID_BATTERY_SIZES, REINFORCE_MONTHS } from "../config/grid";
 import { GRID_LEGEND } from "../map/colorModes";
@@ -118,6 +119,23 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
   );
 }
 
+/** A small mark for an area with work on the way: a bigger station being built, a battery being installed. */
+function WorkInProgress({ area, now }: { area: GridArea; now: number }) {
+  const upgrade = area.upgrades.filter((u) => u.atMs > now).sort((x, y) => x.atMs - y.atMs)[0];
+  const battery = area.batteries.filter((b) => b.atMs > now).sort((x, y) => x.atMs - y.atMs)[0];
+  if (!upgrade && !battery) return null;
+  const parts = [
+    upgrade && `${upgrade.byUtility ? "The utility is reinforcing" : "Reinforcing"} the station (${upgrade.capacityKw} kVA, ${monthYear(upgrade.atMs)})`,
+    battery && `A ${battery.kw} kW battery is being installed (${monthYear(battery.atMs)})`,
+  ].filter(Boolean);
+  return (
+    <span className="grid-wip" title={parts.join("\n")} aria-label={parts.join(". ")}>
+      {upgrade && <Wrench size={12} strokeWidth={2} aria-hidden />}
+      {battery && <BatteryCharging size={12} strokeWidth={2} aria-hidden />}
+    </span>
+  );
+}
+
 /** The grid layer's panel: the transformer areas by how loaded their stations were at the last
  * readings, the selected area's peaks, and reinforcing it or adding a battery. */
 export function GridPanel() {
@@ -174,6 +192,7 @@ export function GridPanel() {
           }}
         >
           <span className="ev-list-name">{a.name}</span>
+          <WorkInProgress area={a} now={now} />
           <span className="info-value">{Math.round(grid.loadShare(a, now) * 100)}%</span>
         </button>
       ))}

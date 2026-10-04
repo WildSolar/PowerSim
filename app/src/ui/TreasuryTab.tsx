@@ -106,9 +106,22 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
       <table className="borrow-table treasury-table">
         <tbody>
           <tr>
-            <td>Government allocation (1 January)</td>
-            <td className="pos">+{formatCHF(live.budgetRp)}</td>
+            <td>
+              Government allocation<span className="borrow-note"> · a twelfth each month, of {formatCHF(live.budgetRp)}</span>
+            </td>
+            <td className="pos">+{formatCHF(live.allocationSoFarRp)}</td>
           </tr>
+          {live.utilityMonths > 0 && (
+            <tr>
+              <td>
+                Municipal utility<span className="borrow-note"> · your share, {live.utilityMonths} month{live.utilityMonths === 1 ? "" : "s"} settled</span>
+              </td>
+              <td className={live.utilityRp >= 0 ? "pos" : "neg"}>
+                {live.utilityRp >= 0 ? "+" : "−"}
+                {formatCHF(Math.abs(live.utilityRp))}
+              </td>
+            </tr>
+          )}
           {live.receivedRp > 0 && (
             <tr>
               <td>Value-capture levy (zoning)</td>
@@ -135,7 +148,7 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
           })}
           <tr className="treasury-note-row">
             <td colSpan={2} className="borrow-note">
-              The utility's year — electricity and district heat sold, power and heat bought, the networks' upkeep — is booked on 31 December.
+              The utility settles each month once it is over: electricity and district heat sold, power and heat bought, the networks' upkeep. You keep a quarter of a profit; a loss is all yours.
             </td>
           </tr>
         </tbody>

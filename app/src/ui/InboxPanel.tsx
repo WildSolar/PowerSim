@@ -1,4 +1,4 @@
-import { Mail, MapPin, Newspaper, Pin, X } from "lucide-react";
+import { CheckCheck, Mail, MapPin, Newspaper, Pin, X } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { mapFocus } from "../map/mapFocus";
 import { formatDate } from "../sim/calendar";
@@ -89,6 +89,15 @@ export function InboxPanel({ initial, onClose, onSelectBuilding }: { initial: In
               </button>
             ))}
           </nav>
+          <button
+            className="inbox-mark-read"
+            disabled={unread.letters + unread.editions === 0}
+            onClick={() => inbox.markAllRead(simClock.getSimTimeMs())}
+            title="Mark every letter and paper as read"
+          >
+            <CheckCheck size={15} strokeWidth={1.75} aria-hidden />
+            <span>Mark all read</span>
+          </button>
           <button className="inbox-close" onClick={onClose} aria-label="Close the inbox" title="Close (Esc)">
             <X size={18} strokeWidth={1.75} aria-hidden />
           </button>

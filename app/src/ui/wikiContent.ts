@@ -302,7 +302,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Municipal finances",
     blocks: [
       p(
-        "The energy department has one treasury, shown in the top bar; click it for the accounts. Money comes in from three places: a yearly allocation from the municipality's general budget (credited each 1 January, sized by the population), the department's share of what its electricity utility earns, and smaller items — sales at its own public chargers, the zoning levy, and money it borrows (see \"Borrowing & debt\").",
+        "The energy department has one treasury, shown in the top bar; click it for the accounts. Money comes in from three places: a yearly allocation from the municipality's general budget (paid a twelfth at the start of each month, sized by the population), the department's share of what its electricity utility earns, and smaller items — sales at its own public chargers, the zoning levy, and money it borrows (see \"Borrowing & debt\").",
       ),
       p(
         "Money goes out only when something actually happens: the day a household installs a subsidised heat pump, buys a subsidised electric car, insulates or puts up panels, the municipal grant is paid. A grant nobody takes up costs nothing — but it is also paid to everyone who would have done the same anyway. Finding the level that tips the undecided without overpaying the rest is the art of subsidy planning.",
@@ -311,7 +311,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Building things — district heating pipes, public chargers, grid reinforcement, a zoning change — is paid the day it is ordered. Campaigns and programmes cost a little every month.",
       ),
       p(
-        "The utility settles its year once a year: what customers paid for electricity and district heat, less the power and heat it bought, the solar it paid for, and the upkeep of the grid, the pipes and the chargers. Like Swiss municipal utilities, it hands three quarters of its profit to the town's general account; your department keeps a quarter. A loss stays with the department. You set the utility's prices in Town hall → Prices, once a year; what it pays for power follows the market (see \"Tariffs & energy prices\").",
+        "The utility settles each month once it is over: what customers paid for electricity and district heat, less the power and heat it bought, the solar it paid for, and the upkeep of the grid, the pipes and the chargers. Like Swiss municipal utilities, it hands three quarters of its profit to the town's general account; your department keeps a quarter. A loss stays with the department. Each month's share reaches the treasury a few days after the month ends; the year's accounts are closed on 31 December. You set the utility's prices in Town hall → Prices, once a year; what it pays for power follows the market (see \"Tariffs & energy prices\").",
       ),
       note(
         "Federal and cantonal grants — the ones every heat pump, solar system and renovation already gets — aren't municipal money; only your own top-up is. Gas, oil and petrol are bought from outside suppliers, never through the utility. The department's share of the utility profit (about CHF 1.4 million a year at the starting prices) and the allocation (about CHF 3.3 million) are small next to a serious subsidy programme, so what you fund matters.",

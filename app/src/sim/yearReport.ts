@@ -94,7 +94,7 @@ export interface YearElectricityMonth {
 
 const electricityByMonth = new Map<number, Promise<YearElectricityMonth>>();
 
-function monthElectricity(buildings: Building[], realPlants: PowerPlant[], year: number, month: number): Promise<YearElectricityMonth> {
+export function monthElectricity(buildings: Building[], realPlants: PowerPlant[], year: number, month: number): Promise<YearElectricityMonth> {
   return sharedMonth(electricityByMonth, year, month, () => {
     const times = monthTimes(year, month, SAMPLES_PER_MONTH);
     const tariff: Tariff = tariffStore.at(toSimTimeMs(Date.UTC(year, month, 15)));
@@ -237,7 +237,7 @@ function waterProfiles(building: Building): WaterHeaterProfile[] {
 
 const heatingTechnologyByMonth = new Map<number, Promise<HeatingTechnologyEnergyKWh>>();
 
-function monthHeatingTechnology(buildings: Building[], year: number, month: number): Promise<HeatingTechnologyEnergyKWh> {
+export function monthHeatingTechnology(buildings: Building[], year: number, month: number): Promise<HeatingTechnologyEnergyKWh> {
   return sharedMonth(heatingTechnologyByMonth, year, month, () => {
     const times = monthTimes(year, month, SAMPLES_PER_MONTH);
     const series = sampleTechnologySeries(buildings, times);

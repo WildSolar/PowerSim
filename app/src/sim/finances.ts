@@ -46,7 +46,7 @@ import { policyStore } from "./policy";
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 import { PAYOUT_CATEGORIES, treasury, type PayoutsByCategory } from "./treasury";
-import { computeHeatingTechnologyBreakdown, yearElectricity } from "./yearReport";
+import { monthElectricity, monthHeatingTechnology } from "./yearReport";
 import { DH_NETWORK_UPKEEP_CHF_PER_M_YEAR, DH_SOURCE_HEAT_PRICE_RP_PER_KWH } from "../config/districtHeat";
 import { UTILITY_PROFIT_RETAINED_SHARE } from "../config/treasury";
 import { districtHeat } from "./districtHeat";
@@ -94,46 +94,148 @@ export function computeMunicipalFinancesForYear(buildings: Building[], realPlant
   return inFlight;
 }
 
-async function computeFinances(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<MunicipalFinances> {
-  // The year's sheet (one per year); wholesale power at each month's market price.
-  const tariff: Tariff = tariffStore.at(toSimTimeMs(Date.UTC(year, 6, 1)));
+/** One month of the municipal utility: what it sold and bought, and its networks' upkeep. */
+export interface UtilityMonth {
+  consumerRevenueRp: number;
+  feedInPaidRp: number;
+  wholesaleCostRp: number;
+  gridMaintenanceCostRp: number;
+  districtHeatRevenueRp: number;
+  districtHeatPurchaseRp: number;
+  districtHeatUpkeepRp: number;
+  publicChargingRevenueRp: number;
+  publicChargingUpkeepRp: number;
+}
+
+const UTILITY_KEYS: (keyof UtilityMonth)[] = [
+  "consumerRevenueRp",
+  "feedInPaidRp",
+  "wholesaleCostRp",
+  "gridMaintenanceCostRp",
+  "districtHeatRevenueRp",
+  "districtHeatPurchaseRp",
+  "districtHeatUpkeepRp",
+  "publicChargingRevenueRp",
+  "publicChargingUpkeepRp",
+];
+
+/** The utility's profit (or loss) in a month. */
+export function utilityProfitRp(m: UtilityMonth): number {
+  return (
+    m.consumerRevenueRp +
+    m.districtHeatRevenueRp +
+    m.publicChargingRevenueRp -
+    m.feedInPaidRp -
+    m.wholesaleCostRp -
+    m.gridMaintenanceCostRp -
+    m.districtHeatPurchaseRp -
+    m.districtHeatUpkeepRp -
+    m.publicChargingUpkeepRp
+  );
+}
+
+/** What the department keeps of the utility's profit so far: a quarter of a profit (the rest goes
+ * to the town's general account), all of a loss. */
+export function departmentShareRp(profitRp: number): number {
+  return profitRp - Math.max(0, profitRp) * (1 - UTILITY_PROFIT_RETAINED_SHARE);
+}
+
+/** Settled months, by year * 12 + month: once a month is over and sampled, its accounts are final. */
+const utilityMonths = new Map<number, UtilityMonth>();
+const utilityInFlight = new Map<number, Promise<UtilityMonth>>();
+
+/** A month of the utility's accounts (from the month's samples, yearReport.ts), settled once and kept. */
+export function settleUtilityMonth(buildings: Building[], realPlants: PowerPlant[], year: number, month: number): Promise<UtilityMonth> {
+  const key = year * 12 + month;
+  const settled = utilityMonths.get(key);
+  if (settled) return Promise.resolve(settled);
+  let inFlight = utilityInFlight.get(key);
+  if (!inFlight) {
+    inFlight = computeUtilityMonth(buildings, realPlants, year, month)
+      .then((m) => {
+        utilityMonths.set(key, m);
+        treasury.notifyBooked(); // the live balance takes it in
+        return m;
+      })
+      .finally(() => utilityInFlight.delete(key));
+    utilityInFlight.set(key, inFlight);
+  }
+  return inFlight;
+}
+
+async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant[], year: number, month: number): Promise<UtilityMonth> {
+  // The year's sheet (one per year); wholesale power at the month's market price.
+  const tariff: Tariff = tariffStore.at(toSimTimeMs(Date.UTC(year, month, 15)));
   const greenShare = policyStore.get().greenPowerShare / 100;
-  let consumerRevenueRp = 0;
-  let feedInPaidRp = 0;
-  let grossConsumptionKWh = 0;
-  let wholesaleCostRp = 0;
+  const { times, series, dynamicW } = await monthElectricity(buildings, realPlants, year, month);
+  const consumptionW = consumptionSeriesW(series);
+  const grossKWh = energyKWh(times, consumptionW);
+  const netKWh = grossKWh - energyKWh(times, series.solarW);
 
-  const months = await yearElectricity(buildings, realPlants, year);
-  months.forEach(({ times, series, dynamicW }, month) => {
-    const consumptionW = consumptionSeriesW(series);
-    consumerRevenueRp += electricityCostRp(times, consumptionW, tariff, dynamicW);
-    feedInPaidRp += flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh);
-    grossConsumptionKWh += energyKWh(times, consumptionW);
-    const netKWh = energyKWh(times, consumptionW) - energyKWh(times, series.solarW);
-    const wholesale = tariffStore.at(toSimTimeMs(Date.UTC(year, month, 15))).wholesalePriceRpKWh;
-    wholesaleCostRp += netKWh * (wholesale + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare);
-  });
-  const gridMaintenanceCostRp = grossConsumptionKWh * tariff.gridMaintenanceRpKWh;
-
-  const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
-  const yearEndMs = toSimTimeMs(Date.UTC(year + 1, 0, 1));
-
-  // District heat: the heat delivered (the report's own heating-technology pass), and the pipes'
-  // upkeep for however much of the year each stretch was in service (sampled monthly).
-  const districtHeatKWh = (await computeHeatingTechnologyBreakdown(buildings, year)).districtHeatingSpaceKWh;
-  const districtHeatRevenueRp = districtHeatKWh * tariff.districtHeatingPriceRpKWh;
-  const districtHeatPurchaseRp = districtHeatKWh * DH_SOURCE_HEAT_PRICE_RP_PER_KWH;
-  let pipedMetreYears = 0;
-  for (let month = 0; month < 12; month++) pipedMetreYears += districtHeat.pipedLengthM(toSimTimeMs(Date.UTC(year, month, 15))) / 12;
-  const districtHeatUpkeepRp = pipedMetreYears * DH_NETWORK_UPKEEP_CHF_PER_M_YEAR * 100;
+  // District heat: the heat delivered (the report's heating-technology pass), and the pipes' upkeep.
+  const districtHeatKWh = (await monthHeatingTechnology(buildings, year, month)).districtHeatingSpaceKWh;
+  const pipedM = districtHeat.pipedLengthM(toSimTimeMs(Date.UTC(year, month, 15)));
 
   // The municipality's own public chargers sell at their own price. Their energy is part of the
   // town's metered consumption above, billed there at the household tariff — taken back out of
   // that line so it isn't counted twice.
-  const charging = publicCharging.municipalYear(year);
-  consumerRevenueRp -= charging.kWh * ((tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2);
-  const publicChargingRevenueRp = charging.revenueRp;
-  const publicChargingUpkeepRp = charging.upkeepRp;
+  const charging = publicCharging.municipalMonth(year, month);
+  return {
+    consumerRevenueRp: electricityCostRp(times, consumptionW, tariff, dynamicW) - charging.kWh * ((tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2),
+    feedInPaidRp: flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh),
+    wholesaleCostRp: netKWh * (tariff.wholesalePriceRpKWh + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare),
+    gridMaintenanceCostRp: grossKWh * tariff.gridMaintenanceRpKWh,
+    districtHeatRevenueRp: districtHeatKWh * tariff.districtHeatingPriceRpKWh,
+    districtHeatPurchaseRp: districtHeatKWh * DH_SOURCE_HEAT_PRICE_RP_PER_KWH,
+    districtHeatUpkeepRp: (pipedM * DH_NETWORK_UPKEEP_CHF_PER_M_YEAR * 100) / 12,
+    publicChargingRevenueRp: charging.revenueRp,
+    publicChargingUpkeepRp: charging.upkeepRp,
+  };
+}
+
+/** The utility's settled months of a year up to `atMs`, in order from January (stopping at the
+ * first not yet settled), summed. */
+export function settledUtilitySoFar(year: number, atMs: number): { months: number; profitRp: number } {
+  let months = 0;
+  let profitRp = 0;
+  for (let m = 0; m < 12; m++) {
+    if (toSimTimeMs(Date.UTC(year, m + 1, 1)) > atMs) break;
+    const settled = utilityMonths.get(year * 12 + m);
+    if (!settled) break;
+    months++;
+    profitRp += utilityProfitRp(settled);
+  }
+  return { months, profitRp };
+}
+
+/** The government's allocation paid so far in a year: a twelfth at the start of each month. */
+export function allocationSoFarRp(allocationRp: number, year: number, atMs: number): number {
+  const d = new Date(toDateMs(atMs));
+  const months = d.getUTCFullYear() < year ? 0 : d.getUTCFullYear() > year ? 12 : d.getUTCMonth() + 1;
+  return (allocationRp * months) / 12;
+}
+
+async function computeFinances(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<MunicipalFinances> {
+  // The year's twelve settled months, added up.
+  const utility = Object.fromEntries(UTILITY_KEYS.map((k) => [k, 0])) as unknown as UtilityMonth;
+  for (let month = 0; month < 12; month++) {
+    const m = await settleUtilityMonth(buildings, realPlants, year, month);
+    for (const k of UTILITY_KEYS) utility[k] += m[k];
+  }
+  const {
+    consumerRevenueRp,
+    feedInPaidRp,
+    wholesaleCostRp,
+    gridMaintenanceCostRp,
+    districtHeatRevenueRp,
+    districtHeatPurchaseRp,
+    districtHeatUpkeepRp,
+    publicChargingRevenueRp,
+    publicChargingUpkeepRp,
+  } = utility;
+
+  const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
+  const yearEndMs = toSimTimeMs(Date.UTC(year + 1, 0, 1));
 
   // Every household decision due this year has to have committed (and paid out) before the year is summed.
   treasury.settleThrough(yearEndMs);
@@ -144,9 +246,8 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
   const dwellingsAtYearStart = buildings.reduce((sum, b) => sum + (existsAt(b, yearStartMs) ? b.dwellings.length : 0), 0);
   const governmentAllocationRp = treasury.allocationRp(dwellingsAtYearStart, allocationApprovalFactor(approval.atYearStart(year)));
   // The utility's profit, most of which goes to the town's general account.
-  const utilityProfitRp =
-    consumerRevenueRp + districtHeatRevenueRp + publicChargingRevenueRp - feedInPaidRp - wholesaleCostRp - gridMaintenanceCostRp - districtHeatPurchaseRp - districtHeatUpkeepRp - publicChargingUpkeepRp;
-  const profitTransferRp = Math.max(0, utilityProfitRp) * (1 - UTILITY_PROFIT_RETAINED_SHARE);
+  const profitRp = utilityProfitRp(utility);
+  const profitTransferRp = profitRp - departmentShareRp(profitRp);
   const netIncomeRp =
     consumerRevenueRp +
     districtHeatRevenueRp +
@@ -249,8 +350,9 @@ export function latestBookedFinances(): MunicipalFinances | null {
 }
 
 /** The treasury's balance at `atMs` — last year's closing balance (when booked), plus this year's
- * allocation, less what has been paid out, plus what has come in. Null while last year's accounts
- * are still being settled. The same sum the live treasury readout shows. */
+ * allocation so far (monthly), the department's share of the utility's settled months, less what
+ * has been paid out, plus what has come in. Null while last year's accounts are still being
+ * settled. The same sum the live treasury readout shows. */
 export function liveBalanceRp(buildings: Building[], atMs: number, baselineYear: number): number | null {
   const year = new Date(toDateMs(atMs)).getUTCFullYear();
   const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
@@ -258,7 +360,8 @@ export function liveBalanceRp(buildings: Building[], atMs: number, baselineYear:
   if (opening === null) return null;
   const dwellings = buildings.reduce((sum, b) => sum + (existsAt(b, yearStartMs) ? b.dwellings.length : 0), 0);
   const allocation = treasury.allocationRp(dwellings, allocationApprovalFactor(approval.atYearStart(year)));
-  return opening + allocation - treasury.paidOutTotal(yearStartMs, atMs) + treasury.received(yearStartMs, atMs);
+  const utility = departmentShareRp(settledUtilitySoFar(year, atMs).profitRp);
+  return opening + allocationSoFarRp(allocation, year, atMs) + utility - treasury.paidOutTotal(yearStartMs, atMs) + treasury.received(yearStartMs, atMs);
 }
 
 /** Every booked year's accounts, oldest first. */
@@ -268,13 +371,18 @@ export function bookedFinances(): MunicipalFinances[] {
 
 // --- saving (saveGame.ts) ---
 
-/** The booked years: the accounts as they were settled. */
-export function snapshotFinances(): Map<number, MunicipalFinances> {
-  return financesCache;
+/** The booked years, and the utility's settled months of the year still open: the accounts as
+ * they were settled. */
+export function snapshotFinances(): { years: Map<number, MunicipalFinances>; utilityMonths: Map<number, UtilityMonth> } {
+  const lastBooked = Math.max(-Infinity, ...financesCache.keys());
+  return { years: financesCache, utilityMonths: new Map([...utilityMonths].filter(([key]) => Math.floor(key / 12) > lastBooked)) };
 }
 
-export function restoreFinances(saved: Map<number, MunicipalFinances>): void {
+export function restoreFinances(saved: ReturnType<typeof snapshotFinances>): void {
   financesCache.clear();
   financesInFlight.clear();
-  for (const [year, f] of saved) financesCache.set(year, f);
+  utilityMonths.clear();
+  utilityInFlight.clear();
+  for (const [year, f] of saved.years) financesCache.set(year, f);
+  for (const [key, m] of saved.utilityMonths) utilityMonths.set(key, m);
 }

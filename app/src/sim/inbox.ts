@@ -97,6 +97,12 @@ class Inbox {
     this.bump();
   }
 
+  /** Marks every letter and edition that has arrived by `nowMs` as read. */
+  markAllRead(nowMs: number): void {
+    for (const item of [...this.letters, ...this.editions]) if (item.atMs <= nowMs) this.read.add(item.id);
+    this.bump();
+  }
+
   unreadCount(nowMs: number): { letters: number; editions: number } {
     return {
       letters: this.letters.filter((l) => l.atMs <= nowMs && !this.read.has(l.id)).length,

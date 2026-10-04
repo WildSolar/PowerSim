@@ -516,8 +516,20 @@ class PublicCharging {
   /** The municipality's own chargers over a calendar year: energy sold, what it earned, and their
    * upkeep (finances.ts). */
   municipalYear(year: number): { kWh: number; revenueRp: number; upkeepRp: number } {
-    const from = yearStartMs(year);
-    const to = yearStartMs(year + 1);
+    const total = { kWh: 0, revenueRp: 0, upkeepRp: 0 };
+    for (let m = 0; m < 12; m++) {
+      const month = this.municipalMonth(year, m);
+      total.kWh += month.kWh;
+      total.revenueRp += month.revenueRp;
+      total.upkeepRp += month.upkeepRp;
+    }
+    return total;
+  }
+
+  /** The same, for one month of a year (0-11). */
+  municipalMonth(year: number, month: number): { kWh: number; revenueRp: number; upkeepRp: number } {
+    const from = toSimTimeMs(Date.UTC(year, month, 1));
+    const to = toSimTimeMs(Date.UTC(year, month + 1, 1));
     let kWh = 0;
     let revenueRp = 0;
     let upkeepRp = 0;
@@ -526,7 +538,7 @@ class PublicCharging {
       const siteKWh = this.energyKWh(site, from, to);
       kWh += siteKWh;
       revenueRp += siteKWh * sitePriceRpPerKWh(site);
-      for (let m = 0; m < 12; m++) upkeepRp += this.upkeepPerYearRp(site, toSimTimeMs(Date.UTC(year, m, 15))) / 12;
+      upkeepRp += this.upkeepPerYearRp(site, toSimTimeMs(Date.UTC(year, month, 15))) / 12;
     }
     return { kWh, revenueRp, upkeepRp };
   }

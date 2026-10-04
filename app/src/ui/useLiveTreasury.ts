@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { MunicipalityDataset } from "../data/types";
 import { toDateMs, toSimTimeMs } from "../sim/calendar";
-import { cachedCumulativeBalanceRp, computeCumulativeBalanceRp } from "../sim/finances";
+import { allocationSoFarRp, cachedCumulativeBalanceRp, computeCumulativeBalanceRp, departmentShareRp, settledUtilitySoFar } from "../sim/finances";
 import { existsAt } from "../sim/lifetime";
 import { useSimDay } from "../sim/store";
 import { allocationApprovalFactor, approval } from "../sim/approval";
@@ -14,8 +14,14 @@ const SETTLE_DELAY_MS = 3000; // give the Year in Review first go at computing t
 export interface LiveTreasury {
   /** Where the treasury stands right now, or null while last year's accounts are still being settled. */
   balanceRp: number | null;
-  /** The overall government's allocation for this year (credited on 1 January). */
+  /** The overall government's allocation for this year, paid a twelfth at the start of each month. */
   budgetRp: number;
+  /** How much of it has been paid so far. */
+  allocationSoFarRp: number;
+  /** The department's share of the utility's result in the months settled so far this year (a
+   * quarter of a profit, all of a loss), and how many months that is. */
+  utilityRp: number;
+  utilityMonths: number;
   /** Subsidies paid out so far this year, as decisions happened. */
   paidOutRp: number;
   /** Value-capture levies (zoning) received so far this year. */
@@ -25,8 +31,8 @@ export interface LiveTreasury {
 }
 
 /** The treasury as of right now: last year's closing balance, plus this year's government
- * allocation, less the subsidies paid out so far. Electricity operations settle once a year
- * (see finances.ts), so they only show up in the balance from the next year on. */
+ * allocation so far and the department's share of the utility's settled months, less the subsidies
+ * paid out so far (see finances.ts). */
 export function useLiveTreasury(dataset: MunicipalityDataset): LiveTreasury {
   const simDay = useSimDay();
   useSyncExternalStore(
@@ -72,5 +78,17 @@ export function useLiveTreasury(dataset: MunicipalityDataset): LiveTreasury {
   const paidOutRp = treasury.paidOutTotal(yearStartMs, simDay + DAY_MS);
   const receivedRp = treasury.received(yearStartMs, simDay + DAY_MS, "zoningLevy"); // value-capture levies (zoning)
   const borrowedRp = treasury.received(yearStartMs, simDay + DAY_MS, "borrowing");
-  return { balanceRp: openingRp === null ? null : openingRp + budgetRp - paidOutRp + receivedRp + borrowedRp, budgetRp, paidOutRp, receivedRp, borrowedRp };
+  const allocationPaidRp = allocationSoFarRp(budgetRp, year, simDay);
+  const utility = settledUtilitySoFar(year, simDay + DAY_MS);
+  const utilityRp = departmentShareRp(utility.profitRp);
+  return {
+    balanceRp: openingRp === null ? null : openingRp + allocationPaidRp + utilityRp - paidOutRp + receivedRp + borrowedRp,
+    budgetRp,
+    allocationSoFarRp: allocationPaidRp,
+    utilityRp,
+    utilityMonths: utility.months,
+    paidOutRp,
+    receivedRp,
+    borrowedRp,
+  };
 }

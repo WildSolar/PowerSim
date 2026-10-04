@@ -172,6 +172,12 @@
 .kpi-sub {
   font-size: 11px;
   color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.kpi-sub .warn {
+  color: var(--warn);
+  font-weight: 600;
 }
 
 .kpi-flag {
