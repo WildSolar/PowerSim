@@ -42,7 +42,17 @@ import { dailyMeanTempC, weatherAt } from "./weather";
 const SAMPLES_PER_MONTH = 24; // matches historyLong.ts's own per-period density
 const COARSE_SAMPLES_PER_MONTH = 8; // for quantities that don't need weather-grade resolution — see computeMobilityFuelLiters
 
-const yieldToEventLoop = () => new Promise((resolve) => setTimeout(resolve, 0));
+// A message rather than a timer: browsers throttle timers in a background tab (to one a minute,
+// in time), which would stall a year's passes while the player looks at another tab.
+const yieldToEventLoop = () =>
+  new Promise((resolve) => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => {
+      channel.port1.close();
+      resolve(undefined);
+    };
+    channel.port2.postMessage(null);
+  });
 
 /** A completed month's samples never change (the same "immutable once finished" principle as
  * historyLong.ts's periods), so each month of each pass below is computed once and shared — also

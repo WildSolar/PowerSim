@@ -33,7 +33,6 @@ import {
 } from "../config/dynamicTariff";
 import type { Building } from "../data/types";
 import { EPOCH_MS, toDateMs, toSimTimeMs } from "./calendar";
-import { simClock } from "./engine";
 import { isResponsive } from "./ev";
 import { annualHeatDemandKWh, currentHeatingSystemId } from "./heatingRenewal";
 import { existsAt } from "./lifetime";
@@ -268,6 +267,7 @@ export function estimateUptake(buildings: Building[], sheet: TariffSheet, year: 
 class DynamicTariff {
   private buildingsProvider: () => Building[] = () => [];
   private uptake = new Map<number, DynamicUptake>();
+  private unsubscribe: (() => void) | null = null;
   private yearStartMs = Infinity;
   private yearEndMs = -Infinity;
   private year = 0;
@@ -275,6 +275,8 @@ class DynamicTariff {
   init(buildingsProvider: () => Building[]): void {
     this.buildingsProvider = buildingsProvider;
     this.uptake.clear();
+    this.unsubscribe?.();
+    this.unsubscribe = tariffStore.onPublish((p) => this.uptake.delete(p.year));
     troughCache.clear();
     this.yearStartMs = Infinity;
     this.yearEndMs = -Infinity;
@@ -295,11 +297,10 @@ class DynamicTariff {
     const year = this.yearOf(simMs);
     let uptake = this.uptake.get(year);
     if (uptake) return uptake;
-    const jan1 = toSimTimeMs(Date.UTC(year, 0, 1));
-    uptake = estimateUptake(this.buildingsProvider(), tariffStore.sheetFor(year), year, jan1);
-    // Settled once the year has begun (its sheet can no longer change); asked about earlier, the
-    // answer may still change.
-    if (simClock.getSimTimeMs() >= jan1) this.uptake.set(year, uptake);
+    // Decided as the town stood on 1 January (only ever asked about once it has: the live game and
+    // the history look at the present and the past). A tariff republished for the year starts over.
+    uptake = estimateUptake(this.buildingsProvider(), tariffStore.sheetFor(year), year, toSimTimeMs(Date.UTC(year, 0, 1)));
+    this.uptake.set(year, uptake);
     return uptake;
   }
 

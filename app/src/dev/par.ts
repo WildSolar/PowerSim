@@ -5,7 +5,8 @@
  *
  *   window.__x = null; __computePar("schlieren", "normal").then((r) => (window.__x = r));
  *
- * then put the results of the three difficulties into public/data/par/<slug>.json.
+ * (window.__parProgress says how far it has got), then put the results of the three difficulties
+ * into public/data/par/<slug>.json.
  */
 
 import type { Difficulty } from "../config/difficulty";
@@ -17,7 +18,10 @@ import { runScenario } from "./scenario";
 
 export async function computePar(slug: string, difficulty: Difficulty): Promise<{ version: string; baselineYear: number; difficulty: Difficulty; firstYear: number; points: number[] }> {
   const reportYears = Array.from({ length: NET_ZERO_TARGET_YEAR - BASELINE_YEAR }, (_, i) => BASELINE_YEAR + 2 + i);
-  await runScenario({ slug, difficulty, enact: [], reportYears, withEmissions: true });
+  const startedAt = Date.now();
+  // Progress, readable from the console while it runs: window.__parProgress.
+  const progress = (msg: string) => Object.assign(window, { __parProgress: `${msg} after ${Math.round((Date.now() - startedAt) / 1000)} s` });
+  await runScenario({ slug, difficulty, enact: [], reportYears, withEmissions: true }, progress);
   const baseline = cachedEmissionsForYear(BASELINE_YEAR);
   if (!baseline) throw new Error("par: the baseline year was not counted");
   const points: number[] = [];
