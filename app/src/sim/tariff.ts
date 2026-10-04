@@ -1,45 +1,41 @@
 /**
- * A minimal time-of-use tariff: two flat rate periods per day. The off-peak window
- * is fixed for this milestone (21:00-06:00, the classic overnight "cheap" block) —
- * only the two prices are player-adjustable. A configurable window is a natural
- * follow-up once there's a reason to need it.
+ * Prices, as everything in the simulation reads them (tariffStore.ts puts them together for a
+ * moment in time):
  *
- * The other four prices here aren't time-of-use at all — they're what solar
- * export earns (feedInPriceRpKWh) and what the three non-electric
- * space-heating carriers cost (oilPriceRpPerLiter, gasPriceRpKWh,
- * districtHeatingPriceRpKWh) — see billing.ts for where each is actually
- * used. Oil is priced per liter (how it's actually sold in Switzerland)
- * rather than per kWh like the other two. Grouped into the same object/store
- * as the electricity prices since they're all "prices the player sets," not
- * because they're mechanically related.
+ *  - The utility's tariff sheet (TariffSheet), published once a year: a simple time-of-use
+ *    electricity price — a cheaper off-peak rate overnight (21:00-06:00) and a dearer peak rate —
+ *    plus what solar feed-in earns, what district heat costs, and the municipality's own charging
+ *    prices. See tariffStore.ts for the yearly publication.
+ *  - Market prices (market.ts), which nobody in the game sets: heating oil (per litre, as it is
+ *    sold), gas, petrol and diesel, and the wholesale electricity the utility buys.
+ *  - The utility's grid upkeep per kWh (config/market.ts), a cost, not a price.
  *
- * The last two are different again — not a price a consumer ever sees, but
- * the DSO's own cost side: what it pays upstream for wholesale electricity,
- * and what it costs to maintain the local grid. See finances.ts for where
- * they turn into the municipal money ledger.
- *
- * Starting values live in config/tariff.ts (re-exported below as
- * DEFAULT_TARIFF) — edit that file to recalibrate, not this one.
+ * See billing.ts and finances.ts for where each turns into money.
  */
 
-export interface Tariff {
+/** What the utility publishes for a calendar year. */
+export interface TariffSheet {
   offPeakPriceRpKWh: number;
   peakPriceRpKWh: number;
   offPeakStartHour: number; // e.g. 21 — off-peak begins in the evening
   offPeakEndHour: number; // e.g. 6 — off-peak ends the next morning
   feedInPriceRpKWh: number; // grid feed-in remuneration for exported solar
-  oilPriceRpPerLiter: number; // per liter of heating oil burned
-  gasPriceRpKWh: number; // per kWh of gas burned (not thermal delivered — see billing.ts)
   districtHeatingPriceRpKWh: number; // per kWh of heat delivered
-  petrolPriceRpPerLiter: number; // per liter of petrol/diesel burned by an ICE car — see mobility.ts
   publicChargingAcRpKWh: number; // at the municipality's own on-street chargers — see publicCharging.ts
   publicChargingDcRpKWh: number; // at the municipality's own fast-charging hubs
   publicChargingFleetRpKWh: number; // at the municipality's own lorry charging parks
+}
+
+/** Every price at one moment: the year's sheet plus the month's market prices and the grid upkeep. */
+export interface Tariff extends TariffSheet {
+  oilPriceRpPerLiter: number; // per liter of heating oil burned
+  gasPriceRpKWh: number; // per kWh of gas burned (not thermal delivered — see billing.ts)
+  petrolPriceRpPerLiter: number; // per liter of petrol/diesel burned by an ICE car — see mobility.ts
   wholesalePriceRpKWh: number; // what the DSO pays upstream per net kWh purchased — see finances.ts
   gridMaintenanceRpKWh: number; // the DSO's own wires/upkeep cost per kWh delivered — see finances.ts
 }
 
-export { DEFAULT_TARIFF } from "../config/tariff";
+export { DEFAULT_SHEET } from "../config/tariff";
 
 export function isOffPeakHour(tariff: Tariff, hourOfDay: number): boolean {
   return hourOfDay >= tariff.offPeakStartHour || hourOfDay < tariff.offPeakEndHour;

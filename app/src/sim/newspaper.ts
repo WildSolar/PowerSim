@@ -1,7 +1,7 @@
 /**
  * The local paper (into inbox.ts): one edition at the start of each month about the month before —
  * a lead story and a handful of headlines, picked by how newsworthy each item is: votes and
- * elections first, then decisions, the grid's readings, what was built, installed and refused,
+ * elections first, then decisions, prices, the grid's readings, what was built, installed and refused,
  * requests answered or ignored, milestones. The paper leans with the public mood: supportive when
  * approval is high, critical when it's low — in its headlines and its editorial.
  *
@@ -11,7 +11,7 @@
 import { SUMMER_MEASURED_MONTH, WINTER_MEASURED_MONTH } from "../config/grid";
 import type { Building, MunicipalityDataset } from "../data/types";
 import { approval, type ApprovalEvent } from "./approval";
-import { toDateMs, toSimTimeMs } from "./calendar";
+import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { debt, type DebtEvent } from "./debt";
 import { districtHeat } from "./districtHeat";
 import { simClock } from "./engine";
@@ -24,8 +24,11 @@ import { MEASURE_BY_ID } from "./measureCatalog";
 import { measures, type MeasureEvent } from "./measures";
 import { mobilityCensus } from "./mobility";
 import { publicCharging } from "./publicCharging";
+import { market } from "./market";
 import { hashSeed, mulberry32 } from "./rng";
 import { solarInstallsInRange } from "./solarAdoption";
+import { benchmarkBillChf, householdBillChf } from "./tariffApproval";
+import { tariffStore, type TariffPublication } from "./tariffStore";
 
 type Leaning = "supportive" | "neutral" | "critical";
 
@@ -66,6 +69,7 @@ class Newspaper {
   private measureEvents: MeasureEvent[] = [];
   private approvalEvents: ApprovalEvent[] = [];
   private debtEvents: DebtEvent[] = [];
+  private tariffEvents: TariffPublication[] = [];
   private lastRate: number | null = null;
   private lastMonth: number | null = null;
   private lastShares: { heatPump: number; ev: number } | null = null;
@@ -79,6 +83,7 @@ class Newspaper {
     this.measureEvents = [];
     this.approvalEvents = [];
     this.debtEvents = [];
+    this.tariffEvents = [];
     this.lastRate = debt.marketPct(simClock.getSimTimeMs());
     this.lastShares = null;
     this.lastMonth = monthIndex(simClock.getSimTimeMs());
@@ -87,6 +92,7 @@ class Newspaper {
       measures.onEvent((e) => this.measureEvents.push(e)),
       approval.onEvent((e) => this.approvalEvents.push(e)),
       debt.onEvent((e) => this.debtEvents.push(e)),
+      tariffStore.onPublish((e) => this.tariffEvents.push(e)),
     ];
   }
 
@@ -128,6 +134,7 @@ class Newspaper {
     this.measureEvents = this.measureEvents.filter((e) => e.atMs >= to);
     this.approvalEvents = this.approvalEvents.filter((e) => e.atMs >= to);
     this.debtEvents = this.debtEvents.filter((e) => e.atMs >= to);
+    this.tariffEvents = this.tariffEvents.filter((e) => e.atMs >= to);
   }
 
   private items(month: number, from: number, to: number, leaning: Leaning): Item[] {
@@ -279,6 +286,39 @@ class Newspaper {
       else if (r.status === "lapsed") items.push({ priority: 32, headline: "Residents left waiting", body: `They asked for ${r.ask}. Nothing came of it.` });
     }
 
+    // Prices: the utility's tariff, the markets.
+    // A tariff republished within the month: the last one, against what applied before the first.
+    const latest = new Map<number, TariffPublication>();
+    for (const e of this.tariffEvents.filter((x) => inMonth(x.atMs))) latest.set(e.year, { ...e, previous: latest.get(e.year)?.previous ?? e.previous });
+    for (const e of latest.values()) {
+      const before = householdBillChf(e.previous);
+      const after = householdBillChf(e.sheet);
+      const pct = before > 0 ? Math.round((after / before - 1) * 100) : 0;
+      const average = Math.round(benchmarkBillChf(e.year));
+      const body = `From 1 January ${e.year}, a typical household pays CHF ${Math.round(after).toLocaleString("en-GB")} a year for its electricity; the Swiss average is about CHF ${average.toLocaleString("en-GB")}.`;
+      if (pct > 0) {
+        items.push({ priority: 50 + Math.min(30, pct * 2), headline: leaning === "critical" ? `Electricity ${pct}% dearer — again the households pay` : `Electricity tariff up ${pct}% for ${e.year}`, body });
+      } else if (pct < 0) {
+        items.push({ priority: 45, headline: leaning === "supportive" ? `Good news on the bill: electricity ${-pct}% cheaper` : `Electricity tariff cut ${-pct}% for ${e.year}`, body });
+      } else {
+        items.push({ priority: 25, headline: `Electricity prices hold steady for ${e.year}`, body });
+      }
+    }
+    const editionYear = Math.floor(month / 12);
+    if (month % 12 === 6 && editionYear > BASELINE_YEAR && !tariffStore.isPublished(editionYear + 1)) {
+      items.push({ priority: 22, headline: `Tariff for ${editionYear + 1} due this month`, body: `The utility has until the end of August to publish next year’s prices (Town hall → Prices). If it doesn’t, this year’s carry over.` });
+    }
+    if (month % 12 === 7 && editionYear > BASELINE_YEAR && !tariffStore.isPublished(editionYear + 1)) {
+      items.push({ priority: 20, headline: `No new tariff: ${editionYear}'s prices carry over`, body: `The utility let the end-of-August deadline pass. Electricity costs the same in ${editionYear + 1}.` });
+    }
+    if (market.shocksBetween(from, to).length > 0) {
+      items.push({
+        priority: 72,
+        headline: "Energy prices soar on world markets",
+        body: "A supply crisis lifts the price of gas, heating oil and wholesale electricity. Those still burning fuel feel it first; it may take a year or two to ease.",
+      });
+    }
+
     // Money: borrowing, the rating, the canton, rates.
     for (const e of this.debtEvents.filter((x) => inMonth(x.atMs))) {
       const chf = (rp: number) => `CHF ${Math.round(rp / 100_000 / 10) / 100} million`;
@@ -379,6 +419,7 @@ class Newspaper {
       measureEvents: this.measureEvents.map((e) => ({ ...e, def: e.def.id })),
       approvalEvents: this.approvalEvents,
       debtEvents: this.debtEvents,
+      tariffEvents: this.tariffEvents,
       lastRate: this.lastRate,
       lastMonth: this.lastMonth,
       lastShares: this.lastShares,
@@ -392,6 +433,7 @@ class Newspaper {
     });
     this.approvalEvents = s.approvalEvents;
     this.debtEvents = s.debtEvents;
+    this.tariffEvents = s.tariffEvents;
     this.lastRate = s.lastRate;
     this.lastMonth = s.lastMonth;
     this.lastShares = s.lastShares;

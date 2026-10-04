@@ -85,7 +85,7 @@ const electricityByMonth = new Map<number, Promise<YearElectricityMonth>>();
 function monthElectricity(buildings: Building[], realPlants: PowerPlant[], year: number, month: number): Promise<YearElectricityMonth> {
   return sharedMonth(electricityByMonth, year, month, () => {
     const times = monthTimes(year, month, SAMPLES_PER_MONTH);
-    const tariff: Tariff = tariffStore.get();
+    const tariff: Tariff = tariffStore.at(toSimTimeMs(Date.UTC(year, month, 15)));
     // The plants in service by the month's end — not the whole year's: asking for those would
     // settle the rest of the year's solar decisions early, under whatever measures are in force now.
     const monthEndMs = toSimTimeMs(Date.UTC(year, month + 1, 1));
@@ -97,8 +97,7 @@ function monthElectricity(buildings: Building[], realPlants: PowerPlant[], year:
  * expensive sampling pass the year-end energy pie, emissions (net grid electricity) and finances
  * (revenue, feed-in, wholesale) all read from, instead of each sampling the year on its own. Solar
  * uses the plants (real + adopted) in service by the end of each month. The tariff only shifts when within a day EVs
- * charge, never the total; each month uses whichever is current when it's sampled — normally just
- * after it ended (see yearPassPrefetch.ts). */
+ * charge, never the total; each month uses the prices in force that month. */
 export function yearElectricity(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<YearElectricityMonth[]> {
   return eachMonth((month) => monthElectricity(buildings, realPlants, year, month));
 }

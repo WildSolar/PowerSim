@@ -30,12 +30,9 @@
  * parameters below.
  *
  * Same caching principle as emissions.ts: a completed year's finances never
- * change once computed, so they're cached by year forever. And the same
- * "retroactive tariff" simplification tariffStore.ts already documents for
- * every other consumer of the current tariff — a year's finances use
- * whichever tariff is current the first time that year is computed, then
- * are locked in; changing prices afterward only shapes future years, never
- * rewrites a year already booked.
+ * change once computed, so they're cached by year forever. Each month is
+ * priced at that month's prices: the year's published tariff sheet and the
+ * month's market price for wholesale power (tariffStore.ts).
  */
 
 import type { Building, PowerPlant } from "../data/types";
@@ -98,22 +95,24 @@ export function computeMunicipalFinancesForYear(buildings: Building[], realPlant
 }
 
 async function computeFinances(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<MunicipalFinances> {
-  const tariff: Tariff = tariffStore.get();
+  // The year's sheet (one per year); wholesale power at each month's market price.
+  const tariff: Tariff = tariffStore.at(toSimTimeMs(Date.UTC(year, 6, 1)));
+  const greenShare = policyStore.get().greenPowerShare / 100;
   let consumerRevenueRp = 0;
   let feedInPaidRp = 0;
   let grossConsumptionKWh = 0;
-  let netElectricityKWh = 0;
+  let wholesaleCostRp = 0;
 
-  for (const { times, series } of await yearElectricity(buildings, realPlants, year)) {
+  const months = await yearElectricity(buildings, realPlants, year);
+  months.forEach(({ times, series }, month) => {
     const consumptionW = consumptionSeriesW(series);
     consumerRevenueRp += electricityCostRp(times, consumptionW, tariff);
     feedInPaidRp += flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh);
     grossConsumptionKWh += energyKWh(times, consumptionW);
-    netElectricityKWh += energyKWh(times, consumptionW) - energyKWh(times, series.solarW);
-  }
-
-  const greenShare = policyStore.get().greenPowerShare / 100;
-  const wholesaleCostRp = netElectricityKWh * (tariff.wholesalePriceRpKWh + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare);
+    const netKWh = energyKWh(times, consumptionW) - energyKWh(times, series.solarW);
+    const wholesale = tariffStore.at(toSimTimeMs(Date.UTC(year, month, 15))).wholesalePriceRpKWh;
+    wholesaleCostRp += netKWh * (wholesale + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare);
+  });
   const gridMaintenanceCostRp = grossConsumptionKWh * tariff.gridMaintenanceRpKWh;
 
   const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));

@@ -260,7 +260,7 @@ class Fleets {
     const spec = FLEET_CATALOG[electricOf(v.vehicleClass)];
     const kWh = (spec.annualKm / 100) * spec.kWhPer100Km;
     const publicRp = kWh * option.priceRpPerKWh + option.hassleRp;
-    return publicRp < depotRunningRp(kWh, depot.chargerRp, spec.lifetimeMeanYears, tariffStore.get()) ? (publicAccess as FleetAccess) : depot;
+    return publicRp < depotRunningRp(kWh, depot.chargerRp, spec.lifetimeMeanYears, tariffStore.at(atMs)) ? (publicAccess as FleetAccess) : depot;
   }
 
   /** Whether a vehicle without a depot that just went diesel would have gone electric with a
@@ -268,7 +268,7 @@ class Fleets {
   private wouldGoElectricWithCharger(v: FleetVehicle, incumbent: FleetVehicleId, atMs: number): boolean {
     const kind: ChargingKind = v.vehicleClass === "van" ? "ac" : "fleet";
     const nearby = publicCharging.hypotheticalOptionCostRp(kind);
-    const candidates = candidatesFor(v.vehicleClass, tariffStore.get(), { kind: "public", siteId: "", ...nearby }, atMs, () => {});
+    const candidates = candidatesFor(v.vehicleClass, tariffStore.at(atMs), { kind: "public", siteId: "", ...nearby }, atMs, () => {});
     return chooseNext(candidates, incumbent, FLEET_UNCERTAINTY_FRACTION, this.biasRp(v) + policyStore.get().progressiveNudgeRp).chosen !== FLEET_CHOICES[v.vehicleClass][1];
   }
 
@@ -289,7 +289,7 @@ class Fleets {
       candidatesAt: (atMs, incumbent) => {
         const b = this.lookupBuilding(v.egid);
         const access: FleetAccess = b ? this.accessAt(v, b, atMs, incumbent) : { kind: "depot", chargerRp: 0 };
-        return candidatesFor(v.vehicleClass, tariffStore.get(), access, atMs, (chosenAtMs) => {
+        return candidatesFor(v.vehicleClass, tariffStore.at(atMs), access, atMs, (chosenAtMs) => {
           if (access.kind === "public") publicCharging.assign(v.key, null, access.siteId, chosenAtMs, publicNeed(v.vehicleClass));
         });
       },

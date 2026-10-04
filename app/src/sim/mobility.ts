@@ -276,10 +276,10 @@ function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "c
     biasStrengthRp: biasStrengthRp(egid, ewid, slotIndex, kind),
     lifetimeMeanYearsFor: (id) => VEHICLE_TYPE_CATALOG[id].lifetimeMeanYears,
     candidatesAt: (atMs, incumbent) => {
-      if (kind === "bike") return bikeCandidatesAt(tariffStore.get(), atMs);
+      if (kind === "bike") return bikeCandidatesAt(tariffStore.at(atMs), atMs);
       const where = chargingAccessAt(egid, ewid, atMs, incumbent);
       const access = where?.access ?? { kind: "home" };
-      return carCandidatesAt(tariffStore.get(), atMs, incumbent, access, (chosenAtMs) => {
+      return carCandidatesAt(tariffStore.at(atMs), atMs, incumbent, access, (chosenAtMs) => {
         if (access.kind === "public") publicCharging.assign(key, slotHandleFor(egid, ewid, slotIndex), access.siteId, chosenAtMs);
       });
     },
@@ -295,7 +295,7 @@ function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "c
                 VEHICLE_TYPE_CATALOG.carEV.baseInstallCostRp * priceFactor("carEV", atMs),
               ),
             candidatesAt: (atMs, incumbent, ageYears) => {
-              const tariff = tariffStore.get();
+              const tariff = tariffStore.at(atMs);
               const where = chargingAccessAt(egid, ewid, atMs, incumbent);
               const access = where?.access ?? { kind: "home" };
               const base = carCandidatesAt(
@@ -338,7 +338,7 @@ function wouldGoElectricWithCharger(egid: string, ewid: string, slotIndex: numbe
   const dwelling = building?.dwellings.find((d) => d.ewid === ewid);
   if (!building || !dwelling || publicCharging.homeChargingAt(building, dwelling)) return false;
   const nearby = publicCharging.hypotheticalOptionCostRp();
-  const candidates = carCandidatesAt(tariffStore.get(), atMs, incumbent, { kind: "public", siteId: "", ...nearby }, () => {});
+  const candidates = carCandidatesAt(tariffStore.at(atMs), atMs, incumbent, { kind: "public", siteId: "", ...nearby }, () => {});
   const bias = biasStrengthRp(egid, ewid, slotIndex, "car") + policyStore.get().progressiveNudgeRp;
   return chooseNext(candidates, incumbent, VEHICLE_UNCERTAINTY_FRACTION, bias).chosen === "carEV";
 }

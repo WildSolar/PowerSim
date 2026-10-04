@@ -214,7 +214,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Consequences: approval below 25% for six months gets you recalled, and every four years (the first in 2030) there is an election: below 50% on election day, the voters choose someone else. Either ends the game. Elections are announced: the Overview shows when the next one is, and the paper follows the mood. Approval also nudges the government's yearly allocation up or down a little.",
       ]),
       note(
-        "Approval reacts to what you decide, not to how things turn out: nobody thanks you for falling emissions or blames you for rising bills. Measures imposed by the canton or the Confederation cost you nothing. The difficulty sets how strongly opinion moves.",
+        "Approval reacts to what you decide, not to how things turn out: nobody thanks you for falling emissions. Prices are the exception — people judge the tariff you publish, and keep judging it while it is in force (see \"Tariffs & energy prices\"). Measures imposed by the canton or the Confederation cost you nothing. The difficulty sets how strongly opinion moves.",
       ),
     ],
   },
@@ -310,7 +310,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Building things — district heating pipes, public chargers, grid reinforcement, a zoning change — is paid the day it is ordered. Campaigns and programmes cost a little every month.",
       ),
       p(
-        "The utility settles its year once a year: what customers paid for electricity and district heat, less the power and heat it bought, the solar it paid for, and the upkeep of the grid, the pipes and the chargers. Like Swiss municipal utilities, it hands three quarters of its profit to the town's general account; your department keeps a quarter. A loss stays with the department. You set the utility's prices and costs in Town hall → Prices.",
+        "The utility settles its year once a year: what customers paid for electricity and district heat, less the power and heat it bought, the solar it paid for, and the upkeep of the grid, the pipes and the chargers. Like Swiss municipal utilities, it hands three quarters of its profit to the town's general account; your department keeps a quarter. A loss stays with the department. You set the utility's prices in Town hall → Prices, once a year; what it pays for power follows the market (see \"Tariffs & energy prices\").",
       ),
       note(
         "Federal and cantonal grants — the ones every heat pump, solar system and renovation already gets — aren't municipal money; only your own top-up is. Gas, oil and petrol are bought from outside suppliers, never through the utility. The department's share of the utility profit (about CHF 1.4 million a year at the starting prices) and the allocation (about CHF 3.3 million) are small next to a serious subsidy programme, so what you fund matters.",
@@ -340,21 +340,30 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "tariff",
-    title: "Prices you set",
+    title: "Tariffs & energy prices",
     blocks: [
       p(
-        "Town hall → Prices holds what the municipal utility charges, and what fuels cost. A price change applies at once, costs nothing to make, and shapes every decision from then on.",
+        "Town hall → Prices is where the municipal utility’s tariff is set. Like a Swiss utility, you publish it once a year: next year’s tariff by the end of August, taking effect on 1 January. Until the deadline you can publish again; publish nothing, and this year’s prices carry over. In your first year you have until the end of December.",
       ),
       list([
         "Electricity: a day rate and a cheaper night rate (21:00–06:00). Households who can wait — about a third of electric car owners — charge their car at night.",
         "Solar feed-in: what panels earn for power fed back into the grid. A higher price makes solar pay for more owners — and costs the utility.",
-        "Oil, gas and petrol: what fuel costs. Dearer fuel makes heat pumps and electric cars look better the next time something is replaced.",
-        "District heating: what the network's heat costs its customers, and earns the utility.",
-        "Public charging: what the municipality's own chargers charge — on-street, fast and at lorry charging parks. Private operators set their own (see \"Public charging\").",
-        "Utility costs: what the utility pays for wholesale power and spends on grid upkeep. They never appear on anyone's bill, only in the utility's accounts (see \"Municipal finances\").",
+        "District heating: what the network’s heat costs its customers, and earns the utility.",
+        "Public charging: what the municipality’s own chargers charge — on-street, fast and at lorry charging parks. Private operators set their own (see \"Public charging\").",
       ]),
-      p("The same page shows where technology prices stand and where they are heading (see \"Technology prices over time\")."),
-      note("A decision is made at the prices of its day and never revisited: changing a price later only affects the decisions that follow."),
+      p(
+        "Before you publish, the page shows what a typical household would pay for its electricity in a year, against this year and against the Swiss average, and how people are likely to take it.",
+      ),
+      p(
+        "People care about their bill (see \"Public approval\"). The day you publish, the change lands like any decision: a rise stings, a cut is welcomed. And for as long as a tariff is in force, people compare it with what households pay elsewhere in Switzerland: a dear tariff keeps weighing on approval, a cheap one helps a little — people resent paying too much more than they reward paying less. Tenants and homeowners mind most, businesses a little less, and homeowners also watch what their panels earn.",
+      ),
+      p(
+        "What you can’t set are the energy markets: heating oil, gas, petrol and diesel, and the wholesale electricity the utility buys. They follow world prices, including the federal CO₂ levy on heating fuels, and drift slowly over the years — until now and then a supply crisis sends them soaring, easing again over a year or two. Nobody sees one coming. Dear fuel makes heat pumps and electric cars look better to anyone choosing at the time; dear wholesale power squeezes the utility’s profit, unless you pass it on — and the Swiss average rises with it, so people are more forgiving when everyone’s bill goes up.",
+      ),
+      p("The same page shows the market prices now and a year ago, and where technology prices are heading (see \"Technology prices over time\")."),
+      note(
+        "A decision is made at the prices of its day and never revisited: a change only affects the decisions that follow. The grid’s upkeep per kWh is a fixed cost of the utility, not something you set. People judge the tariff by its typical bill, not by what each of them actually pays.",
+      ),
     ],
   },
 

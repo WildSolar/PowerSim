@@ -43,6 +43,8 @@ export const CHANGELOG: Release[] = [
       "A score: every year from the second on scores its cut in emissions per resident against the first, through 2050 — shown against par, what doing nothing would score.",
       "Winning and losing: reach net zero by 2050 to win; lose an election (below 50%) or a recall and the run ends. Either way, an end screen shows how it went.",
       "Carbon removal contracts, to balance the emissions a town can't avoid — counting once its own emissions are down to a tenth of what they were.",
+      "A yearly tariff: publish next year's electricity, feed-in, district heating and charging prices by the end of August. People react to the change, and keep comparing your prices with the Swiss average.",
+      "Energy markets: heating oil, gas, petrol and wholesale power follow world prices, including the CO₂ levy, with the odd supply crisis sending them soaring.",
     ],
   },
 ];

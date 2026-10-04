@@ -28,6 +28,8 @@ import { networkFullAt } from "../sim/districtHeatStats";
 import { zoning, type ZoningAction } from "../sim/zoning";
 import { fleets } from "../sim/fleet";
 import { tariffStore } from "../sim/tariffStore";
+import { market } from "../sim/market";
+import { initTariffApproval } from "../sim/tariffApproval";
 import { setCostTrendsEnabled } from "../sim/costTrends";
 import { bookInitialPublicCharging } from "../sim/mobility";
 import { PAYOUT_CATEGORIES, treasury } from "../sim/treasury";
@@ -171,8 +173,13 @@ function snapshot(dataset: MunicipalityDataset, year: number, atMs: number): Sce
 export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string) => void): Promise<ScenarioRow[]> {
   const dataset = (await (await fetch(`/data/${spec.slug ?? "schlieren"}.json`)).json()) as MunicipalityDataset;
   const difficulty = spec.difficulty ?? "normal";
+  market.init(`market:${dataset.bfsNumber}`);
+  tariffStore.init();
   measures.init(difficulty);
-  if (spec.withApproval) approval.init(difficulty, `approval:${dataset.bfsNumber}`);
+  if (spec.withApproval) {
+    approval.init(difficulty, `approval:${dataset.bfsNumber}`);
+    initTariffApproval();
+  }
   streets.init(dataset);
   districtHeat.init(dataset);
   zoning.init(dataset); // before the stock: new buildings ask their parcel what it allows

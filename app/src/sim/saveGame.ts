@@ -80,7 +80,7 @@ export interface SaveFile {
 }
 
 interface SaveState {
-  tariff: ReturnType<typeof tariffStore.get>;
+  tariff: ReturnType<typeof tariffStore.snapshot>;
   measures: ReturnType<typeof measures.snapshot>;
   treasury: ReturnType<typeof treasury.snapshot>;
   renewalChains: ReturnType<typeof snapshotRenewalChains>;
@@ -149,7 +149,7 @@ export async function captureSave(run: RunInfo, name: string): Promise<{ meta: S
 /** Every module's state right now, apart from the year report's samples. */
 export function captureState(transparency: boolean): Omit<SaveState, "yearReport"> {
   return {
-    tariff: tariffStore.get(),
+    tariff: tariffStore.snapshot(),
     measures: measures.snapshot(),
     treasury: treasury.snapshot(),
     renewalChains: snapshotRenewalChains(),

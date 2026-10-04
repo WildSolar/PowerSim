@@ -671,8 +671,8 @@ export function solarStatusOf(building: Building, realPlants: PowerPlant[]): { c
  * at a time), and owners of a system without a battery who look into adding one. */
 function processMonth(buildings: Building[], realPlants: PowerPlant[], year: number, month: number): void {
   const policy = policyStore.get();
-  const tariff = tariffStore.get();
   const yearStartMs = toSimTimeMs(Date.UTC(year, month, 1)); // the start of this month
+  const tariff = tariffStore.at(yearStartMs);
   installMunicipalSolar(buildings, realPlants, year, yearStartMs);
 
   let sunlight: YearSunlight | undefined;

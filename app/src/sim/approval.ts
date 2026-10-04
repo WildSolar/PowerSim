@@ -116,6 +116,14 @@ export function setDebtPenalty(penalty: (atMs: number) => number): void {
   debtPenalty = penalty;
 }
 
+let priceStances: (atMs: number) => Stances = () => ({});
+
+/** Registered by tariffApproval.ts: how each group feels about the prices in force at `atMs` — a
+ * lasting pull like a measure's, without the fading goodwill. */
+export function setPriceStances(stances: (atMs: number) => Stances): void {
+  priceStances = stances;
+}
+
 function clamp(x: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, x));
 }
@@ -292,6 +300,12 @@ class ApprovalEngine {
     return voteAt;
   }
 
+  /** Adds a line to the recent decisions log (for decisions that aren't measures, like a tariff). */
+  note(atMs: number, text: string): void {
+    this.addLog(atMs, text);
+    this.bump();
+  }
+
   // --- time ---
 
   advance(nowMs: number): void {
@@ -346,6 +360,7 @@ class ApprovalEngine {
       const years = Math.max(0, (atMs - enactedAtMs) / (12 * MONTH_MS));
       stance += s > 0 ? s * (GOODWILL_FLOOR_SHARE + (1 - GOODWILL_FLOOR_SHARE) * Math.exp(-years / GOODWILL_FADE_YEARS)) : s;
     }
+    stance += priceStances(atMs)[bloc] ?? 0;
     const level = BASE_APPROVAL + MAX_SWING * this.sensitivity * Math.tanh(STANCE_SATURATION * stance);
     return clamp(level - fiscalPenalty * FISCAL_BLOC_WEIGHT[bloc] * this.sensitivity, 0, 100);
   }

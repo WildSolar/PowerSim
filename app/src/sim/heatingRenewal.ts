@@ -160,7 +160,7 @@ function candidatesAt(
   newBuild = false,
   early = false,
 ): RenewalCandidate<HeatingSystemId>[] {
-  const tariff = tariffStore.get();
+  const tariff = tariffStore.at(atMs);
   const estimate = annualHeatingEstimate(building, atMs);
   const scale = sizeScale(building);
   const fossilBanned = policyStore.get().fossilHeatingInstallBanned || zoning.fossilHeatingBannedAt(building, atMs);
@@ -269,7 +269,7 @@ function chainFor(building: Building, simTimeMs: number): RenewalEvent<HeatingSy
         return earlySwitchChance(EARLY_SWITCH.heating, municipalHeatingSubsidyRp("airHeatPump", true), priceRp);
       },
       candidatesAt: (atMs, incumbent, ageYears) => {
-        const tariff = tariffStore.get();
+        const tariff = tariffStore.at(atMs);
         const keep = runningCostRpFor(incumbent, annualHeatingEstimate(building, atMs), tariff, (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2);
         return earlyCandidates(candidatesAt(building, atMs, incumbent, true, false, true), incumbent, keep, ageYears, EARLY_SWITCH.heating);
       },
@@ -282,7 +282,7 @@ function chainFor(building: Building, simTimeMs: number): RenewalEvent<HeatingSy
  * the given U-value, heated by whatever system it has then (gas if that is not one we price).
  * Retrofit decisions weigh this against the cost of the work. */
 export function annualHeatingCostRp(building: Building, atMs: number, uValueWPerM2K: number): number {
-  const tariff = tariffStore.get();
+  const tariff = tariffStore.at(atMs);
   const estimate = annualHeatingEstimate(building, atMs, uValueWPerM2K);
   const avgElecRpKWh = (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2;
   return runningCostRpFor(currentHeatingSystemId(building, atMs - 1) ?? "gasBoiler", estimate, tariff, avgElecRpKWh);
