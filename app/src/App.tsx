@@ -77,6 +77,7 @@ if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, pol
 if (import.meta.env.DEV) import("./sim/saveGame").then((m) => Object.assign(window, { __save: m }));
 if (import.meta.env.DEV) import("./sim/history").then((m) => Object.assign(window, { __history: m }));
 if (import.meta.env.DEV) import("./dev/par").then((m) => Object.assign(window, { __computePar: m.computePar }));
+if (import.meta.env.DEV) import("./dev/autoplay").then((m) => Object.assign(window, { __autoplay: m.autoplay }));
 
 /** A run: a new game of `slug`, or — with `restore` — a saved one picked up where it was left. */
 function Game({ slug, difficulty, transparency, restore }: { slug: string; difficulty: Difficulty; transparency: boolean; restore?: SaveFile }) {
