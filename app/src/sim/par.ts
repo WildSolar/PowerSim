@@ -5,6 +5,7 @@
  * It belongs to the build that computed it: a balance change needs it computed again.
  */
 
+import { dataUrl } from "../data/loadDataset";
 import type { Difficulty } from "../config/difficulty";
 import { BASELINE_YEAR } from "./calendar";
 
@@ -23,7 +24,7 @@ let current: { firstYear: number; points: number[] } | null = null;
 export async function loadPar(slug: string, difficulty: Difficulty): Promise<void> {
   current = null;
   try {
-    const response = await fetch(`/data/par/${slug}.json`);
+    const response = await fetch(dataUrl(`par/${slug}.json`));
     if (!response.ok) return;
     const file = (await response.json()) as ParFile;
     current = file.baselineYear === BASELINE_YEAR ? (file.difficulties[difficulty] ?? null) : null;

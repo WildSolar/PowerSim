@@ -4,6 +4,7 @@
  * development (see App.tsx). Start a municipality first.
  */
 
+import { dataUrl } from "../data/loadDataset";
 import { toDateMs, toSimTimeMs } from "../sim/calendar";
 import { reportCardStore } from "../sim/reportCardStore";
 import { yearPassPrefetchBusy } from "../sim/yearPassPrefetch";
@@ -124,7 +125,7 @@ export async function timeYearEndReport(waitForPrefetch = true): Promise<Record<
 export async function timeNewYearPieces(): Promise<Record<string, number>> {
   const buildings = stock.getAll();
   const year = new Date(toDateMs(simClock.getSimTimeMs())).getUTCFullYear();
-  const plants = (await (await fetch("/data/schlieren.json")).json()).powerPlants;
+  const plants = (await (await fetch(dataUrl("schlieren.json"))).json()).powerPlants;
   const yearEnd = toSimTimeMs(Date.UTC(year + 1, 0, 1));
   const out: Record<string, number> = {};
   out.solarAdoptionNextYear = await timed(() => effectivePowerPlantsAt(buildings, plants, yearEnd + 60_000));
@@ -143,7 +144,7 @@ export async function timeNewYearPieces(): Promise<Record<string, number>> {
 /** One tick of the map's live power layer (every building's draw right now), and a checksum. */
 export async function timeMapPowerTick(): Promise<Record<string, number>> {
   const buildings = stock.getAll();
-  const plants = (await (await fetch("/data/schlieren.json")).json()).powerPlants;
+  const plants = (await (await fetch(dataUrl("schlieren.json"))).json()).powerPlants;
   const t = simClock.getSimTimeMs();
   const livePlants = effectivePowerPlantsAt(buildings, plants, t);
   const snow = snowDepthCm(t);
@@ -158,7 +159,7 @@ export async function timeMapPowerTick(): Promise<Record<string, number>> {
  * fresh, independent sample of that instant. */
 export async function timeRollingChart(): Promise<Record<string, number | string>> {
   const buildings = stock.getAll();
-  const plants = (await (await fetch("/data/schlieren.json")).json()).powerPlants;
+  const plants = (await (await fetch(dataUrl("schlieren.json"))).json()).powerPlants;
   const tariff = tariffStore.get();
   const out: Record<string, number | string> = {};
   const now0 = simClock.getSimTimeMs();

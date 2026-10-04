@@ -7,6 +7,7 @@
  * and remember everything.
  */
 
+import { dataUrl } from "../data/loadDataset";
 import type { MunicipalityDataset, SiteZone } from "../data/types";
 import { approval } from "../sim/approval";
 import { toDateMs } from "../sim/calendar";
@@ -172,7 +173,7 @@ function snapshot(dataset: MunicipalityDataset, year: number, atMs: number): Sce
 }
 
 export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string) => void): Promise<ScenarioRow[]> {
-  const dataset = (await (await fetch(`/data/${spec.slug ?? "schlieren"}.json`)).json()) as MunicipalityDataset;
+  const dataset = (await (await fetch(dataUrl(`${spec.slug ?? "schlieren"}.json`))).json()) as MunicipalityDataset;
   const difficulty = spec.difficulty ?? "normal";
   market.init(`market:${dataset.bfsNumber}`);
   tariffStore.init();

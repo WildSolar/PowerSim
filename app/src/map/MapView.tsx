@@ -1,5 +1,8 @@
 import { useEffect, useRef } from "react";
-import { Map as MlMap, Marker, NavigationControl, Popup, type GeoJSONSource, type ImageSource, type MapMouseEvent } from "maplibre-gl";
+import { Map as MlMap, Marker, NavigationControl, Popup, setWorkerUrl, type GeoJSONSource, type ImageSource, type MapMouseEvent } from "maplibre-gl";
+// MapLibre finds its worker next to its own file, which a production build bundles away: hand it
+// the worker as Vite builds it.
+import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
 import { buildingHeightM } from "../sim/buildingGeometry";
@@ -58,6 +61,7 @@ import {
   TUNNEL_COLOR,
 } from "./colorModes";
 
+setWorkerUrl(mapWorkerUrl);
 const BASEMAP_STYLE_URL = "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.basemap.vt/style.json";
 
 const POLY_SOURCE_ID = "buildings-polygons";

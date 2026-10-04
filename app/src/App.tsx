@@ -22,7 +22,7 @@ import { WikiPanel } from "./ui/WikiPanel";
 import { GameMenu } from "./ui/GameMenu";
 import { applySave, captureSave, stateJson, type SaveFile } from "./sim/saveGame";
 import { AUTOSAVE_ID, putSave } from "./sim/saveStore";
-import { loadDataset } from "./data/loadDataset";
+import { dataUrl, loadDataset } from "./data/loadDataset";
 import type { MunicipalityDataset } from "./data/types";
 import type { ColorMode } from "./map/colorModes";
 import { simClock } from "./sim/engine";
@@ -142,7 +142,7 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
   useEffect(() => {
     // Set up once: React may run this effect twice (StrictMode), and the modules are singletons.
     let cancelled = false;
-    loadDataset(`/data/${slug}.json`)
+    loadDataset(dataUrl(`${slug}.json`))
       .then((loaded) => {
         if (cancelled) return;
         loadPar(slug, difficulty); // what doing nothing scores here, if computed
