@@ -62,6 +62,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Click any building to look inside: what heats it, what it draws right now, what its occupants pay, and what has changed over the years. Click a home in it to go down to single appliances.",
       ),
       p(
+        "A new game opens with a short briefing — the goal, how you stay in office, what you control — and a checklist of first steps in the corner, each with a button that takes you there. Close it once you know your way around; the game menu brings it back.",
+      ),
+      p(
         "The bar across the top shows the date and the speed, and the three numbers that matter most: the treasury, public approval, and last year's emissions against the first year's. On the left of the map are its layers (see \"Map layers\"). Everything that isn't on the map — measures, the accounts, prices and statistics — is in the Town hall, top right. The game pauses while the Town hall or this wiki is open, and carries on at the same speed when you close them.",
       ),
       note(

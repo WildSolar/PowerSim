@@ -1,0 +1,302 @@
+/* Onboarding: the welcome briefing at the start of a game, and the getting-started checklist. */
+
+.ob-layer {
+  position: absolute;
+  top: var(--top-bar-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 14;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.ob-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--backdrop);
+}
+
+.ob-dialog {
+  position: relative;
+  width: min(600px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 28px 30px 22px;
+  border-radius: var(--r-3);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-2), inset 0 4px 0 var(--accent);
+  font-family: var(--font);
+}
+
+.ob-kicker {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.ob-dialog h1 {
+  margin: 8px 0 10px;
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+
+.ob-lead {
+  margin: 0 0 18px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.ob-points {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 22px;
+  margin: 0 0 22px;
+}
+
+.ob-points div {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.ob-points dt {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.ob-points dd {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.ob-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.ob-primary,
+.ob-secondary {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: var(--r-2);
+  cursor: pointer;
+}
+
+.ob-primary {
+  border: none;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.ob-secondary {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.ob-note {
+  flex-basis: 100%;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+@media (max-width: 560px) {
+  .ob-points {
+    grid-template-columns: 1fr;
+  }
+  .ob-dialog {
+    padding: 22px 18px 18px;
+  }
+  .ob-dialog h1 {
+    font-size: 23px;
+  }
+}
+
+/* --- the checklist --- */
+
+.ob-card,
+.ob-pill {
+  position: absolute;
+  right: 12px;
+  bottom: 64px; /* above the inbox's notices, centred at the bottom */
+  z-index: 4;
+  font-family: var(--font);
+  color: var(--ink);
+}
+
+.ob-card.beside-panel,
+.ob-pill.beside-panel {
+  right: 364px;
+}
+
+.ob-card {
+  width: 290px;
+  max-height: calc(100% - 90px);
+  overflow-y: auto;
+  padding: 12px 14px 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-1);
+}
+
+.ob-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ob-card-title {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.ob-card-count {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.ob-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--r-2);
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.ob-icon:hover {
+  background: var(--fill);
+  color: var(--ink);
+}
+
+.ob-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ob-steps li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.ob-steps li.next {
+  color: var(--ink);
+}
+
+.ob-steps li.done .ob-step-title {
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-4);
+}
+
+.ob-check {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 50%;
+}
+
+.ob-steps li.next .ob-check {
+  border-color: var(--accent);
+}
+
+.ob-steps li.done .ob-check {
+  border-color: var(--good);
+  background: var(--good);
+  color: var(--surface);
+}
+
+.ob-step-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.ob-step-title {
+  font-weight: 600;
+}
+
+.ob-step-hint {
+  color: var(--ink-2);
+  line-height: 1.45;
+}
+
+.ob-step-action {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border: none;
+  border-radius: var(--r-2);
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+}
+
+.ob-card-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0 2px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.ob-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .ob-card.beside-panel,
+  .ob-pill.beside-panel {
+    display: none;
+  }
+}

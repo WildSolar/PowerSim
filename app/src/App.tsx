@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
 import { TownHall, type TownHallSection } from "./ui/TownHall";
+import { GuideCard, WelcomeBriefing, guide, type GuideStep } from "./ui/Onboarding";
+import { mapFocus } from "./map/mapFocus";
+import { currentHeatingSystemId } from "./sim/heatingRenewal";
+import { DEFAULT_RUNNING_SPEED, PAUSE_SPEED, setSpeed } from "./sim/timeControls";
 import { TariffDeadlineDialog, useTariffDeadline } from "./ui/TariffDeadlineDialog";
 import { tariffDeadline } from "./sim/tariffDeadline";
 import { DwellingPanel } from "./ui/DwellingPanel";
@@ -91,6 +95,8 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
   const [showWiki, setShowWiki] = useState(false);
   const [inboxSelection, setInboxSelection] = useState<InboxSelection | null>(null);
   const [showMenu, setShowMenu] = useState(false);
+  // A new game opens with the briefing (a loaded one doesn't).
+  const [showBriefing, setShowBriefing] = useState(!restore);
   // The run's end: 2050's Year in Review closed (`finished`), or approval ended it.
   const [finished, setFinished] = useState(false);
   const gameOver = useSyncExternalStore(
@@ -100,6 +106,38 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
   const reportCardYear = useReportCardYear();
   const stockBuildings = useStockBuildings();
   const keyboardEnabled = !showTownHall && !showWiki && !showMenu && inboxSelection === null && reportCardYear === null;
+  useEffect(() => {
+    if (selectedEgid !== null) guide.saw("building");
+  }, [selectedEgid]);
+  useEffect(() => {
+    if (colorMode === "heating") guide.saw("heating");
+  }, [colorMode]);
+
+  // The guide's "show me" buttons.
+  const guideAction = (step: GuideStep) => {
+    if (step === "building") {
+      // A block of flats still on oil, near the middle of town.
+      const now = simClock.getSimTimeMs();
+      const all = stock.getAll();
+      const lon = all.reduce((s, b) => s + b.lon, 0) / Math.max(1, all.length);
+      const lat = all.reduce((s, b) => s + b.lat, 0) / Math.max(1, all.length);
+      const pick = all
+        .filter((b) => b.dwellings.length >= 4 && b.footprint && currentHeatingSystemId(b, now) === "oilBoiler")
+        .sort((a, b) => Math.hypot(a.lon - lon, a.lat - lat) - Math.hypot(b.lon - lon, b.lat - lat))[0];
+      if (pick) {
+        setSelectedEgid(pick.egid);
+        setSelectedEwid(null);
+        mapFocus.focusBuilding(pick, 17);
+      }
+    } else if (step === "heating") setColorMode("heating");
+    else if (step === "measure") setTownHall("measures");
+    else if (step === "tariff") setTownHall("prices");
+    else if (step === "year") {
+      setTownHall(null);
+      if (simClock.getSpeed() === PAUSE_SPEED) setSpeed(DEFAULT_RUNNING_SPEED);
+    }
+  };
+
   // Time keys work over the windows too (the inbox, the town hall, the wiki), but not over the
   // Year in Review or the tariff deadline, which hold the game where it is.
   const tariffDue = useTariffDeadline();
@@ -328,6 +366,21 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
           onSelectBuilding={(egid) => {
             setSelectedEgid(egid);
             setSelectedEwid(null);
+          }}
+        />
+      )}
+      {dataset && !showBriefing && !gameOver && !finished && <GuideCard besidePanel={selectedEgid !== null} onAction={guideAction} />}
+      {showBriefing && dataset && !gameOver && (
+        <WelcomeBriefing
+          town={dataset.name}
+          onStart={() => {
+            guide.start();
+            setShowBriefing(false);
+          }}
+          onSkipGuide={() => {
+            guide.start();
+            guide.hide();
+            setShowBriefing(false);
           }}
         />
       )}

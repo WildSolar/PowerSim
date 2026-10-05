@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { guide } from "./Onboarding";
 import { Check, Copy, Download, Save, X } from "lucide-react";
 import { simClock } from "../sim/engine";
 import { captureSave, GAME_VERSION, saveToString, type RunInfo } from "../sim/saveGame";
@@ -114,6 +115,20 @@ export function GameMenu({ run, onClose, onMainMenu }: { run: RunInfo; onClose: 
               ))}
             </ul>
           )}
+        </section>
+
+        <section className="gm-section">
+          <h2>Getting started</h2>
+          <p className="gm-note">The briefing's checklist of first steps, if you closed it.</p>
+          <button
+            className="gm-secondary"
+            onClick={() => {
+              guide.show();
+              onClose();
+            }}
+          >
+            Show the guide
+          </button>
         </section>
 
         <section className="gm-section">

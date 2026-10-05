@@ -50,6 +50,7 @@ export const CHANGELOG: Release[] = [
       "In the grid layer, areas with a bigger station or a battery on the way are marked in the list of the most loaded.",
       "Transformer areas follow the streets: each building hangs off the station nearest by road, and the map outlines the areas around their buildings.",
       "Mark every letter and paper as read; the approval figure counts down to the next election.",
+      "A briefing at the start of every new game, and a getting-started checklist that walks you through the first steps (it can be brought back from the game menu).",
       "Energy markets: heating oil, gas, petrol and wholesale power follow world prices, including the CO₂ levy, with the odd supply crisis sending them soaring.",
       "A dynamic tariff households can choose: its price follows the grid's expected load through the day. Cars on it charge in the cheapest night hours, heat pumps run ahead of the evening peak, and some washing machines wait for a cheap hour.",
     ],
