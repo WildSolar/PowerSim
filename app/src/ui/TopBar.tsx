@@ -1,6 +1,7 @@
 import { useSyncExternalStore, type ReactNode } from "react";
 import {
   BookOpen,
+  MessageSquare,
   Cloud,
   CloudMoon,
   CloudRain,
@@ -146,7 +147,7 @@ function TreasuryKpi({ dataset, onOpen }: { dataset: MunicipalityDataset; onOpen
 function electionIn(months: number): string {
   if (months <= 0) return "this month";
   if (months === 1) return "next month";
-  return `in ${months} months`;
+  return `in ${months} mo`;
 }
 
 function ApprovalKpi() {
@@ -170,8 +171,10 @@ function ApprovalKpi() {
       tone={current >= 60 ? "good" : current < 40 ? "bad" : undefined}
       sub={
         <>
-          <span className={delta < -1 ? "bad" : delta > 1 ? "good" : undefined}>{trend}</span>
-          {election !== null && <span className={monthsToElection <= 6 ? "warn" : undefined}> · election {electionIn(monthsToElection)}</span>}
+          {/* Steady goes without saying when there's an election to count down to. */}
+          {(trend !== "steady" || election === null) && <span className={delta < -1 ? "bad" : delta > 1 ? "good" : undefined}>{trend}</span>}
+          {trend !== "steady" && election !== null && " · "}
+          {election !== null && <span className={monthsToElection <= 6 ? "warn" : undefined}>election {electionIn(monthsToElection)}</span>}
         </>
       }
       title={`Public approval of the municipality's energy policy; below 50% on election day, or below 25% for six months, ends the game.${election !== null ? `\nNext election: ${formatDate(election).replace(/^\w+, \d+ /, "")}` : ""}`}
@@ -231,12 +234,13 @@ export interface TopBarProps {
   onOpenTownHall: () => void;
   onOpenInbox: () => void;
   onOpenWiki: () => void;
+  onFeedback: () => void;
   onMenu: () => void;
 }
 
 /** The strip across the top: time and speed, the three numbers that matter, and the way
  * into the town hall, the inbox, the wiki and the menu. */
-export function TopBar({ dataset, onOpenTreasury, onOpenTownHall, onOpenInbox, onOpenWiki, onMenu }: TopBarProps) {
+export function TopBar({ dataset, onOpenTreasury, onOpenTownHall, onOpenInbox, onOpenWiki, onMenu, onFeedback }: TopBarProps) {
   return (
     <header className="top-bar">
       <div className="tb-brand">
@@ -252,6 +256,10 @@ export function TopBar({ dataset, onOpenTreasury, onOpenTownHall, onOpenInbox, o
       </div>
       <div className="tb-actions">
         <InboxButton onOpen={onOpenInbox} />
+        <button className="tb-icon-button" onClick={onFeedback} title="Send feedback: what broke, what was unclear, what you think">
+          <MessageSquare size={17} strokeWidth={1.75} aria-hidden />
+          <span>Feedback</span>
+        </button>
         <button className="tb-icon-button" onClick={onOpenWiki} title="Wiki: how the simulation works">
           <BookOpen size={17} strokeWidth={1.75} aria-hidden />
           <span>Wiki</span>

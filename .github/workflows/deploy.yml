@@ -1,7 +1,8 @@
 # Builds the game and publishes it on GitHub Pages (https://<owner>.github.io/<repository>/).
 # Run by hand: Actions → "Deploy to GitHub Pages" → Run workflow. Needs Pages enabled once, with
 # "GitHub Actions" as its source (Settings → Pages). Only the municipalities listed in
-# app/public/data/index.json ship (vite.config.ts).
+# app/public/data/index.json ship (vite.config.ts). The Feedback button's address comes from the
+# repository variable FEEDBACK_EMAIL.
 name: Deploy to GitHub Pages
 
 on:
@@ -33,6 +34,9 @@ jobs:
       - run: npm run build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
+          # Where the Feedback button's email goes: the repository variable FEEDBACK_EMAIL
+          # (Settings → Secrets and variables → Actions → Variables). Without it, players copy the report.
+          VITE_FEEDBACK_EMAIL: ${{ vars.FEEDBACK_EMAIL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist

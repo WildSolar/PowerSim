@@ -231,7 +231,8 @@
   overflow: hidden;
 }
 
-@media (max-width: 1180px) {
+/* Room for the four figures: the buttons lose their words (their tooltips stay), then the weather. */
+@media (max-width: 1560px) {
   .tb-weather,
   .tb-icon-button span:not(.inbox-badge) {
     display: none;
@@ -241,12 +242,21 @@
   }
 }
 
-@media (max-width: 1000px) {
+@media (max-width: 1180px) {
   .kpi-sub {
     display: none;
   }
+}
+
+@media (max-width: 1000px) {
+  .tb-day {
+    display: none;
+  }
+  .tb-town-hall span {
+    display: none;
+  }
   .kpi {
-    padding: 0 10px;
+    padding: 0 7px;
   }
   .tb-clock {
     gap: 10px;

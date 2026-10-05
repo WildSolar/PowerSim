@@ -6,6 +6,8 @@
  * loop just advances simTime by realDelta * 0.
  */
 
+import { crashes, setCrashPause } from "./crash";
+
 const DEFAULT_MULTIPLIER = 3600; // "Medium": 1 real second = 1 simulated hour (see timeControls.ts)
 
 // A generous but hard ceiling on simulated time, well inside JS's own Date
@@ -34,7 +36,7 @@ export class SimClock {
       if (this.lastFrameTime !== null) {
         const realDeltaMs = now - this.lastFrameTime;
         this.simTimeMs = Math.min(this.simTimeMs + realDeltaMs * this.multiplier, MAX_SIM_TIME_MS);
-        this.listeners.forEach((listener) => listener());
+        this.notify();
       }
       this.lastFrameTime = now;
       this.rafId = requestAnimationFrame(loop);
@@ -58,7 +60,7 @@ export class SimClock {
 
   setSpeed(multiplier: number): void {
     this.multiplier = multiplier;
-    this.listeners.forEach((listener) => listener());
+    this.notify();
   }
 
   /** Snaps to an exact instant and pauses there in one step — used by
@@ -68,7 +70,19 @@ export class SimClock {
   pauseAt(simTimeMs: number): void {
     this.simTimeMs = Math.min(simTimeMs, MAX_SIM_TIME_MS);
     this.multiplier = 0;
-    this.listeners.forEach((listener) => listener());
+    this.notify();
+  }
+
+  /** Tells every listener the time moved. One that throws doesn't take the loop (and the game)
+   * down with it: the error goes to crash.ts, which pauses the game and offers to save it. */
+  private notify(): void {
+    for (const listener of this.listeners) {
+      try {
+        listener();
+      } catch (e) {
+        crashes.report(e, "simulation");
+      }
+    }
   }
 
   subscribe(listener: () => void): () => void {
@@ -78,3 +92,4 @@ export class SimClock {
 }
 
 export const simClock = new SimClock();
+setCrashPause(() => simClock.setSpeed(0));

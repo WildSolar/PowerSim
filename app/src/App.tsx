@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { crashes } from "./sim/crash";
+import { FeedbackDialog } from "./ui/FeedbackDialog";
+import { CrashBoundary, CrashScreen } from "./ui/CrashScreen";
 import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
 import { TownHall, type TownHallSection } from "./ui/TownHall";
@@ -95,6 +98,7 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
   const [showWiki, setShowWiki] = useState(false);
   const [inboxSelection, setInboxSelection] = useState<InboxSelection | null>(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   // A new game opens with the briefing (a loaded one doesn't).
   const [showBriefing, setShowBriefing] = useState(!restore);
   // The run's end: 2050's Year in Review closed (`finished`), or approval ended it.
@@ -225,6 +229,7 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
           if (import.meta.env.DEV) Object.assign(window, { __stateAfterLoad: stateJson(transparency) });
         }
         tariffDeadline.init(); // after a load, so it watches from the saved moment on
+        crashes.setRun({ slug, municipality: loaded.name, difficulty, transparency }); // for the crash screen and reports
         setDataset(loaded);
       })
       .catch((e: Error) => setError(e.message));
@@ -297,6 +302,7 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
         onOpenInbox={() => setInboxSelection((open) => (open ? null : { tab: "letters", id: null }))}
         onOpenWiki={() => setShowWiki((open) => !open)}
         onMenu={() => setShowMenu((open) => !open)}
+        onFeedback={() => setShowFeedback(true)}
       />
       <div className="stage">
         <MapView
@@ -357,7 +363,15 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
       )}
       {showWiki && <WikiPanel onClose={() => setShowWiki(false)} />}
       {showMenu && (
-        <GameMenu run={{ slug, municipality: dataset.name, difficulty, transparency }} onClose={() => setShowMenu(false)} onMainMenu={returnToMenu} />
+        <GameMenu
+          run={{ slug, municipality: dataset.name, difficulty, transparency }}
+          onClose={() => setShowMenu(false)}
+          onMainMenu={returnToMenu}
+          onFeedback={() => {
+            setShowMenu(false);
+            setShowFeedback(true);
+          }}
+        />
       )}
       {inboxSelection && (
         <InboxPanel
@@ -369,6 +383,7 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
           }}
         />
       )}
+      {showFeedback && <FeedbackDialog onClose={() => setShowFeedback(false)} />}
       {dataset && !showBriefing && !gameOver && !finished && <GuideCard besidePanel={selectedEgid !== null} onAction={guideAction} />}
       {showBriefing && dataset && !gameOver && (
         <WelcomeBriefing
@@ -397,7 +412,12 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
 export default function App() {
   const [choice, setChoice] = useState<{ slug: string; difficulty: Difficulty; transparency: boolean; restore?: SaveFile } | null>(null);
   return choice ? (
-    <Game slug={choice.slug} difficulty={choice.difficulty} transparency={choice.transparency} restore={choice.restore} />
+    <>
+      <CrashBoundary>
+        <Game slug={choice.slug} difficulty={choice.difficulty} transparency={choice.transparency} restore={choice.restore} />
+      </CrashBoundary>
+      <CrashScreen />
+    </>
   ) : (
     <StartMenu
       onStart={(slug, difficulty, transparency, restore) => {

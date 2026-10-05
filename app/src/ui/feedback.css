@@ -1,0 +1,238 @@
+/* The feedback dialog, and the crash screen. */
+
+.fb-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  font-family: var(--font);
+}
+
+.fb-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--backdrop);
+}
+
+.fb-dialog {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 20px 22px 18px;
+  border-radius: var(--r-3);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-2);
+}
+
+.fb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.fb-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+}
+
+.fb-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.fb-note {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.fb-bad {
+  color: var(--bad);
+}
+
+.fb-label {
+  display: block;
+  margin: 10px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fb-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.fb-text {
+  resize: vertical;
+}
+
+.fb-report {
+  font-family: ui-monospace, "Cascadia Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.fb-check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 12px 0 4px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.fb-check input {
+  margin-top: 2px;
+}
+
+.fb-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.fb-primary,
+.fb-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: var(--r-2);
+  cursor: pointer;
+}
+
+.fb-primary {
+  border: none;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.fb-primary:disabled {
+  background: var(--fill-2);
+  color: var(--ink-3);
+  cursor: default;
+}
+
+.fb-secondary {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.fb-link {
+  border: none;
+  background: none;
+  padding: 4px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* --- the crash screen --- */
+
+.crash-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--backdrop);
+  font-family: var(--font);
+}
+
+.crash-dialog {
+  width: min(540px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 24px 26px 20px;
+  border-radius: var(--r-3);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-2), inset 0 4px 0 var(--bad);
+}
+
+.crash-kicker {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bad);
+}
+
+.crash-dialog h1 {
+  margin: 6px 0 8px;
+  font-family: var(--font-display);
+  font-size: 24px;
+}
+
+.crash-dialog > p {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.crash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.crash-note {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  color: var(--good);
+}
+
+.crash-details {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.crash-details pre {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  max-height: 160px;
+  overflow: auto;
+  border-radius: var(--r-2);
+  background: var(--fill);
+  color: var(--ink-2);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

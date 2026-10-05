@@ -13,7 +13,7 @@ import "./gameMenu.css";
 
 /** The game menu (☰ in the top bar): save the run in this browser, as a save string, or leave.
  * The game pauses while it is open. */
-export function GameMenu({ run, onClose, onMainMenu }: { run: RunInfo; onClose: () => void; onMainMenu: () => void }) {
+export function GameMenu({ run, onClose, onMainMenu, onFeedback }: { run: RunInfo; onClose: () => void; onMainMenu: () => void; onFeedback: () => void }) {
   usePauseWhileOpen();
   const [name, setName] = useState(() => `${run.municipality}, ${formatDate(simClock.getSimTimeMs())}`);
   const [saves, setSaves] = useState<StoredSave[] | null>(null);
@@ -115,6 +115,14 @@ export function GameMenu({ run, onClose, onMainMenu }: { run: RunInfo; onClose: 
               ))}
             </ul>
           )}
+        </section>
+
+        <section className="gm-section">
+          <h2>Feedback</h2>
+          <p className="gm-note">Something broke, something was unclear, an idea? Your game can go along, so we see what you saw.</p>
+          <button className="gm-secondary" onClick={onFeedback}>
+            Send feedback
+          </button>
         </section>
 
         <section className="gm-section">
