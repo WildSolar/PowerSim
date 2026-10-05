@@ -21,6 +21,7 @@
  * none needs booking at a public charger.
  */
 
+import { RESIDENTS_PER_DWELLING } from "../config/treasury";
 import type { Building, MunicipalityDataset } from "../data/types";
 import {
   DEPOT_CHARGER_COST_RP,
@@ -28,8 +29,8 @@ import {
   DEPOT_SHARE_BY_CLASS,
   DEPOT_SHARE_OTHER,
   DEPOT_SHARE_TRUCK_MIN,
-  FALLBACK_GOODS_VEHICLES,
-  FALLBACK_GOODS_VEHICLES_ELECTRIC,
+  FALLBACK_GOODS_VEHICLES_PER_RESIDENT,
+  FALLBACK_GOODS_ELECTRIC_SHARE,
   FLEET_BIAS_FRACTION,
   FLEET_CATALOG,
   FLEET_CHOICES,
@@ -182,8 +183,9 @@ class Fleets {
     this.byEgid = new Map();
     this.lookupBuilding = lookupBuilding;
     const register = dataset.vehicleRegister;
-    const total = register?.goodsVehicles ?? FALLBACK_GOODS_VEHICLES;
-    const electric = register?.goodsVehiclesElectric ?? FALLBACK_GOODS_VEHICLES_ELECTRIC;
+    const residents = dataset.buildings.reduce((sum, b) => sum + b.dwellings.length, 0) * RESIDENTS_PER_DWELLING;
+    const total = register?.goodsVehicles ?? Math.round(residents * FALLBACK_GOODS_VEHICLES_PER_RESIDENT);
+    const electric = register?.goodsVehiclesElectric ?? Math.round(total * FALLBACK_GOODS_ELECTRIC_SHARE);
     const expected = dataset.buildings.reduce((sum, b) => sum + expectedVehicles(b), 0);
     this.scale = expected > 0 ? total / expected : 0;
 

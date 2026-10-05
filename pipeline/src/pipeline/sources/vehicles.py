@@ -5,6 +5,10 @@ doesn't split them per municipality), each with how many are fully electric.
 
 Vehicles count where their holder is registered, so a business registered here with its lorries
 parked elsewhere counts here — the closest per-municipality figure there is.
+
+As of October 2026 BFS no longer serves this table through its px-web API (it is gone from the
+table list), so new datasets come without the register and the game falls back to the Swiss
+average per resident (app/src/config/fleet.ts). Find where BFS publishes it now before relying on it.
 """
 
 from __future__ import annotations

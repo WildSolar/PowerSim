@@ -489,7 +489,7 @@ function gridZonesGeoJSON(simTimeMs: number) {
 function heatUseGeoJSON() {
   const features: object[] = [];
   for (const z of heatPumpSiting.getZones()) {
-    const bucket = z.zone === "A" ? "noGround" : z.zone === "B" || z.noBoreholes ? "noBoreholes" : z.zone === "C" || z.zone === "E" ? "conditions" : null;
+    const bucket = z.zone === "A" ? "noGround" : z.zone === "B" || z.noBoreholes ? "noBoreholes" : z.zone === "D" || z.zone === "F" ? null : "conditions"; // C, E, G and any zone not known yet
     if (!bucket) continue;
     features.push({
       type: "Feature",
@@ -708,9 +708,11 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const buildings = dataset.buildings;
-    const center: [number, number] =
-      buildings.length > 0 ? [buildings[0].lon, buildings[0].lat] : [8.4479, 47.3967];
+    // Start over the middle of town: the median position of its homes (a mean or the first
+    // building could land on an outlying farm or an empty field).
+    const homes = dataset.buildings.filter((b) => b.dwellings.length > 0);
+    const median = (values: number[]) => values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
+    const center: [number, number] = homes.length > 0 ? [median(homes.map((b) => b.lon)), median(homes.map((b) => b.lat))] : [8.4479, 47.3967];
 
     const map = new MlMap({
       container: containerRef.current,

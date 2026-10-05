@@ -764,7 +764,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Businesses' vans & lorries",
     blocks: [
       p(
-        "Businesses run vans and lorries too. How many are registered in the town, and how many are electric, comes from the federal vehicle register; they are spread over the buildings by floor area and use — warehouses, industry and workshops get the most, shops fewer, offices few. About one in eight is a lorry. A building's panel lists its vans and lorries, and where the electric ones charge.",
+        "Businesses run vans and lorries too. How many are registered in the town, and how many are electric, comes from the federal vehicle register where it is available (otherwise the Swiss average for a town of its size); they are spread over the buildings by floor area and use — warehouses, industry and workshops get the most, shops fewer, offices few. About one in eight is a lorry. A building's panel lists its vans and lorries, and where the electric ones charge.",
       ),
       p(
         "Each vehicle lasts about ten years and is replaced by the same kind of decision as a household's car, only more businesslike. An electric van costs more to buy but far less to run, above all when it charges overnight in its own yard at the night rate — once a charger is installed: a wallbox for a van (about CHF 3,000), a high-power charger and usually a stronger connection for a lorry (about CHF 80,000). Most vehicles at industry and warehouses have a yard, fewer at shops and offices. Without one, a business needs a public charger with room — a van on-street, at a hub or a lorry park, a lorry only at a hub or a lorry park.",

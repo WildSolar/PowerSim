@@ -28,7 +28,7 @@ export const CHANGELOG: Release[] = [
     summary:
       "Run the energy department of a real Swiss municipality and take it to net zero by 2050 — with its real buildings, its grid and its voters.",
     added: [
-      "A real municipality to govern — Schlieren, in canton Zurich — built from open data: every building from the federal building register, with its homes, age and heating; the registered solar panels, public chargers, cars and vans; the zoning plan; the streets.",
+      "Six real municipalities in canton Zurich to govern — Bonstetten, Regensdorf, Schlieren, Uster, Wädenswil and Wetzikon — built from open data: every building from the federal building register, with its homes, age and heating; the registered solar panels, public chargers, cars and vans; the zoning plan; the streets.",
       "A live town: households heat, cook, charge and commute; heating systems, cars and building envelopes wear out and are replaced; new buildings go up and old ones are rebuilt.",
       "Measures in four kinds — subsidies, infrastructure, information and laws — with lead times, running costs and public votes; the canton and the Confederation act on their own schedule.",
       "Public approval behind which five groups feel differently, with votes, elections and recall.",

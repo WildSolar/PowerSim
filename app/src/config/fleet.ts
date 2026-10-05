@@ -37,10 +37,11 @@ export const FLEET_CHOICES: Record<FleetVehicleClass, FleetVehicleId[]> = {
 export const LSVA_RP_PER_KM = 41;
 export const LSVA_EV_EXEMPT_THROUGH_YEAR = 2030;
 
-// Fallbacks for a dataset without the vehicle register: Schlieren, 2024 (BFS px-x-1103020100_111,
-// Sachentransportfahrzeuge, Gemeinde 247) — 1,908 goods vehicles, 143 of them electric.
-export const FALLBACK_GOODS_VEHICLES = 1908;
-export const FALLBACK_GOODS_VEHICLES_ELECTRIC = 143;
+// Fallbacks for a dataset without the vehicle register (BFS withdrew the per-municipality table,
+// px-x-1103020100_111, from its API in 2026): the Swiss average, about 0.05 goods vehicles per
+// resident (some 430,000 in 2024), 4% of them electric. A town with much industry has more.
+export const FALLBACK_GOODS_VEHICLES_PER_RESIDENT = 0.05;
+export const FALLBACK_GOODS_ELECTRIC_SHARE = 0.04;
 
 // Goods vehicles in Switzerland are about 87% vans, 13% lorries and articulated lorries (BFS vehicle
 // stock); electric lorries are still rare — most of the electric goods vehicles are vans.

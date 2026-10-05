@@ -19,9 +19,14 @@ from shapely.ops import polygonize, unary_union
 
 from .. import coords
 
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+# The main Overpass instance, then a public mirror when the main one stays busy.
+OVERPASS_URLS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"]
 # Overpass answers 406 to requests without an identifying User-Agent.
 HEADERS = {"User-Agent": "commune-zero-pipeline/0.1 (offline data preparation)"}
+
+# Query tiles of about 2 km (at Swiss latitudes).
+TILE_DEG_LON = 0.027
+TILE_DEG_LAT = 0.018
 
 LEISURE = "pitch|sports_centre|stadium|track|playground|park|garden|golf_course|recreation_ground|dog_park|nature_reserve|swimming_pool|fitness_station"
 LANDUSE = "cemetery|recreation_ground|allotments|village_green"
@@ -44,9 +49,10 @@ out geom;"""
 
 def _post(query: str) -> list[dict]:
     last_error: Exception | None = None
-    for attempt in range(4):
+    for attempt in range(6):
+        url = OVERPASS_URLS[attempt % len(OVERPASS_URLS)]
         try:
-            response = requests.post(OVERPASS_URL, data={"data": query}, headers=HEADERS, timeout=120)
+            response = requests.post(url, data={"data": query}, headers=HEADERS, timeout=120)
             if response.status_code in (429, 502, 503, 504):
                 raise requests.HTTPError(f"Overpass busy ({response.status_code})")
             response.raise_for_status()
@@ -69,8 +75,21 @@ def _way_polygon(points: list[dict]) -> Polygon | None:
 
 def fetch_excluded_areas(min_lon: float, min_lat: float, max_lon: float, max_lat: float) -> list:
     """Polygons (LV95) of every park/sports/cemetery/allotment area in the bbox."""
+    # A big town in one query times out on a busy server: ask tile by tile (about 2 km square),
+    # each area once even if it crosses tiles.
+    tiles_x = max(1, round((max_lon - min_lon) / TILE_DEG_LON))
+    tiles_y = max(1, round((max_lat - min_lat) / TILE_DEG_LAT))
+    elements: dict[tuple[str, int], dict] = {}
+    for i in range(tiles_x):
+        for j in range(tiles_y):
+            west = min_lon + (max_lon - min_lon) * i / tiles_x
+            east = min_lon + (max_lon - min_lon) * (i + 1) / tiles_x
+            south = min_lat + (max_lat - min_lat) * j / tiles_y
+            north = min_lat + (max_lat - min_lat) * (j + 1) / tiles_y
+            for element in _post(_query(south, west, north, east)):
+                elements[(element["type"], element["id"])] = element
     polygons = []
-    for element in _post(_query(min_lat, min_lon, max_lat, max_lon)):
+    for element in elements.values():
         if element["type"] == "way":
             polygon = _way_polygon(element.get("geometry", []))
             if polygon is not None:

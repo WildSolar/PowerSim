@@ -1,8 +1,38 @@
 [
   {
+    "slug": "bonstetten",
+    "name": "Bonstetten",
+    "bfsNumber": 3,
+    "buildingCount": 1467
+  },
+  {
+    "slug": "regensdorf",
+    "name": "Regensdorf",
+    "bfsNumber": 96,
+    "buildingCount": 3170
+  },
+  {
     "slug": "schlieren",
     "name": "Schlieren",
     "bfsNumber": 247,
     "buildingCount": 2076
+  },
+  {
+    "slug": "uster",
+    "name": "Uster",
+    "bfsNumber": 198,
+    "buildingCount": 7375
+  },
+  {
+    "slug": "wetzikon-zh",
+    "name": "Wetzikon (ZH)",
+    "bfsNumber": 121,
+    "buildingCount": 5069
+  },
+  {
+    "slug": "wadenswil",
+    "name": "Wädenswil",
+    "bfsNumber": 293,
+    "buildingCount": 6166
   }
 ]

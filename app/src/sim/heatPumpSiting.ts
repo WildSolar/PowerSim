@@ -24,7 +24,7 @@ import {
   AIR_UNIT_SOUND_POWER_DB_AT_8KW,
   ATTACHED_GAP_M,
   BOREHOLE_CONDITIONS_COST_FACTOR,
-  GROUND_RULES,
+  groundRule,
   GROUNDWATER_COST_FACTOR,
   GROUNDWATER_FEE_CHF_PER_KW_YEAR,
   NIGHT_PLANNING_VALUE_DB,
@@ -135,7 +135,7 @@ class HeatPumpSiting {
     // Groundwater depends on how big the system is, which changes with insulation work.
     const zoneInfo = this.zoneOf(b);
     const zone = zoneInfo?.zone ?? "F";
-    const rule = GROUND_RULES[zone];
+    const rule = groundRule(zone);
     const kw = designHeatLoadKw(b, atMs);
     if (rule.groundwaterFromKw !== null && kw >= rule.groundwaterFromKw) {
       return { kind: "groundwater", zone, costFactor: GROUNDWATER_COST_FACTOR, annualFeeRp: kw * GROUNDWATER_FEE_CHF_PER_KW_YEAR * 100 };
@@ -147,7 +147,7 @@ class HeatPumpSiting {
   private computeGround(b: Building): GroundSource | null {
     const zoneInfo = this.zoneOf(b);
     const zone = zoneInfo?.zone ?? null;
-    const rule = GROUND_RULES[zone ?? "F"];
+    const rule = groundRule(zone ?? "F");
     const p = this.projection.toXY(b.lon, b.lat);
     const boreholes = rule.boreholes && !zoneInfo?.noBoreholes && !this.nearTunnel(b);
     if (!boreholes) return null;

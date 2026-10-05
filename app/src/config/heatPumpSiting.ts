@@ -3,7 +3,7 @@
 // AWEL's planning guide; the federal Noise Abatement Ordinance (LSV, Annex 6) as applied by the
 // Cercle Bruit guidance 6.21 (Nov 2024). Costs and sound powers are informed placeholders.
 
-export type HeatUseZone = "A" | "B" | "C" | "D" | "E" | "F";
+export type HeatUseZone = "A" | "B" | "C" | "D" | "E" | "F" | "G";
 
 export interface GroundRule {
   /** Boreholes (Erdwärmesonden) allowed. */
@@ -24,7 +24,15 @@ export const GROUND_RULES: Record<HeatUseZone, GroundRule> = {
   D: { boreholes: true, boreholeConditions: false, groundwaterFromKw: 65 },
   E: { boreholes: true, boreholeConditions: true, groundwaterFromKw: 190 }, // spring water
   F: { boreholes: true, boreholeConditions: false, groundwaterFromKw: null }, // no usable groundwater
+  // Zone G came with the atlas's 2026 update; its meaning isn't published with the open data. Until it
+  // is: boreholes with conditions, no groundwater heat. Any other unknown zone is read the same way.
+  G: { boreholes: true, boreholeConditions: true, groundwaterFromKw: null },
 };
+
+/** The rule for a zone, cautious for one the game doesn't know. */
+export function groundRule(zone: string): GroundRule {
+  return GROUND_RULES[zone as HeatUseZone] ?? GROUND_RULES.G;
+}
 // Boreholes keep this far from tunnels and galleries.
 export const TUNNEL_CLEARANCE_M = 50;
 // Casing, a depth limit (so more, shallower boreholes), extra supervision.
