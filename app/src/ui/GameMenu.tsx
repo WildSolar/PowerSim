@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AboutPanel } from "./AboutPanel";
 import { guide } from "./Onboarding";
 import { Check, Copy, Download, Save, X } from "lucide-react";
 import { simClock } from "../sim/engine";
@@ -22,6 +23,7 @@ export function GameMenu({ run, onClose, onMainMenu, onFeedback }: { run: RunInf
   const [exported, setExported] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
 
   const refresh = () =>
     listSaves()
@@ -180,6 +182,10 @@ export function GameMenu({ run, onClose, onMainMenu, onFeedback }: { run: RunInf
             Version {VERSION_LABEL} · build {GAME_VERSION} ·{" "}
             <button className="gm-link" onClick={() => setShowChangelog(true)}>
               What's new
+            </button>{" "}
+            ·{" "}
+            <button className="gm-link" onClick={() => setShowAbout(true)}>
+              About & credits
             </button>
           </span>
           <button
@@ -193,6 +199,7 @@ export function GameMenu({ run, onClose, onMainMenu, onFeedback }: { run: RunInf
         </footer>
       </div>
       {showChangelog && <ChangelogPanel onClose={() => setShowChangelog(false)} />}
+      {showAbout && <AboutPanel onClose={() => setShowAbout(false)} />}
     </div>
   );
 }

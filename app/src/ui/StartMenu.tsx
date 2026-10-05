@@ -4,7 +4,10 @@ import { DEFAULT_DIFFICULTY, DIFFICULTY_ORDER, DIFFICULTY_SPECS, type Difficulty
 import { LoadGamePanel } from "./LoadGamePanel";
 import { ChangelogPanel, hasUnseenRelease } from "./ChangelogPanel";
 import { VERSION_LABEL } from "../changelog";
-import type { SaveFile } from "../sim/saveGame";
+import { isCompatible, openSave, type SaveFile } from "../sim/saveGame";
+import { listSaves, readSave, type StoredSave } from "../sim/saveStore";
+import { AboutPanel } from "./AboutPanel";
+import { savedAtLabel } from "./saveFiles";
 import "./StartMenu.css";
 
 // Case- and accent-insensitive, so "zur" finds Zürich.
@@ -28,6 +31,34 @@ export function StartMenu({ onStart }: Props) {
   const [tab, setTab] = useState<"new" | "load">("new");
   const [showChangelog, setShowChangelog] = useState(false);
   const [unseen, setUnseen] = useState(hasUnseenRelease);
+  const [showAbout, setShowAbout] = useState(false);
+  // The latest save this version can load, to carry on with in one click.
+  const [latest, setLatest] = useState<StoredSave | null>(null);
+  const [continueError, setContinueError] = useState<string | null>(null);
+  // Made for a laptop or desktop: say so on a small or touch-only screen.
+  const smallScreen = typeof window !== "undefined" && (window.innerWidth < 900 || window.matchMedia?.("(pointer: coarse)").matches);
+
+  useEffect(() => {
+    listSaves()
+      .then((saves) => {
+        const loadable = saves.filter((s) => isCompatible(s.meta)).sort((a, b) => b.meta.savedAt.localeCompare(a.meta.savedAt));
+        setLatest(loadable[0] ?? null);
+      })
+      .catch(() => setLatest(null));
+  }, []);
+
+  const continueLatest = async () => {
+    if (!latest) return;
+    setContinueError(null);
+    try {
+      const bytes = await readSave(latest.id);
+      if (!bytes) throw new Error("it has gone missing from the browser's storage");
+      const file = await openSave(bytes);
+      onStart(file.meta.slug, file.meta.difficulty, file.meta.transparency, file);
+    } catch (e) {
+      setContinueError(`Couldn't load it: ${(e as Error).message}`);
+    }
+  };
 
   useEffect(() => {
     loadMunicipalityIndex()
@@ -62,9 +93,26 @@ export function StartMenu({ onStart }: Props) {
           >
             What's new{unseen && <span className="start-menu-new">New</span>}
           </button>
+          <button onClick={() => setShowAbout(true)}>About & credits</button>
         </div>
+        {smallScreen && (
+          <p className="start-menu-small-screen">
+            Commune Zéro is made for a laptop or desktop screen with a mouse. On a phone or a small tablet, parts of it will be cramped.
+          </p>
+        )}
       </div>
       <div className="start-menu-card">
+        {latest && (
+          <div className="start-menu-continue">
+            <button className="start-menu-continue-button" onClick={continueLatest}>
+              <span className="start-menu-continue-label">Continue</span>
+              <span className="start-menu-continue-meta">
+                {latest.meta.municipality} · {latest.meta.dateLabel} · saved {savedAtLabel(latest.meta.savedAt)}
+              </span>
+            </button>
+            {continueError && <p className="start-menu-error">{continueError}</p>}
+          </div>
+        )}
         <div className="start-menu-tabs" role="tablist">
           <button role="tab" aria-selected={tab === "new"} className={tab === "new" ? "active" : ""} onClick={() => setTab("new")}>
             New game
@@ -130,6 +178,7 @@ export function StartMenu({ onStart }: Props) {
         )}
       </div>
       {showChangelog && <ChangelogPanel onClose={() => setShowChangelog(false)} />}
+      {showAbout && <AboutPanel onClose={() => setShowAbout(false)} />}
     </div>
   );
 }

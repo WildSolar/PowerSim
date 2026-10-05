@@ -175,3 +175,20 @@
     padding: 24px 16px 40px;
   }
 }
+
+/* About: what, then whose. */
+.about-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 0;
+}
+
+.about-list li::before {
+  content: none;
+}
+
+.about-list li span {
+  font-size: 13.5px;
+  color: var(--ink-2);
+}

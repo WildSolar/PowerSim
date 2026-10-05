@@ -84,7 +84,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "As a save string: the whole run as a block of text, to copy or download as a file and keep anywhere. Paste it, or open the file, under Load game on the start screen — on any device.",
       ]),
       p(
-        "Every time you close a Year in Review, the game also saves itself to an autosave, which the next one replaces.",
+        "Every time you close a Year in Review, the game also saves itself to an autosave, which the next one replaces. The start screen's Continue picks up the latest save in this browser in one click.",
       ),
       p(
         "If something in the game breaks, it pauses and offers to save your run — in this browser as “Before the crash”, and as a file — so you can reload and carry on from there. The Feedback button (top right, and in the game menu) sends a report: a few words of yours, where you were in the game, and, if you like, your save, so the problem can be seen exactly as you saw it.",

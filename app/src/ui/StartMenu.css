@@ -398,3 +398,49 @@
   text-transform: uppercase;
   text-decoration: none;
 }
+
+/* Carry on with the latest save in one click. */
+.start-menu-continue {
+  margin: -6px 0 20px;
+}
+
+.start-menu-continue-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-radius: var(--r-2);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.start-menu-continue-button:hover {
+  background: var(--accent-strong);
+}
+
+.start-menu-continue-label {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.start-menu-continue-meta {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.start-menu-small-screen {
+  max-width: 340px;
+  margin: 16px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink);
+}

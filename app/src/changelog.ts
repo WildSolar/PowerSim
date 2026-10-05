@@ -52,6 +52,7 @@ export const CHANGELOG: Release[] = [
       "Mark every letter and paper as read; the approval figure counts down to the next election.",
       "A briefing at the start of every new game, and a getting-started checklist that walks you through the first steps (it can be brought back from the game menu).",
       "If something breaks, the game pauses and offers to save your run before you reload. A Feedback button sends a report, with your save if you like.",
+      "Continue on the start screen picks up your latest save; About & credits names the open data and software the game is built on.",
       "Energy markets: heating oil, gas, petrol and wholesale power follow world prices, including the CO₂ levy, with the odd supply crisis sending them soaring.",
       "A dynamic tariff households can choose: its price follows the grid's expected load through the day. Cars on it charge in the cheapest night hours, heat pumps run ahead of the evening peak, and some washing machines wait for a cheap hour.",
     ],
