@@ -42,7 +42,7 @@ export const CHANGELOG: Release[] = [
       "Saving: in this browser, as an autosave each year, or as a save string to keep anywhere.",
       "A score: every year from the second on scores its cut in emissions per resident against the first, through 2050 — shown against par, what doing nothing would score.",
       "Winning and losing: reach net zero by 2050 to win; lose an election (below 50%) or a recall and the run ends. Either way, an end screen shows how it went.",
-      "Carbon removal contracts, to balance the emissions a town can't avoid — counting once its own emissions are down to a tenth of what they were.",
+      "Carbon removal contracts, to balance the emissions a town can't avoid — counting once its own emissions are down to a fifth of what they were.",
       "A yearly tariff: publish next year's electricity, feed-in, district heating and charging prices by the end of August — the game stops at the deadline to ask, if you haven't. People react to the change, and keep comparing your prices with the Swiss average.",
       "Vote results: the town clerk writes on the day, and the measure shows how the vote went. A measure the voters reject can't be put forward again for two years.",
       "Keys 1, 2 and 3 pick a speed; the time keys now work while the inbox, the Town hall or the wiki is open.",

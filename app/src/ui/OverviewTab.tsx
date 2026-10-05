@@ -64,7 +64,8 @@ export function OverviewTab({ dataset, onOpen }: { dataset: MunicipalityDataset;
   );
   useReportCardYear();
   const nowMs = useSimDay();
-  const { balanceRp, budgetRp } = useLiveTreasury(dataset);
+  const { balanceRp } = useLiveTreasury(dataset);
+  const allowanceRp = approval.spendingAllowanceRp(nowMs);
   const spentRp = treasury.operatingPaidOutTotal(nowMs - YEAR_MS, nowMs + DAY_MS);
 
   const year = new Date(toDateMs(nowMs)).getUTCFullYear();
@@ -88,8 +89,8 @@ export function OverviewTab({ dataset, onOpen }: { dataset: MunicipalityDataset;
     <div className="overview">
       <div className="ov-figures">
         <Figure label="Treasury" value={balanceRp === null ? "…" : millions(balanceRp)} onClick={() => onOpen("treasury")}>
-          Running spending in the last 12 months <strong className={spentRp > budgetRp ? "bad" : undefined}>{formatCHF(spentRp)}</strong> against an
-          allocation of {formatCHF(budgetRp)} a year.
+          Running spending in the last 12 months <strong className={spentRp > allowanceRp ? "bad" : undefined}>{formatCHF(spentRp)}</strong> against
+          {" "}{formatCHF(allowanceRp)} a year taken in (the allocation and the utility's profit share).
         </Figure>
         <Figure label="Approval" value={`${Math.round(approval.getApproval())}%`}>
           {election !== null ? `Next election ${monthYear(election)}.` : "No election scheduled."} Very low approval ends the game.

@@ -311,7 +311,7 @@ export function MeasuresTab() {
       ? MEASURE_TOPIC_ORDER.map((t) => ({ key: t, title: MEASURE_TOPIC_LABEL[t], defs: visible.filter((d) => d.topic === t) })).filter((g) => g.defs.length > 0)
       : [{ key: topic, title: null, defs: visible }];
 
-  const budgetRp = treasury.allocationRp(measures.getDwellingCount(nowMs));
+  const budgetRp = approval.spendingAllowanceRp(nowMs);
   const spentRp = treasury.operatingPaidOutTotal(nowMs - YEAR_MS, nowMs + DAY_MS); // investments may be borrowed for
 
   const topicRow = (key: TopicFilter, label: string, defs: MeasureDef[]) => {
@@ -330,8 +330,8 @@ export function MeasuresTab() {
     <div className="measures-tab">
       <SupervisionNotice />
       <p className="measures-intro" style={{ color: spentRp > budgetRp ? "var(--bad)" : undefined }}>
-        Running spending over the last 12 months (subsidies, programmes, interest — not investments): <strong>{formatCHF(spentRp)}</strong>, against a
-        yearly government allocation of {formatCHF(budgetRp)}. Spending well beyond the allocation costs you approval with taxpayers. Money leaves the
+        Running spending over the last 12 months (subsidies, programmes, interest — not investments): <strong>{formatCHF(spentRp)}</strong>, against what
+        the department takes in a year — the government's allocation and its share of the utility's profit — of {formatCHF(budgetRp)}. Spending well beyond that costs you approval with taxpayers. Money leaves the
         treasury only when something actually happens; laws and programmes take months to years to come into effect.
       </p>
       <div className={`measures-layout${selected ? " has-detail" : ""}`}>

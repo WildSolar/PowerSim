@@ -52,10 +52,10 @@ import {
 } from "../config/borrowing";
 import { RESIDENTS_PER_DWELLING } from "../config/treasury";
 import type { Building } from "../data/types";
-import { allocationApprovalFactor, approval, setDebtPenalty } from "./approval";
+import { allocationApprovalFactor, approval, setDebtPenalty, setUtilityShare } from "./approval";
 import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { simClock } from "./engine";
-import { latestBookedFinances, liveBalanceRp, operatingIncomeRp } from "./finances";
+import { departmentUtilityShareRp, latestBookedFinances, liveBalanceRp, operatingIncomeRp } from "./finances";
 import { setSpendingFreeze } from "./fiscalRules";
 import { interestRates } from "./interestRates";
 import { existsAt } from "./lifetime";
@@ -132,6 +132,10 @@ class Debt {
     this.betterSinceMs = null;
     setSpendingFreeze(() => this.supervised);
     setDebtPenalty((atMs) => this.penaltyPoints(atMs));
+    setUtilityShare(() => {
+      const booked = latestBookedFinances();
+      return booked ? departmentUtilityShareRp(booked) : 0;
+    });
     this.unsubscribeClock = simClock.subscribe(() => this.advance(simClock.getSimTimeMs()));
     this.bump();
   }

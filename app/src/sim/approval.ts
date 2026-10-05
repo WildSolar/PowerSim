@@ -116,6 +116,14 @@ export function setDebtPenalty(penalty: (atMs: number) => number): void {
   debtPenalty = penalty;
 }
 
+let utilityShare: () => number = () => 0;
+
+/** Registered by debt.ts: the department's share of the utility's profit in the last booked year
+ * (Rp), which taxpayers count as the department's own income. */
+export function setUtilityShare(share: () => number): void {
+  utilityShare = share;
+}
+
 let priceStances: (atMs: number) => Stances = () => ({});
 
 /** Registered by tariffApproval.ts: how each group feels about the prices in force at `atMs` — a
@@ -366,8 +374,14 @@ class ApprovalEngine {
   }
 
   /** How far the last twelve months' spending overshot the government's allocation, as approval points. */
+  /** What taxpayers accept the department spending in a year: the government's allocation, plus
+   * its own share of the utility's profit (last year's). */
+  spendingAllowanceRp(atMs: number): number {
+    return treasury.allocationRp(measures.getDwellingCount(atMs)) + Math.max(0, utilityShare());
+  }
+
   private fiscalPenalty(atMs: number): number {
-    const budget = treasury.allocationRp(measures.getDwellingCount(atMs));
+    const budget = this.spendingAllowanceRp(atMs);
     if (budget <= 0) return 0;
     const spent = treasury.operatingPaidOutTotal(atMs - 12 * MONTH_MS, atMs); // investments may be borrowed for (debt.ts)
     const overshoot = (spent / budget - 1) / (FISCAL_FULL_RATIO - 1);

@@ -342,6 +342,12 @@ export function operatingIncomeRp(f: MunicipalFinances): number {
   );
 }
 
+/** What the department kept of the utility's profit in a booked year (all of a loss). */
+export function departmentUtilityShareRp(f: MunicipalFinances): number {
+  const profit = utilityProfitRp(f);
+  return profit - f.profitTransferRp;
+}
+
 /** The latest year whose accounts are booked, if any. */
 export function latestBookedFinances(): MunicipalFinances | null {
   let latest: MunicipalFinances | null = null;

@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from "react";
 import type { MunicipalityDataset } from "../data/types";
 import { toDateMs, toSimTimeMs } from "../sim/calendar";
 import { debt } from "../sim/debt";
+import { approval } from "../sim/approval";
 import { simClock } from "../sim/engine";
 import { bookedFinances, operatingIncomeRp, type MunicipalFinances } from "../sim/finances";
 import { treasury, type PayoutCategory, type PayoutsByCategory } from "../sim/treasury";
@@ -60,6 +61,7 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
   useSimDay();
   const live = useLiveTreasury(dataset);
   const now = simClock.getSimTimeMs();
+  const allowanceRp = approval.spendingAllowanceRp(now);
   const year = new Date(toDateMs(now)).getUTCFullYear();
   const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
   const soFar = treasury.paidOut(yearStartMs, now + 1);
@@ -83,14 +85,14 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
           <span className="borrow-value" style={{ color: live.balanceRp !== null && live.balanceRp < 0 ? "var(--bad)" : undefined }}>
             {live.balanceRp === null ? "…" : formatCHF(live.balanceRp)}
           </span>
-          <span className="borrow-note">electricity and heat settle at year end</span>
+          <span className="borrow-note">the utility settles each month</span>
         </div>
         <div>
           <span className="borrow-label">Running spending, 12 months</span>
-          <span className="borrow-value" style={{ color: running12 > live.budgetRp ? "var(--bad)" : undefined }}>
+          <span className="borrow-value" style={{ color: running12 > allowanceRp ? "var(--bad)" : undefined }}>
             {formatCHF(running12)}
           </span>
-          <span className="borrow-note">against an allocation of {formatCHF(live.budgetRp)}</span>
+          <span className="borrow-note">against {formatCHF(allowanceRp)} taken in (allocation and utility profit share)</span>
         </div>
         <div>
           <span className="borrow-label">Debt</span>

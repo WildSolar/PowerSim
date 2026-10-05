@@ -153,6 +153,7 @@ export const MODE_LIFETIME_MEAN_YEARS = 7; // "expected time of around 5-10 year
 
 // --- mobility.ts: vehicle-type-tier renewal (four-factor cost comparison) ---
 
-export const VEHICLE_WEIBULL_SHAPE = 2.2;
+// Fairly tight around the mean: Swiss cars are mostly scrapped at 12-18 years, and few run past 20.
+export const VEHICLE_WEIBULL_SHAPE = 3.5;
 export const VEHICLE_UNCERTAINTY_FRACTION = 0.15; // flat — no obvious per-household "size" proxy the way a building's dwelling count works for heating
 export const VEHICLE_BIAS_MAGNITUDE_RP_PER_YEAR = 60_000; // CHF 600/yr at full lean

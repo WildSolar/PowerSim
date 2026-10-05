@@ -5,7 +5,7 @@ import type { CurvePoint } from "./curve";
 // plant — to balance what it can't avoid. As in Swiss climate law, removals are for the
 // hard-to-avoid rest: they count only once the town's own emissions are down to this share of
 // what they were at the start, so the rest has to be cut first.
-export const REMOVAL_CAP_SHARE = 0.1;
+export const REMOVAL_CAP_SHARE = 0.2;
 
 // CHF per tonne removed, by year: informed placeholders — today's mix of biochar and direct air
 // capture, getting cheaper as the technologies scale up.

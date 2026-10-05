@@ -201,7 +201,9 @@ function carCandidatesAt(
         : (ANNUAL_CAR_KM / 100) * ICE_CAR_L_PER_100KM * tariff.petrolPriceRpPerLiter;
     return {
       id,
-      available: id === "carEV" ? access.kind !== "none" : !policyStore.get().iceCarPurchaseBanned,
+      // Under the ban a household with no charger of its own or nearby goes electric anyway, and
+      // gets by with fast chargers and charging at work.
+      available: id === "carEV" ? access.kind !== "none" || policyStore.get().iceCarPurchaseBanned : !policyStore.get().iceCarPurchaseBanned,
       annualizedCostRp: installCostRp / spec.lifetimeMeanYears + runningCostRp,
       lifetimeMeanYears: spec.lifetimeMeanYears,
       municipalSubsidyRp: municipalRp,
