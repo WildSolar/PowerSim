@@ -33,6 +33,7 @@ import { restoreModeChains, snapshotModeChains } from "./modeRenewal";
 import { newspaper } from "./newspaper";
 import { publicCharging } from "./publicCharging";
 import { restoreRenewalChains, snapshotRenewalChains } from "./renewal";
+import { restoreScore, snapshotScore } from "./score";
 import { restoreSolar, snapshotSolar } from "./solarAdoption";
 import { stock } from "./stock";
 import { studies } from "./studies";
@@ -101,6 +102,7 @@ interface SaveState {
   decisionLog: ReturnType<typeof snapshotDecisionLog> | null;
   emissions: ReturnType<typeof snapshotEmissions>;
   finances: ReturnType<typeof snapshotFinances>;
+  score: ReturnType<typeof snapshotScore>;
   yearReport: Awaited<ReturnType<typeof snapshotYearReport>>;
 }
 
@@ -171,6 +173,7 @@ export function captureState(transparency: boolean): Omit<SaveState, "yearReport
     decisionLog: transparency ? snapshotDecisionLog() : null,
     emissions: snapshotEmissions(),
     finances: snapshotFinances(),
+    score: snapshotScore(),
   };
 }
 
@@ -260,6 +263,7 @@ export function applySave(file: SaveFile): void {
   restoreDecisionLog(s.decisionLog);
   restoreEmissions(s.emissions);
   restoreFinances(s.finances);
+  restoreScore(s.score);
   restoreYearReport(s.yearReport);
   // The clock jumps to the saved moment, paused. That is not a year ending.
   resetYearEndWatcher();

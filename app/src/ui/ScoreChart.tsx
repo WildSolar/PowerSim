@@ -21,6 +21,10 @@ export function ScoreChart({ years, par, firstYear, lastYear }: { years: ScoredY
   const ticks = [yMin, ...[0, 25, 50, 75, 100].filter((t) => t > yMin)];
   const yearTicks = [firstYear, ...[2030, 2035, 2040, 2045].filter((t) => t > firstYear && t < lastYear), lastYear];
   const lastOwn = years[years.length - 1];
+  // After finishing early, the years left count in full: drawn apart from the played ones.
+  const played = years.filter((p) => !p.projected);
+  const projected = years.filter((p) => p.projected);
+  const lastPlayed = played[played.length - 1];
   const lastPar = par?.[par.length - 1];
   const hovered = hover === null ? null : { own: years.find((y2) => y2.year === hover), par: par?.find((p) => p.year === hover) };
 
@@ -30,6 +34,11 @@ export function ScoreChart({ years, par, firstYear, lastYear }: { years: ScoredY
         <span>
           <i className="own" /> Your town
         </span>
+        {projected.length > 0 && (
+          <span>
+            <i className="projected" /> Counted in full
+          </span>
+        )}
         {par && (
           <span>
             <i className="par" /> Par (doing nothing)
@@ -53,9 +62,10 @@ export function ScoreChart({ years, par, firstYear, lastYear }: { years: ScoredY
           ))}
           {area && <path className="own-area" d={area} />}
           {par && <path className="par-line" d={path(par)} />}
-          {years.length > 0 && <path className="own-line" d={path(years)} />}
+          {played.length > 0 && <path className="own-line" d={path(played)} />}
+          {projected.length > 0 && <path className="own-line projected" d={path(lastPlayed ? [lastPlayed, ...projected] : projected)} />}
           {years.map((p) => (
-            <circle key={p.year} className="own-dot" cx={x(p.year)} cy={y(p.points)} r={4} />
+            <circle key={p.year} className={`own-dot${p.projected ? " projected" : ""}`} cx={x(p.year)} cy={y(p.points)} r={4} />
           ))}
           {lastOwn && (
             <text className="end-label own" x={x(lastOwn.year) + 6} y={y(lastOwn.points) + 4}>
@@ -84,7 +94,10 @@ export function ScoreChart({ years, par, firstYear, lastYear }: { years: ScoredY
         {hovered && hover !== null && (
           <div className="score-chart-tip" style={{ left: `${(x(hover) / W) * 100}%` }}>
             <strong>{hover}</strong>
-            <span>Your town: {hovered.own ? `${Math.round(hovered.own.points)}%` : "—"}</span>
+            <span>
+              Your town: {hovered.own ? `${Math.round(hovered.own.points)}%` : "—"}
+              {hovered.own?.projected ? " (counted in full)" : ""}
+            </span>
             {par && <span>Par: {hovered.par ? `${Math.round(hovered.par.points)}%` : "—"}</span>}
           </div>
         )}

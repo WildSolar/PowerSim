@@ -107,6 +107,7 @@ export function OverviewTab({ dataset, onOpen }: { dataset: MunicipalityDataset;
               ? `${Math.round(score.total) - Math.round(par) >= 0 ? "+" : "−"}${Math.abs(Math.round(score.total) - Math.round(par))} against par — what doing nothing would have scored by now.`
               : `${score.years.length} year${score.years.length === 1 ? "" : "s"} scored.`}
           {score.netZeroYear !== null && ` Net zero since ${score.netZeroYear}.`}
+          {score.finishedYear !== null && ` Finished at the end of ${score.finishedYear}; the score is final.`}
         </Figure>
         <Figure label="Measures" value={`${inEffect.length} in effect`} onClick={() => onOpen("measures")}>
           {onTheWay.length > 0 ? `${onTheWay.length} on the way. ` : ""}

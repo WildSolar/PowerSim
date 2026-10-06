@@ -293,8 +293,10 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Par: what the town would score if you did nothing at all — the grid getting cleaner, things wearing out and being replaced, technology getting cheaper. The top bar, the Overview and the Year in Review show your score against par so far: that difference is what your decisions did.",
         "Winning: reach net zero by 2050. The Year in Review marks the year it happens; every year after it scores in full as long as it holds.",
+        "Finishing early: when a year closes at net zero, its Year in Review offers to finish the run there. The years left until 2050 then count in full, 100 points each, and the score is final. Or keep playing: every year still scores what it achieves, and each later year-end at net zero offers the finish again.",
+        "Books in order: you can only finish early if the net zero looks set to last — the department not under the canton's supervision, not in overdraft, and owing no more than three years of its income (what lenders rate A or better; see \"Borrowing & debt\"). A net zero reached on borrowed money has to show it holds while the debt comes down: play on, and each year at net zero still scores in full.",
         "Losing: below 50% approval on election day, or below 25% for six months on end (see \"Public approval\"). The score so far stands; the years you didn't get to score nothing.",
-        "The end: after the Year in Review of 2050 the run is over, and you see how it went — the score, par, the year of net zero, and the cut year by year. You can keep exploring the town afterwards; nothing more is scored.",
+        "The end: after the Year in Review of 2050, or when you finish early, the run is over, and you see how it went — the score, par, the year of net zero, and the cut year by year. You can keep exploring the town afterwards; nothing more is scored, and the voters can no longer end it.",
       ]),
       note(
         "Par is worked out for each town and difficulty with the game itself, for games that start in the same year. Where there isn't one, the score is shown on its own.",

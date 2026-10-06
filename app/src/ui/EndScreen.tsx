@@ -13,7 +13,10 @@ export function EndScreen({ municipality, over, onMainMenu, onKeepPlaying }: { m
   const par = parThrough(NET_ZERO_TARGET_YEAR);
   const total = Math.round(score.total);
   const vsPar = par === null ? null : total - Math.round(par);
-  const last = score.years[score.years.length - 1];
+  // The last year actually played (after finishing early, the rest only count).
+  const played = score.years.filter((y) => !y.projected);
+  const counted = score.years.length - played.length;
+  const last = played[played.length - 1];
   const cut = last ? Math.round(last.points) : null;
 
   const headline = over
@@ -23,7 +26,9 @@ export function EndScreen({ municipality, over, onMainMenu, onKeepPlaying }: { m
       : `${NET_ZERO_TARGET_YEAR}: not yet net zero`;
   const lede = over
     ? over.text
-    : score.netZeroYear !== null
+    : score.finishedYear !== null && score.netZeroYear !== null
+      ? `${municipality} reached net zero ${NET_ZERO_TARGET_YEAR - score.netZeroYear} years ahead of the deadline, and handed over at the end of ${score.finishedYear} with its books in order. The years left until ${NET_ZERO_TARGET_YEAR} count in full.`
+      : score.netZeroYear !== null
       ? `${municipality} reached net zero ${NET_ZERO_TARGET_YEAR - score.netZeroYear > 0 ? `${NET_ZERO_TARGET_YEAR - score.netZeroYear} years ahead of the deadline` : "just in time"}.`
       : `${municipality} cut its emissions per resident by ${cut ?? 0}% against ${BASELINE_YEAR}, but some remain.`;
 
@@ -48,7 +53,9 @@ export function EndScreen({ municipality, over, onMainMenu, onKeepPlaying }: { m
             <h3>Score</h3>
             <div className="yr-value">{total}</div>
             <div className="yr-detail">
-              {score.years.length} year{score.years.length === 1 ? "" : "s"} scored{over ? "; the rest score nothing" : ""}
+              {played.length} year{played.length === 1 ? "" : "s"} scored
+              {counted > 0 ? `, ${counted} more counted in full` : ""}
+              {over ? "; the rest score nothing" : ""}
             </div>
           </section>
           <section>
@@ -83,7 +90,7 @@ export function EndScreen({ municipality, over, onMainMenu, onKeepPlaying }: { m
         <div className="end-actions">
           {onKeepPlaying && (
             <button className="end-secondary" onClick={onKeepPlaying}>
-              Keep exploring the town
+              {score.finishedYear !== null ? "Keep exploring (the score stays)" : "Keep exploring the town"}
             </button>
           )}
           <button className="yr-close" onClick={onMainMenu}>

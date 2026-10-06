@@ -223,7 +223,7 @@ function ScoreKpi() {
       label="Score"
       value={String(total)}
       sub={vsPar === null ? `${score.years.length} year${score.years.length === 1 ? "" : "s"}` : <span className={vsPar >= 0 ? "good" : "bad"}>{`${vsPar >= 0 ? "+" : "−"}${Math.abs(vsPar)} vs par`}</span>}
-      title={`Each year scores its cut in emissions per resident against ${BASELINE_YEAR}, in percent.${par !== null ? ` Par — what doing nothing would have scored by now — is ${Math.round(par)}.` : ""}${score.netZeroYear !== null ? ` Net zero reached in ${score.netZeroYear}.` : ""}`}
+      title={`Each year scores its cut in emissions per resident against ${BASELINE_YEAR}, in percent.${par !== null ? ` Par — what doing nothing would have scored by now — is ${Math.round(par)}.` : ""}${score.netZeroYear !== null ? ` Net zero reached in ${score.netZeroYear}.` : ""}${score.finishedYear !== null ? ` Finished at the end of ${score.finishedYear}: the years left count in full, and the score is final.` : ""}`}
     />
   );
 }

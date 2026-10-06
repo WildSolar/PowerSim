@@ -57,6 +57,7 @@ import { simClock } from "./engine";
 import type { MeasureDef, MeasureParams } from "./measureTypes";
 import { measures, type MeasureEvent } from "./measures";
 import { hashSeed, mulberry32 } from "./rng";
+import { getFinishedYear } from "./score";
 import { treasury } from "./treasury";
 
 const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
@@ -491,6 +492,8 @@ class ApprovalEngine {
   }
 
   private endGame(over: GameOver): void {
+    // A run finished early is over already; what follows is unscored exploring.
+    if (getFinishedYear() !== null) return;
     this.gameOver = over;
     this.addLog(over.atMs, `Game over: ${over.headline}.`);
     measures.freeze();

@@ -123,3 +123,18 @@
   stroke: var(--surface);
   stroke-width: 2;
 }
+
+/* After finishing early: the years left, counted in full rather than played. */
+.score-chart-legend i.projected {
+  border-top: 2px dotted var(--chart-own);
+}
+
+.score-chart .own-line.projected {
+  stroke-dasharray: 2 4;
+  stroke-linecap: round;
+}
+
+.score-chart .own-dot.projected {
+  fill: var(--surface);
+  stroke: var(--chart-own);
+}

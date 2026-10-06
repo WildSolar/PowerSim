@@ -35,6 +35,9 @@ export const RATING_UPGRADE_MONTHS = 12;
 // Debt beyond this many years of income puts the department under cantonal supervision: no new
 // borrowing, no new spending measures or orders. It lifts once debt is back under this share of it.
 export const DEBT_LIMIT_YEARS = 5;
+// Finishing a run early at net zero (sim/handover.ts) needs debt at most this many years of income —
+// what earns an A rating or better.
+export const HANDOVER_MAX_DEBT_YEARS = 3;
 export const SUPERVISION_EXIT_SHARE = 0.8;
 // Before a year's accounts exist, income is taken as this many times the government's allocation.
 export const PROVISIONAL_INCOME_ALLOCATIONS = 2.5;

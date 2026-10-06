@@ -18,7 +18,9 @@ import { useYearCategoryEnergy } from "./useYearCategoryEnergy";
 import { useYearEmissions, BASELINE_YEAR, NET_ZERO_TARGET_YEAR } from "./useYearEmissions";
 import { useYearFinances } from "./useYearFinances";
 import { useYearHeatingReport } from "./useYearHeatingReport";
-import { scoreSoFar, yearPoints } from "../sim/score";
+import { finishEarly, getFinishedYear, scoreSoFar, yearPoints } from "../sim/score";
+import { handoverCheck } from "../sim/handover";
+import { simClock } from "../sim/engine";
 import { parThrough } from "../sim/par";
 import "./panels.css";
 import "./pieChart.css";
@@ -27,6 +29,51 @@ import "./reportCard.css";
 /** "3 years to go", "1 year to go", or the last one. */
 function yearsToGo(left: number): string {
   return left <= 0 ? "the last scored year" : left === 1 ? "1 year to go" : `${left} years to go`;
+}
+
+/** A year closed at net zero: the first time, or again — and whether the run can finish here, the
+ * years left counting in full (handover.ts). */
+function NetZeroBanner({ town, year, onFinish, onKeepPlaying }: { town: string; year: number; onFinish: () => void; onKeepPlaying: () => void }) {
+  const score = scoreSoFar(year);
+  const first = score.netZeroYear === year;
+  const left = NET_ZERO_TARGET_YEAR - year;
+  const check = handoverCheck(year, simClock.getSimTimeMs());
+  return (
+    <div className="yr-netzero">
+      {first ? (
+        <>
+          <strong>Net zero.</strong> In {year}, {town} took out of the air as much as it still emitted — {left > 0 ? `${left} year${left === 1 ? "" : "s"} before the deadline` : "just in time"}.
+        </>
+      ) : (
+        <>
+          <strong>Still net zero.</strong> {town} held net zero through {year}.
+        </>
+      )}
+      {check.offered && check.problems.length === 0 && (
+        <>
+          {" "}
+          You can finish here: the {left} year{left === 1 ? "" : "s"} left until {NET_ZERO_TARGET_YEAR} count in full, 100 points each, for a final score of{" "}
+          {Math.round(score.total + 100 * left)}. Or keep playing — every year still scores what it achieves, and each later year-end at net zero offers the
+          finish again.
+          <div className="yr-netzero-actions">
+            <button className="yr-close" onClick={onFinish}>
+              Finish the run
+            </button>
+            <button className="yr-netzero-secondary" onClick={onKeepPlaying}>
+              Keep playing
+            </button>
+          </div>
+        </>
+      )}
+      {check.offered && check.problems.length > 0 && (
+        <>
+          {" "}
+          To finish here, with the years left counting in full, the books have to be in order too — but {check.problems.join(", and ")}. Keep playing:
+          every year at net zero still scores in full, and the finish is offered at the next year-end that closes at net zero with the books in order.
+        </>
+      )}
+    </div>
+  );
 }
 
 export interface ReportCardModalProps {
@@ -154,10 +201,16 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
             </button>
           </header>
 
-          {emissions && year > BASELINE_YEAR && year <= NET_ZERO_TARGET_YEAR && scoreSoFar(year).netZeroYear === year && (
-            <div className="yr-netzero">
-              <strong>Net zero.</strong> In {year}, {dataset.name} took out of the air as much as it still emitted — {NET_ZERO_TARGET_YEAR - year > 0 ? `${NET_ZERO_TARGET_YEAR - year} years before the deadline` : "just in time"}. Every year from here on scores in full as long as it stays there.
-            </div>
+          {emissions && year > BASELINE_YEAR && year <= NET_ZERO_TARGET_YEAR && emissions.current.netKgCO2 <= 0 && getFinishedYear() === null && (
+            <NetZeroBanner
+              town={dataset.name}
+              year={year}
+              onFinish={() => {
+                finishEarly(year);
+                onClose();
+              }}
+              onKeepPlaying={onClose}
+            />
           )}
 
           <div className="yr-figures">

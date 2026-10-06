@@ -23,7 +23,7 @@ import { PublicBuildingsPanel } from "./ui/PublicBuildingsPanel";
 import { ReportCardModal } from "./ui/ReportCardModal";
 import { EndScreen } from "./ui/EndScreen";
 import { loadPar } from "./sim/par";
-import { NET_ZERO_TARGET_YEAR } from "./sim/score";
+import { getFinishedYear, NET_ZERO_TARGET_YEAR } from "./sim/score";
 import { StartMenu } from "./ui/StartMenu";
 import { WikiPanel } from "./ui/WikiPanel";
 import { GameMenu } from "./ui/GameMenu";
@@ -246,7 +246,8 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
       return;
     }
     if (shownReport.current === null || !dataset) return;
-    if (shownReport.current === NET_ZERO_TARGET_YEAR) setFinished(true);
+    // 2050's review closes the run, as does finishing early from a year's review.
+    if (shownReport.current === NET_ZERO_TARGET_YEAR || shownReport.current === getFinishedYear()) setFinished(true);
     shownReport.current = null;
     captureSave({ slug, municipality: dataset.name, difficulty, transparency }, "Autosave")
       .then(({ meta, bytes }) => putSave(AUTOSAVE_ID, meta, bytes))
