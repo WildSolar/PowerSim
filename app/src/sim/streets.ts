@@ -98,6 +98,25 @@ class StreetNetwork {
     return this.byNode.get(node) ?? [];
   }
 
+  /** The street junction (a segment's end) nearest to (lon, lat): where a plant placed there would
+   * join the district heating network. Null without streets. */
+  nearestJunction(lon: number, lat: number): { node: number; lon: number; lat: number; distanceM: number } | null {
+    const p = this.projection.toXY(lon, lat);
+    let best: { node: number; lon: number; lat: number; d: number } | null = null;
+    for (let id = 0; id < this.segments.length; id++) {
+      const s = this.segments[id];
+      const line = this.linesXY[id];
+      for (const [node, xy, ll] of [
+        [s.a, line[0], s.line[0]],
+        [s.b, line[line.length - 1], s.line[s.line.length - 1]],
+      ] as [number, XY, [number, number]][]) {
+        const d = Math.hypot(xy[0] - p[0], xy[1] - p[1]);
+        if (!best || d < best.d) best = { node, lon: ll[0], lat: ll[1], d };
+      }
+    }
+    return best ? { node: best.node, lon: best.lon, lat: best.lat, distanceM: best.d } : null;
+  }
+
   /** The closest point on any street to (lon, lat), and how far away it is — where something
    * placed on the map (a charger) actually goes. Null without streets. */
   snapToStreet(lon: number, lat: number): { lon: number; lat: number; distanceM: number; street: string | null } | null {

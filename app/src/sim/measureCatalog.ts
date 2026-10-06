@@ -416,18 +416,6 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     annualCostRp: (p, ctx) => (num(p, "level") / 100) * ctx.residents * 5 * CHF,
     approval: () => ({ climate: 0.3, homeowners: 0.05, drivers: -0.05 }),
   },
-  {
-    id: "district-heat-clean",
-    category: "infrastructure",
-    topic: "heating",
-    title: "Clean district heating",
-    summary: "The municipality converts the district heating plant to biomass, geothermal or waste heat. Emissions from every building on district heat fall in proportion. The conversion and its running costs come out of the treasury every year.",
-    params: [{ kind: "slider", key: "share", label: "Share produced without fossil fuels", min: 0, max: 100, step: 10, unit: "%", default: 60 }],
-    leadTimeMonths: 24,
-    effects: (p) => ({ districtHeatCleanShare: num(p, "share") }),
-    annualCostRp: (p, ctx) => (num(p, "share") / 100) * ctx.residents * 35 * CHF,
-    approval: () => ({ climate: 0.4, tenants: 0.05, homeowners: 0.05, business: -0.05 }),
-  },
 
   // --- Carbon removal ---------------------------------------------------------------------
   {

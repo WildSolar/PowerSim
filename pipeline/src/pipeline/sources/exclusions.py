@@ -18,9 +18,14 @@ from shapely.geometry import LineString, Polygon
 from shapely.ops import polygonize, unary_union
 
 from .. import coords
+from ..cache import cached_json
 
-# The main Overpass instance, then a public mirror when the main one stays busy.
-OVERPASS_URLS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"]
+# The main Overpass instance, then public mirrors when the main one stays busy.
+OVERPASS_URLS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+]
 # Overpass answers 406 to requests without an identifying User-Agent.
 HEADERS = {"User-Agent": "commune-zero-pipeline/0.1 (offline data preparation)"}
 
@@ -48,8 +53,12 @@ out geom;"""
 
 
 def _post(query: str) -> list[dict]:
+    return cached_json("overpass", query, lambda: _fetch(query))
+
+
+def _fetch(query: str) -> list[dict]:
     last_error: Exception | None = None
-    for attempt in range(6):
+    for attempt in range(9):
         url = OVERPASS_URLS[attempt % len(OVERPASS_URLS)]
         try:
             response = requests.post(url, data={"data": query}, headers=HEADERS, timeout=120)

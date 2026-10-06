@@ -27,12 +27,12 @@ import { treasury } from "./treasury";
 import { policyStore } from "./policy";
 import type { Building, PowerPlant } from "../data/types";
 import {
-  DISTRICT_HEATING_KG_CO2_PER_KWH,
   HEATING_OIL_KG_CO2_PER_LITER,
   ICE_CAR_FUEL_KG_CO2_PER_LITER,
   NATURAL_GAS_KG_CO2_PER_KWH,
 } from "./emissionFactors";
 import { gridCarbonIntensityGPerKWh } from "./gridCarbon";
+import { dhEmissionsKgCO2 } from "./districtHeatDispatch";
 import { GAS_BOILER_EFFICIENCY, OIL_BOILER_EFFICIENCY, OIL_ENERGY_KWH_PER_LITER } from "./heatingSystems";
 import { computeHeatingTechnologyBreakdown, computeMobilityFuelLiters, computeNetElectricityKWh } from "./yearReport";
 
@@ -114,8 +114,8 @@ async function countYear(buildings: Building[], plants: PowerPlant[], year: numb
   const oilFuelLiters = heatingTechnology.oilBoilerSpaceKWh / OIL_BOILER_EFFICIENCY / OIL_ENERGY_KWH_PER_LITER;
   const oilKgCO2 = oilFuelLiters * HEATING_OIL_KG_CO2_PER_LITER;
 
-  // District heating's efficiency is defined as 1.0 (billing.ts prices it as delivered), so delivered kWh = fuel kWh.
-  const districtHeatingKgCO2 = heatingTechnology.districtHeatingSpaceKWh * DISTRICT_HEATING_KG_CO2_PER_KWH * (1 - policyStore.get().districtHeatCleanShare / 100);
+  // District heating: what its boilers burned, and its heat pumps' power (districtHeatDispatch.ts).
+  const districtHeatingKgCO2 = dhEmissionsKgCO2(heatingTechnology.districtHeat, year);
 
   const mobilityKgCO2 = iceCarLiters * ICE_CAR_FUEL_KG_CO2_PER_LITER;
 

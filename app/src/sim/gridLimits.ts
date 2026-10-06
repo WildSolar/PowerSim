@@ -13,17 +13,6 @@ import type { Building } from "../data/types";
 export const SMALL_SOLAR_KWP = 30;
 
 let drawBlocked: (b: Building, atMs: number) => boolean = () => false;
-let districtHeatFull: (atMs: number) => boolean = () => false;
-
-/** Registered by App: whether the district heating network's winter peak has reached its source. */
-export function setDistrictHeatLimit(full: typeof districtHeatFull): void {
-  districtHeatFull = full;
-}
-
-/** No new district heating connections: the network's winter peak is over what its source delivers. */
-export function districtHeatFullAt(atMs: number): boolean {
-  return districtHeatFull(atMs);
-}
 let feedInBlocked: (b: Building, atMs: number) => boolean = () => false;
 
 export function setGridLimits(draw: typeof drawBlocked, feedIn: typeof feedInBlocked): void {

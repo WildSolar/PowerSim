@@ -83,6 +83,86 @@ def _slug(name: str) -> str:
     return slug or "municipality"
 
 
+def _district_heat(bfs_number: int, buildings_df, segments, boundary_lv95, positions, addressed_segments_by_egid) -> dict | None:
+    """The starting district heating networks and the candidate heat sources (sources/district_heat.py)."""
+    print("District heating: registered networks, and where new heat could come from (BFE)...")
+    district_heated = buildings_df[
+        buildings_df["Energie-/Waermequelle_Heizung_primaer_Bezeichnung"].fillna("").str.startswith("Fernwärme")
+    ]
+    dh_egids = [int(e) for e in district_heated[gwr.EGID_COL]]
+    site_buildings = [
+        {
+            "egid": int(row[gwr.EGID_COL]),
+            "x": float(row["E-Gebaeudekoordinate"]),
+            "y": float(row["N-Gebaeudekoordinate"]),
+            "area_m2": _clean_float(row.get("Gebaeudeflaeche")),
+            # Industrial waste heat comes from buildings with no homes in them.
+            "residential": str(row.get("Gebaeudekategorie_Bezeichnung") or "") not in ("Gebäude ohne Wohnnutzung", "Sonderbau"),
+        }
+        for _, row in buildings_df.iterrows()
+        if int(row[gwr.EGID_COL]) in positions
+    ]
+    network = district_heat_source.build(
+        bfs_number,
+        segments,
+        boundary_lv95,
+        # A customer is connected from the street it is addressed from, not every street it borders.
+        [(*positions[e], set(addressed_segments_by_egid.get(e, []))) for e in dh_egids if e in positions],
+        site_buildings,
+    )
+    if network:
+        for n in network["networks"]:
+            piped_km = sum(segments[s].length_m for s in n["segments"]) / 1000
+            print(f"  network {n['name']}: {len(n['segments'])} segments ({piped_km:.1f} km) piped")
+    print(f"  {len(dh_egids)} district-heated buildings")
+    return network
+
+
+def refresh_district_heat(bfs_number: int) -> Path:
+    """Recomputes only the district heating part of an existing dataset (the rest — footprints,
+    sites, streets — stays as built): GWR for the district-heated buildings and entrances, the
+    BFE's networks and heat sources, the land cover. For a change to district heating alone, without
+    another round of the slow sources."""
+    path = next(
+        (p for p in OUTPUT_DIR.glob("*.json") if p.name != INDEX_FILENAME and json.loads(p.read_text(encoding="utf-8")).get("bfsNumber") == bfs_number),
+        None,
+    )
+    if path is None:
+        raise SystemExit(f"No dataset for BFS {bfs_number} to refresh — build it first.")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    print(f"Refreshing district heating in {path.name}...")
+    buildings_df = gwr.fetch_buildings(bfs_number)
+    kept = {int(b["egid"]) for b in data["buildings"] if b["egid"].isdigit()}
+    buildings_df = buildings_df[buildings_df[gwr.EGID_COL].astype(int).isin(kept)].copy()
+    boundary_lv95 = [Polygon([coords.lonlat_to_lv95(lon, lat) for lon, lat in polygon[0]]) for polygon in data["boundary"]]
+    segments = [
+        streets_source.Segment(
+            id=s["id"],
+            name=s.get("name"),
+            highway=s["highway"],
+            a=s["a"],
+            b=s["b"],
+            lv95=[coords.lonlat_to_lv95(lon, lat) for lon, lat in s["line"]],
+            length_m=s["lengthM"],
+            width_m=s.get("widthM", 0.0),
+            nodes=s.get("nodes") or [s["a"], s["b"]],
+        )
+        for s in data["streets"]
+    ]
+    positions = {
+        int(row[gwr.EGID_COL]): (float(row["E-Gebaeudekoordinate"]), float(row["N-Gebaeudekoordinate"])) for _, row in buildings_df.iterrows()
+    }
+    footprint_by_egid = {
+        int(b["egid"]): [coords.lonlat_to_lv95(lon, lat) for lon, lat in b["footprint"]] for b in data["buildings"] if b.get("footprint") and b["egid"].isdigit()
+    }
+    entrances = gwr.fetch_entrances(bfs_number, set(positions))
+    _, addressed = streets_source.link_buildings(segments, entrances, positions, footprint_by_egid)
+    network = _district_heat(bfs_number, buildings_df, segments, boundary_lv95, positions, addressed)
+    data["districtHeat"] = _to_camel(network) if network else None
+    path.write_text(json.dumps(data, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+    return path
+
+
 def build(bfs_number: int) -> MunicipalityDataset:
     print(f"Fetching GWR buildings for BFS {bfs_number}...")
     buildings_df = gwr.fetch_buildings(bfs_number)
@@ -158,20 +238,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
     segments_by_egid, addressed_segments_by_egid = streets_source.link_buildings(segments, entrances, positions, footprint_by_egid)
     print(f"  {sum(1 for v in segments_by_egid.values() if v)} / {len(positions)} buildings linked to a street")
 
-    district_heated = buildings_df[
-        buildings_df["Energie-/Waermequelle_Heizung_primaer_Bezeichnung"].fillna("").str.startswith("Fernwärme")
-    ]
-    dh_egids = [int(e) for e in district_heated[gwr.EGID_COL]]
-    network = district_heat_source.infer_network(
-        bfs_number,
-        segments,
-        # A customer is connected from the street it is addressed from, not every street it borders.
-        {sid for egid in dh_egids for sid in addressed_segments_by_egid.get(egid, [])},
-        [positions[e] for e in dh_egids],
-    )
-    if network:
-        piped_km = sum(segments[s].length_m for s in network["initial_segments"]) / 1000
-        print(f"  district heating: {len(dh_egids)} customers, {len(network['initial_segments'])} segments ({piped_km:.1f} km) piped, source: {network['source']['name']}")
+    network = _district_heat(bfs_number, buildings_df, segments, boundary_lv95, positions, addressed_segments_by_egid)
 
     print("Fetching the heat-use atlas (canton ZH)...")
     heat_use = heat_use_source.fetch_heat_use(boundary_lv95)
@@ -317,7 +384,17 @@ def main() -> None:
         help="build every municipality in this canton (e.g. ZH) instead of a single one; "
         "a municipality that fails is reported at the end and doesn't stop the rest",
     )
+    parser.add_argument(
+        "--district-heat-only",
+        action="store_true",
+        help="recompute only the district heating part of an existing dataset (no footprints, sites or streets)",
+    )
     args = parser.parse_args()
+
+    if args.district_heat_only:
+        path = refresh_district_heat(args.bfs_number or DEFAULT_BFS_NUMBER)
+        print(f"Wrote {path}")
+        return
 
     if args.canton:
         bfs_numbers = gwr.canton_municipalities(args.canton)

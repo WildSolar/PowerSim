@@ -166,8 +166,8 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
               <Line label="Wholesale electricity bought" value={-last.wholesaleCostRp} />
               <Line label="Grid upkeep" value={-last.gridMaintenanceCostRp} />
               {last.districtHeatRevenueRp > 0 && <Line label="District heat sold" value={last.districtHeatRevenueRp} />}
-              {last.districtHeatPurchaseRp > 0 && <Line label="District heat bought from the source" value={-last.districtHeatPurchaseRp} />}
-              {last.districtHeatUpkeepRp > 0 && <Line label="District heating network upkeep" value={-last.districtHeatUpkeepRp} />}
+              {last.districtHeatPurchaseRp > 0 && <Line label="Making district heat (fuel, power, heat bought)" value={-last.districtHeatPurchaseRp} />}
+              {last.districtHeatUpkeepRp > 0 && <Line label="District heating upkeep: pipes, plants, contracts" value={-last.districtHeatUpkeepRp} />}
               {last.publicChargingRevenueRp > 0 && <Line label="Public charging sold (municipal chargers)" value={last.publicChargingRevenueRp} />}
               {last.publicChargingUpkeepRp > 0 && <Line label="Public charger upkeep" value={-last.publicChargingUpkeepRp} />}
               <tr className="treasury-total">

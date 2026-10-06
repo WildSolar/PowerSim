@@ -1,12 +1,12 @@
 /**
- * What the district heating network means for the buildings around it: who is connected,
- * who could be, the network's peak load against its source's capacity, and how much heat
- * the buildings along a planned extension use — the figure an extension's worth is judged
- * by (heat per metre of pipe). Kept apart from districtHeat.ts because it needs the heating
- * model, which itself depends on districtHeat.ts.
+ * What the district heating networks mean for the buildings around them: who is connected,
+ * who could be, each network's winter peak against its clean sources, and how much heat the
+ * buildings along a planned extension use — the figure an extension's worth is judged by (heat
+ * per metre of pipe). Kept apart from districtHeat.ts because it needs the heating model, which
+ * itself depends on districtHeat.ts.
  */
 
-import { DH_DESIGN_OUTDOOR_TEMP_C, DH_SOURCE_CAPACITY_HEADROOM } from "../config/districtHeat";
+import { DH_DESIGN_OUTDOOR_TEMP_C, DH_NETWORK_LOSS_SHARE, DH_UNKNOWN_CAPACITY_HEADROOM } from "../config/districtHeat";
 import type { Building } from "../data/types";
 import { toDateMs } from "./calendar";
 import { districtHeat } from "./districtHeat";
@@ -43,47 +43,30 @@ function designLoadW(building: Building, atMs: number): number {
   return spaceHeatingThermalDemandW(building, DH_DESIGN_OUTDOOR_TEMP_C, DH_DESIGN_OUTDOOR_TEMP_C, atMs);
 }
 
-/** The connected buildings' combined heat load on a cold winter day. */
-export function networkPeakLoadW(buildings: Building[], atMs: number): number {
-  let total = 0;
+/** Each network's heat load on a cold winter day (W, by network id), pipe losses included: the
+ * connected buildings, and any that no network reaches any more under -1. */
+export function networkPeaksW(buildings: Building[], atMs: number): Map<number, number> {
+  const peaks = new Map<number, number>();
   for (const b of buildings) {
-    if (existsAt(b, atMs) && currentHeatingSystemId(b, atMs) === "districtHeating") total += designLoadW(b, atMs);
+    if (!existsAt(b, atMs) || currentHeatingSystemId(b, atMs) !== "districtHeating") continue;
+    const id = districtHeat.networkOf(b.streetSegments, atMs)?.id ?? -1;
+    peaks.set(id, (peaks.get(id) ?? 0) + designLoadW(b, atMs) * (1 + DH_NETWORK_LOSS_SHARE));
   }
-  return total;
+  return peaks;
 }
 
-const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
-
-let capacityW: number | null = null;
-
-/** The source's capacity at `atMs`. No open data says what it is, so it is set a margin above the
- * load of the buildings connected when the game starts (DH_SOURCE_CAPACITY_HEADROOM), plus any
- * supply the player has added since. */
-export function sourceCapacityW(buildings: Building[], startMs: number, atMs = startMs): number {
-  if (capacityW === null) {
-    let initial = 0;
-    for (const b of buildings) {
-      if (b.origin === undefined && initialHeatingSystemId(b) === "districtHeating") initial += designLoadW(b, startMs);
-    }
-    capacityW = initial * DH_SOURCE_CAPACITY_HEADROOM;
+/** Sizes the starting networks that didn't report their capacity: a margin above the winter peak
+ * of the buildings connected when the game starts. Once, at the start (before any save is loaded). */
+export function sizeUnreportedSources(buildings: Building[], startMs: number): void {
+  const unsized = districtHeat.getSources().filter((s) => s.unsizedShare !== null && !Number.isFinite(s.cleanW));
+  if (unsized.length === 0) return;
+  const initial = buildings.filter((b) => b.origin === undefined && initialHeatingSystemId(b) === "districtHeating");
+  const peaks = networkPeaksW(initial, startMs);
+  for (const s of unsized) {
+    const network = districtHeat.networksAt(startMs).find((n) => n.sources.includes(s));
+    const peakW = network ? (peaks.get(network.id) ?? 0) : 0;
+    districtHeat.setCleanW(s.id, peakW * DH_UNKNOWN_CAPACITY_HEADROOM * (s.unsizedShare ?? 1));
   }
-  return capacityW + districtHeat.extraSupplyW(atMs);
-}
-
-const fullByMonth = new Map<string, boolean>();
-
-/** Whether the network's winter peak has reached what its source delivers, as of `atMs` — then no
- * new buildings can connect. Checked once a month (it scans every building). */
-export function networkFullAt(buildings: Building[], atMs: number): boolean {
-  const month = Math.floor(atMs / MONTH_MS);
-  const key = `${month}:${districtHeat.extraSupplyW(atMs)}`;
-  let full = fullByMonth.get(key);
-  if (full === undefined) {
-    const at = month * MONTH_MS;
-    full = networkPeakLoadW(buildings, at) > sourceCapacityW(buildings, 0, at);
-    fullByMonth.set(key, full);
-  }
-  return full;
 }
 
 const demandCache = new Map<string, number>(); // `${egid}:${year}` -> kWh

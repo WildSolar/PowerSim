@@ -123,6 +123,13 @@ class HeatPumpSiting {
     return found;
   }
 
+  /** The atlas zone at a point, or null outside the atlas (or without one) — where a district
+   * heating plant could draw on groundwater (districtHeatSources.ts). */
+  zoneAt(lon: number, lat: number): HeatUseZone | null {
+    const p = this.projection.toXY(lon, lat);
+    return this.zones.find((zone) => zone.polygons.some((rings) => pointInPolygon(p, rings)))?.zone ?? null;
+  }
+
   /** What a new ground-source heat pump for this building would draw on. */
   groundSource(b: Building, atMs: number): GroundSource {
     if (!this.hasAtlas) return { kind: "borehole", zone: null, conditions: false, costFactor: 1 };

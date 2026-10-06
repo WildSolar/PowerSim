@@ -32,3 +32,4 @@ app/public/data/*
 !app/public/data/wetzikon-zh.json
 # Par (sim/par.ts): computed with the game, not the pipeline — committed.
 !app/public/data/par/
+pipeline/.cache/

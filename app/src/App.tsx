@@ -41,6 +41,7 @@ import { useStockBuildings } from "./ui/useStock";
 import { stock } from "./sim/stock";
 import { streets } from "./sim/streets";
 import { districtHeat } from "./sim/districtHeat";
+import { districtHeatSources } from "./sim/districtHeatSources";
 import { publicCharging } from "./sim/publicCharging";
 import { grid } from "./sim/grid";
 import { inbox } from "./sim/inbox";
@@ -49,8 +50,7 @@ import { letters } from "./sim/letters";
 import { newspaper } from "./sim/newspaper";
 import { InboxPanel, InboxToast, type InboxSelection } from "./ui/InboxPanel";
 import { heatPumpSiting } from "./sim/heatPumpSiting";
-import { setDistrictHeatLimit } from "./sim/gridLimits";
-import { networkFullAt } from "./sim/districtHeatStats";
+import { sizeUnreportedSources } from "./sim/districtHeatStats";
 import { setMeasureAvailability } from "./sim/measureAvailability";
 import { studies } from "./sim/studies";
 import { municipalSolarCandidates } from "./sim/solarAdoption";
@@ -80,7 +80,7 @@ function returnToMenu() {
 // Dev-only handle for inspecting the simulation from the browser console.
 if (import.meta.env.DEV) import("./dev/scenario").then((m) => Object.assign(window, { __scenario: m.runScenario }));
 if (import.meta.env.DEV) import("./dev/perf").then((m) => Object.assign(window, { __perf: m.runPerf, __perfYearEnd: m.timeYearEndReport, __perfNewYear: m.timeNewYearPieces, __perfMapTick: m.timeMapPowerTick, __perfRolling: m.timeRollingChart }));
-if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore, tariffStore, market, inbox, dynamicTariff, grid } });
+if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore, tariffStore, market, inbox, dynamicTariff, grid, districtHeat, districtHeatSources } });
 if (import.meta.env.DEV) import("./sim/saveGame").then((m) => Object.assign(window, { __save: m }));
 if (import.meta.env.DEV) import("./sim/history").then((m) => Object.assign(window, { __history: m }));
 if (import.meta.env.DEV) import("./dev/par").then((m) => Object.assign(window, { __computePar: m.computePar }));
@@ -198,6 +198,7 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
         studies.init(`studies:${loaded.bfsNumber}`);
         streets.init(loaded); // before the stock: new buildings are linked to their street, and to the district heating network
         districtHeat.init(loaded);
+        districtHeatSources.init(loaded, () => stock.getAll());
         zoning.init(loaded); // before the stock: new buildings ask their parcel what it allows
         heatPumpSiting.init(loaded, () => stock.getAll()); // before the stock: heating decisions ask it where a heat pump may go
         publicCharging.init(loaded, 0);
@@ -217,7 +218,7 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
         );
         bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building
         grid.init(loaded, () => stock.getAll()); // last: it reads every building's draw, public chargers included
-        setDistrictHeatLimit((atMs) => networkFullAt(stock.getAll(), atMs));
+        sizeUnreportedSources(stock.getAll(), 0); // the starting networks that didn't report their capacity
         debt.init(() => stock.getAll(), `rates:${loaded.bfsNumber}`);
         // Letters and the paper last: they read everything above.
         inbox.init();

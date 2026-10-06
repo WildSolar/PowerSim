@@ -76,6 +76,16 @@ export function LayerLegend({ mode }: { mode: ColorMode }) {
               <span>{line.label}</span>
             </div>
           ))}
+          {[
+            { label: "Heat source", fill: PIPE_COLOR, stroke: "#fff" },
+            { label: "Heat source being built", fill: PIPE_UNDER_CONSTRUCTION_COLOR, stroke: "#fff" },
+            { label: "Heat within reach", fill: "#fff", stroke: PIPE_COLOR },
+          ].map((dot) => (
+            <div className="legend-row" key={dot.label}>
+              <span className="swatch" style={{ background: dot.fill, border: `2px solid ${dot.stroke}`, borderRadius: "50%", boxShadow: "0 0 0 1px var(--line)" }} />
+              <span>{dot.label}</span>
+            </div>
+          ))}
           <div className="legend-row">
             <span className="swatch" style={{ background: `repeating-linear-gradient(135deg, ${DH_PRIORITY_COLOR} 0 3px, transparent 3px 7px)`, border: `1px solid ${DH_PRIORITY_COLOR}` }} />
             <span>District-heat priority zone</span>

@@ -16,6 +16,9 @@ import { useMapKeyboard } from "./useMapKeyboard";
 import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { snowDepthCm } from "../sim/snow";
 import { districtHeat } from "../sim/districtHeat";
+import { candidateName, districtHeatSources } from "../sim/districtHeatSources";
+import { DH_SURFACE_WATER_MAX_DISTANCE_M, DH_WOOD_NUISANCE_RADIUS_M } from "../config/districtHeat";
+import { groundRule } from "../config/heatPumpSiting";
 import { mapNetworkBucketAt } from "../sim/districtHeatStats";
 import { streets } from "../sim/streets";
 import { pointsAt, publicCharging, siteCapacityAt, type ChargingSite } from "../sim/publicCharging";
@@ -84,6 +87,12 @@ const STREET_HIT_LAYER_ID = "streets-hit"; // wide and invisible: what a click o
 const DH_SOURCE_SOURCE_ID = "district-heat-source";
 const DH_TRUNK_LAYER_ID = "district-heat-trunk";
 const DH_PLANT_LAYER_ID = "district-heat-plant";
+const DH_NUISANCE_LAYER_ID = "district-heat-nuisance";
+const DH_OVERLAY_SOURCE_ID = "district-heat-overlay";
+const DH_OVERLAY_FILL_LAYER_ID = "district-heat-overlay-fill";
+const DH_OVERLAY_LINE_LAYER_ID = "district-heat-overlay-reach";
+// Where a planned plant may go (a usable aquifer, a river or lake and the band along it).
+const DH_SITE_AREA_COLOR = "#2a78d6";
 const STREET_CLICK_TOLERANCE_PX = 6;
 const EV_CHARGING_TICK_MS = 3000; // cars booked to chargers, sites opening and filling up
 
@@ -297,25 +306,63 @@ function streetsToGeoJSON(simTimeMs: number) {
   };
 }
 
-/** The heat source: where the plant is and, for heat arriving from a neighbouring municipality,
- * the trunk line from it to where the network is fed. */
-function districtHeatSourceGeoJSON() {
-  const source = districtHeat.getSource();
+/** District heating's plants: every source (running, or being built) with the trunk line from a
+ * plant away from the streets to where it feeds in; the plants within reach that could give heat
+ * (incinerators, treatment plants, factories that have made an offer); and the plant being
+ * planned, with its feed line — and for a wood plant, the ring of homes that will mind it. */
+function districtHeatSitesGeoJSON(simTimeMs: number) {
   const features: object[] = [];
-  if (source) {
-    features.push({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [source.lon, source.lat] } });
-    if (source.kind === "import") {
+  const line = (from: [number, number], to: [number, number], state: string) =>
+    features.push({ type: "Feature", properties: { state }, geometry: { type: "LineString", coordinates: [from, to] } });
+  for (const s of districtHeat.getSources()) {
+    if (s.hidden) continue;
+    const state = s.fromMs <= simTimeMs ? "running" : "building";
+    features.push({ type: "Feature", properties: { state }, geometry: { type: "Point", coordinates: [s.lon, s.lat] } });
+    if (s.trunkM > 0) line([s.lon, s.lat], [s.feedLon, s.feedLat], state);
+  }
+  const draft = districtHeatSources.getDraft();
+  for (const c of districtHeatSources.availableCandidates(simTimeMs)) {
+    features.push({ type: "Feature", properties: { state: draft?.candidateId === c.id ? "draft" : "candidate", candidate: c.id }, geometry: { type: "Point", coordinates: [c.lon, c.lat] } });
+  }
+  if (draft && draft.lon !== null && draft.lat !== null) {
+    const q = districtHeatSources.quote(simTimeMs);
+    if (!draft.candidateId) features.push({ type: "Feature", properties: { state: q.problem ? "draftBad" : "draft" }, geometry: { type: "Point", coordinates: [draft.lon, draft.lat] } });
+    if (q.feed && !q.problem) line([draft.lon, draft.lat], [q.feed.lon, q.feed.lat], "draft");
+    if (draft.kind === "wood") {
+      const ring: [number, number][] = [];
+      const mPerLat = 111_320;
+      const mPerLon = mPerLat * Math.cos((draft.lat * Math.PI) / 180);
+      for (let i = 0; i <= 48; i++) {
+        const angle = (i / 48) * 2 * Math.PI;
+        ring.push([draft.lon + (Math.cos(angle) * DH_WOOD_NUISANCE_RADIUS_M) / mPerLon, draft.lat + (Math.sin(angle) * DH_WOOD_NUISANCE_RADIUS_M) / mPerLat]);
+      }
+      features.push({ type: "Feature", properties: { state: "nuisance" }, geometry: { type: "Polygon", coordinates: [ring] } });
+    }
+  }
+  return { type: "FeatureCollection" as const, features };
+}
+
+/** Where the plant being planned may go: for a groundwater heat pump the atlas zones that allow
+ * groundwater use, for a river or lake heat pump the water (with a band as wide as the distance a
+ * plant may stand from it). */
+function districtHeatOverlayGeoJSON() {
+  const draft = districtHeatSources.getDraft();
+  const features: object[] = [];
+  if (draft?.kind === "groundwater" && !draft.candidateId) {
+    // The protection zones around drinking-water wells lie inside their aquifer: drawn over it, as off limits.
+    for (const z of heatPumpSiting.getZones()) {
+      if (groundRule(z.zone).groundwaterFromKw === null && z.zone !== "A") continue;
       features.push({
         type: "Feature",
-        properties: {},
-        geometry: {
-          type: "LineString",
-          coordinates: [
-            [source.lon, source.lat],
-            [source.feedLon, source.feedLat],
-          ],
-        },
+        properties: { part: z.zone === "A" ? "blocked" : "area" },
+        geometry: { type: "MultiPolygon", coordinates: z.polygons.map((rings) => rings.map((ring) => ring.map((p) => heatPumpSiting.toLonLat(p)))) },
       });
+    }
+  }
+  if (draft?.kind === "surfaceWater") {
+    for (const rings of districtHeat.getWater()) {
+      features.push({ type: "Feature", properties: { part: "area" }, geometry: { type: "Polygon", coordinates: rings } });
+      for (const ring of rings) features.push({ type: "Feature", properties: { part: "reach" }, geometry: { type: "LineString", coordinates: ring } });
     }
   }
   return { type: "FeatureCollection" as const, features };
@@ -792,14 +839,45 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         layout: { visibility: dhVisibility },
         paint: { "line-color": "#000", "line-width": metresWide(NETWORK_LINE_WIDTH_M, 16) as never, "line-opacity": 0 },
       });
-      map.addSource(DH_SOURCE_SOURCE_ID, { type: "geojson", data: districtHeatSourceGeoJSON() as never });
+      map.addSource(DH_OVERLAY_SOURCE_ID, { type: "geojson", data: districtHeatOverlayGeoJSON() as never });
+      map.addLayer({
+        id: DH_OVERLAY_FILL_LAYER_ID,
+        type: "fill",
+        source: DH_OVERLAY_SOURCE_ID,
+        filter: ["in", ["get", "part"], ["literal", ["area", "blocked"]]],
+        layout: { visibility: dhVisibility },
+        paint: { "fill-color": ["match", ["get", "part"], "blocked", PIPE_UNCONNECTED_COLOR, DH_SITE_AREA_COLOR], "fill-opacity": ["match", ["get", "part"], "blocked", 0.3, 0.22] },
+      });
+      map.addLayer({
+        id: DH_OVERLAY_LINE_LAYER_ID,
+        type: "line",
+        source: DH_OVERLAY_SOURCE_ID,
+        filter: ["==", ["get", "part"], "reach"],
+        layout: { visibility: dhVisibility, "line-join": "round" },
+        // Twice as wide as the distance a plant may stand from the water: the band reaches that far out.
+        paint: { "line-color": DH_SITE_AREA_COLOR, "line-opacity": 0.18, "line-width": metresWide(2 * DH_SURFACE_WATER_MAX_DISTANCE_M, 2) as never },
+      });
+      map.addSource(DH_SOURCE_SOURCE_ID, { type: "geojson", data: districtHeatSitesGeoJSON(simClock.getSimTimeMs()) as never });
+      map.addLayer({
+        id: DH_NUISANCE_LAYER_ID,
+        type: "fill",
+        source: DH_SOURCE_SOURCE_ID,
+        filter: ["==", ["get", "state"], "nuisance"],
+        layout: { visibility: dhVisibility },
+        paint: { "fill-color": PIPE_UNCONNECTED_COLOR, "fill-opacity": 0.12, "fill-outline-color": PIPE_UNCONNECTED_COLOR },
+      });
       map.addLayer({
         id: DH_TRUNK_LAYER_ID,
         type: "line",
         source: DH_SOURCE_SOURCE_ID,
         filter: ["==", ["geometry-type"], "LineString"],
         layout: { visibility: dhVisibility },
-        paint: { "line-color": PIPE_COLOR, "line-width": 4, "line-dasharray": [2, 1.5], "line-opacity": 0.8 },
+        paint: {
+          "line-color": ["match", ["get", "state"], "building", PIPE_UNDER_CONSTRUCTION_COLOR, "draft", PIPE_PLANNED_COLOR, PIPE_COLOR],
+          "line-width": 4,
+          "line-dasharray": [2, 1.5],
+          "line-opacity": 0.8,
+        },
       });
       map.addLayer({
         id: DH_PLANT_LAYER_ID,
@@ -807,7 +885,24 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         source: DH_SOURCE_SOURCE_ID,
         filter: ["==", ["geometry-type"], "Point"],
         layout: { visibility: dhVisibility },
-        paint: { "circle-radius": 9, "circle-color": PIPE_COLOR, "circle-stroke-color": "#fff", "circle-stroke-width": 2 },
+        paint: {
+          "circle-radius": ["match", ["get", "state"], "candidate", 7, 9],
+          "circle-color": [
+            "match",
+            ["get", "state"],
+            "building",
+            PIPE_UNDER_CONSTRUCTION_COLOR,
+            "candidate",
+            "#ffffff",
+            "draft",
+            PIPE_PLANNED_COLOR,
+            "draftBad",
+            PIPE_UNCONNECTED_COLOR,
+            PIPE_COLOR,
+          ],
+          "circle-stroke-color": ["match", ["get", "state"], "candidate", PIPE_COLOR, "#fff"],
+          "circle-stroke-width": ["match", ["get", "state"], "candidate", 3, 2],
+        },
       });
 
       // Zoning: the parcels on the ground, under the buildings, shown only in that layer.
@@ -1156,6 +1251,27 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         if (colorModeRef.current === "districtHeat") {
           const { x, y } = e.point;
           const r = STREET_CLICK_TOLERANCE_PX;
+          // Placing a plant: the click is where it goes.
+          const draft = districtHeatSources.getDraft();
+          if (draft && !draft.candidateId) {
+            districtHeatSources.placeDraft(e.lngLat.lng, e.lngLat.lat);
+            return;
+          }
+          // A plant within reach: plan drawing heat from it.
+          const site = map
+            .queryRenderedFeatures(
+              [
+                [x - r, y - r],
+                [x + r, y + r],
+              ],
+              { layers: [DH_PLANT_LAYER_ID] },
+            )
+            .find((f) => f.properties?.candidate);
+          if (site) {
+            const c = districtHeat.getCandidates().find((x2) => x2.id === site.properties?.candidate);
+            if (c) districtHeatSources.startDraft(c.kind, c.id);
+            return;
+          }
           const hit = map.queryRenderedFeatures(
             [
               [x - r, y - r],
@@ -1375,23 +1491,57 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       STREET_HIT_LAYER_ID,
       DH_TRUNK_LAYER_ID,
       DH_PLANT_LAYER_ID,
+      DH_NUISANCE_LAYER_ID,
+      DH_OVERLAY_FILL_LAYER_ID,
+      DH_OVERLAY_LINE_LAYER_ID,
       DH_PRIORITY_FILL_LAYER_ID,
       DH_PRIORITY_LINE_LAYER_ID,
     ];
     const visible = colorMode === "districtHeat";
     for (const id of layers) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
-    if (!visible) return;
-
-    const source = districtHeat.getSource();
-    let label: Marker | null = null;
-    if (source) {
-      const el = document.createElement("div");
-      el.className = "district-heat-source-label";
-      el.textContent = `🏭 ${source.name}`;
-      label = new Marker({ element: el, anchor: "left", offset: [14, 0] }).setLngLat([source.lon, source.lat]).addTo(map);
+    if (!visible) {
+      districtHeatSources.cancelDraft();
+      return;
     }
 
+    // A label by every plant, and by those within reach.
+    let labels: Marker[] = [];
+    let labelKey = "";
+    const drawLabels = () => {
+      const now = simClock.getSimTimeMs();
+      const items = [
+        ...districtHeat
+          .getSources()
+          .filter((s) => !s.hidden && !s.unregistered)
+          .map((s) => ({ key: s.id, lon: s.lon, lat: s.lat, text: `${s.fromMs <= now ? "🏭" : "🚧"} ${s.name}`, candidate: false })),
+        ...districtHeatSources
+          .availableCandidates(now)
+          .map((c) => ({ key: c.id, lon: c.lon, lat: c.lat, text: c.kind === "industry" ? `${candidateName(c)} · waste heat on offer` : c.name, candidate: true })),
+      ];
+      // Several sources at one plant (a network's own and an addition) share a label.
+      const byPlace = new Map<string, (typeof items)[number]>();
+      for (const item of items) {
+        const at = `${item.lon.toFixed(4)},${item.lat.toFixed(4)}`;
+        const prev = byPlace.get(at);
+        byPlace.set(at, prev ? { ...prev, text: `${prev.text} · ${item.text.replace(/^\S+ /, "")}` } : item);
+      }
+      const key = [...byPlace.values()].map((i) => `${i.key}:${i.text}`).join("|");
+      if (key === labelKey) return;
+      labelKey = key;
+      for (const m of labels) m.remove();
+      labels = [...byPlace.values()].map((item) => {
+        const el = document.createElement("div");
+        el.className = `district-heat-source-label${item.candidate ? " candidate" : ""}`;
+        el.textContent = item.text;
+        return new Marker({ element: el, anchor: "left", offset: [14, 0] }).setLngLat([item.lon, item.lat]).addTo(map);
+      });
+    };
+
     const tick = () => {
+      (map.getSource(DH_SOURCE_SOURCE_ID) as GeoJSONSource | undefined)?.setData(districtHeatSitesGeoJSON(simClock.getSimTimeMs()) as never);
+      (map.getSource(DH_OVERLAY_SOURCE_ID) as GeoJSONSource | undefined)?.setData(districtHeatOverlayGeoJSON() as never);
+      map.getCanvas().style.cursor = districtHeatSources.getDraft()?.candidateId === null ? "crosshair" : "";
+      drawLabels();
       (map.getSource(STREET_SOURCE_ID) as GeoJSONSource | undefined)?.setData(streetsToGeoJSON(simClock.getSimTimeMs()));
       (map.getSource(ZONE_SOURCE_ID) as GeoJSONSource | undefined)?.setData(zoneParcelsGeoJSON(simClock.getSimTimeMs())); // priority zones come into force over time
       const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
@@ -1411,10 +1561,12 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     tick();
     const interval = setInterval(tick, DISTRICT_HEAT_TICK_MS);
     const unsubscribe = districtHeat.subscribe(tick);
+    const unsubscribeSources = districtHeatSources.subscribe(tick);
     return () => {
       clearInterval(interval);
       unsubscribe();
-      label?.remove();
+      unsubscribeSources();
+      for (const m of labels) m.remove();
     };
   }, [colorMode, dataset]);
 

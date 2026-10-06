@@ -48,6 +48,7 @@ import { approval, type ApprovalEvent, type Stances } from "./approval";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { debt } from "./debt";
 import { districtHeat } from "./districtHeat";
+import { candidateName, districtHeatSources } from "./districtHeatSources";
 import { simClock } from "./engine";
 import { grid } from "./grid";
 import { gridDrawBlockedAt } from "./gridLimits";
@@ -67,6 +68,7 @@ import {
   requestText,
   resolvedByOthersText,
   voteResultText,
+  heatOfferText,
   welcomeText,
   type LetterText,
   type Mood,
@@ -207,6 +209,7 @@ class Letters {
     const start = monthStartMs(month);
     const rng = mulberry32(hashSeed(this.seed, "month", String(month)));
     this.reports(month - 1, start, rng);
+    this.heatOffers(month - 1);
     this.moods(month, start, rng);
     if (rng() < REQUEST_CHANCE_PER_MONTH) this.maybeRequest(start, rng);
   }
@@ -280,6 +283,33 @@ class Letters {
       this.post({ atMs: start + Math.floor(rng() * 26) * DAY_MS, kind: "mood", ...this.organisation(b), ...moodText(b, mood, cause, rng()) });
       this.lastMood.set(b, month);
       written++;
+    }
+  }
+
+  // --- offers ---
+
+  /** A factory offering its waste heat for district heating (districtHeatSources.ts), dated the day
+   * the offer was made. */
+  private heatOffers(month: number): void {
+    const from = monthStartMs(month);
+    const to = monthStartMs(month + 1);
+    for (const c of districtHeat.getCandidates()) {
+      if (c.kind !== "industry") continue;
+      const atMs = districtHeatSources.offerAtMs(c);
+      if (atMs < from || atMs >= to) continue;
+      const b = c.egid ? this.buildingsProvider().find((x) => x.egid === c.egid) : undefined;
+      const quote = districtHeatSources.candidateQuote(c, atMs);
+      const where = b?.address ?? "our site";
+      const name = candidateName(c);
+      this.post({
+        atMs,
+        kind: "offer",
+        bloc: "business",
+        from: `${name}, ${where}`,
+        role: "",
+        focus: { lon: c.lon, lat: c.lat, egid: c.egid },
+        ...heatOfferText(name, Math.round(c.potentialMwh ?? 0), quote.sizeMw, quote.yearlyRp, quote.capexRp, districtHeat.servesAt(b?.streetSegments, atMs)),
+      });
     }
   }
 

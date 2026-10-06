@@ -7,9 +7,10 @@
  * spending will draw down.
  *
  * Electricity, plus district heating: the municipal utility also runs the
- * district heating network (districtHeat.ts) — it sells the heat at the
- * tariff's district heating price, buys it from the network's source, and
- * pays for the pipes' upkeep. Gas, oil and petrol/diesel are paid straight to
+ * district heating networks (districtHeat.ts) — it sells the heat at the
+ * tariff's district heating price, pays for making it (fuel, the heat pumps'
+ * power, heat bought from incinerators — districtHeatDispatch.ts), and for
+ * the upkeep of the pipes and plants. Gas, oil and petrol/diesel are paid straight to
  * their own external suppliers, never through the municipal utility, so they
  * don't appear here even though they're billed to the consumer (see billing.ts). Cantonal
  * heating/EV subsidies (heatingSystems.ts/mobilitySystems.ts) aren't paid by
@@ -47,9 +48,8 @@ import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 import { PAYOUT_CATEGORIES, treasury, type PayoutsByCategory } from "./treasury";
 import { monthElectricity, monthHeatingTechnology } from "./yearReport";
-import { DH_NETWORK_UPKEEP_CHF_PER_M_YEAR, DH_SOURCE_HEAT_PRICE_RP_PER_KWH } from "../config/districtHeat";
+import { dhFixedCostRpPerYear, dhProductionCostRp } from "./districtHeatDispatch";
 import { UTILITY_PROFIT_RETAINED_SHARE } from "../config/treasury";
-import { districtHeat } from "./districtHeat";
 import { publicCharging } from "./publicCharging";
 
 export interface MunicipalFinances {
@@ -59,8 +59,8 @@ export interface MunicipalFinances {
   wholesaleCostRp: number; // paid upstream for the net electricity actually drawn from the wider grid (consumption minus all local solar)
   gridMaintenanceCostRp: number; // wires/upkeep cost, scaled to gross electricity delivered to consumers
   districtHeatRevenueRp: number; // district heat sold to connected buildings, at the tariff's district heating price
-  districtHeatPurchaseRp: number; // that heat, bought from the network's source
-  districtHeatUpkeepRp: number; // running the pipes, per metre of piped street
+  districtHeatPurchaseRp: number; // making that heat: fuel, the heat pumps' power, heat bought (less wood plants' power sold)
+  districtHeatUpkeepRp: number; // the pipes, the plants, factory contracts and concessions
   publicChargingRevenueRp: number; // sold at the municipality's own public chargers, at the tariff's public charging prices
   publicChargingUpkeepRp: number; // keeping those chargers running
   profitTransferRp: number; // the utility's profit handed to the municipality's general account (all but the department's share)
@@ -172,9 +172,11 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
   const grossKWh = energyKWh(times, consumptionW);
   const netKWh = grossKWh - energyKWh(times, series.solarW);
 
-  // District heat: the heat delivered (the report's heating-technology pass), and the pipes' upkeep.
-  const districtHeatKWh = (await monthHeatingTechnology(buildings, year, month)).districtHeatingSpaceKWh;
-  const pipedM = districtHeat.pipedLengthM(toSimTimeMs(Date.UTC(year, month, 15)));
+  // District heat: the heat delivered and who made it (the report's heating-technology pass), and
+  // the upkeep of the pipes and plants.
+  const heating = await monthHeatingTechnology(buildings, year, month);
+  const districtHeatKWh = heating.districtHeatingSpaceKWh;
+  const midMonthMs = toSimTimeMs(Date.UTC(year, month, 15));
 
   // The municipality's own public chargers sell at their own price. Their energy is part of the
   // town's metered consumption above, billed there at the household tariff — taken back out of
@@ -186,8 +188,8 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
     wholesaleCostRp: netKWh * (tariff.wholesalePriceRpKWh + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare),
     gridMaintenanceCostRp: grossKWh * tariff.gridMaintenanceRpKWh,
     districtHeatRevenueRp: districtHeatKWh * tariff.districtHeatingPriceRpKWh,
-    districtHeatPurchaseRp: districtHeatKWh * DH_SOURCE_HEAT_PRICE_RP_PER_KWH,
-    districtHeatUpkeepRp: (pipedM * DH_NETWORK_UPKEEP_CHF_PER_M_YEAR * 100) / 12,
+    districtHeatPurchaseRp: dhProductionCostRp(heating.districtHeat, midMonthMs),
+    districtHeatUpkeepRp: dhFixedCostRpPerYear(midMonthMs) / 12,
     publicChargingRevenueRp: charging.revenueRp,
     publicChargingUpkeepRp: charging.upkeepRp,
   };

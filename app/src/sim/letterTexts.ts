@@ -114,6 +114,21 @@ export function campaignText(bloc: Bloc, supports: boolean, title: string, when:
 }
 
 /** The town clerk's notice of a vote's result. `againFrom`: when a rejected measure may be put forward again. */
+/** A factory offering its waste heat to the utility. */
+export function heatOfferText(site: string, potentialMwh: number, mw: number, yearlyRp: number, connectionRp: number, onPipes: boolean): LetterText {
+  const chf = (rp: number) => `CHF ${Math.round(rp / 100).toLocaleString("de-CH")}`;
+  return {
+    subject: "Our waste heat, for the town's district heating",
+    paragraphs: [
+      `Our ${site.toLowerCase()} gives off about ${potentialMwh.toLocaleString("de-CH")} MWh of heat a year — cooling water and exhaust that now go into the air. We would rather it heated homes.`,
+      `We offer it to the municipal utility: about ${mw.toFixed(1)} MW, for a fixed ${chf(yearlyRp)} a year. The utility would build the heat exchanger and the connection, about ${chf(connectionRp)}.`,
+      onPipes
+        ? "The district heating network already runs past our gate. Our offer stands — you will find it in the District heating layer."
+        : "The district heating network doesn't reach us yet: the pipes would have to come our way. Our offer stands — you will find it in the District heating layer.",
+    ],
+  };
+}
+
 export function voteResultText(title: string, accepted: boolean, yesShare: number, againFrom: string | null): LetterText {
   const yes = Math.round(yesShare);
   return accepted

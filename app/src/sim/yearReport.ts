@@ -38,6 +38,8 @@ import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 import { dwellingWaterHeaterProfile, waterHeaterPowerW, waterHeatingKind, type WaterHeaterProfile } from "./waterHeating";
 import { dailyMeanTempC, weatherAt } from "./weather";
+import { districtHeat, type DhNetworkInfo } from "./districtHeat";
+import { addDhEnergy, dispatchInstant, zeroDhEnergy, type DhEnergyKWh } from "./districtHeatDispatch";
 
 const SAMPLES_PER_MONTH = 24; // matches historyLong.ts's own per-period density
 const COARSE_SAMPLES_PER_MONTH = 8; // for quantities that don't need weather-grade resolution — see computeMobilityFuelLiters
@@ -145,17 +147,33 @@ export interface HeatingTechnologyEnergyKWh {
   districtHeatingSpaceKWh: number;
   heatPumpWaterKWh: number;
   directElectricWaterKWh: number;
+  /** Who made the district heat (districtHeatDispatch.ts) — delivered heat plus the pipes' losses. */
+  districtHeat: DhEnergyKWh;
 }
 
-const ZERO_TECHNOLOGY_ENERGY_KWH: HeatingTechnologyEnergyKWh = {
-  airHeatPumpSpaceKWh: 0,
-  groundHeatPumpSpaceKWh: 0,
-  gasBoilerSpaceKWh: 0,
-  oilBoilerSpaceKWh: 0,
-  districtHeatingSpaceKWh: 0,
-  heatPumpWaterKWh: 0,
-  directElectricWaterKWh: 0,
-};
+type TechnologyAmount = Exclude<keyof HeatingTechnologyEnergyKWh, "districtHeat">;
+const TECHNOLOGY_AMOUNTS: TechnologyAmount[] = [
+  "airHeatPumpSpaceKWh",
+  "groundHeatPumpSpaceKWh",
+  "gasBoilerSpaceKWh",
+  "oilBoilerSpaceKWh",
+  "districtHeatingSpaceKWh",
+  "heatPumpWaterKWh",
+  "directElectricWaterKWh",
+];
+
+function zeroTechnologyEnergy(): HeatingTechnologyEnergyKWh {
+  return {
+    airHeatPumpSpaceKWh: 0,
+    groundHeatPumpSpaceKWh: 0,
+    gasBoilerSpaceKWh: 0,
+    oilBoilerSpaceKWh: 0,
+    districtHeatingSpaceKWh: 0,
+    heatPumpWaterKWh: 0,
+    directElectricWaterKWh: 0,
+    districtHeat: zeroDhEnergy(),
+  };
+}
 
 interface TechnologySeriesW {
   airHeatPumpSpaceW: number[];
@@ -165,6 +183,10 @@ interface TechnologySeriesW {
   districtHeatingSpaceW: number[];
   heatPumpWaterW: number[];
   directElectricWaterW: number[];
+  /** District heat production by source, and by the boilers (districtHeatDispatch.ts). */
+  dhSourceW: Map<string, number[]>;
+  dhOilW: number[];
+  dhGasW: number[];
 }
 
 /** Space heating bucketed by which of the five systems is actually installed
@@ -181,8 +203,11 @@ function sampleTechnologySeries(buildings: Building[], times: number[]): Technol
     districtHeatingSpaceW: [],
     heatPumpWaterW: [],
     directElectricWaterW: [],
+    dhSourceW: new Map(),
+    dhOilW: [],
+    dhGasW: [],
   };
-  for (const t of times) {
+  for (const [i, t] of times.entries()) {
     const dailyMeanC = dailyMeanTempC(t);
     const outsideTempC = weatherAt(t).tempC;
     let air = 0;
@@ -192,6 +217,9 @@ function sampleTechnologySeries(buildings: Building[], times: number[]): Technol
     let district = 0;
     let hpWater = 0;
     let directWater = 0;
+    // Each network's load, for the dispatch.
+    const dhLoads = new Map<DhNetworkInfo, number>();
+    let dhOrphanW = 0;
     for (const building of buildings) {
       if (!existsAt(building, t)) continue;
       const heatingId = currentHeatingSystemId(building, t);
@@ -201,7 +229,12 @@ function sampleTechnologySeries(buildings: Building[], times: number[]): Technol
         else if (heatingId === "groundHeatPump") ground += thermalW;
         else if (heatingId === "gasBoiler") gas += thermalW;
         else if (heatingId === "oilBoiler") oil += thermalW;
-        else district += thermalW;
+        else {
+          district += thermalW;
+          const network = districtHeat.networkOf(building.streetSegments, t);
+          if (network) dhLoads.set(network, (dhLoads.get(network) ?? 0) + thermalW);
+          else dhOrphanW += thermalW;
+        }
       }
       const kind = waterHeatingKind(building, t);
       if (kind) {
@@ -219,6 +252,17 @@ function sampleTechnologySeries(buildings: Building[], times: number[]): Technol
     out.districtHeatingSpaceW.push(district);
     out.heatPumpWaterW.push(hpWater);
     out.directElectricWaterW.push(directWater);
+    const production = dispatchInstant(dhLoads, dhOrphanW);
+    for (const [id, w] of production.bySource) {
+      let series = out.dhSourceW.get(id);
+      if (!series) {
+        series = new Array(times.length).fill(0);
+        out.dhSourceW.set(id, series);
+      }
+      series[i] = w;
+    }
+    out.dhOilW.push(production.oilW);
+    out.dhGasW.push(production.gasW);
   }
   return out;
 }
@@ -249,6 +293,11 @@ export function monthHeatingTechnology(buildings: Building[], year: number, mont
       districtHeatingSpaceKWh: energyKWh(times, series.districtHeatingSpaceW),
       heatPumpWaterKWh: energyKWh(times, series.heatPumpWaterW),
       directElectricWaterKWh: energyKWh(times, series.directElectricWaterW),
+      districtHeat: {
+        bySource: Object.fromEntries([...series.dhSourceW].map(([id, w]) => [id, energyKWh(times, w)])),
+        boilerOilKWh: energyKWh(times, series.dhOilW),
+        boilerGasKWh: energyKWh(times, series.dhGasW),
+      },
     };
   });
 }
@@ -256,9 +305,10 @@ export function monthHeatingTechnology(buildings: Building[], year: number, mont
 /** Energy delivered per heating technology over the given calendar year (the report card's heating
  * pies, and emissions.ts's fossil fuel burned), month by month — see sharedMonth. */
 export async function computeHeatingTechnologyBreakdown(buildings: Building[], year: number): Promise<HeatingTechnologyEnergyKWh> {
-  const totals = { ...ZERO_TECHNOLOGY_ENERGY_KWH };
+  const totals = zeroTechnologyEnergy();
   for (const month of await eachMonth((m) => monthHeatingTechnology(buildings, year, m))) {
-    for (const key of Object.keys(totals) as (keyof HeatingTechnologyEnergyKWh)[]) totals[key] += month[key];
+    for (const key of TECHNOLOGY_AMOUNTS) totals[key] += month[key];
+    addDhEnergy(totals.districtHeat, month.districtHeat);
   }
   return totals;
 }

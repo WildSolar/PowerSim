@@ -21,11 +21,11 @@ import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { stock } from "../sim/stock";
 import { streets } from "../sim/streets";
 import { districtHeat } from "../sim/districtHeat";
+import { districtHeatSources } from "../sim/districtHeatSources";
 import { publicCharging } from "../sim/publicCharging";
 import { grid } from "../sim/grid";
 import { heatPumpSiting } from "../sim/heatPumpSiting";
-import { setDistrictHeatLimit } from "../sim/gridLimits";
-import { networkFullAt } from "../sim/districtHeatStats";
+import { sizeUnreportedSources } from "../sim/districtHeatStats";
 import { zoning, type ZoningAction } from "../sim/zoning";
 import { fleets } from "../sim/fleet";
 import { tariffStore } from "../sim/tariffStore";
@@ -185,6 +185,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   }
   streets.init(dataset);
   districtHeat.init(dataset);
+  districtHeatSources.init(dataset, () => stock.getAll());
   zoning.init(dataset); // before the stock: new buildings ask their parcel what it allows
   heatPumpSiting.init(dataset, () => stock.getAll()); // before the stock: heating decisions ask it where a heat pump may go
   publicCharging.init(dataset, 0);
@@ -194,7 +195,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   stock.init(dataset);
   bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building
   grid.init(dataset, () => stock.getAll()); // last: it reads every building's draw, public chargers included
-  setDistrictHeatLimit((atMs) => networkFullAt(stock.getAll(), atMs));
+  sizeUnreportedSources(stock.getAll(), 0);
 
   const startYear = new Date(toDateMs(0)).getUTCFullYear();
   const lastYear = Math.max(...spec.reportYears);

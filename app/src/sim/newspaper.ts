@@ -280,6 +280,12 @@ class Newspaper {
       else if (inMonth(order.orderedAtMs)) items.push({ priority: 38, headline: "District heating to be extended", body: `Work on ${(order.lengthM / 1000).toFixed(1)} km of new pipes is under way.` });
     }
 
+    for (const s of districtHeat.getSources()) {
+      if (s.existing) continue;
+      if (inMonth(s.fromMs)) items.push({ priority: 44, headline: `New heat for the district heating: ${s.name}`, body: `${(s.cleanW / 1e6).toFixed(1)} MW of ${s.label.toLowerCase()} is in service.` });
+      else if (s.orderedAtMs !== null && inMonth(s.orderedAtMs)) items.push({ priority: 40, headline: `Work starts on ${s.name}`, body: `${(s.cleanW / 1e6).toFixed(1)} MW of ${s.label.toLowerCase()} for the district heating, ready in ${Math.round((s.fromMs - s.orderedAtMs) / (30.44 * 24 * 3_600_000))} months.` });
+    }
+
     // Requests.
     for (const r of letters.resolvedIn(from, to)) {
       if (r.status === "granted") items.push({ priority: 28, headline: "Residents' wish granted", body: `They asked for ${r.ask}, and the town hall delivered.` });

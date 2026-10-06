@@ -160,20 +160,65 @@ export interface StreetSegment {
   line: [number, number][]; // [lon, lat]
 }
 
-export interface DistrictHeatSourceData {
-  name: string;
-  /** "plant": inside the municipality; "import": a trunk line from a plant in a neighbouring one;
-   * "unknown": the pipeline had to guess where the heat comes from. */
-  kind: "plant" | "import" | "unknown";
+/** Where a plant joins the street graph (pipeline/sources/district_heat.py). */
+export interface DhSiteData {
+  /** The plant itself. */
   lon: number;
   lat: number;
-  /** The street junction where the network is fed. */
+  /** The street junction the network is fed at. */
   node: number;
   feedLon: number;
   feedLat: number;
+  /** The trunk line from the plant to that junction (m; 0 when it stands at the street). */
+  trunkM: number;
+  /** The plant is in a neighbouring municipality. */
+  outside: boolean;
+}
+
+/** BFE energy sources, as the game reads them: a clean kind, or a fossil fuel. */
+export type DhNetworkSourceKind = "incinerator" | "industry" | "wastewater" | "groundwater" | "surfaceWater" | "wood" | "other" | "oil" | "gas";
+
+/** A district heating network the town starts with: its plant (from the BFE's register of thermal
+ * networks — or, where district-heated buildings have none near them, one of unknown origin) and
+ * the streets inferred to be piped. */
+export interface DhNetworkData extends DhSiteData {
+  name: string;
+  operator: string | null;
+  /** The year it went into service, where reported. */
+  since: number | null;
+  /** In the register (false: a plant the pipeline had to place at its customers' centre). */
+  known: boolean;
+  /** Its heat capacity, where reported (MW). */
+  powerMw: number | null;
+  /** What it runs on, main source first. */
+  sources: { kind: DhNetworkSourceKind; label: string }[];
+  segments: number[];
+}
+
+/** A place new heat could come from: an incinerator or a waste water treatment plant within reach,
+ * or a factory with waste heat to sell. */
+export interface DhCandidateData extends DhSiteData {
+  id: string;
+  kind: "incinerator" | "wastewater" | "industry";
+  name: string;
+  /** Incinerators: the heat and electricity delivered in the latest year reported (MWh). */
+  heatMwh?: number;
+  electricityMwh?: number;
+  /** Treatment plants and factories: the heat that could be recovered a year (MWh). */
+  potentialMwh?: number;
+  /** Factories: the building, and its branch (NOGA division). */
+  egid?: string;
+  noga?: number | null;
 }
 
 export interface DistrictHeatData {
-  source: DistrictHeatSourceData;
-  initialSegments: number[];
+  networks?: DhNetworkData[];
+  candidates?: DhCandidateData[];
+  /** Rivers and lakes big enough to draw heat from: polygons of rings, [lon, lat]. */
+  water?: [number, number][][][];
+  /** Forest in the municipality (ha): the local wood supply. */
+  forestHa?: number;
+  /** Older datasets: one network, its source and its piped streets. */
+  source?: { name: string; lon: number; lat: number; node: number; feedLon: number; feedLat: number };
+  initialSegments?: number[];
 }

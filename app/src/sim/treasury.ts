@@ -72,7 +72,7 @@ export const PAYOUT_LABEL: Record<PayoutCategory, string> = {
   retrofit: "Insulation retrofit subsidies",
   programs: "Campaigns and programmes",
   infrastructure: "Municipal infrastructure",
-  districtHeat: "District heating network extensions",
+  districtHeat: "District heating: pipes and plants",
   charging: "Public chargers",
   zoning: "Zoning plans",
   grid: "Grid reinforcement and batteries",

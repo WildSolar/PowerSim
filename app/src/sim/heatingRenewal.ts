@@ -52,7 +52,7 @@ import type { Tariff } from "./tariff";
 import { dailyMeanTempC } from "./weather";
 import { priceFactor } from "./costTrends";
 import { zoning } from "./zoning";
-import { districtHeatFullAt, gridDrawBlockedAt } from "./gridLimits";
+import { gridDrawBlockedAt } from "./gridLimits";
 import { heatPumpSiting } from "./heatPumpSiting";
 import { EARLY_SWITCH } from "../config/earlySwitch";
 import { earlyCandidates, earlySwitchChance } from "./earlySwitch";
@@ -195,7 +195,7 @@ function candidatesAt(
       // District heating needs a pipe in the street; one already connected keeps its connection. A
       // new heat pump needs room on the grid (a building replacing one keeps its connection).
       available:
-        (id === "districtHeating" ? incumbent === "districtHeating" || (districtHeat.servesAt(building.streetSegments, atMs) && !districtHeatFullAt(atMs)) : true) &&
+        (id === "districtHeating" ? incumbent === "districtHeating" || districtHeat.servesAt(building.streetSegments, atMs) : true) &&
         !(fossilBanned && (id === "gasBoiler" || id === "oilBoiler")) &&
         !(isHeatPump(id) && !isHeatPump(incumbent) && gridBlocked) &&
         sited,

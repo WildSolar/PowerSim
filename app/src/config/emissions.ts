@@ -47,10 +47,3 @@ export const HEATING_OIL_KG_CO2_PER_LITER = 2.65;
 // petrol 2.32 and diesel 2.62 kgCO2/L, averaged toward roughly Switzerland's
 // actual petrol-leaning car fleet split.
 export const ICE_CAR_FUEL_KG_CO2_PER_LITER = 2.45;
-
-// No official BAFU figure for Schweizer Fernwärme generally — real networks
-// vary hugely by heat source (waste incineration with a large biogenic
-// share, gas peaking plants, heat pumps, ...). A judgment call in the same
-// spirit as heatingSystems.ts's own install-cost figures: well below gas,
-// reflecting how much of the Swiss district-heat stock leans on waste heat.
-export const DISTRICT_HEATING_KG_CO2_PER_KWH = 0.12;

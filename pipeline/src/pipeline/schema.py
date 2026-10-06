@@ -74,8 +74,9 @@ class MunicipalityDataset:
     buildings: list[Building]
     power_plants: list[PowerPlant]
     streets: list[StreetSegment] = field(default_factory=list)
-    # The inferred starting network: {source: {name, kind, lon, lat, node, feed_lon, feed_lat},
-    # initial_segments: [ids]}, or None without district heat — see sources/district_heat.py.
+    # District heating: {networks: [the registered networks, each with its plant, sources and inferred
+    # pipes], candidates: [places new heat could come from], water: [river and lake polygons],
+    # forest_ha} — see sources/district_heat.py and sources/heat_sources.py.
     district_heat: dict | None = None
     # Public charging sites for electric cars, from the federal register — see sources/chargers.py:
     # {id, name, lon, lat, points, power_kw, kind: "ac" | "dc"}.

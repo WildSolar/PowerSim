@@ -133,6 +133,14 @@ export function setPriceStances(stances: (atMs: number) => Stances): void {
   priceStances = stances;
 }
 
+let localStances: (atMs: number) => Stances = () => ({});
+
+/** Registered by districtHeatSources.ts: how the neighbours of plants they mind (a wood plant's
+ * lorries and chimney) feel at `atMs` — a lasting pull, for as long as the plant runs. */
+export function setLocalStances(stances: (atMs: number) => Stances): void {
+  localStances = stances;
+}
+
 function clamp(x: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, x));
 }
@@ -370,6 +378,7 @@ class ApprovalEngine {
       stance += s > 0 ? s * (GOODWILL_FLOOR_SHARE + (1 - GOODWILL_FLOOR_SHARE) * Math.exp(-years / GOODWILL_FADE_YEARS)) : s;
     }
     stance += priceStances(atMs)[bloc] ?? 0;
+    stance += localStances(atMs)[bloc] ?? 0;
     const level = BASE_APPROVAL + MAX_SWING * this.sensitivity * Math.tanh(STANCE_SATURATION * stance);
     return clamp(level - fiscalPenalty * FISCAL_BLOC_WEIGHT[bloc] * this.sensitivity, 0, 100);
   }

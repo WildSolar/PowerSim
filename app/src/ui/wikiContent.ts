@@ -133,7 +133,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       ]),
       p("Planning tools:"),
       list([
-        "District heating — who is connected, who could be, the pipes and the heat source; extend the network here (see \"District heating network\").",
+        "District heating — who is connected, who could be, the pipes and the heat sources; extend the network and add heat sources here (see \"District heating network\" and \"Heat for district heating\").",
         "EV charging — where households could charge an electric car, and every public charger by how full it is; build chargers here (see \"Public charging\").",
         "Grid — the transformer areas and how loaded they are; reinforce them or add batteries here (see \"The electricity grid\").",
         "Zoning — the zoning plan, parcel by parcel; change it here (see \"Zoning\").",
@@ -196,7 +196,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Laws are cheap, but act only when something is replaced anyway — and they can be voted down. A strict standard can even backfire: a demanding minimum for renovations puts off owners who would have done a smaller upgrade.",
         "Information measures help people judge their options more sharply, so they act on clear savings and stop chasing marginal ones.",
         "Mobility measures act slowly: a bicycle network, better public transport or parking management shift a little of how people get around each time a household rethinks it. The car always keeps a share.",
-        "Green power and clean district heating cut the emissions of the electricity and heat the town uses; a climate campaign nudges households a little toward the greener option when it's a close call.",
+        "Green power cuts the emissions of the electricity the town uses; a climate campaign nudges households a little toward the greener option when it's a close call. District heating is made clean by building clean heat sources, not by a measure (see \"Heat for district heating\").",
       ]),
       p(
         "The canton and the Confederation act on their own schedule too: a ban on new fossil heating, an end to new petrol and diesel car sales, a renovation standard. Many cantons already require a renewable system when a fossil heating system is replaced (canton Zurich since 2022), so on Easy and Normal the canton's rule is in force from the start; Hard imagines it arriving later. You have no say and pay nothing, but they change what people decide. Each is announced years ahead — the Town hall's Overview shows what is coming — so you can plan around it rather than duplicate it.",
@@ -269,7 +269,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Electricity: what the town draws from the grid, less the solar it feeds back, times how clean Swiss electricity is that year. The national grid gets cleaner over the decades whatever you do; your levers are how much the town draws, and green power as the default for its customers.",
         "Gas and oil heating: the fuel actually burned for heating. Every boiler replaced by a heat pump or district heat takes its share away.",
-        "District heating: the heat delivered, unless the network's heat is made clean.",
+        "District heating: the oil and gas its boilers burn, and the electricity its heat pumps use (see \"Heat for district heating\"). Wood and waste heat count as clean.",
         "Transport: the petrol and diesel burned by households' cars and businesses' vans and lorries. Public transport, cycling and walking count as zero.",
       ]),
       p(
@@ -319,7 +319,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Building things — district heating pipes, public chargers, grid reinforcement, a zoning change — is paid the day it is ordered. Campaigns and programmes cost a little every month.",
       ),
       p(
-        "The utility settles each month once it is over: what customers paid for electricity and district heat, less the power and heat it bought, the solar it paid for, and the upkeep of the grid, the pipes and the chargers. Like Swiss municipal utilities, it hands three quarters of its profit to the town's general account; your department keeps a quarter. A loss stays with the department. Each month's share reaches the treasury a few days after the month ends; the year's accounts are closed on 31 December. You set the utility's prices in Town hall → Prices, once a year; what it pays for power follows the market (see \"Tariffs & energy prices\").",
+        "The utility settles each month once it is over: what customers paid for electricity and district heat, less the power it bought, the cost of making district heat (fuel, the heat pumps' power, heat bought from incinerators), the solar it paid for, and the upkeep of the grid, the pipes, the heat plants and the chargers. Like Swiss municipal utilities, it hands three quarters of its profit to the town's general account; your department keeps a quarter. A loss stays with the department. Each month's share reaches the treasury a few days after the month ends; the year's accounts are closed on 31 December. You set the utility's prices in Town hall → Prices, once a year; what it pays for power follows the market (see \"Tariffs & energy prices\").",
       ),
       note(
         "Federal and cantonal grants — the ones every heat pump, solar system and renovation already gets — aren't municipal money; only your own top-up is. Gas, oil and petrol are bought from outside suppliers, never through the utility. The department's share of the utility profit (about CHF 1.4 million a year at the starting prices) and the allocation (about CHF 3.3 million) are small next to a serious subsidy programme, so what you fund matters.",
@@ -331,7 +331,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Borrowing & debt",
     blocks: [
       p(
-        "Like a Swiss municipality's accounts, spending comes in two kinds. Investments — grid reinforcement and batteries, district heating pipes and supply, public chargers, solar on public buildings — build something that lasts: they may be paid with borrowed money, and they don't count toward the overspending taxpayers resent. Running spending — subsidies, campaigns, programmes, studies, zoning plans and interest — should be covered by income.",
+        "Like a Swiss municipality's accounts, spending comes in two kinds. Investments — grid reinforcement and batteries, district heating pipes and heat plants, public chargers, solar on public buildings — build something that lasts: they may be paid with borrowed money, and they don't count toward the overspending taxpayers resent. Running spending — subsidies, campaigns, programmes, studies, zoning plans and interest — should be covered by income.",
       ),
       list([
         "Bank loans: an amount and a term of 5, 10 or 20 years, repaid in equal monthly instalments (Town hall → Treasury → Borrowing). The rate is the market rate plus a margin for the department's credit rating, fixed for the life of the loan; longer loans cost a little more. Loans can be repaid early.",
@@ -623,19 +623,45 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "District heating network",
     blocks: [
       p(
-        "District heat reaches a building through pipes under its street, so a building can switch to it only if a street it borders is piped (a corner building has two chances). It still has to want to: owners connect when their heating is next replaced, if district heat is the better deal, and new buildings when they are permitted. Once connected, a building stays: a first connection costs around CHF 22,000 for a house, while renewing a connected building's substation costs around CHF 9,000.",
+        "District heat reaches a building through pipes under its street, so a building can switch to it only if a street it borders is piped (a corner building has two chances) and those pipes lead to a heat source in service. It still has to want to: owners connect when their heating is next replaced, if district heat is the better deal, and new buildings when they are permitted. Once connected, a building stays: a first connection costs around CHF 22,000 for a house, while renewing a connected building's substation costs around CHF 9,000. Every network in the game runs hot enough for radiators and hot water, so a connected building needs nothing else.",
       ),
       p(
-        "The heat comes from a source — often a waste-to-energy plant or a large wood-fired plant, sometimes in a neighbouring town, with the heat brought in by trunk line. The municipal utility buys the heat, sells it at the district heating price (Town hall → Prices) and pays for the pipes' upkeep, so a network full of customers earns money while a long pipe past few buildings costs it.",
+        "A town starts with the networks it really has — their plants, what they run on and how big they are, as their operators report them. Some run on wood or waste heat with an oil boiler for the coldest days; some on oil or gas alone. Whatever pipes hang together form one network: when two meet, they share their heat sources. The municipal utility runs them all: it sells the heat at the district heating price (Town hall → Prices), pays for making it and for the upkeep of the pipes and plants, so a network full of customers earns money while a long pipe past few buildings costs it.",
       ),
       p(
-        "To extend the network, open the District heating tool and click streets: each click picks one stretch between two junctions (click again to drop it), and the buildings it would newly reach light up in orange. An extension must connect to the network, directly or through the other streets you picked; a picked street that doesn't shows in red until the gap is closed. Every street the network could run along is shaded grey. The drawer shows the extension's length, cost and build time, and how much heat the buildings it reaches use a year — in total and per metre of pipe, the figure planners judge an extension by. Ordering pays the whole cost at once; the pipes are laid over the following months, and buildings along them can connect as soon as they are done.",
+        "Every network has boilers for whatever its clean sources can't deliver, so a network never runs out of heat — only out of clean heat. On a cold day the clean sources run flat out and the boilers make up the rest, burning oil (or gas). Each network's card in the District heating tool shows its clean sources against its winter peak. A source sized at half the peak already covers most of the year's heat, since the coldest days are few; covering the whole peak keeps the boilers cold. See \"Heat for district heating\" for adding sources.",
       ),
       p(
-        "The drawer also shows how much of the town's heated building stock the network serves and could serve — by number of buildings, floor area and heat demand — and compares the network's load on a cold winter day with what its source can deliver. When that is reached, the network is full: no new buildings can connect until you increase the supply (5 MW more, a peak boiler or a bigger contract, for CHF 2.5 million, ready a year later).",
+        "To extend the pipes, open the District heating tool and click streets: each click picks one stretch between two junctions (click again to drop it), and the buildings it would newly reach light up in orange. An extension must connect to the network or a heat source, directly or through the other streets you picked; a picked street that doesn't shows in red until the gap is closed. Every street the network could run along is shaded grey. The drawer shows the extension's length, cost and build time, and how much heat the buildings it reaches use a year — in total and per metre of pipe, the figure planners judge an extension by. Ordering pays the whole cost at once; the pipes are laid over the following months, and buildings along them can connect as soon as they are done.",
+      ),
+      p(
+        "The drawer also shows how much of the town's heated building stock the networks serve and could serve — by number of buildings, floor area and heat demand — and how much of last year's district heat came from clean sources.",
       ),
       note(
-        "Where the pipes run today isn't public, so the starting network is reconstructed from the buildings the register records as district-heated — plausible, not exact. Garages, sheds and buildings heated by wood never connect and show in pale grey. Costs are estimates: CHF 2,000 per metre of street (half again more on main roads), the heat bought at 7 Rp/kWh, CHF 10 per metre a year in upkeep. A town without a network can't build its own heat source yet.",
+        "Where the pipes run today isn't public, so the starting networks are reconstructed from the buildings the register records as district-heated, each joined to the nearest registered plant along the streets — plausible, not exact. Where a plant didn't report its size, it is taken as half again the winter peak of the buildings connected at the start; a clean source with a fossil boiler beside it is taken to carry a little over half. Garages, sheds and buildings heated by wood never connect and show in pale grey. Costs are estimates: CHF 2,000 per metre of street (half again more on main roads), CHF 10 per metre a year in upkeep, and a tenth of the heat lost on the way.",
+      ),
+    ],
+  },
+  {
+    id: "district-heat-sources",
+    title: "Heat for district heating",
+    blocks: [
+      p(
+        "New heat sources are ordered in the District heating tool, under New heat. Each feeds in at the street junction nearest to it: if the pipes don't reach there, extend them to it — or build a new network from it, street by street. A town with no district heating at all starts that way. A plant takes one to two years to build, longer with a trunk line, and is paid when ordered. Where the size is yours to choose, bigger plants cost less per MW.",
+      ),
+      list([
+        "Incinerator waste heat. A waste incineration plant within reach can sell the town some of its heat — what it doesn't already deliver or turn into electricity. A heat exchanger station, and a trunk line if the plant stands outside the town; the heat is bought per kWh, cheaply.",
+        "Industrial waste heat. Now and then a factory writes to offer the heat its processes throw away — cooling water, exhaust. Its size is what the factory has; the utility pays for the connection, then a fixed sum a year. The offers stay open, and show on the map.",
+        "Waste water. A treatment plant's cleaned water stays at 10–20 °C all year: a heat pump on it gives cheap, steady heat. The plant is public, so there is nothing to pay for the heat itself — only the heat pump, its power, and a trunk line if the plant is outside the town. How much it can give depends on the plant.",
+        "Groundwater. A heat pump on wells into the aquifer, anywhere the canton allows groundwater use (shaded on the map while you place it) — but not in the protection zones around drinking-water wells. A few MW at most per plant, and a yearly water-rights fee.",
+        "Rivers and lakes. A heat pump on a river or lake, standing no more than 100 m from the water. The water never runs out, so the size is yours.",
+        "Wood. A wood chip combined heat and power plant, anywhere in the municipality: heat for the network and power for the grid. To stay renewable, new wood plants together may burn no more than the town's own forest grows — in many towns, not much. And its neighbours mind the lorries and the chimney: homeowners and tenants within 300 m hold it against you for as long as it runs, more the more homes are near.",
+      ]),
+      p(
+        "Running costs differ: waste heat costs least to run, then the heat pumps (their electricity, at the market price), then wood (the chips, less the power it sells). A network uses its sources in that order, and the boilers last. Every source also has upkeep, whether it runs or not. Heat pumps count the emissions of the electricity they use; wood and waste heat count as clean, as in the national inventory; the boilers count their oil or gas.",
+      ),
+      note(
+        "Where heat could come from is real: the incinerators, treatment plants and industrial heat demand are the federal energy office's, the aquifers the canton's, and the forest and the water the land survey's. Which factories offer their heat, and how much, is the game's guess from their branch. Sizes, prices and costs are estimates. Deep geothermal heat isn't in the game yet: in Switzerland it is still about a decade away.",
       ),
     ],
   },
@@ -868,7 +894,7 @@ export const WIKI_GROUPS: WikiGroup[] = [
     id: "heating",
     title: "Heating",
     blurb: "How buildings are heated and insulated, where a heat pump may go, and district heating.",
-    sections: ["climate-control", "water-heating", "insulation", "heat-pump-siting", "district-heat"],
+    sections: ["climate-control", "water-heating", "insulation", "heat-pump-siting", "district-heat", "district-heat-sources"],
   },
   {
     id: "electricity",
