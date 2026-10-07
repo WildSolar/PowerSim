@@ -81,6 +81,9 @@ class MunicipalityDataset:
     # Farmland plots outside the building zones, for Agri-PV: [{id, number, name, area_m2,
     # prime_share, rings}] — see sources/farm.py.
     farm_plots: list = field(default_factory=list)
+    # Where wind turbines could stand: [{id, name, lon, lat, turbines: [{lon, lat, v_mean, a, k}]}]
+    # — see sources/wind.py.
+    wind_sites: list = field(default_factory=list)
     # Public charging sites for electric cars, from the federal register — see sources/chargers.py:
     # {id, name, lon, lat, points, power_kw, kind: "ac" | "dc"}.
     charging_sites: list = field(default_factory=list)

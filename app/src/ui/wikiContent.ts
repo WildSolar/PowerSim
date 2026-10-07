@@ -139,6 +139,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Zoning — the zoning plan, parcel by parcel; change it here (see \"Zoning\").",
         "Public buildings — the municipality's own buildings and what they carry; order solar and chargers for them here (see \"Public buildings\").",
         "Roof solar — large roofs by where a roof contract stands; rent them and put the utility's solar on them here (see \"Roof contracts\").",
+        "Wind — where turbines could stand, once a study has looked, and each wind park's long road through zoning, permit and the courts (see \"Wind power\").",
       ]),
     ],
   },
@@ -753,6 +754,27 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "wind",
+    title: "Wind power",
+    blocks: [
+      p(
+        "A wind turbine makes most of its power in winter, when solar makes least — just when Switzerland is short of electricity. But the road to one is long, and it can fail at every step. Open the Wind tool to take it, one step at a time.",
+      ),
+      list([
+        "The study (a year, CHF 120,000): until then nothing is known. It finds where turbines could stand — at least 400 m from every home, outside the building zones, off the water, with enough wind 125 m up (the federal wind atlas) — grouped into a few sites, each with its wind, its output and the homes within a kilometre. It may find nowhere.",
+        "The zoning plan (two years): a special-use zone for the park, which always goes to the voters. The town as a whole is split — the climate-minded for, homeowners against — and the homes within a kilometre of a turbine mind most: the more of the town's homes are that close, the harder the vote. Voted down, the site can be taken up again after four years.",
+        "The permit (a year and a half): the environmental impact assessment and the building permit. Then, more often than not, an appeal — landscape and bird protection, neighbours — which takes one to four years in the courts. Sometimes the court upholds it, and the permit is void: the site rests four years, then starts again from the zoning plan.",
+        "The build (a year): about CHF 8 million a turbine, half of it paid by the federal investment contribution; the rest is the utility's, an investment it may borrow for.",
+      ]),
+      p(
+        "The turbines are the utility's: what they make saves buying power at the wholesale price (no feed-in is paid for it), against about CHF 190,000 a year of upkeep per turbine. They turn with the weather: windier in winter, and windy when the weather systems bring cloud — when solar is weak. Their output is counted with the town's solar as local generation. The homes within a kilometre keep minding them for as long as they turn.",
+      ),
+      note(
+        "The turbine is a generic modern one for low wind (4.2 MW, 150 m rotor). The sites and their wind are real, from the federal wind atlas; the weather that turns them is the game's, scaled so a year gives what the atlas says. The canton's own wind planning isn't in the game, nor are bird and bat surveys, the military or air traffic — which in reality rule out more sites still.",
+      ),
+    ],
+  },
+  {
     id: "home-batteries",
     title: "Home batteries",
     blocks: [
@@ -940,7 +962,7 @@ export const WIKI_GROUPS: WikiGroup[] = [
     id: "electricity",
     title: "Electricity & solar",
     blurb: "The local grid, rooftop solar, and the batteries that smooth both.",
-    sections: ["grid", "solar", "roof-contracts", "agri-pv", "home-batteries"],
+    sections: ["grid", "solar", "roof-contracts", "agri-pv", "wind", "home-batteries"],
   },
   {
     id: "mobility",

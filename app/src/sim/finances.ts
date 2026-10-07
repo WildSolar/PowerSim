@@ -54,6 +54,8 @@ import { publicCharging } from "./publicCharging";
 import { irradianceWm2, PEAK_IRRADIANCE_WM2 } from "./pv";
 import { roofContracts } from "./roofContracts";
 import { agriPv } from "./agriPv";
+import { wind } from "./wind";
+import { windPowerW } from "./windPower";
 import { contractArrays } from "./solarAdoption";
 
 export interface MunicipalFinances {
@@ -68,6 +70,7 @@ export interface MunicipalFinances {
   publicChargingRevenueRp: number; // sold at the municipality's own public chargers, at the tariff's public charging prices
   publicChargingUpkeepRp: number; // keeping those chargers running
   roofContractCostRp: number; // the utility's arrays on rented roofs: the rent, and their upkeep (roofContracts.ts)
+  windUpkeepRp: number; // the utility's wind turbines (wind.ts)
   profitTransferRp: number; // the utility's profit handed to the municipality's general account (all but the department's share)
   zoningLevyRp: number; // value-capture levy on projects that gained from a zoning change (zoning.ts)
   borrowedRp: number; // money borrowed this year (debt.ts) — cash in, not income
@@ -111,6 +114,7 @@ export interface UtilityMonth {
   publicChargingRevenueRp: number;
   publicChargingUpkeepRp: number;
   roofContractCostRp: number;
+  windUpkeepRp: number;
 }
 
 const UTILITY_KEYS: (keyof UtilityMonth)[] = [
@@ -124,6 +128,7 @@ const UTILITY_KEYS: (keyof UtilityMonth)[] = [
   "publicChargingRevenueRp",
   "publicChargingUpkeepRp",
   "roofContractCostRp",
+  "windUpkeepRp",
 ];
 
 /** The utility's profit (or loss) in a month. */
@@ -138,7 +143,8 @@ export function utilityProfitRp(m: UtilityMonth): number {
     m.districtHeatPurchaseRp -
     m.districtHeatUpkeepRp -
     m.publicChargingUpkeepRp -
-    m.roofContractCostRp
+    m.roofContractCostRp -
+    m.windUpkeepRp
   );
 }
 
@@ -171,6 +177,11 @@ export function settleUtilityMonth(buildings: Building[], realPlants: PowerPlant
   return inFlight;
 }
 
+/** The wind turbines turning by `atMs` (wind.ts's plants). */
+function effectivePowerPlantsAtWind(atMs: number) {
+  return wind.turbinesAt(atMs);
+}
+
 async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant[], year: number, month: number): Promise<UtilityMonth> {
   // The year's sheet (one per year); wholesale power at the month's market price.
   const tariff: Tariff = tariffStore.at(toSimTimeMs(Date.UTC(year, month, 15)));
@@ -197,6 +208,9 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
   // for the grid).
   const fieldsW = times.map((t) => (agriPv.capacityAtKw(t) * 1000 * irradianceWm2(t)) / PEAK_IRRADIANCE_WM2);
   const ppaKWh = energyKWh(times, fieldsW);
+  // And the utility's wind turbines: no feed-in for what they make.
+  const turbines = effectivePowerPlantsAtWind(midMonthMs);
+  const windKWh = energyKWh(times, times.map((t) => turbines.reduce((sum, p) => sum + windPowerW(p, t), 0)));
   const arrays = contractArrays();
   const contractW = times.map((t) => {
     const sun = irradianceWm2(t) / PEAK_IRRADIANCE_WM2;
@@ -205,7 +219,7 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
   return {
     consumerRevenueRp:
       electricityCostRp(times, consumptionW, tariff, dynamicW) - charging.kWh * ((tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2) - ppaKWh * agriPv.ppaEnergyValueRpPerKWh(midMonthMs),
-    feedInPaidRp: Math.max(0, flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh) - flatCostRp(times, contractW, tariff.feedInPriceRpKWh) - ppaKWh * tariff.feedInPriceRpKWh),
+    feedInPaidRp: Math.max(0, flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh) - flatCostRp(times, contractW, tariff.feedInPriceRpKWh) - ppaKWh * tariff.feedInPriceRpKWh - windKWh * tariff.feedInPriceRpKWh),
     wholesaleCostRp: netKWh * (tariff.wholesalePriceRpKWh + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare),
     gridMaintenanceCostRp: grossKWh * tariff.gridMaintenanceRpKWh,
     districtHeatRevenueRp: districtHeatKWh * tariff.districtHeatingPriceRpKWh,
@@ -214,6 +228,7 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
     publicChargingRevenueRp: charging.revenueRp,
     publicChargingUpkeepRp: charging.upkeepRp,
     roofContractCostRp: roofContracts.yearlyCostRp(midMonthMs) / 12,
+    windUpkeepRp: wind.upkeepRpPerYear(midMonthMs) / 12,
   };
 }
 
@@ -257,6 +272,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     publicChargingRevenueRp,
     publicChargingUpkeepRp,
     roofContractCostRp,
+    windUpkeepRp,
   } = utility;
 
   const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
@@ -287,6 +303,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     districtHeatUpkeepRp -
     publicChargingUpkeepRp -
     roofContractCostRp -
+    windUpkeepRp -
     profitTransferRp -
     spendingTotalRp;
 
@@ -302,6 +319,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     publicChargingRevenueRp,
     publicChargingUpkeepRp,
     roofContractCostRp,
+    windUpkeepRp,
     profitTransferRp,
     zoningLevyRp,
     borrowedRp,
@@ -366,6 +384,7 @@ export function operatingIncomeRp(f: MunicipalFinances): number {
     f.districtHeatUpkeepRp -
     f.publicChargingUpkeepRp -
     f.roofContractCostRp -
+    f.windUpkeepRp -
     f.profitTransferRp
   );
 }

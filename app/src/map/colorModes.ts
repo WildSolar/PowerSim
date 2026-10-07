@@ -18,6 +18,7 @@ export type ColorMode =
   | "zoning"
   | "publicBuildings"
   | "roofSolar"
+  | "wind"
   | "grid";
 
 export interface LegendEntry {
@@ -264,6 +265,9 @@ export const ZONING_BUILDING_COLOR = "#d9d6cf";
 export const DH_PRIORITY_COLOR = "#c8641e";
 export const HIGH_STANDARD_COLOR = "#0d7a52";
 export const ZONING_PENDING_COLOR = "#f2b01e";
+// Wind turbines (sim/wind.ts), by how far their site has come.
+export const WIND_SITE_COLORS = { planned: "#6f6d66", underWay: "#2a78d6", ready: "#1baf7a", turning: "#0d7a52", stopped: "#c2410c" } as const;
+
 // Farmland in the zoning layer, by where it stands for Agri-PV (sim/agriPv.ts).
 export const FARM_PLOT_COLORS = { farmland: "#9cbf73", planned: "#e6c229", zoned: "#e6c229", fieldBuilding: "#3d5a80", field: "#3d5a80" } as const;
 

@@ -30,6 +30,8 @@ import { heatPumpSiting } from "../sim/heatPumpSiting";
 import { publicBuildingBucket } from "../sim/publicBuildings";
 import { roofContracts } from "../sim/roofContracts";
 import { agriPv } from "../sim/agriPv";
+import { wind, WIND_PHASE_LABEL } from "../sim/wind";
+import { WIND_LOCAL_RADIUS_M } from "../config/wind";
 import {
   AGE_LEGEND,
   buildingAgeBucket,
@@ -50,6 +52,7 @@ import {
   GRID_LEGEND,
   ZONING_PENDING_COLOR,
   FARM_PLOT_COLORS,
+  WIND_SITE_COLORS,
   EV_CHARGING_LEGEND,
   evChargingBucket,
   HEATING_LEGEND,
@@ -134,6 +137,11 @@ const ZONE_MARK_LAYER_ID = "zone-parcels-mark"; // picked or with a change on th
 // The same parcels in the district heating layer: only the district-heat priority zones, under the streets.
 const DH_PRIORITY_FILL_LAYER_ID = "dh-priority-zones-fill";
 const DH_PRIORITY_LINE_LAYER_ID = "dh-priority-zones-line";
+// Wind sites and their turbines (the Wind layer).
+const WIND_SOURCE_ID = "wind-sites";
+const WIND_REACH_LAYER_ID = "wind-reach";
+const WIND_TURBINE_LAYER_ID = "wind-turbines";
+
 // Farmland plots (Agri-PV), in the same layer.
 const FARM_SOURCE_ID = "farm-plots";
 const FARM_FILL_LAYER_ID = "farm-plots-fill";
@@ -491,6 +499,42 @@ function zoneParcelsGeoJSON(simTimeMs: number) {
   };
 }
 
+/** The wind sites the study found: each turbine, by how far its site has come, and the kilometre
+ * around it where homes mind most. */
+function windSitesGeoJSON(simTimeMs: number) {
+  const features: object[] = [];
+  const bucket = (phase: string) =>
+    phase === "operating"
+      ? "turning"
+      : phase === "permitted" || phase === "building"
+        ? "ready"
+        : phase === "rejected" || phase === "struckDown"
+          ? "stopped"
+          : phase === "found"
+            ? "planned"
+            : "underWay";
+  for (const site of wind.sitesAt(simTimeMs)) {
+    const project = wind.project(site.id);
+    const phase = wind.phaseOf(site.id);
+    const n = project?.turbines ?? site.turbines.length;
+    site.turbines.forEach((t, i) => {
+      const used = i < n;
+      features.push({ type: "Feature", properties: { kind: "turbine", state: used ? bucket(phase) : "planned", used: used ? 1 : 0 }, geometry: { type: "Point", coordinates: [t.lon, t.lat] } });
+      if (used) {
+        const ring: [number, number][] = [];
+        const mPerLat = 111_320;
+        const mPerLon = mPerLat * Math.cos((t.lat * Math.PI) / 180);
+        for (let k = 0; k <= 48; k++) {
+          const a = (k / 48) * 2 * Math.PI;
+          ring.push([t.lon + (Math.cos(a) * WIND_LOCAL_RADIUS_M) / mPerLon, t.lat + (Math.sin(a) * WIND_LOCAL_RADIUS_M) / mPerLat]);
+        }
+        features.push({ type: "Feature", properties: { kind: "reach" }, geometry: { type: "Polygon", coordinates: [ring] } });
+      }
+    });
+  }
+  return { type: "FeatureCollection" as const, features };
+}
+
 /** The farmland plots, by where each stands for Agri-PV, and which are picked. */
 function farmPlotsGeoJSON(simTimeMs: number) {
   const selection = agriPv.getSelection();
@@ -721,6 +765,7 @@ function colorExpression(mode: ColorMode, selectedEgid: string | null, scales: C
     zoning: () => ZONING_BUILDING_COLOR,
     publicBuildings: () => legendMatchExpression("publicStatus", PUBLIC_BUILDINGS_LEGEND),
     roofSolar: () => legendMatchExpression("roofStatus", ROOF_SOLAR_LEGEND),
+    wind: () => ZONING_BUILDING_COLOR,
     groundHeat: () => legendMatchExpression("groundStatus", GROUND_HEAT_LEGEND),
     // With an area selected, buildings elsewhere fade so its own stand out.
     grid: () => ["case", ["==", ["get", "gridStatus"], "dimmed"], GRID_DIMMED_COLOR, legendMatchExpression("gridStatus", GRID_LEGEND)],
@@ -936,6 +981,42 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       const zoneVisibility = colorModeRef.current === "zoning" ? "visible" : "none";
       if (!map.hasImage(STRIPE_DH)) map.addImage(STRIPE_DH, stripeImage(DH_PRIORITY_COLOR, true));
       if (!map.hasImage(STRIPE_STANDARD)) map.addImage(STRIPE_STANDARD, stripeImage(HIGH_STANDARD_COLOR, false));
+      // Wind: the sites' turbines and the kilometre around them, shown only in that layer.
+      const windVisibility = colorModeRef.current === "wind" ? "visible" : "none";
+      map.addSource(WIND_SOURCE_ID, { type: "geojson", data: windSitesGeoJSON(simClock.getSimTimeMs()) as never });
+      map.addLayer({
+        id: WIND_REACH_LAYER_ID,
+        type: "fill",
+        source: WIND_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "reach"],
+        layout: { visibility: windVisibility },
+        paint: { "fill-color": WIND_SITE_COLORS.underWay, "fill-opacity": 0.06, "fill-outline-color": WIND_SITE_COLORS.underWay },
+      });
+      map.addLayer({
+        id: WIND_TURBINE_LAYER_ID,
+        type: "circle",
+        source: WIND_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "turbine"],
+        layout: { visibility: windVisibility },
+        paint: {
+          "circle-radius": ["case", ["==", ["get", "used"], 1], 8, 5],
+          "circle-color": [
+            "match",
+            ["get", "state"],
+            "turning",
+            WIND_SITE_COLORS.turning,
+            "ready",
+            WIND_SITE_COLORS.ready,
+            "underWay",
+            WIND_SITE_COLORS.underWay,
+            "stopped",
+            WIND_SITE_COLORS.stopped,
+            WIND_SITE_COLORS.planned,
+          ],
+          "circle-stroke-color": "#fff",
+          "circle-stroke-width": 2,
+        },
+      });
       map.addSource(FARM_SOURCE_ID, { type: "geojson", data: farmPlotsGeoJSON(simClock.getSimTimeMs()) });
       map.addLayer({
         id: FARM_FILL_LAYER_ID,
@@ -1698,6 +1779,41 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     return () => {
       clearInterval(interval);
       unsubscribe();
+    };
+  }, [colorMode, dataset]);
+
+  // Wind layer: the sites (once the study has found them), their turbines and the kilometre around
+  // them, kept current as projects move on; a label by each site.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer(WIND_TURBINE_LAYER_ID)) return;
+    const visible = colorMode === "wind";
+    for (const id of [WIND_REACH_LAYER_ID, WIND_TURBINE_LAYER_ID]) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+    if (!visible) return;
+    let labels: Marker[] = [];
+    let labelKey = "";
+    const tick = () => {
+      const now = simClock.getSimTimeMs();
+      (map.getSource(WIND_SOURCE_ID) as GeoJSONSource | undefined)?.setData(windSitesGeoJSON(now) as never);
+      const sites = wind.sitesAt(now);
+      const key = sites.map((s) => `${s.id}:${wind.phaseOf(s.id)}`).join("|");
+      if (key === labelKey) return;
+      labelKey = key;
+      for (const m of labels) m.remove();
+      labels = sites.map((s) => {
+        const el = document.createElement("div");
+        el.className = "district-heat-source-label";
+        el.textContent = `${s.name ?? s.id} · ${WIND_PHASE_LABEL[wind.phaseOf(s.id)].toLowerCase()}`;
+        return new Marker({ element: el, anchor: "left", offset: [14, 0] }).setLngLat([s.turbines[0].lon, s.turbines[0].lat]).addTo(map);
+      });
+    };
+    tick();
+    const interval = setInterval(tick, DISTRICT_HEAT_TICK_MS);
+    const unsubscribe = wind.subscribe(tick);
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+      for (const m of labels) m.remove();
     };
   }, [colorMode, dataset]);
 

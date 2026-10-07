@@ -36,6 +36,7 @@ import { restoreRenewalChains, snapshotRenewalChains } from "./renewal";
 import { restoreScore, snapshotScore } from "./score";
 import { roofContracts } from "./roofContracts";
 import { agriPv } from "./agriPv";
+import { wind } from "./wind";
 import { restoreSolar, snapshotSolar } from "./solarAdoption";
 import { stock } from "./stock";
 import { studies } from "./studies";
@@ -107,6 +108,7 @@ interface SaveState {
   score: ReturnType<typeof snapshotScore>;
   roofContracts: ReturnType<typeof roofContracts.snapshot>;
   agriPv: ReturnType<typeof agriPv.snapshot>;
+  wind: ReturnType<typeof wind.snapshot>;
   yearReport: Awaited<ReturnType<typeof snapshotYearReport>>;
 }
 
@@ -180,6 +182,7 @@ export function captureState(transparency: boolean): Omit<SaveState, "yearReport
     score: snapshotScore(),
     roofContracts: roofContracts.snapshot(),
     agriPv: agriPv.snapshot(),
+    wind: wind.snapshot(),
   };
 }
 
@@ -262,7 +265,9 @@ export function applySave(file: SaveFile): void {
       ? (accepted) => zoning.voteResult(Number(key.slice("zoning:".length)), accepted)
       : key.startsWith("agriPv:")
         ? (accepted) => agriPv.voteResult(Number(key.slice("agriPv:".length)), accepted)
-        : (accepted, atMs, yes) => measures.resolveVote(key, accepted, atMs, yes),
+        : key.startsWith("wind:")
+          ? (accepted, atMs) => wind.voteResult(key.split(":")[1], accepted, atMs)
+          : (accepted, atMs, yes) => measures.resolveVote(key, accepted, atMs, yes),
   );
   debt.restore(s.debt);
   studies.restore(s.studies);
@@ -276,6 +281,7 @@ export function applySave(file: SaveFile): void {
   restoreScore(s.score);
   roofContracts.restore(s.roofContracts);
   agriPv.restore(s.agriPv);
+  wind.restore(s.wind);
   restoreYearReport(s.yearReport);
   // The clock jumps to the saved moment, paused. That is not a year ending.
   resetYearEndWatcher();

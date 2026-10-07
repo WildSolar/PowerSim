@@ -24,6 +24,7 @@
  * free.
  */
 
+import { windPowerW } from "./windPower";
 import type { PowerPlant } from "../data/types";
 import { toDateMs, dayOfYear } from "./calendar";
 import { snowDepthCm, snowPvBlockingFactor } from "./snow";
@@ -111,6 +112,7 @@ export function isSunRising(simTimeMs: number): boolean {
 /** Generation in W — negative-signed, i.e. a credit against consumption, since this
  * feeds directly into the same "total power" sums as every consuming device. */
 export function pvPowerW(plant: PowerPlant, simTimeMs: number, snowCoverCm?: number): number {
+  if (plant.technology === "Wind") return -windPowerW(plant, simTimeMs);
   if (plant.technology !== "Photovoltaic" || !plant.capacityKw) return 0;
   if (plant.activeToMs !== undefined && simTimeMs >= plant.activeToMs) return 0; // its building has been demolished
   return pvPowerWAt(plant, simTimeMs, irradianceWm2(simTimeMs, snowCoverCm));
@@ -119,6 +121,8 @@ export function pvPowerW(plant: PowerPlant, simTimeMs: number, snowCoverCm?: num
 /** pvPowerW for a caller summing many plants at one instant: the irradiance is the same for
  * every roof, so it's worked out once (irradianceWm2) and passed in. */
 export function pvPowerWAt(plant: PowerPlant, simTimeMs: number, irradiance: number): number {
+  // The town's wind turbines (wind.ts) are summed with its solar: local generation.
+  if (plant.technology === "Wind") return -windPowerW(plant, simTimeMs);
   if (plant.technology !== "Photovoltaic" || !plant.capacityKw) return 0;
   if (plant.activeToMs !== undefined && simTimeMs >= plant.activeToMs) return 0; // its building has been demolished
   // A solar feed-in limit (the law) caps what the system delivers at a share of its rating — taken

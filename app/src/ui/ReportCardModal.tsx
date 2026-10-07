@@ -179,6 +179,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
         { label: "District heating upkeep", rp: finances.current.districtHeatUpkeepRp },
         { label: "Public charger upkeep", rp: finances.current.publicChargingUpkeepRp },
         { label: "Roof rent and upkeep (utility's solar)", rp: finances.current.roofContractCostRp },
+        { label: "Wind turbine upkeep", rp: finances.current.windUpkeepRp },
         { label: "Utility profit handed to the town", rp: finances.current.profitTransferRp },
         ...PAYOUT_CATEGORIES.map((c) => ({ label: PAYOUT_LABEL[c], rp: finances.current.spendingRp[c] })),
       ]

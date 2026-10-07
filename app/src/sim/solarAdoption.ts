@@ -908,12 +908,16 @@ export function effectivePowerPlants(buildings: Building[], realPlants: PowerPla
   return [...realPlantsWithDemolitions(buildings, realPlants, cutoffMs), ...synthesizedPlants(buildings, cutoffMs), ...extraPlants(cutoffMs)];
 }
 
-let extraPlants: (cutoffMs: number) => PowerPlant[] = () => [];
+const extraPlantSources = new Map<string, (cutoffMs: number) => PowerPlant[]>();
 
-/** Registered by agriPv.ts: solar on no building (Agri-PV fields) in service before `cutoffMs`,
- * included with every building's. */
-export function setExtraPlants(plants: (cutoffMs: number) => PowerPlant[]): void {
-  extraPlants = plants;
+/** Registered under a key by modules with plants on no building — Agri-PV fields (agriPv.ts), wind
+ * turbines (wind.ts): those in service before `cutoffMs`, included with every building's. */
+export function setExtraPlants(key: string, plants: (cutoffMs: number) => PowerPlant[]): void {
+  extraPlantSources.set(key, plants);
+}
+
+function extraPlants(cutoffMs: number): PowerPlant[] {
+  return [...extraPlantSources.values()].flatMap((f) => f(cutoffMs));
 }
 
 /** Real Pronovo plants plus every adoption already reached as of the exact

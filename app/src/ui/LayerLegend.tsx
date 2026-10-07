@@ -15,6 +15,7 @@ import {
   HIGH_STANDARD_COLOR,
   ZONING_PENDING_COLOR,
   FARM_PLOT_COLORS,
+  WIND_SITE_COLORS,
   CHARGER_USE_RAMP,
   HEATING_LEGEND,
   INSULATION_LEGEND,
@@ -92,6 +93,26 @@ export function LayerLegend({ mode }: { mode: ColorMode }) {
           <div className="legend-row">
             <span className="swatch" style={{ background: `repeating-linear-gradient(135deg, ${DH_PRIORITY_COLOR} 0 3px, transparent 3px 7px)`, border: `1px solid ${DH_PRIORITY_COLOR}` }} />
             <span>District-heat priority zone</span>
+          </div>
+        </div>
+      )}
+      {mode === "wind" && (
+        <div className="legend">
+          {[
+            { label: "Site found, nothing done yet", color: WIND_SITE_COLORS.planned },
+            { label: "Zoning or permit under way", color: WIND_SITE_COLORS.underWay },
+            { label: "Permitted or being built", color: WIND_SITE_COLORS.ready },
+            { label: "Turning", color: WIND_SITE_COLORS.turning },
+            { label: "Voted down or struck down", color: WIND_SITE_COLORS.stopped },
+          ].map((d) => (
+            <div className="legend-row" key={d.label}>
+              <span className="swatch" style={{ background: d.color, borderRadius: "50%", border: "2px solid #fff", boxShadow: "0 0 0 1px var(--line)" }} />
+              <span>{d.label}</span>
+            </div>
+          ))}
+          <div className="legend-row">
+            <span className="swatch" style={{ background: "transparent", border: `1px solid ${WIND_SITE_COLORS.underWay}` }} />
+            <span>A kilometre around a turbine: the neighbours who mind most</span>
           </div>
         </div>
       )}

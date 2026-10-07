@@ -15,6 +15,7 @@ import {
   School,
   Sun,
   UtilityPole,
+  Wind,
   Zap,
 } from "lucide-react";
 import type { ColorMode } from "../map/colorModes";
@@ -46,6 +47,7 @@ const TOOLS: LayerDef[] = [
   { mode: "zoning", label: "Zoning", Icon: LandPlot },
   { mode: "publicBuildings", label: "Public buildings", Icon: School },
   { mode: "roofSolar", label: "Roof solar", Icon: PanelsTopLeft },
+  { mode: "wind", label: "Wind", Icon: Wind },
 ];
 
 const TOOL_MODES = new Set<ColorMode>(TOOLS.map((t) => t.mode));

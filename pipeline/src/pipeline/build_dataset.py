@@ -31,6 +31,7 @@ from .sources import chargers as chargers_source
 from .sources import vehicles as vehicles_source
 from .sources import district_heat as district_heat_source
 from .sources import farm as farm_source
+from .sources import wind as wind_source
 from .sources import streets as streets_source
 from .sources import exclusions as exclusions_source
 from .sources import gwr, powerplants, sites as sites_source, statent, stock_history
@@ -119,7 +120,7 @@ def _district_heat(bfs_number: int, buildings_df, segments, boundary_lv95, posit
     return network
 
 
-REFRESHABLE = ("district-heat", "farm")
+REFRESHABLE = ("district-heat", "farm", "wind")
 
 
 def refresh(bfs_number: int, parts: list[str]) -> Path:
@@ -140,6 +141,11 @@ def refresh(bfs_number: int, parts: list[str]) -> Path:
         print(f"Refreshing farmland plots in {path.name}...")
         data["farmPlots"] = _to_camel(farm_source.fetch_plots(bfs_number, boundary_lv95))
         print(f"  {len(data['farmPlots'])} plots")
+    if "wind" in parts:
+        print(f"Refreshing wind sites in {path.name}...")
+        homes = [coords.lonlat_to_lv95(b["lon"], b["lat"]) for b in data["buildings"] if b.get("dwellings")]
+        data["windSites"] = _to_camel(wind_source.fetch_sites(bfs_number, boundary_lv95, homes))
+        print(f"  {len(data['windSites'])} site(s): " + ", ".join(f"{s['name']} ({len(s['turbines'])})" for s in data["windSites"]))
     if "district-heat" in parts:
         _refresh_district_heat(bfs_number, data, boundary_lv95)
     path.write_text(json.dumps(data, ensure_ascii=False, allow_nan=False), encoding="utf-8")
@@ -258,6 +264,12 @@ def build(bfs_number: int) -> MunicipalityDataset:
     farm_plots = farm_source.fetch_plots(bfs_number, boundary_lv95)
     print(f"  {len(farm_plots)} farmland plots of {farm_source.MIN_PLOT_HA:g} ha or more, {sum(p['area_m2'] for p in farm_plots) / 10_000:.0f} ha")
 
+    print("Finding wind sites (federal wind atlas)...")
+    with_homes = {int(e) for e in dwellings_df[gwr.EGID_COL].dropna()}
+    homes_xy = [xy for e, xy in positions.items() if e in with_homes]
+    wind_sites = wind_source.fetch_sites(bfs_number, boundary_lv95, homes_xy)
+    print(f"  {len(wind_sites)} site(s): " + ", ".join(f"{s['name']} ({len(s['turbines'])})" for s in wind_sites))
+
     print("Fetching the heat-use atlas (canton ZH)...")
     heat_use = heat_use_source.fetch_heat_use(boundary_lv95)
     if heat_use:
@@ -353,6 +365,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
         ],
         district_heat=network,
         farm_plots=farm_plots,
+        wind_sites=wind_sites,
         charging_sites=charging_sites,
         vehicle_register=vehicle_register,
         zone_parcels=zone_parcels,

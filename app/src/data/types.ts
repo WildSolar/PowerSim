@@ -57,6 +57,18 @@ export interface PowerPlant {
   activeToMs?: number;
   /** A home battery with this system (sim/homeBattery.ts) — set by solarAdoption.ts. */
   battery?: { kwh: number; kw: number; feedInCap: number | null };
+  /** A wind turbine's site: its wind distribution at hub height (Weibull A, k) — sim/windPower.ts. */
+  wind?: { a: number; k: number };
+}
+
+/** Where a wind park could stand (pipeline/sources/wind.py): its turbines' positions and the wind at
+ * each, from the federal wind atlas at 125 m. */
+export interface WindSiteData {
+  id: string;
+  name: string | null;
+  lon: number;
+  lat: number;
+  turbines: { lon: number; lat: number; vMean: number; a: number; k: number }[];
 }
 
 export interface StockHistory {
@@ -99,6 +111,8 @@ export interface MunicipalityDataset {
   districtHeat?: DistrictHeatData | null;
   /** Farmland plots for Agri-PV; absent in older datasets. */
   farmPlots?: FarmPlotData[];
+  /** Wind sites; absent in older datasets. */
+  windSites?: WindSiteData[];
   /** Public charging sites for electric cars, from the federal register — see pipeline/sources/chargers.py. */
   chargingSites?: ChargingSiteData[];
   /** The registered road vehicles (BFS), latest year. Absent in older datasets. */

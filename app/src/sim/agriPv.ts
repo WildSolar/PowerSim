@@ -166,7 +166,7 @@ class AgriPv {
     this.lastMonth = monthIndex(simClock.getSimTimeMs());
     this.stanceCache = null;
     this.unsubscribeClock = simClock.subscribe(() => this.advance(simClock.getSimTimeMs()));
-    setExtraPlants((cutoffMs) => this.plantsBefore(cutoffMs));
+    setExtraPlants("agriPv", (cutoffMs) => this.plantsBefore(cutoffMs));
     setLocalStances("agriPv", (atMs) => this.lastingStances(atMs));
     this.notify();
   }

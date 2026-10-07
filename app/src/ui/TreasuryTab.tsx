@@ -171,6 +171,7 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
               {last.publicChargingRevenueRp > 0 && <Line label="Public charging sold (municipal chargers)" value={last.publicChargingRevenueRp} />}
               {last.publicChargingUpkeepRp > 0 && <Line label="Public charger upkeep" value={-last.publicChargingUpkeepRp} />}
               {last.roofContractCostRp > 0 && <Line label="Roof rent and upkeep (utility's solar)" value={-last.roofContractCostRp} />}
+              {last.windUpkeepRp > 0 && <Line label="Wind turbine upkeep" value={-last.windUpkeepRp} />}
               <tr className="treasury-total">
                 <td>The utility's profit</td>
                 <td className={utilityMarginRp(last) + last.profitTransferRp >= 0 ? "pos" : "neg"}>
