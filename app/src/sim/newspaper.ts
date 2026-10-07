@@ -14,6 +14,7 @@ import { approval, type ApprovalEvent } from "./approval";
 import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { debt, type DebtEvent } from "./debt";
 import { districtHeat } from "./districtHeat";
+import { agriPv } from "./agriPv";
 import { simClock } from "./engine";
 import { grid } from "./grid";
 import { currentHeatingSystemId, heatingRenewalsInRange } from "./heatingRenewal";
@@ -278,6 +279,14 @@ class Newspaper {
     for (const order of districtHeat.getOrders()) {
       if (inMonth(order.completesAtMs)) items.push({ priority: 42, headline: "District heating reaches new streets", body: `${(order.lengthM / 1000).toFixed(1)} km of new pipes are ready; buildings along them can connect.` });
       else if (inMonth(order.orderedAtMs)) items.push({ priority: 38, headline: "District heating to be extended", body: `Work on ${(order.lengthM / 1000).toFixed(1)} km of new pipes is under way.` });
+    }
+
+    // Agri-PV.
+    for (const f of agriPv.getFields()) {
+      const field = agriPv.getPlot(f.plotId)?.name ?? "a field outside town";
+      const mw = (f.capacityKw / 1000).toFixed(1);
+      if (inMonth(f.decidedAtMs)) items.push({ priority: 46, headline: `Solar over the crops at ${field}`, body: `A local business is to build ${mw} MWp of Agri-PV there, and take the power as it comes. The farmer keeps farming underneath.` });
+      else if (inMonth(f.installedAtMs)) items.push({ priority: 40, headline: `Agri-PV at ${field} in service`, body: `${mw} MWp of panels over the field are feeding in.` });
     }
 
     for (const s of districtHeat.getSources()) {

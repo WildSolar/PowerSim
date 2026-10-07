@@ -133,12 +133,13 @@ export function setPriceStances(stances: (atMs: number) => Stances): void {
   priceStances = stances;
 }
 
-let localStances: (atMs: number) => Stances = () => ({});
+const localStances = new Map<string, (atMs: number) => Stances>();
 
-/** Registered by districtHeatSources.ts: how the neighbours of plants they mind (a wood plant's
- * lorries and chimney) feel at `atMs` — a lasting pull, for as long as the plant runs. */
-export function setLocalStances(stances: (atMs: number) => Stances): void {
-  localStances = stances;
+/** Registered under a key by modules whose works people mind for as long as they are there — a
+ * wood plant's neighbours (districtHeatSources.ts), farmland zoned for solar (agriPv.ts): how they
+ * feel at `atMs`, a lasting pull. */
+export function setLocalStances(key: string, stances: (atMs: number) => Stances): void {
+  localStances.set(key, stances);
 }
 
 function clamp(x: number, lo: number, hi: number): number {
@@ -378,7 +379,7 @@ class ApprovalEngine {
       stance += s > 0 ? s * (GOODWILL_FLOOR_SHARE + (1 - GOODWILL_FLOOR_SHARE) * Math.exp(-years / GOODWILL_FADE_YEARS)) : s;
     }
     stance += priceStances(atMs)[bloc] ?? 0;
-    stance += localStances(atMs)[bloc] ?? 0;
+    for (const local of localStances.values()) stance += local(atMs)[bloc] ?? 0;
     const level = BASE_APPROVAL + MAX_SWING * this.sensitivity * Math.tanh(STANCE_SATURATION * stance);
     return clamp(level - fiscalPenalty * FISCAL_BLOC_WEIGHT[bloc] * this.sensitivity, 0, 100);
   }

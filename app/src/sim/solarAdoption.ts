@@ -905,7 +905,15 @@ function synthesizedPlants(buildings: Building[], cutoffMs: number): PowerPlant[
 export function effectivePowerPlants(buildings: Building[], realPlants: PowerPlant[], year: number): PowerPlant[] {
   ensureAdvancedThrough(buildings, realPlants, year);
   const cutoffMs = toSimTimeMs(Date.UTC(year + 1, 0, 1));
-  return [...realPlantsWithDemolitions(buildings, realPlants, cutoffMs), ...synthesizedPlants(buildings, cutoffMs)];
+  return [...realPlantsWithDemolitions(buildings, realPlants, cutoffMs), ...synthesizedPlants(buildings, cutoffMs), ...extraPlants(cutoffMs)];
+}
+
+let extraPlants: (cutoffMs: number) => PowerPlant[] = () => [];
+
+/** Registered by agriPv.ts: solar on no building (Agri-PV fields) in service before `cutoffMs`,
+ * included with every building's. */
+export function setExtraPlants(plants: (cutoffMs: number) => PowerPlant[]): void {
+  extraPlants = plants;
 }
 
 /** Real Pronovo plants plus every adoption already reached as of the exact
@@ -920,7 +928,7 @@ export function effectivePowerPlants(buildings: Building[], realPlants: PowerPla
  * principle renewal.ts's own chains already use. */
 export function effectivePowerPlantsAt(buildings: Building[], realPlants: PowerPlant[], simTimeMs: number): PowerPlant[] {
   ensureAdvancedThroughMonth(buildings, realPlants, monthIndexAt(simTimeMs));
-  return [...realPlantsWithDemolitions(buildings, realPlants, simTimeMs), ...synthesizedPlants(buildings, simTimeMs)];
+  return [...realPlantsWithDemolitions(buildings, realPlants, simTimeMs), ...synthesizedPlants(buildings, simTimeMs), ...extraPlants(simTimeMs)];
 }
 
 /** A new or replacement building rooftop array, decided at permit time: the

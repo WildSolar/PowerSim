@@ -154,7 +154,7 @@ class DistrictHeatSources {
     this.draft = null;
     this.nuisanceCache = null;
     this.hints = new Map();
-    setLocalStances((atMs) => this.nuisanceStances(atMs));
+    setLocalStances("woodPlants", (atMs) => this.nuisanceStances(atMs));
     this.notify();
   }
 

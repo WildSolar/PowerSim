@@ -30,6 +30,7 @@ from .sources import heat_use as heat_use_source
 from .sources import chargers as chargers_source
 from .sources import vehicles as vehicles_source
 from .sources import district_heat as district_heat_source
+from .sources import farm as farm_source
 from .sources import streets as streets_source
 from .sources import exclusions as exclusions_source
 from .sources import gwr, powerplants, sites as sites_source, statent, stock_history
@@ -118,11 +119,15 @@ def _district_heat(bfs_number: int, buildings_df, segments, boundary_lv95, posit
     return network
 
 
-def refresh_district_heat(bfs_number: int) -> Path:
-    """Recomputes only the district heating part of an existing dataset (the rest — footprints,
-    sites, streets — stays as built): GWR for the district-heated buildings and entrances, the
-    BFE's networks and heat sources, the land cover. For a change to district heating alone, without
-    another round of the slow sources."""
+REFRESHABLE = ("district-heat", "farm")
+
+
+def refresh(bfs_number: int, parts: list[str]) -> Path:
+    """Recomputes only some parts of an existing dataset (the rest — footprints, sites, streets —
+    stays as built), without another round of the slow sources:
+    - "district-heat": GWR for the district-heated buildings and entrances, the BFE's networks and
+      heat sources, the land cover;
+    - "farm": the farmland plots."""
     path = next(
         (p for p in OUTPUT_DIR.glob("*.json") if p.name != INDEX_FILENAME and json.loads(p.read_text(encoding="utf-8")).get("bfsNumber") == bfs_number),
         None,
@@ -130,11 +135,22 @@ def refresh_district_heat(bfs_number: int) -> Path:
     if path is None:
         raise SystemExit(f"No dataset for BFS {bfs_number} to refresh — build it first.")
     data = json.loads(path.read_text(encoding="utf-8"))
-    print(f"Refreshing district heating in {path.name}...")
+    boundary_lv95 = [Polygon([coords.lonlat_to_lv95(lon, lat) for lon, lat in polygon[0]]) for polygon in data["boundary"]]
+    if "farm" in parts:
+        print(f"Refreshing farmland plots in {path.name}...")
+        data["farmPlots"] = _to_camel(farm_source.fetch_plots(bfs_number, boundary_lv95))
+        print(f"  {len(data['farmPlots'])} plots")
+    if "district-heat" in parts:
+        _refresh_district_heat(bfs_number, data, boundary_lv95)
+    path.write_text(json.dumps(data, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+    return path
+
+
+def _refresh_district_heat(bfs_number: int, data: dict, boundary_lv95) -> None:
+    print("Refreshing district heating...")
     buildings_df = gwr.fetch_buildings(bfs_number)
     kept = {int(b["egid"]) for b in data["buildings"] if b["egid"].isdigit()}
     buildings_df = buildings_df[buildings_df[gwr.EGID_COL].astype(int).isin(kept)].copy()
-    boundary_lv95 = [Polygon([coords.lonlat_to_lv95(lon, lat) for lon, lat in polygon[0]]) for polygon in data["boundary"]]
     segments = [
         streets_source.Segment(
             id=s["id"],
@@ -159,8 +175,6 @@ def refresh_district_heat(bfs_number: int) -> Path:
     _, addressed = streets_source.link_buildings(segments, entrances, positions, footprint_by_egid)
     network = _district_heat(bfs_number, buildings_df, segments, boundary_lv95, positions, addressed)
     data["districtHeat"] = _to_camel(network) if network else None
-    path.write_text(json.dumps(data, ensure_ascii=False, allow_nan=False), encoding="utf-8")
-    return path
 
 
 def build(bfs_number: int) -> MunicipalityDataset:
@@ -239,6 +253,10 @@ def build(bfs_number: int) -> MunicipalityDataset:
     print(f"  {sum(1 for v in segments_by_egid.values() if v)} / {len(positions)} buildings linked to a street")
 
     network = _district_heat(bfs_number, buildings_df, segments, boundary_lv95, positions, addressed_segments_by_egid)
+
+    print("Fetching farmland plots (canton ZH)...")
+    farm_plots = farm_source.fetch_plots(bfs_number, boundary_lv95)
+    print(f"  {len(farm_plots)} farmland plots of {farm_source.MIN_PLOT_HA:g} ha or more, {sum(p['area_m2'] for p in farm_plots) / 10_000:.0f} ha")
 
     print("Fetching the heat-use atlas (canton ZH)...")
     heat_use = heat_use_source.fetch_heat_use(boundary_lv95)
@@ -334,6 +352,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
             for s in segments
         ],
         district_heat=network,
+        farm_plots=farm_plots,
         charging_sites=charging_sites,
         vehicle_register=vehicle_register,
         zone_parcels=zone_parcels,
@@ -385,14 +404,18 @@ def main() -> None:
         "a municipality that fails is reported at the end and doesn't stop the rest",
     )
     parser.add_argument(
-        "--district-heat-only",
-        action="store_true",
-        help="recompute only the district heating part of an existing dataset (no footprints, sites or streets)",
+        "--refresh",
+        help=f"recompute only these parts of an existing dataset, comma-separated ({', '.join(REFRESHABLE)}) — no footprints, sites or streets",
     )
+    parser.add_argument("--district-heat-only", action="store_true", help="same as --refresh district-heat")
     args = parser.parse_args()
 
-    if args.district_heat_only:
-        path = refresh_district_heat(args.bfs_number or DEFAULT_BFS_NUMBER)
+    if args.refresh or args.district_heat_only:
+        parts = ["district-heat"] if args.district_heat_only else [p.strip() for p in args.refresh.split(",")]
+        unknown = [p for p in parts if p not in REFRESHABLE]
+        if unknown:
+            raise SystemExit(f"Can't refresh {', '.join(unknown)}: only {', '.join(REFRESHABLE)}")
+        path = refresh(args.bfs_number or DEFAULT_BFS_NUMBER, parts)
         print(f"Wrote {path}")
         return
 

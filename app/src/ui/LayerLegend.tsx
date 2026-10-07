@@ -14,6 +14,7 @@ import {
   DH_PRIORITY_COLOR,
   HIGH_STANDARD_COLOR,
   ZONING_PENDING_COLOR,
+  FARM_PLOT_COLORS,
   CHARGER_USE_RAMP,
   HEATING_LEGEND,
   INSULATION_LEGEND,
@@ -111,6 +112,18 @@ export function LayerLegend({ mode }: { mode: ColorMode }) {
           <div className="legend-row">
             <span className="swatch line-swatch" style={{ background: ZONING_PENDING_COLOR }} />
             <span>Change on the way</span>
+          </div>
+          <div className="legend-row">
+            <span className="swatch" style={{ background: FARM_PLOT_COLORS.farmland, opacity: 0.6 }} />
+            <span>Farmland</span>
+          </div>
+          <div className="legend-row">
+            <span className="swatch" style={{ background: FARM_PLOT_COLORS.zoned }} />
+            <span>Zoned for Agri-PV</span>
+          </div>
+          <div className="legend-row">
+            <span className="swatch" style={{ background: FARM_PLOT_COLORS.field }} />
+            <span>Agri-PV field</span>
           </div>
         </div>
       )}

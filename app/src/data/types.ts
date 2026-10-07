@@ -97,6 +97,8 @@ export interface MunicipalityDataset {
   streets?: StreetSegment[];
   /** The district heating network the game starts with, inferred — see pipeline/sources/district_heat.py. */
   districtHeat?: DistrictHeatData | null;
+  /** Farmland plots for Agri-PV; absent in older datasets. */
+  farmPlots?: FarmPlotData[];
   /** Public charging sites for electric cars, from the federal register — see pipeline/sources/chargers.py. */
   chargingSites?: ChargingSiteData[];
   /** The registered road vehicles (BFS), latest year. Absent in older datasets. */
@@ -209,6 +211,21 @@ export interface DhCandidateData extends DhSiteData {
   /** Factories: the building, and its branch (NOGA division). */
   egid?: string;
   noga?: number | null;
+}
+
+/** A farmland plot outside the building zones, one parcel's field (pipeline/sources/farm.py). */
+export interface FarmPlotData {
+  /** The parcel's land register id (E-GRID). */
+  id: string;
+  /** Its parcel number. */
+  number: string | null;
+  /** The field name the survey gives the place. */
+  name: string | null;
+  areaM2: number;
+  /** The share of it that is prime cropland (Fruchtfolgefläche). */
+  primeShare: number;
+  /** Outer ring first, then holes: [lon, lat]. */
+  rings: [number, number][][];
 }
 
 export interface DistrictHeatData {

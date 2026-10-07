@@ -53,6 +53,7 @@ import { UTILITY_PROFIT_RETAINED_SHARE } from "../config/treasury";
 import { publicCharging } from "./publicCharging";
 import { irradianceWm2, PEAK_IRRADIANCE_WM2 } from "./pv";
 import { roofContracts } from "./roofContracts";
+import { agriPv } from "./agriPv";
 import { contractArrays } from "./solarAdoption";
 
 export interface MunicipalFinances {
@@ -192,14 +193,19 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
 
   // The utility's own arrays on rented roofs make part of the town's solar: no feed-in is paid for
   // what they make (the utility keeps it, saving power it would buy at wholesale).
+  // Agri-PV fields too — and their partners take that energy instead of buying it (they still pay
+  // for the grid).
+  const fieldsW = times.map((t) => (agriPv.capacityAtKw(t) * 1000 * irradianceWm2(t)) / PEAK_IRRADIANCE_WM2);
+  const ppaKWh = energyKWh(times, fieldsW);
   const arrays = contractArrays();
   const contractW = times.map((t) => {
     const sun = irradianceWm2(t) / PEAK_IRRADIANCE_WM2;
     return arrays.reduce((sum, a) => sum + (a.installedAtMs <= t ? a.capacityKw * 1000 * sun : 0), 0);
   });
   return {
-    consumerRevenueRp: electricityCostRp(times, consumptionW, tariff, dynamicW) - charging.kWh * ((tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2),
-    feedInPaidRp: Math.max(0, flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh) - flatCostRp(times, contractW, tariff.feedInPriceRpKWh)),
+    consumerRevenueRp:
+      electricityCostRp(times, consumptionW, tariff, dynamicW) - charging.kWh * ((tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2) - ppaKWh * agriPv.ppaEnergyValueRpPerKWh(midMonthMs),
+    feedInPaidRp: Math.max(0, flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh) - flatCostRp(times, contractW, tariff.feedInPriceRpKWh) - ppaKWh * tariff.feedInPriceRpKWh),
     wholesaleCostRp: netKWh * (tariff.wholesalePriceRpKWh + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare),
     gridMaintenanceCostRp: grossKWh * tariff.gridMaintenanceRpKWh,
     districtHeatRevenueRp: districtHeatKWh * tariff.districtHeatingPriceRpKWh,

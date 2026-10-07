@@ -13,6 +13,7 @@ import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
 import "./zoningPanel.css";
 import { SupervisionNotice } from "./SupervisionNotice";
+import { AgriPvSection } from "./AgriPvSection";
 
 const ZONE_LABEL: Record<SiteZone, string> = { residential: "Residential", mixed: "Mixed", centre: "Centre", work: "Work", public: "Public use" };
 const ZONE_COLOR = Object.fromEntries(ZONING_LEGEND.map((l) => [l.bucket, l.color])) as Record<SiteZone, string>;
@@ -202,6 +203,8 @@ export function ZoningPanel() {
           </div>
         </div>
       )}
+
+      <AgriPvSection />
 
       {changes.length > 0 && (
         <>

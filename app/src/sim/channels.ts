@@ -38,6 +38,7 @@ export interface Channels {
   // Decisions in general
   uncertaintyMultiplier: number; // scales the indifference band of every investment decision (information campaigns shrink it)
   progressiveNudgeRp: number; // Rp/year added to every household's progressive lean (climate-awareness campaigns)
+  agriPvDialogue: number; // 0 or 1: the Agri-PV dialogue runs, building acceptance of solar on farmland (agriPv.ts)
   homeChargingBoost: number; // 0-1: share of the households who couldn't charge at home who now can (right to charge)
   publicBuildingChargerSitesPerYear: number; // charging sites the municipality puts at its own buildings each year
   publicBuildingChargerPoints: number; // how many points each of those gets
@@ -80,6 +81,7 @@ export const CHANNEL_DEFAULTS: Channels = {
   modeShiftToOtherPts: 0,
   uncertaintyMultiplier: 1,
   progressiveNudgeRp: 0,
+  agriPvDialogue: 0,
   homeChargingBoost: 0,
   publicBuildingChargerSitesPerYear: 0,
   publicBuildingChargerPoints: 4,
@@ -127,6 +129,7 @@ const COMBINERS: { [K in keyof Channels]: Combiner<Channels[K]> } = {
   modeShiftToOtherPts: sum,
   uncertaintyMultiplier: product,
   progressiveNudgeRp: sum,
+  agriPvDialogue: max,
   homeChargingBoost: max,
   publicBuildingChargerSitesPerYear: sum,
   publicBuildingChargerPoints: max,

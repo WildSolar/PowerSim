@@ -78,6 +78,9 @@ class MunicipalityDataset:
     # pipes], candidates: [places new heat could come from], water: [river and lake polygons],
     # forest_ha} — see sources/district_heat.py and sources/heat_sources.py.
     district_heat: dict | None = None
+    # Farmland plots outside the building zones, for Agri-PV: [{id, number, name, area_m2,
+    # prime_share, rings}] — see sources/farm.py.
+    farm_plots: list = field(default_factory=list)
     # Public charging sites for electric cars, from the federal register — see sources/chargers.py:
     # {id, name, lon, lat, points, power_kw, kind: "ac" | "dc"}.
     charging_sites: list = field(default_factory=list)

@@ -405,6 +405,19 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     approval: () => ({ climate: 0.4, homeowners: 0.05, tenants: 0.05 }),
   },
   {
+    id: "agri-pv-dialogue",
+    category: "information",
+    topic: "advice",
+    title: "Agri-PV dialogue",
+    summary:
+      "Field visits, farmers who already harvest under panels, round tables with the farmers' association and the landscape groups. Year by year, people come to accept solar over farmland — which softens the opposition to Agri-PV zones, those put forward and those already in force. A running cost.",
+    params: [],
+    leadTimeMonths: 2,
+    effects: () => ({ agriPvDialogue: 1 }),
+    annualCostRp: (_p, ctx) => (40_000 + ctx.residents * 1) * CHF,
+    approval: () => ({ climate: 0.1, homeowners: 0.02 }),
+  },
+  {
     id: "climate-awareness",
     category: "information",
     topic: "advice",

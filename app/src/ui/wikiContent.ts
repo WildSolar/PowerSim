@@ -516,6 +516,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Densifying (one or two floors more than the plan allows today) lets new and replacement buildings go higher and hold more homes, and makes replacing old buildings there pay sooner. You can take the extra floors back, too.",
         "A district heating priority zone allows no new oil or gas heating at all. A new building on a street with a district heating pipe must connect; one replacing its heating may still choose a heat pump. The District heating tool shows these zones too, so extensions can follow them.",
         "A high-standard zone requires new and replacement buildings to reach Minergie-P, with a full roof of solar panels.",
+        "Outside the building zones, farmland can be zoned for Agri-PV (see \"Agri-PV\").",
       ]),
       p(
         "Before you submit a change, the drawer shows what it would touch — the area, the buildings and homes, the open building land — what the planning costs, and how people are likely to take it. The change is paid when submitted and comes into force about eighteen months later, after the planning procedure. It is political: each group reacts at once (tenants welcome more homes, neighbours and homeowners dislike densification, businesses resent losing work zones, the climate-minded like energy zones and compact building), and a contested change — or any change covering 15% or more of the town's zoned land — goes to a public vote first, which can strike it down. On the map, a parcel with a change on the way is outlined in yellow, densified parcels are shaded stronger, and energy zones are striped.",
@@ -732,6 +733,26 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "agri-pv",
+    title: "Agri-PV",
+    blocks: [
+      p(
+        "Solar parks on open land are all but impossible in Switzerland: outside the building zones, the land is for farming. Agri-PV is the opening — panels high above the crops, or in rows between them, on fields that stay farmed. Two steps, two actors.",
+      ),
+      list([
+        "Zoning: in the Zoning tool, the green fields outside the building zones are the town's farmland, one parcel's field each, with its local name. Pick fields and put them forward as an Agri-PV zone. It costs the planning work, always goes to a public vote, and comes into force two years on. People mind: the landscape and the food land weigh against it, prime cropland most of all (the canton's Fruchtfolgeflächen); the climate-minded and business are for. Part of the opposition stays for as long as the zone is there.",
+        "Acceptance: at first, a zone is a hard sell — expect to lose early votes. The Agri-PV dialogue (an information measure: field visits, farmers who already harvest under panels, round tables) brings people round year by year, and every field they get to see helps a little. Acceptance softens the opposition to new zones and to those in force alike, though some will always mind.",
+        "Building: businesses with a big electricity use look into the zoned field nearest to them now and then. They build a field sized to cover part of their own use — at CHF 600–1,000 per kWp, the bigger the cheaper, plus a rent to the farmer — and take its power as it comes, under a power purchase agreement, instead of buying that energy from the utility. They still pay for the grid. Whether it pays depends on the price you set for electricity: the dearer it is, the better the deal.",
+      ]),
+      p(
+        "The fields feed into the town's grid like any solar and count against its emissions. The utility pays no feed-in for them, and sells their partners that much less energy — it keeps the grid fee.",
+      ),
+      note(
+        "The fields are real (the canton's land cover and cadastral parcels, outside the federal building zones); which businesses invest, and when, is the game's. How fields connect to the grid isn't modelled yet: they feed into the town as a whole.",
+      ),
+    ],
+  },
+  {
     id: "home-batteries",
     title: "Home batteries",
     blocks: [
@@ -919,7 +940,7 @@ export const WIKI_GROUPS: WikiGroup[] = [
     id: "electricity",
     title: "Electricity & solar",
     blurb: "The local grid, rooftop solar, and the batteries that smooth both.",
-    sections: ["grid", "solar", "roof-contracts", "home-batteries"],
+    sections: ["grid", "solar", "roof-contracts", "agri-pv", "home-batteries"],
   },
   {
     id: "mobility",

@@ -264,6 +264,8 @@ export const ZONING_BUILDING_COLOR = "#d9d6cf";
 export const DH_PRIORITY_COLOR = "#c8641e";
 export const HIGH_STANDARD_COLOR = "#0d7a52";
 export const ZONING_PENDING_COLOR = "#f2b01e";
+// Farmland in the zoning layer, by where it stands for Agri-PV (sim/agriPv.ts).
+export const FARM_PLOT_COLORS = { farmland: "#9cbf73", planned: "#e6c229", zoned: "#e6c229", fieldBuilding: "#3d5a80", field: "#3d5a80" } as const;
 
 export const EV_CHARGING_LEGEND: LegendEntry[] = [
   { bucket: "home", label: "Can charge at home", color: "#1baf7a" },
