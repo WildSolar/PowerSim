@@ -22,13 +22,39 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.2.0",
+    date: "2026-10-07",
+    title: "More towns, more heat, more power",
+    summary:
+      "Five more municipalities to govern, district heating rebuilt around real networks and real heat sources, and three new ways to make clean electricity — the utility's own solar on rented roofs, solar over farmland, and wind.",
+    added: [
+      "Five more municipalities in canton Zurich: Bonstetten, Regensdorf, Uster, Wädenswil and Wetzikon, alongside Schlieren.",
+      "District heating, rebuilt: towns start with their real networks — what each runs on, how big it is — and every network burns oil or gas only for what its clean sources can't cover. Add heat sources of your own: waste heat from an incinerator or a factory that offers it, heat pumps on a waste water plant, groundwater, a river or a lake, or a wood chip plant (as big as the town's forest can feed, and minded by its neighbours). A plant can start a network of its own, so towns without district heating can build one.",
+      "Roof contracts: rent large roofs and put the utility's own solar on them. Set the rent in the new Roof solar layer and offer it to one roof or all of them; owners accept, decline, or are prompted to build their own. The utility pays the build cost and keeps what the arrays make.",
+      "Agri-PV: zone farmland for solar over the crops in the Zoning tool. It always goes to a vote, and people mind at first; the Agri-PV dialogue brings them round. Businesses with a big electricity use then build fields on the zoned land and take the power themselves.",
+      "Wind power: commission a study to find where turbines could stand, then take each site through a zoning plan (always put to the vote), a permit (usually appealed, sometimes struck down in court) and the build. Turbines make most of their power in winter.",
+      "Finish early: when a year closes at net zero and the books are in order (no supervision, no overdraft, debt at most three years of income), the Year in Review offers to end the run there, the years left until 2050 counting in full.",
+      "A briefing at the start of every new game, and a getting-started checklist that walks you through the first steps (it can be brought back from the game menu).",
+      "If something breaks, the game pauses and offers to save your run before you reload. A Feedback button sends a report, with your save if you like.",
+      "Continue on the start screen picks up your latest save; About & credits names the open data and software the game is built on.",
+    ],
+    changed: [
+      "The “Clean district heating” measure and the fixed 5 MW supply step are gone: district heating gets cleaner by building clean heat sources.",
+      "Cars are scrapped closer to their typical age, and under a ban on new petrol and diesel cars a household without a charger of its own goes electric anyway.",
+      "A ban on new petrol and diesel cars meets milder opposition beyond the drivers, and a popular council carries contested votes more easily.",
+      "Carbon removal contracts count once the town's own emissions are down to a fifth of what they were (was a tenth), and can cover up to a fifth.",
+      "Taxpayers judge running spending against what the department takes in: the government's allocation plus its share of last year's utility profit.",
+    ],
+    fixed: ["Dates that should show a month and year (the next election, public votes, plants being built) no longer show the day as well."],
+  },
+  {
     version: "0.1.0",
-    date: null,
+    date: "2026-10-04",
     title: "The first beta",
     summary:
       "Run the energy department of a real Swiss municipality and take it to net zero by 2050 — with its real buildings, its grid and its voters.",
     added: [
-      "Six real municipalities in canton Zurich to govern — Bonstetten, Regensdorf, Schlieren, Uster, Wädenswil and Wetzikon — built from open data: every building from the federal building register, with its homes, age and heating; the registered solar panels, public chargers, cars and vans; the zoning plan; the streets.",
+      "A real municipality to govern — Schlieren, in canton Zurich — built from open data: every building from the federal building register, with its homes, age and heating; the registered solar panels, public chargers, cars and vans; the zoning plan; the streets.",
       "A live town: households heat, cook, charge and commute; heating systems, cars and building envelopes wear out and are replaced; new buildings go up and old ones are rebuilt.",
       "Measures in four kinds — subsidies, infrastructure, information and laws — with lead times, running costs and public votes; the canton and the Confederation act on their own schedule.",
       "Public approval behind which five groups feel differently, with votes, elections and recall.",
@@ -42,7 +68,7 @@ export const CHANGELOG: Release[] = [
       "Saving: in this browser, as an autosave each year, or as a save string to keep anywhere.",
       "A score: every year from the second on scores its cut in emissions per resident against the first, through 2050 — shown against par, what doing nothing would score.",
       "Winning and losing: reach net zero by 2050 to win; lose an election (below 50%) or a recall and the run ends. Either way, an end screen shows how it went.",
-      "Carbon removal contracts, to balance the emissions a town can't avoid — counting once its own emissions are down to a fifth of what they were.",
+      "Carbon removal contracts, to balance the emissions a town can't avoid — counting once its own emissions are down to a tenth of what they were.",
       "A yearly tariff: publish next year's electricity, feed-in, district heating and charging prices by the end of August — the game stops at the deadline to ask, if you haven't. People react to the change, and keep comparing your prices with the Swiss average.",
       "Vote results: the town clerk writes on the day, and the measure shows how the vote went. A measure the voters reject can't be put forward again for two years.",
       "Keys 1, 2 and 3 pick a speed; the time keys now work while the inbox, the Town hall or the wiki is open.",
@@ -50,16 +76,8 @@ export const CHANGELOG: Release[] = [
       "In the grid layer, areas with a bigger station or a battery on the way are marked in the list of the most loaded.",
       "Transformer areas follow the streets: each building hangs off the station nearest by road, and the map outlines the areas around their buildings.",
       "Mark every letter and paper as read; the approval figure counts down to the next election.",
-      "A briefing at the start of every new game, and a getting-started checklist that walks you through the first steps (it can be brought back from the game menu).",
-      "If something breaks, the game pauses and offers to save your run before you reload. A Feedback button sends a report, with your save if you like.",
-      "Continue on the start screen picks up your latest save; About & credits names the open data and software the game is built on.",
       "Energy markets: heating oil, gas, petrol and wholesale power follow world prices, including the CO₂ levy, with the odd supply crisis sending them soaring.",
       "A dynamic tariff households can choose: its price follows the grid's expected load through the day. Cars on it charge in the cheapest night hours, heat pumps run ahead of the evening peak, and some washing machines wait for a cheap hour.",
-      "District heating, rebuilt: towns start with their real networks — what each runs on, how big it is — and every network burns oil or gas only for what its clean sources can't cover. Add heat sources of your own: waste heat from an incinerator or a factory that offers it, heat pumps on a waste water plant, groundwater, a river or a lake, or a wood chip plant (as big as the town's forest can feed, and minded by its neighbours). A plant can start a network of its own, so towns without district heating can build one. This replaces the “Clean district heating” measure and the fixed 5 MW supply step.",
-      "Wind power: commission a study to find where turbines could stand, then take each site through a zoning plan (always put to the vote), a permit (usually appealed, sometimes struck down in court) and the build. Turbines make most of their power in winter.",
-      "Agri-PV: zone farmland for solar over the crops in the Zoning tool. It always goes to a vote, and people mind at first; the Agri-PV dialogue brings them round. Businesses with a big electricity use then build fields on the zoned land and take the power themselves.",
-      "Roof contracts: rent large roofs and put the utility's own solar on them. Set the rent in the new Roof solar layer and offer it to one roof or all of them; owners accept, decline, or are prompted to build their own. The utility pays the build cost and keeps what the arrays make.",
-      "Finish early: when a year closes at net zero and the books are in order (no supervision, no overdraft, debt at most three years of income), the Year in Review offers to end the run there, the years left until 2050 counting in full.",
     ],
   },
 ];
