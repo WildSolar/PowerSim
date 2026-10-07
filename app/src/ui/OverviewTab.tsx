@@ -27,7 +27,7 @@ function millions(rp: number): string {
 const YEAR_MS = 365.25 * DAY_MS;
 
 function monthYear(simTimeMs: number): string {
-  return formatDate(simTimeMs).replace(/^\w+, \d+ /, "");
+  return formatDate(simTimeMs).replace(/^\d+ /, "");
 }
 
 function Figure({ label, value, children, onClick }: { label: string; value: ReactNode; children?: ReactNode; onClick?: () => void }) {

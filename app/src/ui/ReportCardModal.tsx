@@ -175,9 +175,10 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
         { label: "Wholesale electricity", rp: finances.current.wholesaleCostRp },
         { label: "Solar feed-in paid", rp: finances.current.feedInPaidRp },
         { label: "Grid upkeep", rp: finances.current.gridMaintenanceCostRp },
-        { label: "District heat bought from the source", rp: finances.current.districtHeatPurchaseRp },
-        { label: "District heating network upkeep", rp: finances.current.districtHeatUpkeepRp },
+        { label: "Making district heat", rp: finances.current.districtHeatPurchaseRp },
+        { label: "District heating upkeep", rp: finances.current.districtHeatUpkeepRp },
         { label: "Public charger upkeep", rp: finances.current.publicChargingUpkeepRp },
+        { label: "Roof rent and upkeep (utility's solar)", rp: finances.current.roofContractCostRp },
         { label: "Utility profit handed to the town", rp: finances.current.profitTransferRp },
         ...PAYOUT_CATEGORIES.map((c) => ({ label: PAYOUT_LABEL[c], rp: finances.current.spendingRp[c] })),
       ]

@@ -203,7 +203,7 @@ function MeasureDetail({ def, nowMs, onClose }: { def: MeasureDef; nowMs: number
       {def.subsidyCategory && <SubsidyEvidence category={def.subsidyCategory} nowMs={nowMs} />}
       {vote && (
         <div className="measure-vote">
-          Public vote in {formatDate(vote.atMs).replace(/^\w+, \d+ /, "")} — latest poll: {Math.round(vote.pollYes)}% in favour
+          Public vote in {formatDate(vote.atMs).replace(/^\d+ /, "")} — latest poll: {Math.round(vote.pollYes)}% in favour
         </div>
       )}
       {!vote && lastVote && (

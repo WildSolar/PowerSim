@@ -4,7 +4,21 @@ import { currentHeatingSystemId } from "../sim/heatingRenewal";
 import type { BuildingChargingAccess } from "../sim/publicCharging";
 import type { ChargingKind } from "../config/charging";
 
-export type ColorMode = "none" | "category" | "heating" | "groundHeat" | "power" | "solar" | "age" | "insulation" | "districtHeat" | "evCharging" | "zoning" | "publicBuildings" | "grid";
+export type ColorMode =
+  | "none"
+  | "category"
+  | "heating"
+  | "groundHeat"
+  | "power"
+  | "solar"
+  | "age"
+  | "insulation"
+  | "districtHeat"
+  | "evCharging"
+  | "zoning"
+  | "publicBuildings"
+  | "roofSolar"
+  | "grid";
 
 export interface LegendEntry {
   bucket: string;
@@ -224,6 +238,17 @@ export const PUBLIC_BUILDINGS_LEGEND: LegendEntry[] = [
   { bucket: "chargers", label: "Chargers", color: "#2a78d6" },
   { bucket: "none", label: "Neither yet", color: "#6f6d66" },
   { bucket: "other", label: "Not a public building", color: "#e4e2dc" },
+];
+
+// The Roof solar layer: large roofs by where a roof contract stands (sim/roofContracts.ts).
+export const ROOF_SOLAR_LEGEND: LegendEntry[] = [
+  { bucket: "utility", label: "The utility's solar", color: "#0d7a52" },
+  { bucket: "accepted", label: "Accepted, to build", color: "#1baf7a" },
+  { bucket: "offered", label: "Offer pending", color: "#2a78d6" },
+  { bucket: "eligible", label: "Large roof, no solar", color: "#4a3aa7" },
+  { bucket: "ownSolar", label: "Owner's own solar", color: "#eda100" },
+  { bucket: "declined", label: "Said no (for now)", color: "#6f6d66" },
+  { bucket: "other", label: "Small, public or not standing", color: "#e4e2dc" },
 ];
 
 // The zoning layer: parcels by zone type, in the colours Swiss zoning plans use (yellow homes,

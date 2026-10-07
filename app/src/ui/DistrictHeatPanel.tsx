@@ -30,7 +30,7 @@ function formatMW(w: number): string {
 }
 
 function monthYear(ms: number): string {
-  return formatDate(ms).replace(/^\w+, \d+ /, "");
+  return formatDate(ms).replace(/^\d+ /, "");
 }
 
 const PLACED: { kind: PlacedKind; note: string }[] = [

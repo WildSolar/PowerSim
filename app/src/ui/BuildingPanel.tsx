@@ -33,6 +33,8 @@ import { COMMERCIAL_CATEGORY_ICON, COMMERCIAL_CATEGORY_LABEL } from "./commercia
 import { EnergyBreakdown } from "./EnergyBreakdown";
 import { FleetSection } from "./FleetSection";
 import { PublicBuildingOrders } from "./PublicBuildingsPanel";
+import { RoofContractCard } from "./RoofSolarPanel";
+import { ROOF_CONTRACT_MIN_FOOTPRINT_M2 } from "../config/roofContracts";
 import { SupervisionNotice } from "./SupervisionNotice";
 import { isPublicBuilding, publicBuildingKind } from "../sim/publicBuildings";
 import { HeatPumpSiteSection } from "./HeatPumpSiteSection";
@@ -166,6 +168,13 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
           <div className="public-orders">
             <PublicBuildingOrders building={building} realPlants={realPlants} now={simTimeMs} onOrdered={() => setOrders((n) => n + 1)} withName={false} />
           </div>
+        </>
+      )}
+
+      {!isPublicBuilding(building) && (building.footprintAreaM2 ?? 0) >= ROOF_CONTRACT_MIN_FOOTPRINT_M2 && (
+        <>
+          <h3 className="section-heading">Roof contract</h3>
+          <RoofContractCard building={building} now={simTimeMs} />
         </>
       )}
 

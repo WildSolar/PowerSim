@@ -234,3 +234,21 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+.dh-check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.district-heat-panel .info-value.good {
+  color: var(--good);
+}
+
+.district-heat-panel .info-value.bad {
+  color: var(--bad);
+}

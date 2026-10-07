@@ -138,6 +138,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Grid — the transformer areas and how loaded they are; reinforce them or add batteries here (see \"The electricity grid\").",
         "Zoning — the zoning plan, parcel by parcel; change it here (see \"Zoning\").",
         "Public buildings — the municipality's own buildings and what they carry; order solar and chargers for them here (see \"Public buildings\").",
+        "Roof solar — large roofs by where a roof contract stands; rent them and put the utility's solar on them here (see \"Roof contracts\").",
       ]),
     ],
   },
@@ -713,6 +714,24 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "roof-contracts",
+    title: "Roof contracts",
+    blocks: [
+      p(
+        "Many large roofs stay bare even where panels would pay: the owner lacks the cash, the time, or the interest. The utility can step in — rent the roof and put its own solar on it, as many Swiss utilities do. Open the Roof solar tool: it shows every roof of a building over 300 m² by where it stands, and the drawer sets the rent you offer, per m² of roof the panels cover, a year.",
+      ),
+      list([
+        "Offering: click a roof to see what an array there would mean — its size, what it costs to build, what a year of its output saves, the rent and the upkeep — and offer it, or offer every eligible roof at once (the drawer estimates how many would say yes, and what building their arrays would cost).",
+        "The answer comes within weeks. Some owners take your letter as a prompt to look into solar themselves, and put up their own if it pays. The rest weigh your rent against what they want for their roof — which differs from owner to owner, most somewhere around CHF 1–4 per m². Offer more and more say yes; but every franc of rent comes out of what the array earns. A no means you can't ask again for three years.",
+        "Building: once an owner accepts, you have a year to build — at once, if the drawer's box is ticked. You pay what the owner would have paid, less the federal payment every installation gets, as an investment you may borrow for. The panels are in service about four months later; in a full grid area a large array comes with a grid-friendly battery.",
+        "Earning: the arrays are the utility's. It pays no feed-in for what they make; their power saves buying from the wider grid at the wholesale price. Against that it pays the rent and the arrays' upkeep, every year. Big roofs pay well; small ones barely cover their costs.",
+      ]),
+      note(
+        "What each owner wants for their roof is the game's guess, as is how many look into solar of their own. Contracts run as long as the panels; owners never cancel them, and the arrays last the game.",
+      ),
+    ],
+  },
+  {
     id: "home-batteries",
     title: "Home batteries",
     blocks: [
@@ -900,7 +919,7 @@ export const WIKI_GROUPS: WikiGroup[] = [
     id: "electricity",
     title: "Electricity & solar",
     blurb: "The local grid, rooftop solar, and the batteries that smooth both.",
-    sections: ["grid", "solar", "home-batteries"],
+    sections: ["grid", "solar", "roof-contracts", "home-batteries"],
   },
   {
     id: "mobility",

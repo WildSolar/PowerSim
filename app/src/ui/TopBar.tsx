@@ -177,7 +177,7 @@ function ApprovalKpi() {
           {election !== null && <span className={monthsToElection <= 6 ? "warn" : undefined}>election {electionIn(monthsToElection)}</span>}
         </>
       }
-      title={`Public approval of the municipality's energy policy; below 50% on election day, or below 25% for six months, ends the game.${election !== null ? `\nNext election: ${formatDate(election).replace(/^\w+, \d+ /, "")}` : ""}`}
+      title={`Public approval of the municipality's energy policy; below 50% on election day, or below 25% for six months, ends the game.${election !== null ? `\nNext election: ${formatDate(election).replace(/^\d+ /, "")}` : ""}`}
     />
   );
 }

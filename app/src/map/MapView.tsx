@@ -28,6 +28,7 @@ import { mapFocus } from "./mapFocus";
 import { grid } from "../sim/grid";
 import { heatPumpSiting } from "../sim/heatPumpSiting";
 import { publicBuildingBucket } from "../sim/publicBuildings";
+import { roofContracts } from "../sim/roofContracts";
 import {
   AGE_LEGEND,
   buildingAgeBucket,
@@ -44,6 +45,7 @@ import {
   ZONING_BUILDING_COLOR,
   ZONING_LEGEND,
   PUBLIC_BUILDINGS_LEGEND,
+  ROOF_SOLAR_LEGEND,
   GRID_LEGEND,
   ZONING_PENDING_COLOR,
   EV_CHARGING_LEGEND,
@@ -175,6 +177,7 @@ type BuildingProperties = {
   network: string; // districtHeatStats.ts's NetworkStatus
   charging: string; // colorModes.ts's evChargingBucket
   publicStatus: string; // publicBuildings.ts's publicBuildingBucket
+  roofStatus: string; // roofContracts.ts's bucket
   groundStatus: string; // heatPumpSiting.ts's groundBucket
   gridStatus: string; // grid.ts's bucket for the building's transformer area
   powerW: number;
@@ -255,6 +258,7 @@ function buildingsToGeoJSON(
     network: mapNetworkBucketAt(b, simTimeMs),
     charging: evChargingBucket(chargingAccess.get(b.egid)),
     publicStatus: publicBuildingBucket(b, plants),
+    roofStatus: roofContracts.bucket(b, simTimeMs),
     groundStatus: heatPumpSiting.groundBucket(b, simTimeMs),
     gridStatus: gridStatusOf(b),
     powerW: previousPowerW?.get(b.egid) ?? 0,
@@ -694,6 +698,7 @@ function colorExpression(mode: ColorMode, selectedEgid: string | null, scales: C
     evCharging: () => legendMatchExpression("charging", EV_CHARGING_LEGEND),
     zoning: () => ZONING_BUILDING_COLOR,
     publicBuildings: () => legendMatchExpression("publicStatus", PUBLIC_BUILDINGS_LEGEND),
+    roofSolar: () => legendMatchExpression("roofStatus", ROOF_SOLAR_LEGEND),
     groundHeat: () => legendMatchExpression("groundStatus", GROUND_HEAT_LEGEND),
     // With an area selected, buildings elsewhere fade so its own stand out.
     grid: () => ["case", ["==", ["get", "gridStatus"], "dimmed"], GRID_DIMMED_COLOR, legendMatchExpression("gridStatus", GRID_LEGEND)],
@@ -1614,6 +1619,34 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     tick();
     const interval = setInterval(tick, SOLAR_TICK_MS);
     const unsubscribe = publicCharging.subscribe(tick);
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
+  }, [colorMode, dataset]);
+
+  // Roof solar layer: large roofs by where their contract stands, kept current as owners answer
+  // and arrays are built.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || colorMode !== "roofSolar") return;
+    const tick = () => {
+      const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
+      const pointSource = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
+      const polyData = polygonsRef.current;
+      const pointData = pointsRef.current;
+      if (!polySource || !pointSource || !polyData || !pointData) return;
+      const now = simClock.getSimTimeMs();
+      for (const f of [...polyData.features, ...pointData.features]) {
+        const b = stock.lookup(f.properties.egid);
+        if (b) f.properties.roofStatus = roofContracts.bucket(b, now);
+      }
+      polySource.setData(polyData);
+      pointSource.setData(pointData);
+    };
+    tick();
+    const interval = setInterval(tick, SOLAR_TICK_MS);
+    const unsubscribe = roofContracts.subscribe(tick);
     return () => {
       clearInterval(interval);
       unsubscribe();

@@ -126,8 +126,9 @@ export interface SolarAdoptionRecord {
   federalSubsidyRp: number;
   municipalSubsidyRp: number;
   annualSavingsRp: number;
-  /** A new building's array, fixed at permit time by the construction rules rather than an owner's choice. */
-  origin?: "mandate" | "voluntary" | "municipal";
+  /** A new building's array, fixed at permit time by the construction rules rather than an owner's
+   * choice; the municipality's own; or the utility's on a rented roof (roofContracts.ts). */
+  origin?: "mandate" | "voluntary" | "municipal" | "contract";
 }
 
 const adoptionByEgid = new Map<string, SolarAdoptionRecord>();
@@ -655,6 +656,90 @@ export function installMunicipalSolarNow(building: Building, realPlants: PowerPl
   return true;
 }
 
+/** The array the whole usable roof of `building` would take in the year of `atMs`: its size, the
+ * roof area it covers, what it costs installed and the federal payment towards it, and the battery
+ * a full grid area requires of a large one. */
+export function roofArray(building: Building, atMs: number): { capacityKw: number; areaM2: number; installCostRp: number; federalRp: number; battery: { kwh: number; kw: number; feedInCap: number | null } | null; batteryRp: number } | null {
+  const year = new Date(toDateMs(atMs)).getUTCFullYear();
+  const usable = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
+  const areaM2 = (building.footprintAreaM2 ?? 0) * usable;
+  const capacityKw = areaM2 * kwpPerM2At(year);
+  if (capacityKw <= 0) return null;
+  const battery = municipalBatteryFor(building, capacityKw, atMs);
+  return {
+    capacityKw,
+    areaM2,
+    installCostRp: capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year)),
+    federalRp: federalSubsidyRp(capacityKw),
+    battery,
+    batteryRp: battery ? homeBatteryCostRp(battery.kwh, atMs) : 0,
+  };
+}
+
+/** A year of output from 1 kWp in the year of `atMs` (kWh): the full-load hours of this town's sun. */
+export function specificYieldKWhPerKwp(atMs: number): number {
+  const year = new Date(toDateMs(atMs)).getUTCFullYear();
+  const { times, irradianceWm2: irradiance } = yearSunlight(year);
+  let kWh = 0;
+  for (let i = 1; i < times.length; i++) kWh += (((irradiance[i - 1] + irradiance[i]) / 2 / PEAK_IRRADIANCE_WM2) * (times[i] - times[i - 1])) / HOUR_MS;
+  return kWh;
+}
+
+/** An owner offered a roof contract looks into solar of their own, there and then (roofContracts.ts):
+ * the same decision as any owner's, taken now rather than by chance. True if they go ahead — it is
+ * then recorded like any other owner's array, installed a couple of months on. */
+export function considerOwnSolarNow(building: Building, realPlants: PowerPlant[], atMs: number): boolean {
+  if (adoptionByEgid.has(building.egid) || realPvEgids(realPlants).has(building.egid)) return false;
+  const d = new Date(toDateMs(atMs));
+  const year = d.getUTCFullYear();
+  const monthStartMs = toSimTimeMs(Date.UTC(year, d.getUTCMonth(), 1));
+  const decision = evaluateAdoption(building, year, monthStartMs, yearSunlight(year), tariffStore.at(atMs), policyStore.get(), {
+    hazard: 1,
+    draw: 0,
+    neighborAdopters: 0,
+    renewalBoosted: false,
+  });
+  if (!decision) return false;
+  const installedAtMs = Math.max(decision.installedAtMs, atMs + 2 * (YEAR_MS / 12));
+  const battery = batteryByEgid.get(building.egid);
+  if (battery && battery.installedAtMs < installedAtMs) batteryByEgid.set(building.egid, { ...battery, installedAtMs });
+  adoptionByEgid.set(building.egid, { ...decision, installedAtMs });
+  treasury.recordPayout("solar", installedAtMs, decision.municipalSubsidyRp, building.egid);
+  return true;
+}
+
+/** The utility puts an array on a rented roof (roofContracts.ts): the whole usable roof, paid for by
+ * the treasury as an investment (less the federal payment every installation gets), with the battery
+ * a full grid area requires, generating once installed `months` on. */
+export function installContractSolar(building: Building, realPlants: PowerPlant[], atMs: number, months: number): { capacityKw: number; areaM2: number; costRp: number; installedAtMs: number } | null {
+  if (adoptionByEgid.has(building.egid) || realPvEgids(realPlants).has(building.egid) || spendingFrozen(atMs)) return null;
+  const array = roofArray(building, atMs);
+  if (!array) return null;
+  const installedAtMs = atMs + months * (YEAR_MS / 12);
+  if (array.battery) {
+    batteryByEgid.set(building.egid, { installedAtMs, ...array.battery, costRp: array.batteryRp, municipalSubsidyRp: 0, origin: "municipal", gridCondition: true });
+  }
+  adoptionByEgid.set(building.egid, {
+    installedAtMs,
+    capacityKw: array.capacityKw,
+    installCostRp: array.installCostRp,
+    federalSubsidyRp: array.federalRp,
+    municipalSubsidyRp: 0,
+    annualSavingsRp: 0,
+    origin: "contract",
+  });
+  const costRp = Math.max(0, array.installCostRp - array.federalRp) + array.batteryRp;
+  treasury.recordPayout("infrastructure", atMs, costRp, `roof-contract:${building.egid}`);
+  return { capacityKw: array.capacityKw, areaM2: array.areaM2, costRp, installedAtMs };
+}
+
+/** The utility's arrays on rented roofs: building, size and when they came into service. */
+export function contractArrays(): { egid: string; capacityKw: number; installedAtMs: number }[] {
+  const out: { egid: string; capacityKw: number; installedAtMs: number }[] = [];
+  for (const [egid, r] of adoptionByEgid) if (r.origin === "contract") out.push({ egid, capacityKw: r.capacityKw, installedAtMs: r.installedAtMs });
+  return out;
+}
+
 /** A building's solar: its capacity, and when it was or will be installed (a register plant has
  * been there all along). Null without. */
 export function solarStatusOf(building: Building, realPlants: PowerPlant[]): { capacityKw: number; installedAtMs: number } | null {
@@ -922,6 +1007,9 @@ function solarOnlyLog(building: Building, simTimeMs: number): SolarAdoptionLogEn
   if (!record || record.installedAtMs > simTimeMs) return [];
   if (record.origin === "municipal") {
     return [{ installedAtMs: record.installedAtMs, note: `The municipality put solar panels on this public building: ${record.capacityKw.toFixed(1)} kWp, paid from the treasury.` }];
+  }
+  if (record.origin === "contract") {
+    return [{ installedAtMs: record.installedAtMs, note: `The utility rents this roof and put its own solar panels on it: ${record.capacityKw.toFixed(1)} kWp.` }];
   }
   if (record.origin) {
     const why = record.origin === "mandate" ? "the minimum the building rules required" : "the whole usable roof, beyond what the rules required";

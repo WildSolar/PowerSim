@@ -11,6 +11,7 @@ import {
   Flame,
   LandPlot,
   Map as MapIcon,
+  PanelsTopLeft,
   School,
   Sun,
   UtilityPole,
@@ -44,6 +45,7 @@ const TOOLS: LayerDef[] = [
   { mode: "grid", label: "Grid", Icon: UtilityPole },
   { mode: "zoning", label: "Zoning", Icon: LandPlot },
   { mode: "publicBuildings", label: "Public buildings", Icon: School },
+  { mode: "roofSolar", label: "Roof solar", Icon: PanelsTopLeft },
 ];
 
 const TOOL_MODES = new Set<ColorMode>(TOOLS.map((t) => t.mode));

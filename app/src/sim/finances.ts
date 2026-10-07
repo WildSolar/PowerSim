@@ -51,11 +51,14 @@ import { monthElectricity, monthHeatingTechnology } from "./yearReport";
 import { dhFixedCostRpPerYear, dhProductionCostRp } from "./districtHeatDispatch";
 import { UTILITY_PROFIT_RETAINED_SHARE } from "../config/treasury";
 import { publicCharging } from "./publicCharging";
+import { irradianceWm2, PEAK_IRRADIANCE_WM2 } from "./pv";
+import { roofContracts } from "./roofContracts";
+import { contractArrays } from "./solarAdoption";
 
 export interface MunicipalFinances {
   year: number;
   consumerRevenueRp: number; // what consumers paid for grid electricity, time-of-use priced — the same rates billing.ts bills them at
-  feedInPaidRp: number; // paid out to solar owners (real or adopted) for exported generation
+  feedInPaidRp: number; // paid out to solar owners (real or adopted) for exported generation — never for the utility's own arrays on rented roofs
   wholesaleCostRp: number; // paid upstream for the net electricity actually drawn from the wider grid (consumption minus all local solar)
   gridMaintenanceCostRp: number; // wires/upkeep cost, scaled to gross electricity delivered to consumers
   districtHeatRevenueRp: number; // district heat sold to connected buildings, at the tariff's district heating price
@@ -63,6 +66,7 @@ export interface MunicipalFinances {
   districtHeatUpkeepRp: number; // the pipes, the plants, factory contracts and concessions
   publicChargingRevenueRp: number; // sold at the municipality's own public chargers, at the tariff's public charging prices
   publicChargingUpkeepRp: number; // keeping those chargers running
+  roofContractCostRp: number; // the utility's arrays on rented roofs: the rent, and their upkeep (roofContracts.ts)
   profitTransferRp: number; // the utility's profit handed to the municipality's general account (all but the department's share)
   zoningLevyRp: number; // value-capture levy on projects that gained from a zoning change (zoning.ts)
   borrowedRp: number; // money borrowed this year (debt.ts) — cash in, not income
@@ -105,6 +109,7 @@ export interface UtilityMonth {
   districtHeatUpkeepRp: number;
   publicChargingRevenueRp: number;
   publicChargingUpkeepRp: number;
+  roofContractCostRp: number;
 }
 
 const UTILITY_KEYS: (keyof UtilityMonth)[] = [
@@ -117,6 +122,7 @@ const UTILITY_KEYS: (keyof UtilityMonth)[] = [
   "districtHeatUpkeepRp",
   "publicChargingRevenueRp",
   "publicChargingUpkeepRp",
+  "roofContractCostRp",
 ];
 
 /** The utility's profit (or loss) in a month. */
@@ -130,7 +136,8 @@ export function utilityProfitRp(m: UtilityMonth): number {
     m.gridMaintenanceCostRp -
     m.districtHeatPurchaseRp -
     m.districtHeatUpkeepRp -
-    m.publicChargingUpkeepRp
+    m.publicChargingUpkeepRp -
+    m.roofContractCostRp
   );
 }
 
@@ -182,9 +189,17 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
   // town's metered consumption above, billed there at the household tariff — taken back out of
   // that line so it isn't counted twice.
   const charging = publicCharging.municipalMonth(year, month);
+
+  // The utility's own arrays on rented roofs make part of the town's solar: no feed-in is paid for
+  // what they make (the utility keeps it, saving power it would buy at wholesale).
+  const arrays = contractArrays();
+  const contractW = times.map((t) => {
+    const sun = irradianceWm2(t) / PEAK_IRRADIANCE_WM2;
+    return arrays.reduce((sum, a) => sum + (a.installedAtMs <= t ? a.capacityKw * 1000 * sun : 0), 0);
+  });
   return {
     consumerRevenueRp: electricityCostRp(times, consumptionW, tariff, dynamicW) - charging.kWh * ((tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2),
-    feedInPaidRp: flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh),
+    feedInPaidRp: Math.max(0, flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh) - flatCostRp(times, contractW, tariff.feedInPriceRpKWh)),
     wholesaleCostRp: netKWh * (tariff.wholesalePriceRpKWh + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare),
     gridMaintenanceCostRp: grossKWh * tariff.gridMaintenanceRpKWh,
     districtHeatRevenueRp: districtHeatKWh * tariff.districtHeatingPriceRpKWh,
@@ -192,6 +207,7 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
     districtHeatUpkeepRp: dhFixedCostRpPerYear(midMonthMs) / 12,
     publicChargingRevenueRp: charging.revenueRp,
     publicChargingUpkeepRp: charging.upkeepRp,
+    roofContractCostRp: roofContracts.yearlyCostRp(midMonthMs) / 12,
   };
 }
 
@@ -234,6 +250,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     districtHeatUpkeepRp,
     publicChargingRevenueRp,
     publicChargingUpkeepRp,
+    roofContractCostRp,
   } = utility;
 
   const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
@@ -263,6 +280,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     districtHeatPurchaseRp -
     districtHeatUpkeepRp -
     publicChargingUpkeepRp -
+    roofContractCostRp -
     profitTransferRp -
     spendingTotalRp;
 
@@ -277,6 +295,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     districtHeatUpkeepRp,
     publicChargingRevenueRp,
     publicChargingUpkeepRp,
+    roofContractCostRp,
     profitTransferRp,
     zoningLevyRp,
     borrowedRp,
@@ -340,6 +359,7 @@ export function operatingIncomeRp(f: MunicipalFinances): number {
     f.districtHeatPurchaseRp -
     f.districtHeatUpkeepRp -
     f.publicChargingUpkeepRp -
+    f.roofContractCostRp -
     f.profitTransferRp
   );
 }
