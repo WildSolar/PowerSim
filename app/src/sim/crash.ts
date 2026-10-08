@@ -8,6 +8,7 @@
  * screen has gone.
  */
 
+import { track } from "../analytics";
 import type { RunInfo } from "./saveGame";
 
 export interface Crash {
@@ -36,6 +37,7 @@ export const crashes = {
     if (crash) return; // the first one is the one that matters (a broken listener throws every frame)
     console.error(`[crash: ${where}]`, e);
     crash = { message: e.message || String(error), stack: e.stack ?? "", where, screenAlive: where !== "screen" };
+    track(`crash/${where}`, "Crash");
     pauseHook();
     listeners.forEach((l) => l());
   },

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { track } from "../analytics";
 import { simClock } from "../sim/engine";
 import { TUTORIAL_STEPS, type TutorialState } from "./tutorialSteps";
 import "./tutorial.css";
@@ -39,6 +40,19 @@ export function Tutorial({ state, onPickBuilding, onClearStage, onExit, onStay }
   const fullRef = useRef(full);
   fullRef.current = full;
   const isLast = index === TUTORIAL_STEPS.length - 1;
+
+  // How far players get (analytics.ts): each chapter reached, the end, or where they left.
+  useEffect(() => {
+    if (index === 0 || TUTORIAL_STEPS[index - 1].chapter !== step.chapter) {
+      const n = [...new Set(TUTORIAL_STEPS.map((s) => s.chapter))].indexOf(step.chapter) + 1;
+      track(isLast ? "tutorial/finish" : `tutorial/chapter/${n}`, isLast ? "Tutorial finished" : `Tutorial chapter ${n}: ${step.chapter}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
+  const leave = () => {
+    track(`tutorial/leave/${step.id}`, `Tutorial left at ${step.id}`);
+    onExit();
+  };
 
   useEffect(() => {
     if (step.clearStage) onClearStage();
@@ -133,7 +147,7 @@ export function Tutorial({ state, onPickBuilding, onClearStage, onExit, onStay }
               <button className="tour-secondary" onClick={() => setLeaving(false)}>
                 Stay
               </button>
-              <button className="tour-primary" onClick={onExit}>
+              <button className="tour-primary" onClick={leave}>
                 To the start screen
               </button>
             </>

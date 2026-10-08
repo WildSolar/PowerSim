@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { X } from "lucide-react";
 import { VERSION_LABEL } from "../changelog";
 import { GAME_VERSION } from "../sim/saveGame";
+import { ANALYTICS_ENABLED } from "../analytics";
 import "./changelog.css";
 
 const DATA: { what: string; source: string }[] = [
@@ -72,6 +73,15 @@ export function AboutPanel({ onClose }: { onClose: () => void }) {
             <p className="cl-summary">
               Open government data of the Swiss Confederation and the Canton of Zurich, used under their terms with the source named. The data is processed
               and simplified for the game; any errors are the game's, not the providers'.
+            </p>
+          </section>
+
+          <section className="cl-group">
+            <h3>Privacy</h3>
+            <p className="cl-summary">
+              The game runs entirely in your browser; your runs and saves stay there. The published game counts visits and a few milestones — a game started,
+              a year reached, the tutorial finished — anonymously, with GoatCounter: no cookies, nothing about you, nothing about your game beyond that.
+              {ANALYTICS_ENABLED ? "" : " (Not in this copy.)"}
             </p>
           </section>
 

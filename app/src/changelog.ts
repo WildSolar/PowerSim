@@ -25,6 +25,7 @@ export const CHANGELOG: Release[] = [
     version: "0.3.0",
     date: null,
     added: [
+      "The published game counts visits and a few milestones anonymously (no cookies, nothing about you) — see About & credits.",
       "A tutorial, on the start screen: your first weeks as the newly elected mayor, with your chief of staff showing you the job step by step — the map and its views, the clock, the Town hall and its measures, the planning tools, your mail and your first Year in Review. It highlights what to click, and plays as a small game of its own.",
     ],
   },

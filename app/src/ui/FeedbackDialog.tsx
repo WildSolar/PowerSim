@@ -1,5 +1,6 @@
 import { Check, Copy, X } from "lucide-react";
-import { useState } from "react";
+import { track } from "../analytics";
+import { useEffect, useState } from "react";
 import { crashes, type Crash } from "../sim/crash";
 import { copyText, downloadSave, FEEDBACK_EMAIL, FEEDBACK_KINDS, openEmail, reportText, type FeedbackKind } from "./feedback";
 import { usePauseWhileOpen } from "./usePauseWhileOpen";
@@ -18,6 +19,7 @@ export function FeedbackDialog({ onClose, crash = null, pause = true }: { onClos
   const [attachSave, setAttachSave] = useState(true);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<{ report: string; saveFile: string | null; saveError: string | null } | null>(null);
+  useEffect(() => track(crash ? "feedback/crash" : "feedback/open", "Feedback form opened"), [crash]);
   const [copied, setCopied] = useState(false);
 
   const send = async () => {

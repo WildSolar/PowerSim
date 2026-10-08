@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { formatDate } from "./sim/calendar";
+import { BASELINE_YEAR, formatDate } from "./sim/calendar";
 import { crashes } from "./sim/crash";
 import { FeedbackDialog } from "./ui/FeedbackDialog";
 import { CrashBoundary, CrashScreen } from "./ui/CrashScreen";
@@ -8,6 +8,7 @@ import { BuildingPanel } from "./ui/BuildingPanel";
 import { TownHall, type TownHallSection } from "./ui/TownHall";
 import { GuideCard, WelcomeBriefing, guide, type GuideStep } from "./ui/Onboarding";
 import { Tutorial } from "./ui/Tutorial";
+import { track } from "./analytics";
 import { mapFocus } from "./map/mapFocus";
 import { currentHeatingSystemId } from "./sim/heatingRenewal";
 import { DEFAULT_RUNNING_SPEED, PAUSE_SPEED, setSpeed } from "./sim/timeControls";
@@ -251,6 +252,17 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
     };
   }, [slug, difficulty, restore]);
 
+  // Milestones, counted anonymously (analytics.ts): each Year in Review reached, and how a run ends.
+  useEffect(() => {
+    if (reportCardYear !== null && !tutorial) track(`year/${reportCardYear - BASELINE_YEAR + 1}`, `Year ${reportCardYear - BASELINE_YEAR + 1} reached`);
+  }, [reportCardYear, tutorial]);
+  useEffect(() => {
+    if (gameOver && !tutorial) track(`end/${gameOver.reason}`, gameOver.headline);
+  }, [gameOver, tutorial]);
+  useEffect(() => {
+    if (finished && !tutorial) track(getFinishedYear() !== null ? "end/finished-early" : "end/2050", "Run finished");
+  }, [finished, tutorial]);
+
   // Each time a Year in Review is closed, the run is saved to this browser's one autosave slot.
   const shownReport = useRef<number | null>(null);
   useEffect(() => {
@@ -469,11 +481,13 @@ export default function App() {
       onStart={(slug, difficulty, transparency, restore) => {
         // A saved run keeps its own calendar: set before anything starts counting time.
         if (restore) setEpoch(restore.meta.epochMs);
+        track(restore ? "load" : `start/${slug}/${difficulty}`, restore ? "Game loaded" : `New game: ${slug}, ${difficulty}`);
         setChoice({ slug, difficulty, transparency, restore });
       }}
       onTutorial={(slug) => {
         // The tutorial starts on 10 December: its first Year in Review is a few weeks away.
         setEpoch(Date.UTC(new Date().getUTCFullYear(), 11, 10));
+        track("tutorial/start", "Tutorial started");
         setChoice({ slug, difficulty: "normal", transparency: false, tutorial: true });
       }}
     />

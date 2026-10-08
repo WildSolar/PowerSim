@@ -2,7 +2,8 @@
 # Run by hand: Actions → "Deploy to GitHub Pages" → Run workflow. Needs Pages enabled once, with
 # "GitHub Actions" as its source (Settings → Pages). Only the municipalities listed in
 # app/public/data/index.json ship (vite.config.ts). The Feedback button's address comes from the
-# repository variable FEEDBACK_EMAIL.
+# repository variable FEEDBACK_EMAIL, the GoatCounter site code (anonymous usage counts) from
+# GOATCOUNTER_CODE.
 name: Deploy to GitHub Pages
 
 on:
@@ -37,6 +38,9 @@ jobs:
           # Where the Feedback button's email goes: the repository variable FEEDBACK_EMAIL
           # (Settings → Secrets and variables → Actions → Variables). Without it, players copy the report.
           VITE_FEEDBACK_EMAIL: ${{ vars.FEEDBACK_EMAIL }}
+          # The GoatCounter site code (the "xyz" of xyz.goatcounter.com): the repository variable
+          # GOATCOUNTER_CODE. Without it, nothing is counted.
+          VITE_GOATCOUNTER_CODE: ${{ vars.GOATCOUNTER_CODE }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist
