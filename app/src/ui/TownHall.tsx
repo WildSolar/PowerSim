@@ -63,12 +63,12 @@ export function TownHall({ dataset, transparency, section, onSection, onClose }:
         </div>
         <nav className="th-tabs" aria-label="Town hall sections">
           {sections.map((s) => (
-            <button key={s.id} className={s.id === current.id ? "active" : ""} aria-current={s.id === current.id ? "page" : undefined} onClick={() => onSection(s.id)}>
+            <button key={s.id} data-tour={`th-${s.id}`} className={s.id === current.id ? "active" : ""} aria-current={s.id === current.id ? "page" : undefined} onClick={() => onSection(s.id)}>
               {s.title}
             </button>
           ))}
         </nav>
-        <button className="th-close" onClick={onClose} aria-label="Close the town hall" title="Back to the map (Esc)">
+        <button className="th-close" data-tour="th-close" onClick={onClose} aria-label="Close the town hall" title="Back to the map (Esc)">
           <X size={18} strokeWidth={1.75} aria-hidden />
         </button>
       </header>

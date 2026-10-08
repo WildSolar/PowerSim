@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { formatDate } from "./sim/calendar";
 import { crashes } from "./sim/crash";
 import { FeedbackDialog } from "./ui/FeedbackDialog";
 import { CrashBoundary, CrashScreen } from "./ui/CrashScreen";
@@ -6,6 +7,7 @@ import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
 import { TownHall, type TownHallSection } from "./ui/TownHall";
 import { GuideCard, WelcomeBriefing, guide, type GuideStep } from "./ui/Onboarding";
+import { Tutorial } from "./ui/Tutorial";
 import { mapFocus } from "./map/mapFocus";
 import { currentHeatingSystemId } from "./sim/heatingRenewal";
 import { DEFAULT_RUNNING_SPEED, PAUSE_SPEED, setSpeed } from "./sim/timeControls";
@@ -92,7 +94,7 @@ if (import.meta.env.DEV) import("./dev/par").then((m) => Object.assign(window, {
 if (import.meta.env.DEV) import("./dev/autoplay").then((m) => Object.assign(window, { __autoplay: m.autoplay }));
 
 /** A run: a new game of `slug`, or — with `restore` — a saved one picked up where it was left. */
-function Game({ slug, difficulty, transparency, restore }: { slug: string; difficulty: Difficulty; transparency: boolean; restore?: SaveFile }) {
+function Game({ slug, difficulty, transparency, restore, tutorial = false }: { slug: string; difficulty: Difficulty; transparency: boolean; restore?: SaveFile; tutorial?: boolean }) {
   const [dataset, setDataset] = useState<MunicipalityDataset | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedEgid, setSelectedEgid] = useState<string | null>(null);
@@ -105,7 +107,9 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
   const [showMenu, setShowMenu] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   // A new game opens with the briefing (a loaded one doesn't).
-  const [showBriefing, setShowBriefing] = useState(!restore);
+  const [showBriefing, setShowBriefing] = useState(!restore && !tutorial);
+  // The tutorial runs over the game until it's done (then this is an ordinary game in that town).
+  const [inTutorial, setInTutorial] = useState(tutorial);
   // The run's end: 2050's Year in Review closed (`finished`), or approval ended it.
   const [finished, setFinished] = useState(false);
   const gameOver = useSyncExternalStore(
@@ -178,7 +182,7 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
 
   useEffect(() => {
     // A loaded game stays still until it is put back (applySave), then waits, paused.
-    if (restore) simClock.setSpeed(0);
+    if (restore || tutorial) simClock.setSpeed(0);
     simClock.start();
     const stopWatcher = startYearEndWatcher();
     return () => {
@@ -255,13 +259,18 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
       return;
     }
     if (shownReport.current === null || !dataset) return;
+    // The tutorial's game isn't autosaved: it would take the player's own run's slot.
+    if (tutorial) {
+      shownReport.current = null;
+      return;
+    }
     // 2050's review closes the run, as does finishing early from a year's review.
     if (shownReport.current === NET_ZERO_TARGET_YEAR || shownReport.current === getFinishedYear()) setFinished(true);
     shownReport.current = null;
     captureSave({ slug, municipality: dataset.name, difficulty, transparency }, "Autosave")
       .then(({ meta, bytes }) => putSave(AUTOSAVE_ID, meta, bytes))
       .catch((e: Error) => console.warn("Autosave failed:", e.message));
-  }, [reportCardYear, dataset, slug, difficulty, transparency]);
+  }, [reportCardYear, dataset, slug, difficulty, transparency, tutorial]);
 
   // Samples each finished month for the year-end report in the background, so the report opens fast.
   useEffect(() => (dataset ? startYearPassPrefetch(dataset.powerPlants) : undefined), [dataset]);
@@ -331,7 +340,7 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
         />
         <LayerDock mode={colorMode} onChange={setColorMode} />
         {isToolLayer(colorMode) ? (
-          <aside className="tool-drawer" aria-label={layerLabel(colorMode)}>
+          <aside className="tool-drawer" aria-label={layerLabel(colorMode)} data-tour="tool-drawer">
             {toolPanel}
             <details className="drawer-legend" open>
               <summary>Legend</summary>
@@ -339,7 +348,7 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
             </details>
           </aside>
         ) : (
-          <div className="map-legend">
+          <div className="map-legend" data-tour="legend">
             <h3 className="map-legend-title">{layerLabel(colorMode)}</h3>
             <LayerLegend mode={colorMode} />
           </div>
@@ -398,7 +407,30 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
         />
       )}
       {showFeedback && <FeedbackDialog onClose={() => setShowFeedback(false)} />}
-      {dataset && !showBriefing && !gameOver && !finished && <GuideCard besidePanel={selectedEgid !== null} onAction={guideAction} />}
+      {inTutorial && !gameOver && (
+        <Tutorial
+          state={{
+            town: dataset.name,
+            colorMode,
+            selectedEgid,
+            townHall,
+            inboxOpen: inboxSelection !== null,
+            reportCardYear,
+            nextElection: approval.nextElectionMs() !== null ? formatDate(approval.nextElectionMs() as number).replace(/^\d+ /, "") : null,
+          }}
+          onPickBuilding={() => guideAction("building")}
+          onClearStage={() => {
+            setInboxSelection(null);
+            setTownHall(null);
+            setShowWiki(false);
+            setSelectedEgid(null);
+            setColorMode("none");
+          }}
+          onExit={returnToMenu}
+          onStay={() => setInTutorial(false)}
+        />
+      )}
+      {dataset && !showBriefing && !gameOver && !finished && !tutorial && <GuideCard besidePanel={selectedEgid !== null} onAction={guideAction} />}
       {showBriefing && dataset && !gameOver && (
         <WelcomeBriefing
           town={dataset.name}
@@ -424,11 +456,11 @@ function Game({ slug, difficulty, transparency, restore }: { slug: string; diffi
 }
 
 export default function App() {
-  const [choice, setChoice] = useState<{ slug: string; difficulty: Difficulty; transparency: boolean; restore?: SaveFile } | null>(null);
+  const [choice, setChoice] = useState<{ slug: string; difficulty: Difficulty; transparency: boolean; restore?: SaveFile; tutorial?: boolean } | null>(null);
   return choice ? (
     <>
       <CrashBoundary>
-        <Game slug={choice.slug} difficulty={choice.difficulty} transparency={choice.transparency} restore={choice.restore} />
+        <Game slug={choice.slug} difficulty={choice.difficulty} transparency={choice.transparency} restore={choice.restore} tutorial={choice.tutorial} />
       </CrashBoundary>
       <CrashScreen />
     </>
@@ -438,6 +470,11 @@ export default function App() {
         // A saved run keeps its own calendar: set before anything starts counting time.
         if (restore) setEpoch(restore.meta.epochMs);
         setChoice({ slug, difficulty, transparency, restore });
+      }}
+      onTutorial={(slug) => {
+        // The tutorial starts on 10 December: its first Year in Review is a few weeks away.
+        setEpoch(Date.UTC(new Date().getUTCFullYear(), 11, 10));
+        setChoice({ slug, difficulty: "normal", transparency: false, tutorial: true });
       }}
     />
   );

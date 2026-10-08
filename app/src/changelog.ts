@@ -22,6 +22,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.3.0",
+    date: null,
+    added: [
+      "A tutorial, on the start screen: your first weeks as the newly elected mayor, with your chief of staff showing you the job step by step — the map and its views, the clock, the Town hall and its measures, the planning tools, your mail and your first Year in Review. It highlights what to click, and plays as a small game of its own.",
+    ],
+  },
+  {
     version: "0.2.0",
     date: "2026-10-07",
     title: "More towns, more heat, more power",

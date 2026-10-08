@@ -282,7 +282,7 @@ export function InboxButton({ onOpen }: { onOpen: () => void }) {
   const unread = inbox.unreadCount(simClock.getSimTimeMs());
   const total = unread.letters + unread.editions;
   return (
-    <button className="tb-icon-button" onClick={onOpen} title="Letters and the local paper">
+    <button className="tb-icon-button" onClick={onOpen} title="Letters and the local paper" data-tour="inbox">
       <Mail size={17} strokeWidth={1.75} aria-hidden />
       <span>Inbox</span>
       {total > 0 ? <span className="inbox-badge">{total}</span> : null}

@@ -59,7 +59,7 @@ function compactChf(rp: number): string {
   return formatCHF(rp);
 }
 
-function Kpi({ label, value, sub, tone, title, onClick }: { label: string; value: ReactNode; sub?: ReactNode; tone?: "good" | "bad"; title?: string; onClick?: () => void }) {
+function Kpi({ label, value, sub, tone, title, onClick, tour }: { label: string; value: ReactNode; sub?: ReactNode; tone?: "good" | "bad"; title?: string; onClick?: () => void; tour?: string }) {
   const body = (
     <>
       <span className="kpi-label">{label}</span>
@@ -68,11 +68,11 @@ function Kpi({ label, value, sub, tone, title, onClick }: { label: string; value
     </>
   );
   return onClick ? (
-    <button className="kpi kpi-button" title={title} onClick={onClick}>
+    <button className="kpi kpi-button" title={title} onClick={onClick} data-tour={tour}>
       {body}
     </button>
   ) : (
-    <div className="kpi" title={title}>
+    <div className="kpi" title={title} data-tour={tour}>
       {body}
     </div>
   );
@@ -85,7 +85,7 @@ function Clock() {
   const dayNight = dayNightStatus(simTimeMs);
   const insolation = Math.round(ghiWm2(simTimeMs));
   return (
-    <div className="tb-clock">
+    <div className="tb-clock" data-tour="clock">
       <div className="tb-date">
         <span className="tb-day">
           {formatWeekday(simTimeMs)}, {formatDate(simTimeMs)}
@@ -96,7 +96,7 @@ function Clock() {
         <WeatherIcon condition={weather.condition} night={dayNight.dayFraction < 0.5} />
         <span className="tb-temp">{Math.round(weather.tempC)}°C</span>
       </div>
-      <div className="tb-speed" role="group" aria-label="Speed">
+      <div className="tb-speed" role="group" aria-label="Speed" data-tour="speed">
         {SPEEDS.map((s) => (
           <button
             key={s.value}
@@ -133,6 +133,7 @@ function TreasuryKpi({ dataset, onOpen }: { dataset: MunicipalityDataset; onOpen
   ];
   return (
     <Kpi
+      tour="treasury"
       label="Treasury"
       value={balanceRp === null ? "…" : compactChf(balanceRp)}
       tone={balanceRp !== null && balanceRp < 0 ? "bad" : undefined}
@@ -166,6 +167,7 @@ function ApprovalKpi() {
   const trend = Math.abs(delta) < 1 ? "steady" : `${delta > 0 ? "▲" : "▼"} ${Math.abs(Math.round(delta))} pts`;
   return (
     <Kpi
+      tour="approval"
       label="Approval"
       value={`${Math.round(current)}%`}
       tone={current >= 60 ? "good" : current < 40 ? "bad" : undefined}
@@ -191,13 +193,14 @@ function EmissionsKpi() {
   const current = lastYear >= BASELINE_YEAR ? cachedEmissionsForYear(lastYear) : null;
   const baseline = cachedEmissionsForYear(BASELINE_YEAR);
   if (!current) {
-    return <Kpi label="CO₂" value="—" sub={`first count Jan ${BASELINE_YEAR + 1}`} title="The town's emissions are counted at the end of each year, in the Year in Review." />;
+    return <Kpi tour="co2" label="CO₂" value="—" sub={`first count Jan ${BASELINE_YEAR + 1}`} title="The town's emissions are counted at the end of each year, in the Year in Review." />;
   }
   const kt = current.netKgCO2 / 1_000_000;
   // The year's cut per resident against the start — the points it scored.
   const cut = baseline && lastYear > BASELINE_YEAR ? yearPoints(current, baseline) : null;
   return (
     <Kpi
+      tour="co2"
       label={`CO₂ ${lastYear}`}
       value={`${kt.toLocaleString("de-CH", { maximumFractionDigits: 1, minimumFractionDigits: 1 })} kt`}
       sub={cut === null ? "the baseline" : <span className={cut > 0 ? "good" : "bad"}>{`${cut > 0 ? "−" : "+"}${Math.abs(Math.round(cut))}% per resident`}</span>}
@@ -212,7 +215,7 @@ function ScoreKpi() {
   useReportCardYear(); // a new year counted
   const score = scoreSoFar();
   if (score.years.length === 0) {
-    return <Kpi label="Score" value="—" sub={`first year Jan ${BASELINE_YEAR + 2}`} title="Each year from the second on scores its cut in emissions per resident against the first, in percent." />;
+    return <Kpi tour="score" label="Score" value="—" sub={`first year Jan ${BASELINE_YEAR + 2}`} title="Each year from the second on scores its cut in emissions per resident against the first, in percent." />;
   }
   const last = score.years[score.years.length - 1].year;
   const par = parThrough(last);
@@ -220,6 +223,7 @@ function ScoreKpi() {
   const vsPar = par === null ? null : total - Math.round(par);
   return (
     <Kpi
+      tour="score"
       label="Score"
       value={String(total)}
       sub={vsPar === null ? `${score.years.length} year${score.years.length === 1 ? "" : "s"}` : <span className={vsPar >= 0 ? "good" : "bad"}>{`${vsPar >= 0 ? "+" : "−"}${Math.abs(vsPar)} vs par`}</span>}
@@ -260,11 +264,11 @@ export function TopBar({ dataset, onOpenTreasury, onOpenTownHall, onOpenInbox, o
           <MessageSquare size={17} strokeWidth={1.75} aria-hidden />
           <span>Feedback</span>
         </button>
-        <button className="tb-icon-button" onClick={onOpenWiki} title="Wiki: how the simulation works">
+        <button className="tb-icon-button" onClick={onOpenWiki} title="Wiki: how the simulation works" data-tour="wiki">
           <BookOpen size={17} strokeWidth={1.75} aria-hidden />
           <span>Wiki</span>
         </button>
-        <button className="tb-town-hall" onClick={onOpenTownHall} title="Measures, prices, the accounts and the statistics (the simulation pauses while it's open)">
+        <button className="tb-town-hall" data-tour="townhall" onClick={onOpenTownHall} title="Measures, prices, the accounts and the statistics (the simulation pauses while it's open)">
           <Landmark size={17} strokeWidth={1.75} aria-hidden />
           <span>Town hall</span>
         </button>

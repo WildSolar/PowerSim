@@ -62,6 +62,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Click any building to look inside: what heats it, what it draws right now, what its occupants pay, and what has changed over the years. Click a home in it to go down to single appliances.",
       ),
       p(
+        "New to the game? The tutorial on the start screen is a small game of its own: newly elected, you spend your first weeks in office with your chief of staff, who walks you through the map, the views, the clock, the Town hall, the planning tools and your mail — showing you what to click — up to your first Year in Review.",
+      ),
+      p(
         "A new game opens with a short briefing — the goal, how you stay in office, what you control — and a checklist of first steps in the corner, each with a button that takes you there. Close it once you know your way around; the game menu brings it back.",
       ),
       p(

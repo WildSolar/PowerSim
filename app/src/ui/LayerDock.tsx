@@ -91,6 +91,7 @@ export function LayerDock({ mode, onChange }: { mode: ColorMode; onChange: (mode
       <button
         className={l.mode === mode ? "active" : ""}
         aria-pressed={l.mode === mode}
+        data-tour={`layer-${l.mode}`}
         title={compact ? l.label : undefined}
         onClick={() => onChange(tool && l.mode === mode ? "none" : l.mode)}
       >
@@ -105,7 +106,7 @@ export function LayerDock({ mode, onChange }: { mode: ColorMode; onChange: (mode
       <h3 className="dock-heading">{compact ? "View" : "Views"}</h3>
       <ul>{VIEWS.map((l) => item(l, false))}</ul>
       <h3 className="dock-heading">{compact ? "Plan" : "Plan & build"}</h3>
-      <ul>{TOOLS.map((l) => item(l, true))}</ul>
+      <ul data-tour="tools">{TOOLS.map((l) => item(l, true))}</ul>
       <button className="dock-fold" onClick={toggleCompact} title={compact ? "Show labels" : "Fold to icons"} aria-label={compact ? "Show labels" : "Fold to icons"}>
         {compact ? <ChevronsRight size={16} aria-hidden /> : <ChevronsLeft size={16} aria-hidden />}
       </button>

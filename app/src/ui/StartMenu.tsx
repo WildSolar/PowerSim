@@ -20,9 +20,14 @@ function normalize(text: string): string {
 
 interface Props {
   onStart: (slug: string, difficulty: Difficulty, transparency: boolean, restore?: SaveFile) => void;
+  /** The tutorial, in this municipality. */
+  onTutorial: (slug: string) => void;
 }
 
-export function StartMenu({ onStart }: Props) {
+/** The town the tutorial plays in: small and quick to load, with a bit of everything. */
+const TUTORIAL_TOWN = "bonstetten";
+
+export function StartMenu({ onStart, onTutorial }: Props) {
   const [municipalities, setMunicipalities] = useState<MunicipalityIndexEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -112,6 +117,17 @@ export function StartMenu({ onStart }: Props) {
             </button>
             {continueError && <p className="start-menu-error">{continueError}</p>}
           </div>
+        )}
+        {municipalities && municipalities.length > 0 && (
+          <button
+            className="start-menu-tutorial"
+            onClick={() => onTutorial(municipalities.find((m) => m.slug === TUTORIAL_TOWN)?.slug ?? municipalities[0].slug)}
+          >
+            <span className="start-menu-tutorial-label">New in office? Take the tutorial</span>
+            <span className="start-menu-tutorial-meta">
+              Your chief of staff shows you the job, step by step — in {municipalities.find((m) => m.slug === TUTORIAL_TOWN)?.name ?? municipalities[0].name}. About 15 minutes.
+            </span>
+          </button>
         )}
         <div className="start-menu-tabs" role="tablist">
           <button role="tab" aria-selected={tab === "new"} className={tab === "new" ? "active" : ""} onClick={() => setTab("new")}>

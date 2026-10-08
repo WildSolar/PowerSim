@@ -104,7 +104,7 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
   // A construction site (or a building already gone) has no devices, bills or history to show.
   if (!existsAt(building, simTimeMs)) {
     return (
-      <div className="panel">
+      <div className="panel" data-tour="building-panel">
         <button className="panel-close" onClick={onClose} aria-label="Close">
           ×
         </button>
@@ -125,7 +125,7 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
   }
 
   return (
-    <div className="panel">
+    <div className="panel" data-tour="building-panel">
       <button className="panel-close" onClick={onClose} aria-label="Close">
         ×
       </button>

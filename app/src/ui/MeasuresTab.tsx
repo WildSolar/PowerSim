@@ -214,7 +214,7 @@ function MeasureDetail({ def, nowMs, onClose }: { def: MeasureDef; nowMs: number
       )}
 
       <div className="measure-actions">
-        <button className="measure-enact" disabled={!changed || unavailable !== null || moratoriumUntil !== null} onClick={() => measures.enact(def.id, draft)}>
+        <button className="measure-enact" data-tour="measure-enact" disabled={!changed || unavailable !== null || moratoriumUntil !== null} onClick={() => measures.enact(def.id, draft)}>
           {latest === null ? "Enact" : "Apply change"}
         </button>
         {latest !== null && unavailable === null && (
@@ -264,7 +264,7 @@ function MeasureTile({ def, nowMs, selected, onSelect }: { def: MeasureDef; nowM
   const status = measureStatus(def, nowMs);
   const footer = cardFooter(def, nowMs);
   return (
-    <button className={`measure-tile ${status.tone}${selected ? " selected" : ""}`} onClick={onSelect} aria-pressed={selected}>
+    <button className={`measure-tile ${status.tone}${selected ? " selected" : ""}`} onClick={onSelect} aria-pressed={selected} data-tour={`measure-${def.id}`}>
       <span className="measure-tile-top">
         <span className="measure-kind">{MEASURE_CATEGORY_SINGULAR[def.category]}</span>
         <span className={`measure-status ${status.tone}`}>{status.label}</span>
