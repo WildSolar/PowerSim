@@ -214,10 +214,10 @@ function LineDraftCard() {
       <div className="dh-network-name">Direct line</div>
       {!draft.a ? (
         <p className="dh-note">Click on the map where the line should start — at the network, a plant&apos;s junction or anywhere you want to reach. It joins the nearest street junction.</p>
-      ) : !draft.b ? (
-        <p className="dh-note">Now click where it should end. It runs straight between the two junctions.</p>
+      ) : draft.points.length === 1 ? (
+        <p className="dh-note">Now click along its course: every click is a bend, the last one is where it ends (at the nearest street junction). Go round the built-up areas where you can — open land is the cheapest ground.</p>
       ) : null}
-      {draft.missed && <p className="dh-warning">No street junction near there: click closer to a street.</p>}
+      {draft.missed && <p className="dh-warning">No street junction near there: start the line closer to a street.</p>}
       {quote && (
         <>
           <div className="info-row">
@@ -240,8 +240,8 @@ function LineDraftCard() {
             <span>Build time</span>
             <span className="info-value">{quote.months} months</span>
           </div>
-          {quote.problem && <p className="dh-warning">{quote.problem}</p>}
-          <p className="dh-note">A line carries heat across; nobody connects along it. Click again to move its end.</p>
+          {quote.problem && <p className={quote.connected || !draft.b ? "dh-note" : "dh-warning"}>{quote.problem}</p>}
+          <p className="dh-note">A line carries heat across; nobody connects along it. Click on to carry it further.</p>
         </>
       )}
       <div className="dh-actions">
@@ -250,6 +250,7 @@ function LineDraftCard() {
             Order for {formatCHF(quote.costRp)}
           </button>
         )}
+        {draft.points.length > 0 && <button onClick={() => districtHeatLines.undo()}>Undo last point</button>}
         <button onClick={() => districtHeatLines.cancel()}>Cancel</button>
       </div>
     </div>

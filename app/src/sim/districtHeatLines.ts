@@ -1,7 +1,9 @@
 /**
- * Planning a direct line: a district heating pipe laid straight from one street junction to another,
- * off the streets — to bring a plant's heat across town the short way, or to join two networks
- * without going round by the streets. It carries heat; nobody connects along it (districtHeat.ts
+ * Planning a direct line: a district heating pipe laid from one street junction to another, off the
+ * streets — to bring a plant's heat across town the short way, or to join two networks without going
+ * round by the streets. The player draws its course: it starts at the junction nearest the first
+ * click, bends at every click after, and ends at the junction nearest the last one — so it can skirt
+ * the built-up areas through cheaper ground. It carries heat; nobody connects along it (districtHeat.ts
  * keeps the lines and joins the networks at their ends).
  *
  * Its price depends on what it crosses (config/districtHeat.ts): cheap through fields, about a
@@ -29,9 +31,15 @@ export interface LineEnd {
 }
 
 export interface LineDraft {
+  /** Every click so far, [lon, lat]: the first and the last are the ends (taken to their junctions),
+   * the ones between are bends. */
+  points: [number, number][];
+  /** The start: the junction nearest the first click. */
   a: LineEnd | null;
+  /** The end: the junction nearest the last click, if there is one near enough (null while the
+   * line has only its start, or the last click isn't near a junction). */
   b: LineEnd | null;
-  /** Why the last click didn't take (no junction near it). */
+  /** The first click wasn't near a junction (so the line hasn't started). */
   missed: boolean;
 }
 
@@ -120,7 +128,7 @@ class DistrictHeatLines {
   }
 
   start(): void {
-    this.draft = { a: null, b: null, missed: false };
+    this.draft = { points: [], a: null, b: null, missed: false };
     districtHeat.clearSelection();
     districtHeatSources.cancelDraft();
     this.notify();
@@ -132,35 +140,72 @@ class DistrictHeatLines {
     this.notify();
   }
 
-  /** A click on the map while drawing: the first sets where the line starts, the next where it
-   * ends (and later ones move the end) — each at the street junction nearest the click. */
+  /** A click on the map while drawing: the first starts the line (at the junction nearest it),
+   * every later one adds a point to its course — the last of them is where it ends, at the junction
+   * nearest it. */
   click(lon: number, lat: number): void {
     if (!this.draft) return;
-    const junction = streets.nearestJunction(lon, lat);
-    if (!junction || junction.distanceM > DH_LINE_SNAP_M) {
-      this.draft = { ...this.draft, missed: true };
-    } else {
-      const end = { node: junction.node, lon: junction.lon, lat: junction.lat };
-      this.draft = this.draft.a ? { ...this.draft, b: end, missed: false } : { a: end, b: null, missed: false };
-    }
+    const points = [...this.draft.points, [lon, lat] as [number, number]];
+    if (points.length === 1 && !this.junctionNear(lon, lat)) this.draft = { ...this.draft, missed: true };
+    else this.draft = this.withPoints(points);
     this.notify();
   }
 
-  /** The line as drawn, priced at `atMs`. Null until both ends are set. */
+  /** Takes back the last click. */
+  undo(): void {
+    if (!this.draft || this.draft.points.length === 0) return;
+    this.draft = this.withPoints(this.draft.points.slice(0, -1));
+    this.notify();
+  }
+
+  private junctionNear(lon: number, lat: number): LineEnd | null {
+    const j = streets.nearestJunction(lon, lat);
+    return j && j.distanceM <= DH_LINE_SNAP_M ? { node: j.node, lon: j.lon, lat: j.lat } : null;
+  }
+
+  private withPoints(points: [number, number][]): LineDraft {
+    const first = points[0];
+    const last = points[points.length - 1];
+    return {
+      points,
+      a: first ? this.junctionNear(first[0], first[1]) : null,
+      b: points.length >= 2 ? this.junctionNear(last[0], last[1]) : null,
+      missed: false,
+    };
+  }
+
+  /** The line's course as drawn, [lon, lat]: from its start junction through the bends to its end
+   * (the end junction, or the last click while it isn't near one). */
+  course(): [number, number][] {
+    const d = this.draft;
+    if (!d?.a || d.points.length === 0) return [];
+    const bends = d.points.slice(1, -1);
+    const last = d.points[d.points.length - 1];
+    const end: [number, number] = d.b ? [d.b.lon, d.b.lat] : last;
+    return d.points.length === 1 ? [[d.a.lon, d.a.lat]] : [[d.a.lon, d.a.lat], ...bends, end];
+  }
+
+  /** The line as drawn, priced at `atMs`. Null until it has a second point. */
   quote(atMs: number): LineQuote | null {
     const d = this.draft;
-    if (!d?.a || !d.b) return null;
-    const pa = this.projection.toXY(d.a.lon, d.a.lat);
-    const pb = this.projection.toXY(d.b.lon, d.b.lat);
-    const lengthM = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]);
-    const byTerrain = this.terrain(pa, pb, atMs);
+    const course = this.course().map(([lon, lat]) => this.projection.toXY(lon, lat));
+    if (!d?.a || course.length < 2) return null;
+    const byTerrain: Record<DhLineTerrain, number> = { open: 0, plot: 0, road: 0, building: 0, water: 0 };
+    let lengthM = 0;
+    for (let i = 1; i < course.length; i++) {
+      lengthM += Math.hypot(course[i][0] - course[i - 1][0], course[i][1] - course[i - 1][1]);
+      const leg = this.terrain(course[i - 1], course[i], atMs);
+      for (const t of Object.keys(leg) as DhLineTerrain[]) byTerrain[t] += leg[t];
+    }
     const chfPerM = DH_PIPE_COST_CHF_PER_M * priceFactor("districtHeatPipes", atMs);
     const costRp = Math.round((Object.keys(byTerrain) as DhLineTerrain[]).reduce((sum, t) => sum + byTerrain[t] * DH_LINE_COST_FACTOR[t], 0) * chfPerM) * 100;
-    const connected = districtHeat.reachesNode(d.a.node) || districtHeat.reachesNode(d.b.node);
-    const duplicate = districtHeat.getLines().some((l) => (l.a === d.a!.node && l.b === d.b!.node) || (l.a === d.b!.node && l.b === d.a!.node));
-    const problem =
-      d.a.node === d.b.node
-        ? "Both ends are at the same junction: click further away."
+    const b = d.b;
+    const connected = districtHeat.reachesNode(d.a.node) || (b !== null && districtHeat.reachesNode(b.node));
+    const duplicate = b !== null && districtHeat.getLines().some((l) => (l.a === d.a!.node && l.b === b.node) || (l.a === b.node && l.b === d.a!.node));
+    const problem = !b
+      ? "The line has to end at a street junction: click near one to finish it there (or keep clicking to lay its course)."
+      : d.a.node === b.node
+        ? "Both ends are at the same junction."
         : duplicate
           ? "There is a line between these two junctions already."
           : !connected
@@ -178,10 +223,7 @@ class DistrictHeatLines {
       {
         a: d.a.node,
         b: d.b.node,
-        coords: [
-          [d.a.lon, d.a.lat],
-          [d.b.lon, d.b.lat],
-        ],
+        coords: this.course(),
         lengthM: q.lengthM,
         costRp: q.costRp,
         orderedAtMs: atMs,
@@ -196,7 +238,8 @@ class DistrictHeatLines {
 
   // --- what the line crosses ---
 
-  /** Metres of each kind of ground between two points, at `atMs` (the buildings standing then). */
+  /** Metres of each kind of ground on a straight leg between two points, at `atMs` (the buildings
+   * standing then). */
   private terrain(pa: XY, pb: XY, atMs: number): Record<DhLineTerrain, number> {
     const result: Record<DhLineTerrain, number> = { open: 0, plot: 0, road: 0, building: 0, water: 0 };
     const length = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]);

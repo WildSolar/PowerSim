@@ -322,21 +322,14 @@ function districtHeatLinesGeoJSON(simTimeMs: number) {
   const draft = districtHeatLines.getDraft();
   if (draft) {
     const q = districtHeatLines.quote(simTimeMs);
-    const state = q?.problem ? "plannedUnconnected" : "planned";
-    if (draft.a && draft.b)
-      features.push({
-        type: "Feature",
-        properties: { state },
-        geometry: {
-          type: "LineString",
-          coordinates: [
-            [draft.a.lon, draft.a.lat],
-            [draft.b.lon, draft.b.lat],
-          ],
-        },
-      });
-    for (const end of [draft.a, draft.b])
-      if (end) features.push({ type: "Feature", properties: { state }, geometry: { type: "Point", coordinates: [end.lon, end.lat] } });
+    // Red only once it can't be ordered as it stands (an end that's set but leads nowhere).
+    const state = q?.problem && draft.b ? "plannedUnconnected" : "planned";
+    const course = districtHeatLines.course();
+    if (course.length >= 2) features.push({ type: "Feature", properties: { state }, geometry: { type: "LineString", coordinates: course } });
+    // Its ends, and smaller marks at the bends.
+    course.forEach((p, i) =>
+      features.push({ type: "Feature", properties: { state, bend: i > 0 && i < course.length - 1 ? 1 : 0 }, geometry: { type: "Point", coordinates: p } }),
+    );
   }
   return { type: "FeatureCollection" as const, features };
 }
@@ -976,7 +969,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         filter: ["==", ["geometry-type"], "Point"],
         layout: { visibility: dhVisibility },
         paint: {
-          "circle-radius": 6,
+          "circle-radius": ["case", ["==", ["get", "bend"], 1], 4, 6],
           "circle-color": ["match", ["get", "state"], "plannedUnconnected", PIPE_UNCONNECTED_COLOR, PIPE_PLANNED_COLOR],
           "circle-stroke-color": "#fff",
           "circle-stroke-width": 2,
