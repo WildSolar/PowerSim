@@ -10,6 +10,7 @@ import { formatCHF } from "./format";
 import "./districtHeatPanel.css";
 import "./zoningPanel.css";
 import { SupervisionNotice } from "./SupervisionNotice";
+import { PlotLink } from "./PlotLink";
 
 function monthYear(ms: number): string {
   return formatDate(ms).replace(/^\d+ /, "");
@@ -129,7 +130,9 @@ export function WindPanel() {
 
   return (
     <div className="district-heat-panel">
-      <h3 className="panel-title">Wind</h3>
+      <h3 className="panel-title">
+        Wind <PlotLink chart="electricity" title="Electricity made and used over time" />
+      </h3>
       <SupervisionNotice />
       <p className="dh-note">
         Wind turbines make most of their power in winter, when solar makes least. But in Switzerland the road to one is long: a study, a zoning plan the voters decide

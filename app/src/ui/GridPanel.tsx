@@ -11,6 +11,7 @@ import { formatCHF } from "./format";
 import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
 import { SupervisionNotice } from "./SupervisionNotice";
+import { PlotLink } from "./PlotLink";
 
 const BUCKET_COLOR = Object.fromEntries(GRID_LEGEND.map((l) => [l.bucket, l.color]));
 
@@ -46,7 +47,9 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
   return (
     <div className="ev-site">
       <div className="ev-site-head">
-        <span className="ev-site-name">Transformer area {area.name}</span>
+        <span className="ev-site-name">
+          Transformer area {area.name} <PlotLink chart="transformer" param={String(area.id)} title="This transformer over time" />
+        </span>
         <button className="ev-close" onClick={() => grid.select(null)} title="Deselect">
           ✕
         </button>
@@ -160,7 +163,9 @@ export function GridPanel() {
 
   return (
     <div className="district-heat-panel">
-      <h3 className="panel-title">Electricity grid</h3>
+      <h3 className="panel-title">
+        Electricity grid <PlotLink chart="overloaded" title="Overloaded transformers over time" />
+      </h3>
       <SupervisionNotice />
       <div className="info-row">
         <span>Transformer areas</span>

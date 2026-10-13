@@ -12,6 +12,7 @@ import { formatCHF } from "./format";
 import { useLiveTreasury } from "./useLiveTreasury";
 import "./borrowing.css";
 import { UTILITY_PROFIT_RETAINED_SHARE } from "../config/treasury";
+import { PlotLink } from "./PlotLink";
 
 type Section = "accounts" | "borrowing";
 
@@ -158,7 +159,9 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
 
       {last && (
         <>
-          <h3 className="borrow-section">The utility in {last.year}</h3>
+          <h3 className="borrow-section">
+            The utility in {last.year} <PlotLink chart="utility" title="The utility's accounts over time" />
+          </h3>
           <table className="borrow-table treasury-table">
             <tbody>
               <Line label="Electricity sold to consumers" value={last.consumerRevenueRp} />
@@ -192,7 +195,9 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
         </>
       )}
 
-      <h3 className="borrow-section">Year by year</h3>
+      <h3 className="borrow-section">
+        Year by year <PlotLink chart="spending" title="Spending over time" />
+      </h3>
       {rows.length === 0 ? (
         <p className="borrow-note">The first year's accounts are booked on 31 December.</p>
       ) : (

@@ -16,6 +16,7 @@ import { ExternalOutlook, PublicOpinion, RecentDecisions } from "./MeasuresTab";
 import { useLiveTreasury } from "./useLiveTreasury";
 import { BASELINE_YEAR, NET_ZERO_TARGET_YEAR } from "./useYearEmissions";
 import "./overview.css";
+import { PlotLink } from "./PlotLink";
 
 const DAY_MS = 24 * 60 * 60_000;
 
@@ -30,10 +31,13 @@ function monthYear(simTimeMs: number): string {
   return formatDate(simTimeMs).replace(/^\d+ /, "");
 }
 
-function Figure({ label, value, children, onClick }: { label: string; value: ReactNode; children?: ReactNode; onClick?: () => void }) {
+function Figure({ label, value, children, onClick, chart }: { label: string; value: ReactNode; children?: ReactNode; onClick?: () => void; chart?: string }) {
   return (
     <section className={`ov-figure${onClick ? " clickable" : ""}`} onClick={onClick}>
-      <h3>{label}</h3>
+      <h3>
+        {label}
+        {chart && <PlotLink chart={chart} title={`${label} over time`} />}
+      </h3>
       <div className="ov-value">{value}</div>
       {children && <div className="ov-detail">{children}</div>}
     </section>
@@ -92,7 +96,7 @@ export function OverviewTab({ dataset, onOpen }: { dataset: MunicipalityDataset;
           Running spending in the last 12 months <strong className={spentRp > allowanceRp ? "bad" : undefined}>{formatCHF(spentRp)}</strong> against
           {" "}{formatCHF(allowanceRp)} a year taken in (the allocation and the utility's profit share).
         </Figure>
-        <Figure label="Approval" value={`${Math.round(approval.getApproval())}%`}>
+        <Figure label="Approval" chart="approval" value={`${Math.round(approval.getApproval())}%`}>
           {election !== null ? `Next election ${monthYear(election)}.` : "No election scheduled."} Very low approval ends the game.
         </Figure>
         <Figure label={last ? `CO₂ in ${last.year}` : "CO₂"} value={last ? `${(last.netKgCO2 / 1_000_000).toLocaleString("de-CH", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kt` : "—"}>
@@ -126,7 +130,9 @@ export function OverviewTab({ dataset, onOpen }: { dataset: MunicipalityDataset;
         <div className="ov-column">
           {last && (
             <section className="ov-card">
-              <h3>Where the emissions come from, {last.year}</h3>
+              <h3>
+                Where the emissions come from, {last.year} <PlotLink chart="emissions" title="Emissions over time" />
+              </h3>
               <div className="ov-sectors">
                 {SECTORS.map((s) => {
                   const share = last.totalKgCO2 > 0 ? last[s.key] / last.totalKgCO2 : 0;

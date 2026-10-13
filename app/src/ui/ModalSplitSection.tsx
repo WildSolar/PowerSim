@@ -6,6 +6,7 @@ import { fleets } from "../sim/fleet";
 import { mobilityCensus, type MobilityCensus } from "../sim/mobility";
 import { MOBILITY_MODE_ORDER } from "../sim/mobilitySystems";
 import "./modalSplit.css";
+import { PlotLink } from "./PlotLink";
 
 function pct(part: number, whole: number): string {
   return whole > 0 ? `${Math.round((part / whole) * 100)}%` : "–";
@@ -36,7 +37,9 @@ export function ModalSplitSection({ buildings, simDayMs }: { buildings: Building
 
   return (
     <>
-      <h3 className="section-heading">Getting around</h3>
+      <h3 className="section-heading">
+        Getting around <PlotLink chart="modal-split" title="The modal split over time" />
+      </h3>
       <p className="modal-split-note">Residents by their main way of getting around — from the federal mobility survey and the vehicle register.</p>
       <div className="modal-split-bar" role="img" aria-label={MOBILITY_MODE_ORDER.map((m) => `${MOBILITY_MODE_CATALOG[m].label} ${pct(now.byMode[m], nowTotal)}`).join(", ")}>
         {MOBILITY_MODE_ORDER.map((m) => (

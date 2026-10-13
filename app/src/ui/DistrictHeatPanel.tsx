@@ -19,6 +19,7 @@ import { mapFocus } from "../map/mapFocus";
 import { useStockBuildings } from "./useStock";
 import "./districtHeatPanel.css";
 import { SupervisionNotice } from "./SupervisionNotice";
+import { PlotLink } from "./PlotLink";
 
 function percent(part: number, share: CoverageShare): string {
   return share.total > 0 ? `${Math.round((part / share.total) * 100)}%` : "–";
@@ -274,7 +275,9 @@ export function DistrictHeatPanel() {
 
   return (
     <div className="district-heat-panel">
-      <h3 className="panel-title">District heating</h3>
+      <h3 className="panel-title">
+        District heating <PlotLink chart="district-heat" title="District heat over time" />
+      </h3>
       <SupervisionNotice />
 
       {fossilNetworks.length > 0 && (

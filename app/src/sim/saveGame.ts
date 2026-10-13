@@ -37,6 +37,7 @@ import { restoreScore, snapshotScore } from "./score";
 import { roofContracts } from "./roofContracts";
 import { agriPv } from "./agriPv";
 import { wind } from "./wind";
+import { monthRecords } from "./monthRecords";
 import { restoreSolar, snapshotSolar } from "./solarAdoption";
 import { stock } from "./stock";
 import { studies } from "./studies";
@@ -109,6 +110,7 @@ interface SaveState {
   roofContracts: ReturnType<typeof roofContracts.snapshot>;
   agriPv: ReturnType<typeof agriPv.snapshot>;
   wind: ReturnType<typeof wind.snapshot>;
+  monthRecords: ReturnType<typeof monthRecords.snapshot>;
   yearReport: Awaited<ReturnType<typeof snapshotYearReport>>;
 }
 
@@ -183,6 +185,7 @@ export function captureState(transparency: boolean): Omit<SaveState, "yearReport
     roofContracts: roofContracts.snapshot(),
     agriPv: agriPv.snapshot(),
     wind: wind.snapshot(),
+    monthRecords: monthRecords.snapshot(),
   };
 }
 
@@ -282,6 +285,7 @@ export function applySave(file: SaveFile): void {
   roofContracts.restore(s.roofContracts);
   agriPv.restore(s.agriPv);
   wind.restore(s.wind);
+  monthRecords.restore(s.monthRecords);
   restoreYearReport(s.yearReport);
   // The clock jumps to the saved moment, paused. That is not a year ending.
   resetYearEndWatcher();

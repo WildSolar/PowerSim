@@ -77,6 +77,8 @@ export interface GridArea {
   /** The last readings: winter peak draw, summer peak feed-in (kW), and which year they're from. */
   winter: { year: number; peakKw: number } | null;
   summer: { year: number; exportKw: number } | null;
+  /** Every reading so far, and the capacity it was read against (the charts). */
+  readings?: { year: number; season: "winter" | "summer"; kw: number; capacityKw: number }[];
 }
 
 function yearOf(simTimeMs: number): number {
@@ -184,6 +186,7 @@ class Grid {
       const [lo, hi] = START_HEADROOM_RANGE;
       const headroom = lo + mulberry32(hashSeed("grid-headroom", String(area.id)))() * (hi - lo);
       area.startCapacityKw = stationSizeFor(Math.max(1, peak * headroom));
+      for (const r of area.readings ?? []) r.capacityKw = area.startCapacityKw;
     }
     this.measuredWinter = startYear;
     this.measuredSummer = startYear;
@@ -419,9 +422,11 @@ class Grid {
         if (kw > peaks[i]) peaks[i] = kw;
       });
     }
+    const readAtMs = toSimTimeMs(Date.UTC(year, season === "winter" ? 2 : 8, 1));
     this.areas.forEach((area, i) => {
       if (season === "winter") area.winter = { year, peakKw: peaks[i] };
       else area.summer = { year, exportKw: peaks[i] };
+      (area.readings ??= []).push({ year, season, kw: peaks[i], capacityKw: this.capacityAt(area, readAtMs) });
     });
   }
 

@@ -32,7 +32,7 @@ import { historyTimeSteps, sampleDynamicConsumptionW, sampleMunicipalityCategory
 import { ANNUAL_CAR_KM, ICE_CAR_L_PER_100KM } from "./mobilitySystems";
 import { slotsWithVehicleAt } from "./mobility";
 import { fleets } from "./fleet";
-import { effectivePowerPlantsAt } from "./solarAdoption";
+import { effectivePowerPlantsAt, roofPotentialKw } from "./solarAdoption";
 import { spaceHeatingThermalDemandW } from "./spaceHeating";
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
@@ -40,6 +40,10 @@ import { dwellingWaterHeaterProfile, waterHeaterPowerW, waterHeatingKind, type W
 import { dailyMeanTempC, weatherAt } from "./weather";
 import { districtHeat, type DhNetworkInfo } from "./districtHeat";
 import { addDhEnergy, dispatchInstant, zeroDhEnergy, type DhEnergyKWh } from "./districtHeatDispatch";
+import { monthRecords } from "./monthRecords";
+import { DH_SOURCE_SPECS } from "../config/districtHeat";
+import { mobilityCensus } from "./mobility";
+import { windPowerW } from "./windPower";
 
 const SAMPLES_PER_MONTH = 24; // matches historyLong.ts's own per-period density
 const COARSE_SAMPLES_PER_MONTH = 8; // for quantities that don't need weather-grade resolution — see computeMobilityFuelLiters
@@ -103,11 +107,10 @@ export function monthElectricity(buildings: Building[], realPlants: PowerPlant[]
     // The plants in service by the month's end — not the whole year's: asking for those would
     // settle the rest of the year's solar decisions early, under whatever measures are in force now.
     const monthEndMs = toSimTimeMs(Date.UTC(year, month + 1, 1));
-    return {
-      times,
-      series: sampleMunicipalityCategorySeries(buildings, times, tariff, effectivePowerPlantsAt(buildings, realPlants, monthEndMs - 1)),
-      dynamicW: sampleDynamicConsumptionW(buildings, times, tariff),
-    };
+    const plants = effectivePowerPlantsAt(buildings, realPlants, monthEndMs - 1);
+    const series = sampleMunicipalityCategorySeries(buildings, times, tariff, plants);
+    recordMonthElectricity(buildings, year, month, times, series, plants, monthEndMs - 1);
+    return { times, series, dynamicW: sampleDynamicConsumptionW(buildings, times, tariff) };
   });
 }
 
@@ -285,6 +288,7 @@ export function monthHeatingTechnology(buildings: Building[], year: number, mont
   return sharedMonth(heatingTechnologyByMonth, year, month, () => {
     const times = monthTimes(year, month, SAMPLES_PER_MONTH);
     const series = sampleTechnologySeries(buildings, times);
+    recordMonthHeating(year, month, times, series);
     return {
       airHeatPumpSpaceKWh: energyKWh(times, series.airHeatPumpSpaceW),
       groundHeatPumpSpaceKWh: energyKWh(times, series.groundHeatPumpSpaceW),
@@ -299,6 +303,53 @@ export function monthHeatingTechnology(buildings: Building[], year: number, mont
         boilerGasKWh: energyKWh(times, series.dhGasW),
       },
     };
+  });
+}
+
+/** Keeps a month's electricity in the record the charts read (monthRecords.ts): use by category,
+ * what wind made of the local generation, rooftop solar against its potential, and the modal split
+ * at the month's end. */
+function recordMonthElectricity(buildings: Building[], year: number, month: number, times: number[], series: CategorySeries, plants: PowerPlant[], endMs: number): void {
+  const energy = categoryEnergyFromSeries(times, series);
+  const turbines = plants.filter((p) => p.technology === "Wind");
+  const windKWh = turbines.length > 0 ? energyKWh(times, times.map((t) => turbines.reduce((sum, p) => sum + windPowerW(p, t), 0))) : 0;
+  let builtKw = 0;
+  for (const p of plants) if (p.technology === "Photovoltaic" && p.egid && (p.activeToMs === undefined || p.activeToMs > endMs)) builtKw += p.capacityKw ?? 0;
+  let potentialKw = 0;
+  for (const b of buildings) if (existsAt(b, endMs)) potentialKw += roofPotentialKw(b, year);
+  // At the month's last sample, which the pass above has already asked about: counting never
+  // settles a household's choice sooner than the game would have.
+  const census = mobilityCensus(buildings, times[times.length - 1]);
+  monthRecords.record(year * 12 + month, {
+    electricityKWh: { ...energy, solar: Math.max(0, energy.solar - windKWh) },
+    windKWh,
+    solarBuiltKw: builtKw,
+    solarPotentialKw: potentialKw,
+    mobility: { car: census.byMode.car, carElectric: census.carsElectric, bike: census.byMode.bike, other: census.byMode.other },
+  });
+}
+
+/** Keeps a month's heat in the record: by heating system, and the district heat by what made it. */
+function recordMonthHeating(year: number, month: number, times: number[], series: TechnologySeriesW): void {
+  const labelOf = new Map(districtHeat.getSources().map((s) => [s.id, s.kind ? DH_SOURCE_SPECS[s.kind].label : "Other clean heat"]));
+  const districtHeatKWh: Record<string, number> = {};
+  for (const [id, w] of series.dhSourceW) {
+    const label = labelOf.get(id) ?? "Other";
+    districtHeatKWh[label] = (districtHeatKWh[label] ?? 0) + energyKWh(times, w);
+  }
+  const oil = energyKWh(times, series.dhOilW);
+  const gas = energyKWh(times, series.dhGasW);
+  if (oil > 0) districtHeatKWh["Oil boilers"] = oil;
+  if (gas > 0) districtHeatKWh["Gas boilers"] = gas;
+  monthRecords.record(year * 12 + month, {
+    heatingKWh: {
+      oil: energyKWh(times, series.oilBoilerSpaceW),
+      gas: energyKWh(times, series.gasBoilerSpaceW),
+      airHeatPump: energyKWh(times, series.airHeatPumpSpaceW),
+      groundHeatPump: energyKWh(times, series.groundHeatPumpSpaceW),
+      districtHeating: energyKWh(times, series.districtHeatingSpaceW),
+    },
+    districtHeatKWh,
   });
 }
 

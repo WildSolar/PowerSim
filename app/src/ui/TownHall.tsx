@@ -5,6 +5,7 @@ import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { useSimDay, useSimSpeed, useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
 import { PAUSE_SPEED } from "../sim/timeControls";
+import { ChartsTab } from "./ChartsTab";
 import { CityStatsTab } from "./CityStatsTab";
 import { DecisionLogTab } from "./DecisionLogTab";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
@@ -16,7 +17,7 @@ import { TechnologyPrices } from "./TechnologyPrices";
 import { usePauseWhileOpen } from "./usePauseWhileOpen";
 import "./townHall.css";
 
-export type TownHallSection = "overview" | "measures" | "treasury" | "prices" | "stats" | "log";
+export type TownHallSection = "overview" | "measures" | "treasury" | "prices" | "stats" | "charts" | "log";
 
 const SECTIONS: { id: TownHallSection; title: string; blurb: string }[] = [
   { id: "overview", title: "Overview", blurb: "Where the town stands, what the canton and the Confederation have in store, and what was decided lately." },
@@ -24,6 +25,7 @@ const SECTIONS: { id: TownHallSection; title: string; blurb: string }[] = [
   { id: "treasury", title: "Treasury", blurb: "The department's accounts, year by year, and its borrowing." },
   { id: "prices", title: "Prices", blurb: "What the municipal utility charges, and where technology prices are heading." },
   { id: "stats", title: "Statistics", blurb: "Where the town's energy goes, now and over time." },
+  { id: "charts", title: "Charts", blurb: "How the town has changed since you took office: energy, the grid, the residents and the books, month by month." },
   { id: "log", title: "Decision log", blurb: "Every choice households, owners and businesses made, with the options they weighed." },
 ];
 
@@ -101,6 +103,7 @@ export function TownHall({ dataset, transparency, section, onSection, onClose }:
               </section>
             </div>
           )}
+          {current.id === "charts" && <ChartsTab />}
           {current.id === "log" && <DecisionLogTab dataset={dataset} />}
         </div>
       </div>

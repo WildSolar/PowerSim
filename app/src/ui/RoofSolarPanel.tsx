@@ -9,6 +9,7 @@ import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
 import "./districtHeatPanel.css";
 import { SupervisionNotice } from "./SupervisionNotice";
+import { PlotLink } from "./PlotLink";
 
 function monthYear(ms: number): string {
   return formatDate(ms).replace(/^\d+ /, "");
@@ -167,7 +168,9 @@ export function RoofSolarPanel({ buildings, onSelectBuilding }: { buildings: Bui
 
   return (
     <div className="district-heat-panel">
-      <h3 className="panel-title">Roof solar</h3>
+      <h3 className="panel-title">
+        Roof solar <PlotLink chart="rooftop-solar" title="Rooftop solar over time" />
+      </h3>
       <SupervisionNotice />
       <p className="dh-note">
         Rent large roofs and put the utility's own solar on them. An owner can accept, decline, or be prompted to build their own. The utility pays the build cost — the

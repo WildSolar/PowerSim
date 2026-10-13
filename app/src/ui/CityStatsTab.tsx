@@ -16,6 +16,7 @@ import { useHistorySeries } from "./useHistorySeries";
 import { usePeriodPieEnergy, type PieGranularity } from "./usePeriodPieEnergy";
 import "./panels.css";
 import "./pieChart.css";
+import { PlotLink } from "./PlotLink";
 
 export interface CityStatsTabProps {
   dataset: MunicipalityDataset;
@@ -89,7 +90,9 @@ export function CityStatsTab({ dataset }: CityStatsTabProps) {
 
       <ModalSplitSection buildings={dataset.buildings} simDayMs={currentDay} />
 
-      <h3 className="section-heading">Energy breakdown</h3>
+      <h3 className="section-heading">
+        Energy breakdown <PlotLink chart="electricity" title="Electricity over time" />
+      </h3>
       <div className="tier-buttons">
         {GRANULARITIES.map((g) => (
           <button key={g.value} className={g.value === granularity ? "active" : ""} onClick={() => setGranularity(g.value)}>

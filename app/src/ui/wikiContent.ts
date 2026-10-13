@@ -921,6 +921,26 @@ export const WIKI_SECTIONS: WikiSection[] = [
       note("History shows finished days, weeks and months only, so its bars don't change once drawn."),
     ],
   },
+  {
+    id: "charts",
+    title: "Charts",
+    blocks: [
+      p(
+        "Town hall → Charts shows how the town has changed since you took office. Pick a chart on the left; hover over it to read the numbers for a month or a year. A small grey chart icon next to a panel's title — the grid, a transformer, district heating, roof solar, wind, the modal split, the accounts, approval — opens the matching chart directly.",
+      ),
+      list([
+        "Electricity — what the town used each month, by what used it (homes, businesses, heat pumps, hot water, cooling, electric cars), and what its solar panels and wind turbines made.",
+        "Heat by heating system — the heat buildings got each month, by what heated them.",
+        "District heat by source — what the networks' plants made each month, and how much the backup boilers burned.",
+        "Rooftop solar — how much of what the town's roofs could carry has been built.",
+        "A transformer — each winter's peak draw and summer's peak feed-in at one station, against its capacity. “Overloaded transformers” counts the stations over their limit at each reading.",
+        "Modal split — how residents get around, with the share of electric cars.",
+        "Approval — month by month, against the 50% you need on election day.",
+        "Emissions, spending and the utility's accounts — year by year, as each year is counted and booked.",
+      ]),
+      note("Monthly charts fill in as each month ends; yearly ones with each Year in Review. Readings of the grid come after each winter and each summer, as in \"The electricity grid\"."),
+    ],
+  },
 ];
 
 /** The wiki's contents: every section, grouped by what it is about. */
@@ -977,6 +997,6 @@ export const WIKI_GROUPS: WikiGroup[] = [
     id: "households",
     title: "Households & numbers",
     blurb: "What runs in a home, what it pays, and the statistics that add it all up.",
-    sections: ["appliances", "finances", "statistics"],
+    sections: ["appliances", "finances", "statistics", "charts"],
   },
 ];

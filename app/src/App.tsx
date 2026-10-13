@@ -6,6 +6,7 @@ import { CrashBoundary, CrashScreen } from "./ui/CrashScreen";
 import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
 import { TownHall, type TownHallSection } from "./ui/TownHall";
+import { chartNav } from "./ui/chartNav";
 import { GuideCard, WelcomeBriefing, guide, type GuideStep } from "./ui/Onboarding";
 import { Tutorial } from "./ui/Tutorial";
 import { track } from "./analytics";
@@ -48,6 +49,7 @@ import { districtHeatSources } from "./sim/districtHeatSources";
 import { roofContracts } from "./sim/roofContracts";
 import { agriPv } from "./sim/agriPv";
 import { wind } from "./sim/wind";
+import { monthRecords } from "./sim/monthRecords";
 import { WindPanel } from "./ui/WindPanel";
 import { RoofSolarPanel } from "./ui/RoofSolarPanel";
 import { publicCharging } from "./sim/publicCharging";
@@ -103,6 +105,11 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
   const [colorMode, setColorMode] = useState<ColorMode>("none");
   const [townHall, setTownHall] = useState<TownHallSection | null>(null);
   const showTownHall = townHall !== null;
+  // A chart link (PlotLink.tsx) opens the town hall on its Charts tab.
+  useEffect(() => {
+    chartNav.setOpener(() => setTownHall("charts"));
+    return () => chartNav.setOpener(null);
+  }, []);
   const [showWiki, setShowWiki] = useState(false);
   const [inboxSelection, setInboxSelection] = useState<InboxSelection | null>(null);
   const [showMenu, setShowMenu] = useState(false);
@@ -235,6 +242,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         debt.init(() => stock.getAll(), `rates:${loaded.bfsNumber}`);
         // Letters and the paper last: they read everything above.
         inbox.init();
+        monthRecords.init();
         letters.init(loaded, () => stock.getAll(), `letters:${loaded.bfsNumber}`);
         newspaper.init(loaded, () => stock.getAll(), `paper:${loaded.bfsNumber}`);
         if (restore) {

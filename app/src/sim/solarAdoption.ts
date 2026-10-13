@@ -676,6 +676,12 @@ export function roofArray(building: Building, atMs: number): { capacityKw: numbe
   };
 }
 
+/** What the usable part of a building's roof could take, at the panels of `year` (kWp). */
+export function roofPotentialKw(building: Building, year: number): number {
+  const usable = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
+  return (building.footprintAreaM2 ?? 0) * usable * kwpPerM2At(year);
+}
+
 /** A year of output from 1 kWp in the year of `atMs` (kWh): the full-load hours of this town's sun. */
 export function specificYieldKWhPerKwp(atMs: number): number {
   const year = new Date(toDateMs(atMs)).getUTCFullYear();
