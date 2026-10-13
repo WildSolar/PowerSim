@@ -681,6 +681,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Power reaches every building through the transformer station serving its neighbourhood, and each station can carry only so much. The cables run along the streets, so a building hangs off the station nearest to it by road — not necessarily the nearest as the crow flies — and an area follows its streets. Each area is served by a station of standard size with some headroom over the town's demand at the start.",
       ),
       p(
+        "On-street chargers hang off their neighbourhood's station like the houses around them. A fast-charging hub, a lorry charging park and a district heating plant's heat pumps are big enough to get a transformer of their own on the medium-voltage grid — it comes with them, in their price — so they don't load the neighbourhood's.",
+      ),
+      p(
         "Twice a year the utility reads its meters: after the winter (the highest draw, on the coldest evenings when heat pumps, cooking and cars plugging in come together) and after the summer (the highest feed-in, on the sunniest middays when rooftop solar pushes power back up the line). The Grid tool colours every building by how loaded its station was at the last reading, marks the stations and outlines the area each one serves; pick a station or any building to highlight its area. The drawer ranks the areas and shows each one's peaks against its capacity.",
       ),
       p(
@@ -692,7 +695,10 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "New buildings are always connected.",
       ]),
       p(
-        "After each reading the utility reinforces the worst overloaded area out of its upkeep budget — but demand outruns that. The rest is up to you, paid from the treasury: reinforcing an area (the next station size up, with its cables; ready after nine months) or adding a neighbourhood battery (250 kW, 500 kW or 1 MW, storing two hours; it covers its power of the peak either way, is ready after six months, and gets cheaper over the years).",
+        "After each reading the utility reinforces the worst overloaded area, one size up, out of its upkeep budget — but demand outruns that. The rest is up to you, paid from the treasury: reinforcing an area or adding a neighbourhood battery (250 kW, 500 kW or 1 MW, storing two hours; it covers its power of the peak either way, is ready after six months, and gets cheaper over the years).",
+      ),
+      p(
+        "Reinforcing puts in a new station of the size you choose, cables included, ready after nine months. A new station replaces the old one whatever its size, so going straight to the size you will need costs less than getting there in steps — but the money is spent now. One order per station at a time; while the utility's own reinforcement is under way, you can make it bigger and pay the difference.",
       ),
       p(
         "Reinforcing everywhere is expensive, so three measures buy time by shaving the peaks: heat pump load control lets the utility switch enrolled heat pumps off in turns at peak times (half of them off at any one moment, briefly, hardly noticed); a smart charging programme has electric cars charge at night rather than as soon as they are plugged in; and a solar feed-in limit caps what panels deliver at 70% (or less) of their rating, which costs little energy but shaves the sunny-midday peak. A battery subsidy tied to grid-friendly operation does the same for the systems it pays for. They slow overloading down; in the long run, reinforcement is the answer.",

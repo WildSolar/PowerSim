@@ -25,9 +25,16 @@ export const CHANGELOG: Release[] = [
     version: "0.3.0",
     date: null,
     added: [
+      "Grid: choose the size when you reinforce a transformer station. A new station replaces the old one, so one step to the size you need costs less than several small ones; one order per station at a time, and while the utility's own reinforcement is under way you can make it bigger for the difference.",
       "Charts, a new tab in the Town hall: how the town has changed since you took office — electricity by use and what solar and wind made, heat by heating system, district heat by source (backup boilers included), the share of the roofs' solar potential built, each transformer's peaks against its capacity, the modal split, approval, emissions, spending and the utility's accounts. A small chart icon next to a transformer, a panel or an account opens its chart.",
       "The published game counts visits and a few milestones anonymously (no cookies, nothing about you) — see About & credits.",
       "A tutorial, on the start screen: your first weeks as the newly elected mayor, with your chief of staff showing you the job step by step — the map and its views, the clock, the Town hall and its measures, the planning tools, your mail and your first Year in Review. It highlights what to click, and plays as a small game of its own.",
+    ],
+    changed: [
+      "Grid: only on-street chargers load their neighbourhood's transformer station. Fast-charging hubs and lorry charging parks have a transformer of their own, which comes with them.",
+    ],
+    fixed: [
+      "Grid: a neighbourhood battery being installed shows its size.",
     ],
   },
   {

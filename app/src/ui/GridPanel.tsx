@@ -5,7 +5,7 @@ import { GRID_LEGEND } from "../map/colorModes";
 import { mapFocus } from "../map/mapFocus";
 import { formatDate } from "../sim/calendar";
 import { simClock } from "../sim/engine";
-import { grid, gridBatteryCostRp, reinforceCostRp, type GridArea } from "../sim/grid";
+import { grid, gridBatteryCostRp, type GridArea } from "../sim/grid";
 import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
 import "./districtHeatPanel.css";
@@ -25,6 +25,13 @@ function monthYear(simTimeMs: number): string {
   return formatDate(simTimeMs).replace(/^\d+ /, "");
 }
 
+/** "500 kWh", "1 MWh": a neighbourhood battery's storage (two hours of its power, for an order
+ * that didn't keep it). */
+function batterySize(b: { kw: number; kwh?: number }): string {
+  const kwh = b.kwh ?? b.kw * 2;
+  return kwh >= 1000 ? `${kwh / 1000} MWh` : `${kwh} kWh`;
+}
+
 function LoadBar({ kw, capacityKw }: { kw: number; capacityKw: number }) {
   const share = capacityKw > 0 ? kw / capacityKw : 0;
   const color = share > 1 ? BUCKET_COLOR.over : share >= 0.9 ? BUCKET_COLOR.full : share >= 0.75 ? BUCKET_COLOR.tight : BUCKET_COLOR.ok;
@@ -37,7 +44,8 @@ function LoadBar({ kw, capacityKw }: { kw: number; capacityKw: number }) {
 
 function AreaDetails({ area, now }: { area: GridArea; now: number }) {
   const capacity = grid.capacityAt(area, now);
-  const planned = grid.plannedCapacity(area);
+  const options = grid.reinforceOptions(area, now);
+  const pending = grid.pendingUpgrade(area, now);
   const battery = grid.batteryKwAt(area, now);
   const pendingBatteries = area.batteries.filter((b) => b.atMs > now);
   const pendingUpgrade = area.upgrades.filter((u) => u.atMs > now);
@@ -93,19 +101,29 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
       ))}
       {pendingBatteries.length > 0 && (
         <p className="dh-note">
-          {pendingBatteries.length} battery{pendingBatteries.length === 1 ? "" : "s"} being installed — in service {monthYear(pendingBatteries[pendingBatteries.length - 1].atMs)}.
+          {pendingBatteries.length === 1 ? "1 battery" : `${pendingBatteries.length} batteries`} ({pendingBatteries.map(batterySize).join(", ")}) being installed — in service{" "}
+          {monthYear(pendingBatteries[pendingBatteries.length - 1].atMs)}.
         </p>
       )}
-      <div className="ev-sizes">
-        <button onClick={() => grid.reinforce(area.id, simClock.getSimTimeMs())}>
-          <span className="ev-build-name">
-            Reinforce to {grid.nextSizeFor(area)} kVA
-          </span>
-          <span className="ev-build-detail">
-            {formatCHF(reinforceCostRp(planned))} · {REINFORCE_MONTHS} months
-          </span>
-        </button>
-      </div>
+      {options.length > 0 && (
+        <>
+          <div
+            className="dh-note"
+            style={{ marginTop: 6 }}
+            title="A new station replaces the old one, cables included: going straight to the size you need costs less than two steps"
+          >
+            {pending ? `Make it bigger than the utility's ${pending.capacityKw} kVA (you pay the difference):` : `Reinforce the station (${REINFORCE_MONTHS} months):`}
+          </div>
+          <div className="ev-sizes">
+            {options.map((o) => (
+              <button key={o.kw} onClick={() => grid.reinforce(area.id, simClock.getSimTimeMs(), o.kw)}>
+                <span className="ev-build-name">{o.kw} kVA</span>
+                <span className="ev-build-detail">{compactCHF(o.costRp)}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       <div className="dh-note" style={{ marginTop: 6 }} title="A battery covers its power of the area's peak — the winter evening draw and the summer midday feed-in alike — and stores two hours of it">
         Add a neighbourhood battery ({BATTERY_MONTHS} months):
       </div>
@@ -129,7 +147,7 @@ function WorkInProgress({ area, now }: { area: GridArea; now: number }) {
   if (!upgrade && !battery) return null;
   const parts = [
     upgrade && `${upgrade.byUtility ? "The utility is reinforcing" : "Reinforcing"} the station (${upgrade.capacityKw} kVA, ${monthYear(upgrade.atMs)})`,
-    battery && `A ${battery.kw} kW battery is being installed (${monthYear(battery.atMs)})`,
+    battery && `A ${batterySize(battery)} battery is being installed (${monthYear(battery.atMs)})`,
   ].filter(Boolean);
   return (
     <span className="grid-wip" title={parts.join("\n")} aria-label={parts.join(". ")}>

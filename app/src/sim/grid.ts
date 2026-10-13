@@ -73,7 +73,7 @@ export interface GridArea {
   startCapacityKw: number;
   /** Reinforcements: the capacity from `atMs` on. */
   upgrades: { atMs: number; capacityKw: number; byUtility?: boolean }[];
-  batteries: { atMs: number; kw: number }[];
+  batteries: { atMs: number; kw: number; kwh?: number }[];
   /** The last readings: winter peak draw, summer peak feed-in (kW), and which year they're from. */
   winter: { year: number; peakKw: number } | null;
   summer: { year: number; exportKw: number } | null;
@@ -109,9 +109,17 @@ function mostCommonStreet(buildings: Building[]): string | null {
   return best;
 }
 
-export function reinforceCostRp(fromKw: number): number {
-  const toKw = nextStationSize(fromKw);
+/** A new station of `toKw`: the transformer and the cables with it, whatever stood there before —
+ * so one step to the size needed costs less than two smaller ones. */
+export function reinforceCostRp(toKw: number): number {
   return (REINFORCE_BASE_CHF + REINFORCE_CHF_PER_KVA * toKw) * 100;
+}
+
+/** The station sizes above `kw` (the standard ones, then two or more units), the first `count`. */
+function stationSizesAbove(kw: number, count: number): number[] {
+  const sizes: number[] = [];
+  for (let size = nextStationSize(kw); sizes.length < count; size = nextStationSize(size)) sizes.push(size);
+  return sizes;
 }
 
 /** A station's zone for the map, in [lon, lat]: its area as polygons, and its outline as lines. */
@@ -416,7 +424,9 @@ class Grid {
         if (!existsAt(b, t)) continue;
         sums[this.areaIdOf(b)] += buildingPowerW(b, t, plants, snow) - (controlled > 0 ? controlled * heatPumpPowerW(b, t) : 0);
       }
-      for (const site of publicCharging.getSites()) sums[this.siteAreaId(site.lon, site.lat)] += publicCharging.siteLoadW(site, t);
+      // On-street chargers hang off the local station; a fast-charging hub or a lorry park has its own
+      // transformer on the medium-voltage grid (it comes with the site, config/charging.ts).
+      for (const site of publicCharging.getSites()) if (site.kind === "ac") sums[this.siteAreaId(site.lon, site.lat)] += publicCharging.siteLoadW(site, t);
       sums.forEach((w, i) => {
         const kw = season === "winter" ? w / 1000 : -w / 1000;
         if (kw > peaks[i]) peaks[i] = kw;
@@ -475,14 +485,35 @@ class Grid {
 
   // --- the player ---
 
-  /** Orders the next station size up for an area: paid now, in service once built. */
-  reinforce(areaId: number, atMs: number): void {
+  /** The reinforcement under way at an area, if any. */
+  pendingUpgrade(area: GridArea, atMs: number): GridArea["upgrades"][number] | undefined {
+    return area.upgrades.find((u) => u.atMs > atMs);
+  }
+
+  /** The sizes the player can order for an area, and what each costs: none while the player's own
+   * order is under way; above the utility's, at the difference, while the utility's routine one is
+   * (the work is already planned — the municipality pays for the bigger station). */
+  reinforceOptions(area: GridArea, atMs: number): { kw: number; costRp: number }[] {
+    const pending = this.pendingUpgrade(area, atMs);
+    if (pending && !pending.byUtility) return [];
+    const credit = pending ? reinforceCostRp(pending.capacityKw) : 0;
+    return stationSizesAbove(this.plannedCapacity(area), 3).map((kw) => ({ kw, costRp: reinforceCostRp(kw) - credit }));
+  }
+
+  /** Orders a bigger station for an area (one of reinforceOptions; the smallest if not said): paid
+   * now, in service once built. */
+  reinforce(areaId: number, atMs: number, toKw?: number): void {
     const area = this.areas[areaId];
     if (!area || spendingFrozen(atMs)) return;
-    const from = this.plannedCapacity(area);
-    const pendingUntil = area.upgrades.reduce((latest, u) => Math.max(latest, u.atMs), atMs);
-    area.upgrades.push({ atMs: Math.max(pendingUntil, atMs + REINFORCE_MONTHS * MONTH_MS), capacityKw: nextStationSize(from) });
-    treasury.recordPayout("grid", atMs, reinforceCostRp(from), `grid-${areaId}`);
+    const options = this.reinforceOptions(area, atMs);
+    const option = toKw === undefined ? options[0] : options.find((o) => o.kw === toKw);
+    if (!option) return;
+    const pending = this.pendingUpgrade(area, atMs);
+    if (pending) {
+      pending.capacityKw = option.kw;
+      pending.byUtility = false;
+    } else area.upgrades.push({ atMs: atMs + REINFORCE_MONTHS * MONTH_MS, capacityKw: option.kw });
+    treasury.recordPayout("grid", atMs, option.costRp, `grid-${areaId}`);
     this.notify();
   }
 
@@ -491,13 +522,9 @@ class Grid {
     const area = this.areas[areaId];
     const size = GRID_BATTERY_SIZES[sizeIndex];
     if (!area || !size || spendingFrozen(atMs)) return;
-    area.batteries.push({ atMs: atMs + BATTERY_MONTHS * MONTH_MS, kw: size.kw });
+    area.batteries.push({ atMs: atMs + BATTERY_MONTHS * MONTH_MS, kw: size.kw, kwh: size.kwh });
     treasury.recordPayout("grid", atMs, gridBatteryCostRp(sizeIndex, atMs), `grid-battery-${areaId}`);
     this.notify();
-  }
-
-  nextSizeFor(area: GridArea): number {
-    return nextStationSize(this.plannedCapacity(area));
   }
 
   getSelectedId(): number | null {
