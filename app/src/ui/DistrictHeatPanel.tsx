@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { DH_BOILER_EFFICIENCY, DH_SOURCE_SPECS, DH_WOOD_NUISANCE_RADIUS_M } from "../config/districtHeat";
+import { DH_BOILER_EFFICIENCY, DH_LINE_COST_FACTOR, DH_SOURCE_SPECS, DH_WOOD_NUISANCE_RADIUS_M, type DhLineTerrain } from "../config/districtHeat";
 import type { DhCandidateData } from "../data/types";
 import { BASELINE_YEAR, formatDate, toDateMs } from "../sim/calendar";
 import { districtHeat, type DhNetworkInfo } from "../sim/districtHeat";
 import { zeroDhEnergy, type DhEnergyKWh } from "../sim/districtHeatDispatch";
 import { candidateName, districtHeatSources, type PlacedKind } from "../sim/districtHeatSources";
+import { districtHeatLines } from "../sim/districtHeatLines";
 import { simClock } from "../sim/engine";
 import { networkCoverage, networkPeaksW, networkStatusAt, streetDemand, type CoverageShare } from "../sim/districtHeatStats";
 import { heatPumpSiting } from "../sim/heatPumpSiting";
@@ -194,6 +195,67 @@ function candidateLine(c: DhCandidateData, maxMw: number): string {
   return c.kind === "industry" ? `${maxMw.toFixed(1)} MW of waste heat on offer${where}` : `${size}${where}`;
 }
 
+const TERRAIN_LABEL: Record<DhLineTerrain, string> = {
+  open: "Through open land",
+  plot: "Through gardens and yards",
+  road: "Across roads",
+  building: "Under buildings",
+  water: "Across water",
+};
+
+/** Drawing a direct line: where it starts and ends, what it crosses and costs. */
+function LineDraftCard() {
+  const simDay = useSimDay();
+  const draft = districtHeatLines.getDraft();
+  const quote = districtHeatLines.quote(simDay);
+  if (!draft) return null;
+  return (
+    <div className="dh-draft">
+      <div className="dh-network-name">Direct line</div>
+      {!draft.a ? (
+        <p className="dh-note">Click on the map where the line should start — at the network, a plant&apos;s junction or anywhere you want to reach. It joins the nearest street junction.</p>
+      ) : !draft.b ? (
+        <p className="dh-note">Now click where it should end. It runs straight between the two junctions.</p>
+      ) : null}
+      {draft.missed && <p className="dh-warning">No street junction near there: click closer to a street.</p>}
+      {quote && (
+        <>
+          <div className="info-row">
+            <span>Length</span>
+            <span className="info-value">{Math.round(quote.lengthM)} m</span>
+          </div>
+          {(Object.keys(TERRAIN_LABEL) as DhLineTerrain[])
+            .filter((t) => quote.byTerrain[t] >= 1)
+            .map((t) => (
+              <div className="info-row" key={t} title={`Costs ${DH_LINE_COST_FACTOR[t]}× a metre under a street`}>
+                <span>{TERRAIN_LABEL[t]}</span>
+                <span className="info-value">{Math.round(quote.byTerrain[t])} m</span>
+              </div>
+            ))}
+          <div className="info-row">
+            <span>Cost</span>
+            <span className="info-value">{formatCHF(quote.costRp)}</span>
+          </div>
+          <div className="info-row">
+            <span>Build time</span>
+            <span className="info-value">{quote.months} months</span>
+          </div>
+          {quote.problem && <p className="dh-warning">{quote.problem}</p>}
+          <p className="dh-note">A line carries heat across; nobody connects along it. Click again to move its end.</p>
+        </>
+      )}
+      <div className="dh-actions">
+        {quote && (
+          <button className="dh-order" disabled={!!quote.problem} onClick={() => districtHeatLines.order(simClock.getSimTimeMs())}>
+            Order for {formatCHF(quote.costRp)}
+          </button>
+        )}
+        <button onClick={() => districtHeatLines.cancel()}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 /** The district heating layer's own panel: each network (what feeds it, against its winter peak),
  * new heat sources (from a plant within reach, or placed on the map), and planning a pipe extension
  * — the streets picked on the map, what they cost and take to build, and how much heat the
@@ -206,6 +268,10 @@ export function DistrictHeatPanel() {
   const draftVersion = useSyncExternalStore(
     (l) => districtHeatSources.subscribe(l),
     () => districtHeatSources.getVersion(),
+  );
+  useSyncExternalStore(
+    (l) => districtHeatLines.subscribe(l),
+    () => districtHeatLines.getVersion(),
   );
   const simDay = useSimDay();
   const buildings = useStockBuildings();
@@ -250,7 +316,14 @@ export function DistrictHeatPanel() {
   }, [buildings, simDay, version]); // eslint-disable-line react-hooks/exhaustive-deps
   const quote = useMemo(() => districtHeat.quote(simDay), [version, simDay]); // eslint-disable-line react-hooks/exhaustive-deps
   const demand = useMemo(() => streetDemand(buildings, quote.segments, simDay), [buildings, quote, simDay]);
-  const pipesUnderConstruction = districtHeat.getOrders().filter((o) => o.completesAtMs > simDay);
+  const pipesUnderConstruction = [
+    ...districtHeat.getOrders().filter((o) => o.completesAtMs > simDay),
+    ...districtHeat
+      .getLines()
+      .filter((l) => l.completesAtMs > simDay)
+      .map((l) => ({ id: `line${l.id}`, lengthM: l.lengthM, completesAtMs: l.completesAtMs, line: true })),
+  ];
+  const lineLengthM = districtHeat.lineLengthM(simDay);
   const plantsUnderConstruction = districtHeat.getSources().filter((s) => s.fromMs > simDay);
   const allNetworks = districtHeat
     .networksAt(simDay)
@@ -314,6 +387,12 @@ export function DistrictHeatPanel() {
             <span>Piped streets</span>
             <span className="info-value">{stats.lengthKm.toFixed(1)} km</span>
           </div>
+          {lineLengthM > 0 && (
+            <div className="info-row">
+              <span>Direct lines</span>
+              <span className="info-value">{(lineLengthM / 1000).toFixed(1)} km</span>
+            </div>
+          )}
           <div className="info-row">
             <span>Connected buildings</span>
             <span className="info-value">{stats.connected}</span>
@@ -410,8 +489,15 @@ export function DistrictHeatPanel() {
       {districtHeat.getSources().length > 0 && (
         <>
           <h4 className="dh-subtitle">Extend the network</h4>
-          {quote.segments.length === 0 ? (
-            <p className="dh-note">Click streets on the map to plan an extension. It has to connect to the network or a heat source, directly or through the other streets you pick.</p>
+          {districtHeatLines.getDraft() ? (
+            <LineDraftCard />
+          ) : quote.segments.length === 0 ? (
+            <>
+              <p className="dh-note">Click streets on the map to plan an extension. It has to connect to the network or a heat source, directly or through the other streets you pick.</p>
+              <button className="dh-link" onClick={() => districtHeatLines.start()}>
+                Or lay a direct line, off the streets…
+              </button>
+            </>
           ) : (
             <>
               <div className="info-row">
@@ -458,7 +544,9 @@ export function DistrictHeatPanel() {
           <h4 className="dh-subtitle">Pipes being laid</h4>
           {pipesUnderConstruction.map((o) => (
             <div className="info-row" key={o.id}>
-              <span>{Math.round(o.lengthM)} m</span>
+              <span>
+                {Math.round(o.lengthM)} m{"line" in o ? " (direct line)" : ""}
+              </span>
               <span className="info-value">ready {monthYear(o.completesAtMs)}</span>
             </div>
           ))}

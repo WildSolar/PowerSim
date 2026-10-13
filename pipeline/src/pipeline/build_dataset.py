@@ -120,12 +120,14 @@ def _district_heat(bfs_number: int, buildings_df, segments, boundary_lv95, posit
     return network
 
 
-REFRESHABLE = ("district-heat", "farm", "wind")
+REFRESHABLE = ("streets", "district-heat", "farm", "wind")
 
 
 def refresh(bfs_number: int, parts: list[str]) -> Path:
     """Recomputes only some parts of an existing dataset (the rest — footprints, sites, streets —
     stays as built), without another round of the slow sources:
+    - "streets": the street network again, the buildings' links to it, and (since it is laid along
+      them) district heating with it;
     - "district-heat": GWR for the district-heated buildings and entrances, the BFE's networks and
       heat sources, the land cover;
     - "farm": the farmland plots."""
@@ -146,10 +148,49 @@ def refresh(bfs_number: int, parts: list[str]) -> Path:
         homes = [coords.lonlat_to_lv95(b["lon"], b["lat"]) for b in data["buildings"] if b.get("dwellings")]
         data["windSites"] = _to_camel(wind_source.fetch_sites(bfs_number, boundary_lv95, homes))
         print(f"  {len(data['windSites'])} site(s): " + ", ".join(f"{s['name']} ({len(s['turbines'])})" for s in data["windSites"]))
-    if "district-heat" in parts:
+    if "streets" in parts:
+        _refresh_streets(bfs_number, data, boundary_lv95)
+    if "district-heat" in parts or "streets" in parts:
         _refresh_district_heat(bfs_number, data, boundary_lv95)
     path.write_text(json.dumps(data, ensure_ascii=False, allow_nan=False), encoding="utf-8")
     return path
+
+
+def _refresh_streets(bfs_number: int, data: dict, boundary_lv95) -> None:
+    print("Refreshing the street network...")
+    buildings_df = gwr.fetch_buildings(bfs_number)
+    min_e, max_e = buildings_df["E-Gebaeudekoordinate"].min(), buildings_df["E-Gebaeudekoordinate"].max()
+    min_n, max_n = buildings_df["N-Gebaeudekoordinate"].min(), buildings_df["N-Gebaeudekoordinate"].max()
+    segments = streets_source.fetch_segments(boundary_lv95, min_e, min_n, max_e, max_n)
+    print(f"  {len(segments)} street segments, {sum(s.length_m for s in segments) / 1000:.1f} km")
+    kept = {int(b["egid"]) for b in data["buildings"] if b["egid"].isdigit()}
+    positions = {
+        int(row[gwr.EGID_COL]): (float(row["E-Gebaeudekoordinate"]), float(row["N-Gebaeudekoordinate"]))
+        for _, row in buildings_df.iterrows()
+        if int(row[gwr.EGID_COL]) in kept
+    }
+    footprint_by_egid = {
+        int(b["egid"]): [coords.lonlat_to_lv95(lon, lat) for lon, lat in b["footprint"]] for b in data["buildings"] if b.get("footprint") and b["egid"].isdigit()
+    }
+    entrances = gwr.fetch_entrances(bfs_number, set(positions))
+    segments_by_egid, _ = streets_source.link_buildings(segments, entrances, positions, footprint_by_egid)
+    for b in data["buildings"]:
+        if b["egid"].isdigit():
+            b["streetSegments"] = segments_by_egid.get(int(b["egid"]), [])
+    data["streets"] = [
+        {
+            "id": s.id,
+            "name": s.name,
+            "highway": s.highway,
+            "a": s.a,
+            "b": s.b,
+            "lengthM": round(s.length_m, 1),
+            "widthM": round(s.width_m, 1),
+            "line": [[round(v, 6) for v in coords.lv95_to_lonlat(x, y)] for x, y in s.lv95],
+            "nodes": s.nodes,
+        }
+        for s in segments
+    ]
 
 
 def _refresh_district_heat(bfs_number: int, data: dict, boundary_lv95) -> None:
@@ -418,7 +459,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--refresh",
-        help=f"recompute only these parts of an existing dataset, comma-separated ({', '.join(REFRESHABLE)}) — no footprints, sites or streets",
+        help=f"recompute only these parts of an existing dataset, comma-separated ({', '.join(REFRESHABLE)}) — no footprints or sites",
     )
     parser.add_argument("--district-heat-only", action="store_true", help="same as --refresh district-heat")
     args = parser.parse_args()

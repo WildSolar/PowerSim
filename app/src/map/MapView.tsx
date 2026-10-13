@@ -17,7 +17,8 @@ import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { snowDepthCm } from "../sim/snow";
 import { districtHeat } from "../sim/districtHeat";
 import { candidateName, districtHeatSources } from "../sim/districtHeatSources";
-import { DH_SURFACE_WATER_MAX_DISTANCE_M, DH_WOOD_NUISANCE_RADIUS_M } from "../config/districtHeat";
+import { districtHeatLines } from "../sim/districtHeatLines";
+import { DH_WOOD_NUISANCE_RADIUS_M } from "../config/districtHeat";
 import { groundRule } from "../config/heatPumpSiting";
 import { mapNetworkBucketAt } from "../sim/districtHeatStats";
 import { streets } from "../sim/streets";
@@ -92,6 +93,10 @@ const STREET_LINE_LAYER_ID = "streets-line";
 const STREET_CONSTRUCTION_LAYER_ID = "streets-construction";
 const STREET_HIT_LAYER_ID = "streets-hit"; // wide and invisible: what a click on a street is tested against
 const DH_SOURCE_SOURCE_ID = "district-heat-source";
+// Direct lines off the streets: laid, being laid, and the one being drawn (with its ends).
+const DH_LINE_SOURCE_ID = "district-heat-lines";
+const DH_LINE_LAYER_ID = "district-heat-lines";
+const DH_LINE_END_LAYER_ID = "district-heat-line-ends";
 const DH_TRUNK_LAYER_ID = "district-heat-trunk";
 const DH_PLANT_LAYER_ID = "district-heat-plant";
 const DH_NUISANCE_LAYER_ID = "district-heat-nuisance";
@@ -307,6 +312,35 @@ function buildingsToGeoJSON(
   };
 }
 
+/** The direct lines: laid, being laid, and the one being drawn — with its ends marked. */
+function districtHeatLinesGeoJSON(simTimeMs: number) {
+  const features: object[] = districtHeat.getLines().map((l) => ({
+    type: "Feature",
+    properties: { state: l.completesAtMs <= simTimeMs ? "piped" : "construction" },
+    geometry: { type: "LineString", coordinates: l.coords },
+  }));
+  const draft = districtHeatLines.getDraft();
+  if (draft) {
+    const q = districtHeatLines.quote(simTimeMs);
+    const state = q?.problem ? "plannedUnconnected" : "planned";
+    if (draft.a && draft.b)
+      features.push({
+        type: "Feature",
+        properties: { state },
+        geometry: {
+          type: "LineString",
+          coordinates: [
+            [draft.a.lon, draft.a.lat],
+            [draft.b.lon, draft.b.lat],
+          ],
+        },
+      });
+    for (const end of [draft.a, draft.b])
+      if (end) features.push({ type: "Feature", properties: { state }, geometry: { type: "Point", coordinates: [end.lon, end.lat] } });
+  }
+  return { type: "FeatureCollection" as const, features };
+}
+
 /** Every street segment, by where it stands in the district heating network — piped, being
  * built, picked for the next extension (and whether it connects), or without pipes. */
 function streetsToGeoJSON(simTimeMs: number) {
@@ -361,8 +395,8 @@ function districtHeatSitesGeoJSON(simTimeMs: number) {
 }
 
 /** Where the plant being planned may go: for a groundwater heat pump the atlas zones that allow
- * groundwater use, for a river or lake heat pump the water (with a band as wide as the distance a
- * plant may stand from it). */
+ * groundwater use, for a river or lake heat pump the area within reach of the water, inside the
+ * municipality. */
 function districtHeatOverlayGeoJSON() {
   const draft = districtHeatSources.getDraft();
   const features: object[] = [];
@@ -378,7 +412,7 @@ function districtHeatOverlayGeoJSON() {
     }
   }
   if (draft?.kind === "surfaceWater") {
-    for (const rings of districtHeat.getWater()) {
+    for (const rings of districtHeatSources.surfaceWaterZone()) {
       features.push({ type: "Feature", properties: { part: "area" }, geometry: { type: "Polygon", coordinates: rings } });
       for (const ring of rings) features.push({ type: "Feature", properties: { part: "reach" }, geometry: { type: "LineString", coordinates: ring } });
     }
@@ -911,6 +945,43 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         layout: { visibility: dhVisibility },
         paint: { "line-color": "#000", "line-width": metresWide(NETWORK_LINE_WIDTH_M, 16) as never, "line-opacity": 0 },
       });
+      map.addSource(DH_LINE_SOURCE_ID, { type: "geojson", data: districtHeatLinesGeoJSON(simClock.getSimTimeMs()) as never });
+      map.addLayer({
+        id: DH_LINE_LAYER_ID,
+        type: "line",
+        source: DH_LINE_SOURCE_ID,
+        filter: ["==", ["geometry-type"], "LineString"],
+        layout: { visibility: dhVisibility, "line-cap": "round" },
+        paint: {
+          "line-color": [
+            "match",
+            ["get", "state"],
+            "construction",
+            PIPE_UNDER_CONSTRUCTION_COLOR,
+            "planned",
+            PIPE_PLANNED_COLOR,
+            "plannedUnconnected",
+            PIPE_UNCONNECTED_COLOR,
+            PIPE_COLOR,
+          ],
+          "line-width": metresWide(NETWORK_LINE_WIDTH_M * 0.7, 3) as never,
+          // Off the streets: drawn in dashes, the way pipes run under fields on a plan.
+          "line-dasharray": [2, 1],
+        },
+      });
+      map.addLayer({
+        id: DH_LINE_END_LAYER_ID,
+        type: "circle",
+        source: DH_LINE_SOURCE_ID,
+        filter: ["==", ["geometry-type"], "Point"],
+        layout: { visibility: dhVisibility },
+        paint: {
+          "circle-radius": 6,
+          "circle-color": ["match", ["get", "state"], "plannedUnconnected", PIPE_UNCONNECTED_COLOR, PIPE_PLANNED_COLOR],
+          "circle-stroke-color": "#fff",
+          "circle-stroke-width": 2,
+        },
+      });
       map.addSource(DH_OVERLAY_SOURCE_ID, { type: "geojson", data: districtHeatOverlayGeoJSON() as never });
       map.addLayer({
         id: DH_OVERLAY_FILL_LAYER_ID,
@@ -926,8 +997,8 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         source: DH_OVERLAY_SOURCE_ID,
         filter: ["==", ["get", "part"], "reach"],
         layout: { visibility: dhVisibility, "line-join": "round" },
-        // Twice as wide as the distance a plant may stand from the water: the band reaches that far out.
-        paint: { "line-color": DH_SITE_AREA_COLOR, "line-opacity": 0.18, "line-width": metresWide(2 * DH_SURFACE_WATER_MAX_DISTANCE_M, 2) as never },
+        // The zone's outline.
+        paint: { "line-color": DH_SITE_AREA_COLOR, "line-opacity": 0.7, "line-width": 1.5 },
       });
       map.addSource(DH_SOURCE_SOURCE_ID, { type: "geojson", data: districtHeatSitesGeoJSON(simClock.getSimTimeMs()) as never });
       map.addLayer({
@@ -1385,6 +1456,11 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         if (colorModeRef.current === "districtHeat") {
           const { x, y } = e.point;
           const r = STREET_CLICK_TOLERANCE_PX;
+          // Drawing a direct line: the click sets an end.
+          if (districtHeatLines.getDraft()) {
+            districtHeatLines.click(e.lngLat.lng, e.lngLat.lat);
+            return;
+          }
           // Placing a plant: the click is where it goes.
           const draft = districtHeatSources.getDraft();
           if (draft && !draft.candidateId) {
@@ -1628,6 +1704,8 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       DH_NUISANCE_LAYER_ID,
       DH_OVERLAY_FILL_LAYER_ID,
       DH_OVERLAY_LINE_LAYER_ID,
+      DH_LINE_LAYER_ID,
+      DH_LINE_END_LAYER_ID,
       DH_PRIORITY_FILL_LAYER_ID,
       DH_PRIORITY_LINE_LAYER_ID,
     ];
@@ -1635,6 +1713,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     for (const id of layers) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
     if (!visible) {
       districtHeatSources.cancelDraft();
+      districtHeatLines.cancel();
       return;
     }
 
@@ -1674,7 +1753,8 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     const tick = () => {
       (map.getSource(DH_SOURCE_SOURCE_ID) as GeoJSONSource | undefined)?.setData(districtHeatSitesGeoJSON(simClock.getSimTimeMs()) as never);
       (map.getSource(DH_OVERLAY_SOURCE_ID) as GeoJSONSource | undefined)?.setData(districtHeatOverlayGeoJSON() as never);
-      map.getCanvas().style.cursor = districtHeatSources.getDraft()?.candidateId === null ? "crosshair" : "";
+      map.getCanvas().style.cursor = districtHeatSources.getDraft()?.candidateId === null || districtHeatLines.getDraft() ? "crosshair" : "";
+      (map.getSource(DH_LINE_SOURCE_ID) as GeoJSONSource | undefined)?.setData(districtHeatLinesGeoJSON(simClock.getSimTimeMs()) as never);
       drawLabels();
       (map.getSource(STREET_SOURCE_ID) as GeoJSONSource | undefined)?.setData(streetsToGeoJSON(simClock.getSimTimeMs()));
       (map.getSource(ZONE_SOURCE_ID) as GeoJSONSource | undefined)?.setData(zoneParcelsGeoJSON(simClock.getSimTimeMs())); // priority zones come into force over time
@@ -1696,10 +1776,12 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     const interval = setInterval(tick, DISTRICT_HEAT_TICK_MS);
     const unsubscribe = districtHeat.subscribe(tick);
     const unsubscribeSources = districtHeatSources.subscribe(tick);
+    const unsubscribeLines = districtHeatLines.subscribe(tick);
     return () => {
       clearInterval(interval);
       unsubscribe();
       unsubscribeSources();
+      unsubscribeLines();
       for (const m of labels) m.remove();
     };
   }, [colorMode, dataset]);

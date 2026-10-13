@@ -51,6 +51,8 @@ import { districtHeat, type DhSource } from "./districtHeat";
 import { heatPumpSiting } from "./heatPumpSiting";
 import { existsAt } from "./lifetime";
 import { LocalProjection, pointInPolygon, type XY } from "./localGeo";
+import { areaWithin } from "./zoneShape";
+import { districtHeatLines } from "./districtHeatLines";
 import { market } from "./market";
 import { hashSeed, mulberry32 } from "./rng";
 import { streets } from "./streets";
@@ -142,6 +144,7 @@ class DistrictHeatSources {
   private version = 0;
   private nuisanceCache: { key: string; share: number } | null = null;
   private hints = new Map<PlacedKind, { lon: number; lat: number } | null>();
+  private waterZone: [number, number][][][] | null = null;
 
   init(dataset: MunicipalityDataset, buildingsProvider: () => Building[]): void {
     const first = dataset.buildings[0];
@@ -154,6 +157,7 @@ class DistrictHeatSources {
     this.draft = null;
     this.nuisanceCache = null;
     this.hints = new Map();
+    this.waterZone = null;
     setLocalStances("woodPlants", (atMs) => this.nuisanceStances(atMs));
     this.notify();
   }
@@ -222,6 +226,7 @@ class DistrictHeatSources {
     this.draft = { kind, candidateId, lon: c?.lon ?? null, lat: c?.lat ?? null, sizeMw: 0 };
     const sizes = this.quote(0).sizes;
     this.draft.sizeMw = c?.kind === "industry" ? (sizes[sizes.length - 1] ?? 0) : (sizes[Math.min(sizes.length - 1, Math.floor(sizes.length / 3))] ?? 0);
+    districtHeatLines.cancel();
     this.notify();
   }
 
@@ -370,6 +375,18 @@ class DistrictHeatSources {
       if (d > DH_SURFACE_WATER_MAX_DISTANCE_M) return `That's ${Math.round(d)} m from the water: a plant has to stand within ${DH_SURFACE_WATER_MAX_DISTANCE_M} m of a river or lake.`;
     }
     return null;
+  }
+
+  /** Where a river or lake heat pump may stand — within reach of the water, inside the
+   * municipality — as polygons of [lon, lat] rings, for the map. Worked out once. */
+  surfaceWaterZone(): [number, number][][][] {
+    this.waterZone ??= areaWithin(this.water, DH_SURFACE_WATER_MAX_DISTANCE_M, this.boundary.length > 0 ? this.boundary : null).map((rings) =>
+      rings.map((ring) => {
+        const lonLat = ring.map(([x, y]) => this.projection.toLonLat(x, y));
+        return [...lonLat, lonLat[0]];
+      }),
+    );
+    return this.waterZone;
   }
 
   /** Distance to the nearest river or lake (0 on the water), null without any. */

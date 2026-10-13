@@ -49,6 +49,7 @@ import { districtHeatSources } from "./sim/districtHeatSources";
 import { roofContracts } from "./sim/roofContracts";
 import { agriPv } from "./sim/agriPv";
 import { wind } from "./sim/wind";
+import { districtHeatLines } from "./sim/districtHeatLines";
 import { monthRecords } from "./sim/monthRecords";
 import { WindPanel } from "./ui/WindPanel";
 import { RoofSolarPanel } from "./ui/RoofSolarPanel";
@@ -90,7 +91,7 @@ function returnToMenu() {
 // Dev-only handle for inspecting the simulation from the browser console.
 if (import.meta.env.DEV) import("./dev/scenario").then((m) => Object.assign(window, { __scenario: m.runScenario }));
 if (import.meta.env.DEV) import("./dev/perf").then((m) => Object.assign(window, { __perf: m.runPerf, __perfYearEnd: m.timeYearEndReport, __perfNewYear: m.timeNewYearPieces, __perfMapTick: m.timeMapPowerTick, __perfRolling: m.timeRollingChart }));
-if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore, tariffStore, market, inbox, dynamicTariff, grid, districtHeat, districtHeatSources, roofContracts, agriPv, wind } });
+if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore, tariffStore, market, inbox, dynamicTariff, grid, districtHeat, districtHeatSources, districtHeatLines, roofContracts, agriPv, wind } });
 if (import.meta.env.DEV) import("./sim/saveGame").then((m) => Object.assign(window, { __save: m }));
 if (import.meta.env.DEV) import("./sim/history").then((m) => Object.assign(window, { __history: m }));
 if (import.meta.env.DEV) import("./dev/par").then((m) => Object.assign(window, { __computePar: m.computePar }));
@@ -216,6 +217,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         streets.init(loaded); // before the stock: new buildings are linked to their street, and to the district heating network
         districtHeat.init(loaded);
         districtHeatSources.init(loaded, () => stock.getAll());
+        districtHeatLines.init(loaded, () => stock.getAll());
         roofContracts.init(loaded, () => stock.getAll(), `roofs:${loaded.bfsNumber}`);
         agriPv.init(loaded, () => stock.getAll(), `agripv:${loaded.bfsNumber}`);
         wind.init(loaded, () => stock.getAll(), `wind:${loaded.bfsNumber}`);

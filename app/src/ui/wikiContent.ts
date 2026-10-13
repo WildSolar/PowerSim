@@ -644,6 +644,16 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "To extend the pipes, open the District heating tool and click streets: each click picks one stretch between two junctions (click again to drop it), and the buildings it would newly reach light up in orange. An extension must connect to the network or a heat source, directly or through the other streets you picked; a picked street that doesn't shows in red until the gap is closed. Every street the network could run along is shaded grey. The drawer shows the extension's length, cost and build time, and how much heat the buildings it reaches use a year — in total and per metre of pipe, the figure planners judge an extension by. Ordering pays the whole cost at once; the pipes are laid over the following months, and buildings along them can connect as soon as they are done.",
       ),
       p(
+        "Streets aren't the only way across. ‘Lay a direct line’ in the same section runs a pipe straight from one street junction to another — click where it starts, then where it ends; each end joins the nearest junction, and one of them has to be on the network (a piped street, a line or a plant's junction). Use it to bring a plant's heat across town the short way, or to join two networks without going round by the streets. A line carries heat across, but nobody connects along it.",
+      ),
+      list([
+        "Open land — fields, meadows, woods: under half the price of a metre under a street.",
+        "Gardens, yards and car parks in the building zone: about a street's price — the surface has to be put back and the owners agree.",
+        "Roads crossed: two and a half times a street's price for each metre of road, dug up under traffic.",
+        "Under buildings: six times — a bored tunnel, and the owners' leave.",
+        "Across a river or lake: five times.",
+      ]),
+      p(
         "The drawer also shows how much of the town's heated building stock the networks serve and could serve — by number of buildings, floor area and heat demand — and how much of last year's district heat came from clean sources.",
       ),
       note(

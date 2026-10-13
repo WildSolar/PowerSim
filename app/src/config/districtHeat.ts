@@ -16,6 +16,16 @@ export const DH_MAIN_ROAD_CLASSES = new Set(["main"]);
 export const DH_BUILD_MIN_MONTHS = 3;
 export const DH_BUILD_METRES_PER_MONTH = 250;
 
+// Direct lines off the streets (sim/districtHeatLines.ts): the cost of a metre against a metre under a
+// street (DH_PIPE_COST_CHF_PER_M), by what the line crosses. Open land is a trench through a field;
+// gardens, yards and car parks in the building zone need their surface restored and the owners'
+// leave; a road crossed has to be dug up under traffic; a house is tunnelled under, a river or lake
+// crossed by a bored tunnel.
+export const DH_LINE_COST_FACTOR = { open: 0.45, plot: 0.9, road: 2.5, building: 6, water: 5 } as const;
+export type DhLineTerrain = keyof typeof DH_LINE_COST_FACTOR;
+// A line's ends join the nearest street junction this close to where the player clicked.
+export const DH_LINE_SNAP_M = 120;
+
 // A trunk line from a plant outside the streets (an incinerator, a treatment plant in the next
 // municipality): bigger pipes, across fields and under roads, per metre.
 export const DH_TRUNK_COST_CHF_PER_M = 3_000;

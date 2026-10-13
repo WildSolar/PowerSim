@@ -25,6 +25,7 @@ export const CHANGELOG: Release[] = [
     version: "0.3.0",
     date: null,
     added: [
+      "District heating: lay a direct line off the streets, from one junction to another — to bring a plant's heat across town the short way, or to join two networks. Its price depends on what it crosses: cheap through fields, dear across roads, under houses or over water.",
       "Grid: choose the size when you reinforce a transformer station. A new station replaces the old one, so one step to the size you need costs less than several small ones; one order per station at a time.",
       "Grid: reinforce overloaded stations automatically after each reading, to the size their peak needs, as long as the treasury has the money — a setting in the Grid tool.",
       "Surplus power: when the town makes more than it uses, the utility sells the surplus on the spot market at that hour's price, which sinks on sunny middays and falls below zero from the early 2030s. Neighbourhood batteries keep surplus for the evening, so the utility sells less cheap and buys less. A new chart shows power bought, sold and shifted.",
@@ -39,6 +40,8 @@ export const CHANGELOG: Release[] = [
     ],
     fixed: [
       "Grid: a neighbourhood battery being installed shows its size.",
+      "District heating: where a river or lake heat pump may stand is shown as one clean area inside the municipality, instead of overlapping blotches.",
+      "Streets that met within a couple of metres without being joined — a short connecting piece lost, a street drawn twice side by side — now meet, so pipes can follow them.",
     ],
   },
   {

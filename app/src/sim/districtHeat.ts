@@ -11,8 +11,10 @@
  *
  * What a town starts with comes from the pipeline (pipeline/sources/district_heat.py): the
  * registered networks, each with its plant and its inferred pipes. The player extends the pipes
- * street by street (paid up front, laid over a build time that grows with length) and orders new
- * heat sources (districtHeatSources.ts), which can start a network of their own.
+ * street by street (paid up front, laid over a build time that grows with length), lays direct lines
+ * from one junction to another off the streets (planned and priced in districtHeatLines.ts: they carry
+ * heat across, but nobody connects along them), and orders new heat sources (districtHeatSources.ts),
+ * which can start a network of their own.
  *
  * Deliberately free of the heating model's own imports (heatingRenewal.ts depends on this);
  * statistics that need it — load, demand along a street — are in districtHeatStats.ts.
@@ -60,6 +62,19 @@ export interface SelectionQuote {
 }
 
 export type DhFuel = "oil" | "gas";
+
+/** A direct line off the streets, from one street junction to another (districtHeatLines.ts). */
+export interface DhLine {
+  id: number;
+  a: number;
+  b: number;
+  /** Its course, [lon, lat], from a to b. */
+  coords: [number, number][];
+  lengthM: number;
+  costRp: number;
+  orderedAtMs: number;
+  completesAtMs: number;
+}
 
 /** A heat source feeding a network at a street junction. */
 export interface DhSource {
@@ -176,6 +191,7 @@ class DistrictHeatNetwork {
   private readonly listeners = new Set<() => void>();
   private version = 0;
   private topologies = new Map<string, Topology>();
+  private lines: DhLine[] = [];
   private lastTopology: { atMs: number; version: number; topology: Topology } | null = null;
 
   init(dataset: MunicipalityDataset): void {
@@ -191,6 +207,7 @@ class DistrictHeatNetwork {
     this.water = dh?.water ?? [];
     this.forestHa = dh?.forestHa ?? 0;
     this.orders = [];
+    this.lines = [];
     this.selection = new Set();
     this.version++;
     this.topologies.clear();
@@ -318,9 +335,36 @@ class DistrictHeatNetwork {
     return total;
   }
 
-  /** Trunk lines to sources in service (m). */
+  /** Trunk lines to sources in service, and direct lines laid (m). */
   trunkLengthM(atMs: number): number {
-    return this.sources.reduce((sum, s) => sum + (s.fromMs <= atMs ? s.trunkM : 0), 0);
+    return this.sources.reduce((sum, s) => sum + (s.fromMs <= atMs ? s.trunkM : 0), 0) + this.lineLengthM(atMs);
+  }
+
+  // --- direct lines ---
+
+  getLines(): DhLine[] {
+    return this.lines;
+  }
+
+  lineLengthM(atMs: number): number {
+    return this.lines.reduce((sum, l) => sum + (l.completesAtMs <= atMs ? l.lengthM : 0), 0);
+  }
+
+  /** Whether a junction is on the network or on its way to it: a source's, one along a piped (or
+   * ordered) street, or a line's end. */
+  reachesNode(node: number): boolean {
+    if (this.sources.some((s) => s.node === node)) return true;
+    if (this.lines.some((l) => l.a === node || l.b === node)) return true;
+    return streets.atNode(node).some((id) => this.builtAtMs.has(id));
+  }
+
+  /** Orders a direct line (priced by districtHeatLines.ts): paid now, in service once laid. */
+  addLine(line: Omit<DhLine, "id">, atMs: number): boolean {
+    if (spendingFrozen(atMs)) return false;
+    this.lines.push({ ...line, id: this.lines.length });
+    treasury.recordPayout("districtHeat", atMs, line.costRp, "district-heat-line");
+    this.notify();
+    return true;
   }
 
   getOrders(): NetworkOrder[] {
@@ -335,6 +379,8 @@ class DistrictHeatNetwork {
     if (last && last.atMs === atMs && last.version === this.version) return last.topology;
     let key = "";
     for (const o of this.orders) if (o.completesAtMs <= atMs) key += `${o.id},`;
+    key += "|";
+    for (const l of this.lines) if (l.completesAtMs <= atMs) key += `${l.id},`;
     key += "|";
     for (const s of this.sources) if (s.fromMs <= atMs) key += `${s.id},`;
     let topology = this.topologies.get(key);
@@ -371,6 +417,12 @@ class DistrictHeatNetwork {
       const nodes = streets.nodesOf(id);
       for (const n of nodes) if (!parent.has(n)) parent.set(n, n);
       for (let i = 1; i < nodes.length; i++) union(nodes[0], nodes[i]);
+    }
+    // A direct line joins the junctions at its two ends.
+    for (const l of this.lines) {
+      if (l.completesAtMs > atMs) continue;
+      for (const n of [l.a, l.b]) if (!parent.has(n)) parent.set(n, n);
+      union(l.a, l.b);
     }
     const segmentNetwork = new Map<number, number>();
     for (const id of piped) {
@@ -461,6 +513,7 @@ class DistrictHeatNetwork {
     const reached = new Set<number>();
     for (const s of this.sources) reached.add(s.node);
     for (const id of this.builtAtMs.keys()) for (const n of streets.nodesOf(id)) reached.add(n);
+    for (const l of this.lines) reached.add(l.a).add(l.b);
     const pending = new Set(selected);
     let progress = true;
     while (pending.size > 0 && progress) {
@@ -497,13 +550,14 @@ class DistrictHeatNetwork {
   // --- saving (saveGame.ts) ---
 
   snapshot() {
-    return { builtAtMs: this.builtAtMs, orders: this.orders, sources: this.sources };
+    return { builtAtMs: this.builtAtMs, orders: this.orders, sources: this.sources, lines: this.lines };
   }
 
   restore(s: ReturnType<DistrictHeatNetwork["snapshot"]>): void {
     this.builtAtMs = s.builtAtMs;
     this.orders = s.orders;
     this.sources = s.sources;
+    this.lines = s.lines ?? [];
     this.selection = new Set();
     this.notify();
   }

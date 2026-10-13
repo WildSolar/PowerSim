@@ -16,7 +16,9 @@ they carry the same name (even where the class changes), so a segment is "this s
 one junction to the next". A stretch too short to pick on the map (under MIN_SEGMENT_M) is
 merged into a neighbour it meets end to end, so a segment may run past a junction; its
 `nodes` lists every junction along it. A dead end stopping just short of another street is
-joined to it. Segments with at least MIN_INSIDE_M inside the municipality are kept.
+joined to it, and so is a junction left a metre or two beside a street it should meet. Street ends
+within NODE_SNAP_M of each other are one junction. Segments with at least MIN_INSIDE_M inside the
+municipality are kept.
 Motorways, service access roads, ferries and unnamed footpaths are left out; named paths
 stay (buildings are addressed from them).
 
@@ -38,6 +40,8 @@ from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import substring, unary_union
 from shapely.strtree import STRtree
 
+from ..cache import cached_json
+
 IDENTIFY_URL = "https://api3.geo.admin.ch/rest/services/api/MapServer/identify"
 TLM_LAYER = "ch.swisstopo.swisstlm3d-strassen"
 TILE_M = 400
@@ -57,8 +61,9 @@ ROAD_WIDTH_M = {
 NAMED_PATH_WIDTH_M = {15: 2.0, 16: 1.5}  # 2m Weg, 1m Weg
 MAIN_ROAD_CODES = {8, 20}
 
-# Two stretches of one street count as side-by-side carriageways when this far apart...
-DUAL_MIN_GAP_M = 3.0
+# Two stretches of one street count as side-by-side carriageways when this far apart (from a
+# duplicate drawn a metre beside the other to a boulevard's two sides)...
+DUAL_MIN_GAP_M = 1.0
 DUAL_MAX_GAP_M = 30.0
 # ...running parallel (cosine of the angle between them)...
 DUAL_PARALLEL_COS = 0.9
@@ -73,6 +78,8 @@ REATTACH_MAX_M = 25.0
 ABSORB_MIN_STREET_WIDTH_M = 6.0
 ABSORB_MAX_GAP_M = 20.0
 ABSORB_MIN_SHARE = 0.7
+# Street ends this close together are one junction.
+NODE_SNAP_M = 1.5
 # Stretches shorter than this between two junctions (the knots of a big crossing) are contracted
 # into a single junction: nothing to lay a pipe along.
 MIN_KNOT_M = 4.0
@@ -89,6 +96,9 @@ MAX_HALF_WIDTH_M = 20.0  # the widest merged street's half-width, for the spatia
 # where a merged carriageway or a filtered-out access road left a street hanging just short of
 # the next one.
 GAP_CLOSE_M = 20.0
+# A junction this close to another street it doesn't meet is joined to it too: side streets left a
+# metre or two from a street that moved onto its centre line, or a connecting piece lost.
+JUNCTION_SNAP_M = 2.5
 # A street is the municipality's if at least this much of it lies inside the boundary.
 MIN_INSIDE_M = 5.0
 
@@ -132,7 +142,7 @@ def _identify(x0: float, y0: float, x1: float, y1: float, out: dict, depth: int 
         "mapExtent": extent,
         "imageDisplay": "500,500,96",
     }
-    results = requests.get(IDENTIFY_URL, params=params, timeout=90).json().get("results", [])
+    results = cached_json("tlm-roads", extent, lambda: requests.get(IDENTIFY_URL, params=params, timeout=90).json().get("results", []))
     if len(results) >= MAX_RESULTS and depth < 6:
         mx, my = (x0 + x1) / 2, (y0 + y1) / 2
         for quarter in ((x0, y0, mx, my), (mx, y0, x1, my), (x0, my, mx, y1), (mx, my, x1, y1)):
@@ -418,17 +428,30 @@ def fetch_segments(boundary_lv95: list[Polygon], min_e: float, min_n: float, max
     roads = _join_plain_bends(roads)
 
     inside = [p.buffer(0) for p in boundary_lv95]
-    node_ids: dict[tuple[int, int], int] = {}
+    # Junctions: ends this close together are one (a street pulled onto its centre line ends a few
+    # decimetres from where its side streets meet it).
+    node_at: list[tuple[float, float]] = []
+    node_grid: dict[tuple[int, int], list[int]] = defaultdict(list)
 
     def node(p: tuple[float, float]) -> int:
-        return node_ids.setdefault(_key(p), len(node_ids))
+        cx, cy = math.floor(p[0] / NODE_SNAP_M), math.floor(p[1] / NODE_SNAP_M)
+        for gx in (cx - 1, cx, cx + 1):
+            for gy in (cy - 1, cy, cy + 1):
+                for n in node_grid[(gx, gy)]:
+                    if math.hypot(node_at[n][0] - p[0], node_at[n][1] - p[1]) <= NODE_SNAP_M:
+                        return n
+        node_at.append(p)
+        node_grid[(cx, cy)].append(len(node_at) - 1)
+        return len(node_at) - 1
 
     segments: list[Segment] = []
     for road in roads:
         line = road.line
         if line.length < 1:
             continue
-        if sum(line.intersection(poly).length for poly in inside) < MIN_INSIDE_M:
+        # A piece too short to keep (under MIN_KNOT_M) still ties its two junctions into one when the
+        # knots are contracted below, so it stays whatever lies inside the boundary.
+        if line.length >= MIN_KNOT_M and sum(line.intersection(poly).length for poly in inside) < MIN_INSIDE_M:
             continue
         coords = [(x, y) for x, y, *_ in line.coords]
         segments.append(
@@ -448,25 +471,31 @@ def fetch_segments(boundary_lv95: list[Polygon], min_e: float, min_n: float, max
 
 def _close_gaps(segments: list[Segment]) -> list[Segment]:
     """Joins every dead end (a segment end no other segment shares) that comes within
-    GAP_CLOSE_M of another segment to that segment, as a junction along it — see GAP_CLOSE_M."""
+    GAP_CLOSE_M of another segment to that segment, as a junction along it — see GAP_CLOSE_M — and
+    every junction within JUNCTION_SNAP_M of a street it doesn't already meet."""
     lines = [LineString(s.lv95) for s in segments]
     tree = STRtree(lines)
     count: dict[int, int] = defaultdict(int)
     for seg in segments:
         for n in seg.nodes:
             count[n] += 1
+    at_node: dict[int, list[Segment]] = defaultdict(list)
+    for seg in segments:
+        for n in seg.nodes:
+            at_node[n].append(seg)
     for seg in segments:
         for node, point in ((seg.a, seg.lv95[0]), (seg.b, seg.lv95[-1])):
-            if count[node] != 1:
-                continue
+            reach = GAP_CLOSE_M if count[node] == 1 else JUNCTION_SNAP_M
+            # Streets one junction away already meet it.
+            near_nodes = {n for s in at_node[node] for n in s.nodes}
             p = Point(point)
             best = None
-            for k in tree.query(p.buffer(GAP_CLOSE_M)):
+            for k in tree.query(p.buffer(reach)):
                 other = segments[int(k)]
-                if other.id == seg.id or node in other.nodes:
+                if other.id == seg.id or node in other.nodes or (count[node] > 1 and near_nodes & set(other.nodes)):
                     continue
                 d = lines[other.id].distance(p)
-                if d <= GAP_CLOSE_M and (best is None or d < best[1]):
+                if d <= reach and (best is None or d < best[1]):
                     best = (other, d)
             if best is None:
                 continue
@@ -479,6 +508,7 @@ def _close_gaps(segments: list[Segment]) -> list[Segment]:
             index = next((i for i, pos in enumerate(positions) if pos > along), len(positions) - 1)
             other.nodes.insert(max(1, index), node)
             count[node] += 1
+            at_node[node].append(other)
     return segments
 
 
