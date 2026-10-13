@@ -44,6 +44,9 @@ import { monthRecords } from "./monthRecords";
 import { DH_SOURCE_SPECS } from "../config/districtHeat";
 import { mobilityCensus } from "./mobility";
 import { windPowerW } from "./windPower";
+import { powerFlows } from "./spotMarket";
+import { grid } from "./grid";
+import { consumptionSeriesW } from "./billing";
 
 const SAMPLES_PER_MONTH = 24; // matches historyLong.ts's own per-period density
 const COARSE_SAMPLES_PER_MONTH = 8; // for quantities that don't need weather-grade resolution — see computeMobilityFuelLiters
@@ -320,12 +323,16 @@ function recordMonthElectricity(buildings: Building[], year: number, month: numb
   // At the month's last sample, which the pass above has already asked about: counting never
   // settles a household's choice sooner than the game would have.
   const census = mobilityCensus(buildings, times[times.length - 1]);
+  const flows = powerFlows(times, consumptionSeriesW(series), series.solarW, grid.batteriesInService(toSimTimeMs(Date.UTC(year, month, 15))), 0);
   monthRecords.record(year * 12 + month, {
     electricityKWh: { ...energy, solar: Math.max(0, energy.solar - windKWh) },
     windKWh,
     solarBuiltKw: builtKw,
     solarPotentialKw: potentialKw,
     mobility: { car: census.byMode.car, carElectric: census.carsElectric, bike: census.byMode.bike, other: census.byMode.other },
+    boughtKWh: flows.boughtKWh,
+    soldKWh: flows.soldKWh,
+    storedKWh: flows.storedKWh,
   });
 }
 

@@ -166,7 +166,8 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
             <tbody>
               <Line label="Electricity sold to consumers" value={last.consumerRevenueRp} />
               <Line label="Solar feed-in paid to owners" value={-last.feedInPaidRp} />
-              <Line label="Wholesale electricity bought" value={-last.wholesaleCostRp} />
+              <Line label="Electricity bought over contracts" value={-last.wholesaleCostRp} />
+              <Line label="Surplus sold on the spot market" value={last.surplusSoldRp} />
               <Line label="Grid upkeep" value={-last.gridMaintenanceCostRp} />
               {last.districtHeatRevenueRp > 0 && <Line label="District heat sold" value={last.districtHeatRevenueRp} />}
               {last.districtHeatPurchaseRp > 0 && <Line label="Making district heat (fuel, power, heat bought)" value={-last.districtHeatPurchaseRp} />}

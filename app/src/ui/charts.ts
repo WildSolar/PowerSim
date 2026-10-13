@@ -131,6 +131,24 @@ function electricityChart(nowMs: number): ChartData {
   };
 }
 
+function tradeChart(nowMs: number): ChartData {
+  const { records, ...m } = monthly(nowMs, (r) => r.boughtKWh !== undefined);
+  const bought = records.map((r) => r.boughtKWh!);
+  const sold = records.map((r) => r.soldKWh!);
+  const stored = records.map((r) => r.storedKWh!);
+  const { unit, scale } = energyUnit(Math.max(0, ...bought, ...sold));
+  const sc = (v: number[]) => v.map((x) => x * scale);
+  return {
+    ...m,
+    unit,
+    series: [
+      { key: "bought", label: "Bought over contracts", color: "#2a78d6", kind: "line", values: sc(bought) },
+      { key: "sold", label: "Surplus sold on the spot market", color: color("solar"), kind: "line", values: sc(sold) },
+      ...(stored.some((v) => v > 0) ? [{ key: "stored", label: "Shifted by neighbourhood batteries", color: "#4a3aa7", kind: "line" as const, dashed: true, values: sc(stored) }] : []),
+    ],
+  };
+}
+
 // --- heat ---
 
 function heatChart(nowMs: number): ChartData {
@@ -319,7 +337,7 @@ function spendingChart(nowMs: number): ChartData {
 function utilityChart(nowMs: number): ChartData {
   const list = bookedFinances();
   const k = (rp: number) => rp / 100 / 1000;
-  const sales = list.map((f) => f.consumerRevenueRp + f.districtHeatRevenueRp + f.publicChargingRevenueRp);
+  const sales = list.map((f) => f.consumerRevenueRp + f.districtHeatRevenueRp + f.publicChargingRevenueRp + f.surplusSoldRp);
   const costs = list.map(
     (f) =>
       f.feedInPaidRp +
@@ -337,7 +355,7 @@ function utilityChart(nowMs: number): ChartData {
     ...axis(nowMs),
     unit: "kCHF",
     series: [
-      { key: "sales", label: "Sales: power, district heat, charging", color: "#2a78d6", kind: "line", values: sales.map(k) },
+      { key: "sales", label: "Sales: power, surplus, district heat, charging", color: "#2a78d6", kind: "line", values: sales.map(k) },
       { key: "costs", label: "Costs: power bought, feed-in, the grid, heat, upkeep", color: "#eb6834", kind: "line", values: costs.map(k) },
       { key: "result", label: "Result", color: "#1baf7a", kind: "line", dashed: true, values: sales.map((s, i) => k(s - costs[i])) },
     ],
@@ -367,6 +385,13 @@ export const CHARTS: ChartDef[] = [
     title: "Electricity",
     description: "What the town used each month, by what used it, and what its solar panels and wind turbines made.",
     data: (_, now) => electricityChart(now),
+  },
+  {
+    id: "trade",
+    group: "Energy",
+    title: "Power bought and sold",
+    description: "What the utility bought each month over its contracts, the surplus it sold when the town made more than it used, and what the neighbourhood batteries shifted from one to the other.",
+    data: (_, now) => tradeChart(now),
   },
   {
     id: "heat",

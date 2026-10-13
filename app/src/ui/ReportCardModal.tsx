@@ -165,6 +165,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
         { label: "Electricity sold to customers", rp: finances.current.consumerRevenueRp },
         { label: "Government allocation", rp: finances.current.governmentAllocationRp },
         { label: "District heat sold", rp: finances.current.districtHeatRevenueRp },
+        ...(finances.current.surplusSoldRp > 0 ? [{ label: "Surplus power sold (spot market)", rp: finances.current.surplusSoldRp }] : []),
         { label: "Public charging sold (municipal chargers)", rp: finances.current.publicChargingRevenueRp },
         { label: "Zoning levy", rp: finances.current.zoningLevyRp },
         { label: "Borrowed (loans and bonds)", rp: finances.current.borrowedRp },
@@ -172,8 +173,9 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
     : [];
   const costs: LedgerRow[] = finances
     ? [
-        { label: "Wholesale electricity", rp: finances.current.wholesaleCostRp },
+        { label: "Electricity bought over contracts", rp: finances.current.wholesaleCostRp },
         { label: "Solar feed-in paid", rp: finances.current.feedInPaidRp },
+        ...(finances.current.surplusSoldRp < 0 ? [{ label: "Surplus power sold below zero (spot market)", rp: -finances.current.surplusSoldRp }] : []),
         { label: "Grid upkeep", rp: finances.current.gridMaintenanceCostRp },
         { label: "Making district heat", rp: finances.current.districtHeatPurchaseRp },
         { label: "District heating upkeep", rp: finances.current.districtHeatUpkeepRp },

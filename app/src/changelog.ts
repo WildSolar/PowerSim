@@ -25,13 +25,17 @@ export const CHANGELOG: Release[] = [
     version: "0.3.0",
     date: null,
     added: [
-      "Grid: choose the size when you reinforce a transformer station. A new station replaces the old one, so one step to the size you need costs less than several small ones; one order per station at a time, and while the utility's own reinforcement is under way you can make it bigger for the difference.",
+      "Grid: choose the size when you reinforce a transformer station. A new station replaces the old one, so one step to the size you need costs less than several small ones; one order per station at a time.",
+      "Grid: reinforce overloaded stations automatically after each reading, to the size their peak needs, as long as the treasury has the money — a setting in the Grid tool.",
+      "Surplus power: when the town makes more than it uses, the utility sells the surplus on the spot market at that hour's price, which sinks on sunny middays and falls below zero from the early 2030s. Neighbourhood batteries keep surplus for the evening, so the utility sells less cheap and buys less. A new chart shows power bought, sold and shifted.",
       "Charts, a new tab in the Town hall: how the town has changed since you took office — electricity by use and what solar and wind made, heat by heating system, district heat by source (backup boilers included), the share of the roofs' solar potential built, each transformer's peaks against its capacity, the modal split, approval, emissions, spending and the utility's accounts. A small chart icon next to a transformer, a panel or an account opens its chart.",
       "The published game counts visits and a few milestones anonymously (no cookies, nothing about you) — see About & credits.",
       "A tutorial, on the start screen: your first weeks as the newly elected mayor, with your chief of staff showing you the job step by step — the map and its views, the clock, the Town hall and its measures, the planning tools, your mail and your first Year in Review. It highlights what to click, and plays as a small game of its own.",
     ],
     changed: [
       "Grid: only on-street chargers load their neighbourhood's transformer station. Fast-charging hubs and lorry charging parks have a transformer of their own, which comes with them.",
+      "Grid: the utility no longer reinforces the worst overloaded station by itself — reinforcing is up to you (or the new automatic setting).",
+      "The utility buys power on long-term contracts at the month's wholesale price for what the town draws beyond its own generation, hour by hour, instead of netting the whole month's surplus against it.",
     ],
     fixed: [
       "Grid: a neighbourhood battery being installed shows its size.",

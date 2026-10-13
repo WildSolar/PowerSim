@@ -16,6 +16,7 @@
  */
 
 import {
+  AUTO_REINFORCE_HEADROOM,
   BATTERY_MONTHS,
   GRID_BATTERY_SIZES,
   GRID_FULL_SHARE,
@@ -25,7 +26,6 @@ import {
   REINFORCE_BASE_CHF,
   REINFORCE_CHF_PER_KVA,
   REINFORCE_MONTHS,
-  ROUTINE_REINFORCEMENTS_PER_READING,
   START_HEADROOM_RANGE,
   SUMMER_MEASURED_MONTH,
   SUMMER_PEAK_DAYS,
@@ -38,7 +38,8 @@ import {
 } from "../config/grid";
 import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
 import { buildingPowerW } from "./buildingPower";
-import { toDateMs, toSimTimeMs } from "./calendar";
+import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
+import { liveBalanceRp } from "./finances";
 import { simClock } from "./engine";
 import { existsAt } from "./lifetime";
 import { buildingCellZones, RoadAssignment } from "./gridAreas";
@@ -72,7 +73,7 @@ export interface GridArea {
   y: number;
   startCapacityKw: number;
   /** Reinforcements: the capacity from `atMs` on. */
-  upgrades: { atMs: number; capacityKw: number; byUtility?: boolean }[];
+  upgrades: { atMs: number; capacityKw: number; auto?: boolean }[];
   batteries: { atMs: number; kw: number; kwh?: number }[];
   /** The last readings: winter peak draw, summer peak feed-in (kW), and which year they're from. */
   winter: { year: number; peakKw: number } | null;
@@ -147,6 +148,8 @@ class Grid {
   private buildingsProvider: () => Building[] = () => [];
   private measuredWinter = -Infinity;
   private measuredSummer = -Infinity;
+  /** The player's setting: reinforce overloaded stations after each reading, money permitting. */
+  private autoReinforce = false;
   private selectedId: number | null = null;
   private unsubscribeClock: (() => void) | null = null;
   private readonly listeners = new Set<() => void>();
@@ -158,6 +161,7 @@ class Grid {
     const first = dataset.buildings[0];
     this.projection = new LocalProjection(first?.lon ?? 8.4, first?.lat ?? 47.4);
     this.realPlants = dataset.powerPlants;
+    this.autoReinforce = false;
     this.buildingsProvider = buildingsProvider;
     this.areaOfEgid = new Map();
     this.zones = null;
@@ -350,6 +354,19 @@ class Grid {
     return area.upgrades.length > 0 ? area.upgrades[area.upgrades.length - 1].capacityKw : area.startCapacityKw;
   }
 
+  /** Every neighbourhood battery in service at `atMs`, together: power (kW) and storage (kWh). */
+  batteriesInService(atMs: number): { kw: number; kwh: number } {
+    let kw = 0;
+    let kwh = 0;
+    for (const a of this.areas)
+      for (const b of a.batteries)
+        if (b.atMs <= atMs) {
+          kw += b.kw;
+          kwh += b.kwh ?? b.kw * 2;
+        }
+    return { kw, kwh };
+  }
+
   batteryKwAt(area: GridArea, atMs: number): number {
     return area.batteries.reduce((sum, b) => sum + (b.atMs <= atMs ? b.kw : 0), 0);
   }
@@ -450,13 +467,13 @@ class Grid {
     if (winterDue > this.measuredWinter) {
       this.measure("winter", winterDue);
       this.measuredWinter = winterDue;
-      this.routineReinforcement(atMs);
+      this.reinforceAutomatically(atMs);
       changed = true;
     }
     if (summerDue > this.measuredSummer) {
       this.measure("summer", summerDue);
       this.measuredSummer = summerDue;
-      this.routineReinforcement(atMs);
+      this.reinforceAutomatically(atMs);
       changed = true;
     }
     if (changed) {
@@ -466,21 +483,39 @@ class Grid {
     }
   }
 
-  /** The utility's routine programme: after a reading, the worst overloaded areas with nothing on
-   * order get the next station size, paid from grid upkeep (no treasury cost). */
-  private routineReinforcement(atMs: number): void {
+  /** The player's automatic reinforcement, if switched on: after a reading, each overloaded station
+   * with nothing on order gets the size its peak needs (with some headroom), worst first, as long as
+   * the treasury has the money — a station it can't pay for waits for the next reading. */
+  private reinforceAutomatically(atMs: number): void {
+    if (!this.autoReinforce || spendingFrozen(atMs)) return;
+    let balance = liveBalanceRp(this.buildingsProvider(), atMs, BASELINE_YEAR);
+    if (balance === null) return;
     const overloaded = this.areas
-      .filter((a) => !a.upgrades.some((u) => u.atMs > atMs))
+      .filter((a) => !this.pendingUpgrade(a, atMs))
       .map((a) => {
         const { drawKw, feedInKw } = this.effectivePeaks(a, atMs);
-        return { a, ratio: Math.max(drawKw, feedInKw) / this.capacityAt(a, atMs) };
+        const peakKw = Math.max(drawKw, feedInKw);
+        return { a, peakKw, ratio: peakKw / this.capacityAt(a, atMs) };
       })
       .filter((x) => x.ratio > 1)
-      .sort((x, y) => y.ratio - x.ratio)
-      .slice(0, ROUTINE_REINFORCEMENTS_PER_READING);
-    for (const { a } of overloaded) {
-      a.upgrades.push({ atMs: atMs + REINFORCE_MONTHS * MONTH_MS, capacityKw: nextStationSize(this.plannedCapacity(a)), byUtility: true });
+      .sort((x, y) => y.ratio - x.ratio);
+    for (const { a, peakKw } of overloaded) {
+      const toKw = Math.max(nextStationSize(this.plannedCapacity(a)), stationSizeFor(peakKw * AUTO_REINFORCE_HEADROOM));
+      const costRp = reinforceCostRp(toKw);
+      if (costRp > balance) continue;
+      a.upgrades.push({ atMs: atMs + REINFORCE_MONTHS * MONTH_MS, capacityKw: toKw, auto: true });
+      treasury.recordPayout("grid", atMs, costRp, `grid-${a.id}`);
+      balance -= costRp;
     }
+  }
+
+  getAutoReinforce(): boolean {
+    return this.autoReinforce;
+  }
+
+  setAutoReinforce(on: boolean): void {
+    this.autoReinforce = on;
+    this.notify();
   }
 
   // --- the player ---
@@ -490,14 +525,11 @@ class Grid {
     return area.upgrades.find((u) => u.atMs > atMs);
   }
 
-  /** The sizes the player can order for an area, and what each costs: none while the player's own
-   * order is under way; above the utility's, at the difference, while the utility's routine one is
-   * (the work is already planned — the municipality pays for the bigger station). */
+  /** The sizes the player can order for an area, and what each costs — none while an order is
+   * under way. */
   reinforceOptions(area: GridArea, atMs: number): { kw: number; costRp: number }[] {
-    const pending = this.pendingUpgrade(area, atMs);
-    if (pending && !pending.byUtility) return [];
-    const credit = pending ? reinforceCostRp(pending.capacityKw) : 0;
-    return stationSizesAbove(this.plannedCapacity(area), 3).map((kw) => ({ kw, costRp: reinforceCostRp(kw) - credit }));
+    if (this.pendingUpgrade(area, atMs)) return [];
+    return stationSizesAbove(this.plannedCapacity(area), 3).map((kw) => ({ kw, costRp: reinforceCostRp(kw) }));
   }
 
   /** Orders a bigger station for an area (one of reinforceOptions; the smallest if not said): paid
@@ -508,11 +540,7 @@ class Grid {
     const options = this.reinforceOptions(area, atMs);
     const option = toKw === undefined ? options[0] : options.find((o) => o.kw === toKw);
     if (!option) return;
-    const pending = this.pendingUpgrade(area, atMs);
-    if (pending) {
-      pending.capacityKw = option.kw;
-      pending.byUtility = false;
-    } else area.upgrades.push({ atMs: atMs + REINFORCE_MONTHS * MONTH_MS, capacityKw: option.kw });
+    area.upgrades.push({ atMs: atMs + REINFORCE_MONTHS * MONTH_MS, capacityKw: option.kw });
     treasury.recordPayout("grid", atMs, option.costRp, `grid-${areaId}`);
     this.notify();
   }
@@ -555,7 +583,7 @@ class Grid {
   // --- saving (saveGame.ts) ---
 
   snapshot() {
-    return { areas: this.areas, areaOfEgid: this.areaOfEgid, measuredWinter: this.measuredWinter, measuredSummer: this.measuredSummer };
+    return { areas: this.areas, areaOfEgid: this.areaOfEgid, measuredWinter: this.measuredWinter, measuredSummer: this.measuredSummer, autoReinforce: this.autoReinforce };
   }
 
   restore(s: ReturnType<Grid["snapshot"]>): void {
@@ -563,6 +591,7 @@ class Grid {
     this.areaOfEgid = s.areaOfEgid;
     this.measuredWinter = s.measuredWinter;
     this.measuredSummer = s.measuredSummer;
+    this.autoReinforce = s.autoReinforce ?? false;
     this.road = this.roadFor(this.areas.map((a) => [a.x, a.y] as XY));
     this.siteAreas = new Map();
     this.zones = null;

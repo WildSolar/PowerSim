@@ -57,12 +57,15 @@ import { agriPv } from "./agriPv";
 import { wind } from "./wind";
 import { windPowerW } from "./windPower";
 import { contractArrays } from "./solarAdoption";
+import { grid } from "./grid";
+import { powerFlows } from "./spotMarket";
 
 export interface MunicipalFinances {
   year: number;
   consumerRevenueRp: number; // what consumers paid for grid electricity, time-of-use priced — the same rates billing.ts bills them at
   feedInPaidRp: number; // paid out to solar owners (real or adopted) for exported generation — never for the utility's own arrays on rented roofs
-  wholesaleCostRp: number; // paid upstream for the net electricity actually drawn from the wider grid (consumption minus all local solar)
+  wholesaleCostRp: number; // paid upstream, over the contracts, for what the town drew beyond its own generation in each hour (spotMarket.ts)
+  surplusSoldRp: number; // what the town's surplus fetched on the spot market — below zero when sunny middays drive the price under it
   gridMaintenanceCostRp: number; // wires/upkeep cost, scaled to gross electricity delivered to consumers
   districtHeatRevenueRp: number; // district heat sold to connected buildings, at the tariff's district heating price
   districtHeatPurchaseRp: number; // making that heat: fuel, the heat pumps' power, heat bought (less wood plants' power sold)
@@ -107,6 +110,7 @@ export interface UtilityMonth {
   consumerRevenueRp: number;
   feedInPaidRp: number;
   wholesaleCostRp: number;
+  surplusSoldRp: number;
   gridMaintenanceCostRp: number;
   districtHeatRevenueRp: number;
   districtHeatPurchaseRp: number;
@@ -121,6 +125,7 @@ const UTILITY_KEYS: (keyof UtilityMonth)[] = [
   "consumerRevenueRp",
   "feedInPaidRp",
   "wholesaleCostRp",
+  "surplusSoldRp",
   "gridMaintenanceCostRp",
   "districtHeatRevenueRp",
   "districtHeatPurchaseRp",
@@ -136,7 +141,8 @@ export function utilityProfitRp(m: UtilityMonth): number {
   return (
     m.consumerRevenueRp +
     m.districtHeatRevenueRp +
-    m.publicChargingRevenueRp -
+    m.publicChargingRevenueRp +
+    m.surplusSoldRp -
     m.feedInPaidRp -
     m.wholesaleCostRp -
     m.gridMaintenanceCostRp -
@@ -189,7 +195,9 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
   const { times, series, dynamicW } = await monthElectricity(buildings, realPlants, year, month);
   const consumptionW = consumptionSeriesW(series);
   const grossKWh = energyKWh(times, consumptionW);
-  const netKWh = grossKWh - energyKWh(times, series.solarW);
+  // Hour by hour: what the town drew beyond what it made, bought over the contracts; the surplus,
+  // sold on the spot market — after the neighbourhood batteries took what they could.
+  const flows = powerFlows(times, consumptionW, series.solarW, grid.batteriesInService(toSimTimeMs(Date.UTC(year, month, 15))), tariff.wholesalePriceRpKWh);
 
   // District heat: the heat delivered and who made it (the report's heating-technology pass), and
   // the upkeep of the pipes and plants.
@@ -220,7 +228,8 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
     consumerRevenueRp:
       electricityCostRp(times, consumptionW, tariff, dynamicW) - charging.kWh * ((tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2) - ppaKWh * agriPv.ppaEnergyValueRpPerKWh(midMonthMs),
     feedInPaidRp: Math.max(0, flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh) - flatCostRp(times, contractW, tariff.feedInPriceRpKWh) - ppaKWh * tariff.feedInPriceRpKWh - windKWh * tariff.feedInPriceRpKWh),
-    wholesaleCostRp: netKWh * (tariff.wholesalePriceRpKWh + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare),
+    wholesaleCostRp: flows.boughtKWh * (tariff.wholesalePriceRpKWh + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare),
+    surplusSoldRp: flows.soldRp,
     gridMaintenanceCostRp: grossKWh * tariff.gridMaintenanceRpKWh,
     districtHeatRevenueRp: districtHeatKWh * tariff.districtHeatingPriceRpKWh,
     districtHeatPurchaseRp: dhProductionCostRp(heating.districtHeat, midMonthMs),
@@ -265,6 +274,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     consumerRevenueRp,
     feedInPaidRp,
     wholesaleCostRp,
+    surplusSoldRp,
     gridMaintenanceCostRp,
     districtHeatRevenueRp,
     districtHeatPurchaseRp,
@@ -293,6 +303,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     consumerRevenueRp +
     districtHeatRevenueRp +
     publicChargingRevenueRp +
+    surplusSoldRp +
     zoningLevyRp +
     borrowedRp +
     governmentAllocationRp -
@@ -312,6 +323,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     consumerRevenueRp,
     feedInPaidRp,
     wholesaleCostRp,
+    surplusSoldRp,
     gridMaintenanceCostRp,
     districtHeatRevenueRp,
     districtHeatPurchaseRp,
@@ -375,6 +387,7 @@ export function operatingIncomeRp(f: MunicipalFinances): number {
     f.consumerRevenueRp +
     f.districtHeatRevenueRp +
     f.publicChargingRevenueRp +
+    f.surplusSoldRp +
     f.zoningLevyRp +
     f.governmentAllocationRp -
     f.feedInPaidRp -

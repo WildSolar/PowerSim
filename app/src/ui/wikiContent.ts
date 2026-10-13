@@ -375,6 +375,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
       p(
         "What you can’t set are the energy markets: heating oil, gas, petrol and diesel, and the wholesale electricity the utility buys. They follow world prices, including the federal CO₂ levy on heating fuels, and drift slowly over the years — until now and then a supply crisis sends them soaring, easing again over a year or two. Nobody sees one coming. Dear fuel makes heat pumps and electric cars look better to anyone choosing at the time; dear wholesale power squeezes the utility’s profit, unless you pass it on — and the Swiss average rises with it, so people are more forgiving when everyone’s bill goes up.",
       ),
+      p(
+        "Like Swiss municipal utilities, yours buys its power on long-term contracts, at the month’s wholesale price, so a sudden spike in the market doesn’t hit it at once. But in an hour when the town makes more than it uses — local solar and wind beyond the town’s own use — the surplus goes to the spot market, at that hour’s price. With the whole region’s panels producing at once, that price sinks on sunny middays, and from the early 2030s it falls below zero on the sunniest: the utility then pays to get rid of the power, on top of the feed-in it pays the panels’ owners. Neighbourhood batteries, a dynamic tariff and smart charging move use into those hours, or keep the surplus for the evening.",
+      ),
       p("The same page shows the market prices now and a year ago, and where technology prices are heading (see \"Technology prices over time\")."),
       note(
         "A decision is made at the prices of its day and never revisited: a change only affects the decisions that follow. The grid’s upkeep per kWh is a fixed cost of the utility, not something you set. People judge the tariff by its typical bill, not by what each of them actually pays.",
@@ -695,10 +698,16 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "New buildings are always connected.",
       ]),
       p(
-        "After each reading the utility reinforces the worst overloaded area, one size up, out of its upkeep budget — but demand outruns that. The rest is up to you, paid from the treasury: reinforcing an area or adding a neighbourhood battery (250 kW, 500 kW or 1 MW, storing two hours; it covers its power of the peak either way, is ready after six months, and gets cheaper over the years).",
+        "Nobody reinforces the grid but you, paid from the treasury: reinforcing an area, or adding a neighbourhood battery (250 kW, 500 kW or 1 MW, storing two hours; it covers its power of the peak either way, is ready after six months, and gets cheaper over the years).",
       ),
       p(
-        "Reinforcing puts in a new station of the size you choose, cables included, ready after nine months. A new station replaces the old one whatever its size, so going straight to the size you will need costs less than getting there in steps — but the money is spent now. One order per station at a time; while the utility's own reinforcement is under way, you can make it bigger and pay the difference.",
+        "Reinforcing puts in a new station of the size you choose, cables included, ready after nine months. A new station replaces the old one whatever its size, so going straight to the size you will need costs less than getting there in steps — but the money is spent now. One order per station at a time.",
+      ),
+      p(
+        "Tick ‘Reinforce overloaded stations automatically’ in the Grid tool and it is done for you: after each reading, every overloaded station with nothing on order gets the size its peak needs with a quarter to spare, worst first, as long as the treasury has the money. One it can't pay for waits for the next reading.",
+      ),
+      p(
+        "Neighbourhood batteries also earn their keep: when the town makes more power than it uses — sunny middays, once there is a lot of solar — they take in what they can of the surplus, which would otherwise sell cheap, and give it back in the evening, when the utility would have to buy it (see \"Tariffs & energy prices\"). Each takes in at most its power at any moment, and fills once a day.",
       ),
       p(
         "Reinforcing everywhere is expensive, so three measures buy time by shaving the peaks: heat pump load control lets the utility switch enrolled heat pumps off in turns at peak times (half of them off at any one moment, briefly, hardly noticed); a smart charging programme has electric cars charge at night rather than as soon as they are plugged in; and a solar feed-in limit caps what panels deliver at 70% (or less) of their rating, which costs little energy but shaves the sunny-midday peak. A battery subsidy tied to grid-friendly operation does the same for the systems it pays for. They slow overloading down; in the long run, reinforcement is the answer.",
@@ -735,7 +744,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Offering: click a roof to see what an array there would mean — its size, what it costs to build, what a year of its output saves, the rent and the upkeep — and offer it, or offer every eligible roof at once (the drawer estimates how many would say yes, and what building their arrays would cost).",
         "The answer comes within weeks. Some owners take your letter as a prompt to look into solar themselves, and put up their own if it pays. The rest weigh your rent against what they want for their roof — which differs from owner to owner, most somewhere around CHF 1–4 per m². Offer more and more say yes; but every franc of rent comes out of what the array earns. A no means you can't ask again for three years.",
         "Building: once an owner accepts, you have a year to build — at once, if the drawer's box is ticked. You pay what the owner would have paid, less the federal payment every installation gets, as an investment you may borrow for. The panels are in service about four months later; in a full grid area a large array comes with a grid-friendly battery.",
-        "Earning: the arrays are the utility's. It pays no feed-in for what they make; their power saves buying from the wider grid at the wholesale price. Against that it pays the rent and the arrays' upkeep, every year. Big roofs pay well; small ones barely cover their costs.",
+        "Earning: the arrays are the utility's. It pays no feed-in for what they make; their power saves buying from the wider grid at the wholesale price — or, at a sunny midday when the town already makes more than it uses, sells at the spot price. Against that it pays the rent and the arrays' upkeep, every year. Big roofs pay well; small ones barely cover their costs.",
       ]),
       note(
         "What each owner wants for their roof is the game's guess, as is how many look into solar of their own. Contracts run as long as the panels; owners never cancel them, and the arrays last the game.",

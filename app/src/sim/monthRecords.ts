@@ -25,6 +25,11 @@ export interface MonthRecord {
   solarBuiltKw?: number;
   solarPotentialKw?: number;
   mobility?: { car: number; carElectric: number; bike: number; other: number };
+  /** The utility's trade (spotMarket.ts): bought over the contracts, sold on the spot market, and
+   * what the neighbourhood batteries took in (kWh). */
+  boughtKWh?: number;
+  soldKWh?: number;
+  storedKWh?: number;
 }
 
 class MonthRecords {

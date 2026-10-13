@@ -26,9 +26,9 @@ export const LOAD_CONTROL_OFF_SHARE_AT_PEAK = 0.5;
 export const GRID_TIGHT_SHARE = 0.75;
 export const GRID_FULL_SHARE = 0.9;
 
-// The utility's own routine programme, paid from grid upkeep: after each reading it reinforces this many
-// of the most overloaded areas (worst first). Demand outruns it; the player speeds it up.
-export const ROUTINE_REINFORCEMENTS_PER_READING = 1;
+// Automatic reinforcement (the player's setting): after each reading, an overloaded station gets the
+// smallest size that carries its peak with this much headroom.
+export const AUTO_REINFORCE_HEADROOM = 1.25;
 
 // Reinforcing an area: the next transformer size up (and the cables with it).
 export const REINFORCE_BASE_CHF = 80_000;

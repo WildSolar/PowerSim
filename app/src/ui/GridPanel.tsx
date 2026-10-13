@@ -45,7 +45,6 @@ function LoadBar({ kw, capacityKw }: { kw: number; capacityKw: number }) {
 function AreaDetails({ area, now }: { area: GridArea; now: number }) {
   const capacity = grid.capacityAt(area, now);
   const options = grid.reinforceOptions(area, now);
-  const pending = grid.pendingUpgrade(area, now);
   const battery = grid.batteryKwAt(area, now);
   const pendingBatteries = area.batteries.filter((b) => b.atMs > now);
   const pendingUpgrade = area.upgrades.filter((u) => u.atMs > now);
@@ -96,7 +95,7 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
       {pendingUpgrade.map((u) => (
         <p className="dh-note" key={u.atMs}>
           Reinforcing to {u.capacityKw} kVA — in service {monthYear(u.atMs)}
-          {u.byUtility ? " (the utility's routine programme)" : ""}.
+          {u.auto ? " (ordered automatically)" : ""}.
         </p>
       ))}
       {pendingBatteries.length > 0 && (
@@ -112,7 +111,7 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
             style={{ marginTop: 6 }}
             title="A new station replaces the old one, cables included: going straight to the size you need costs less than two steps"
           >
-            {pending ? `Make it bigger than the utility's ${pending.capacityKw} kVA (you pay the difference):` : `Reinforce the station (${REINFORCE_MONTHS} months):`}
+            Reinforce the station ({REINFORCE_MONTHS} months):
           </div>
           <div className="ev-sizes">
             {options.map((o) => (
@@ -125,7 +124,7 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
         </>
       )}
       <div className="dh-note" style={{ marginTop: 6 }} title="A battery covers its power of the area's peak — the winter evening draw and the summer midday feed-in alike — and stores two hours of it">
-        Add a neighbourhood battery ({BATTERY_MONTHS} months):
+        Add a neighbourhood battery ({BATTERY_MONTHS} months): <PlotLink chart="trade" title="Power bought, sold and shifted by batteries" />
       </div>
       <div className="ev-sizes">
         {GRID_BATTERY_SIZES.map((size, i) => (
@@ -146,7 +145,7 @@ function WorkInProgress({ area, now }: { area: GridArea; now: number }) {
   const battery = area.batteries.filter((b) => b.atMs > now).sort((x, y) => x.atMs - y.atMs)[0];
   if (!upgrade && !battery) return null;
   const parts = [
-    upgrade && `${upgrade.byUtility ? "The utility is reinforcing" : "Reinforcing"} the station (${upgrade.capacityKw} kVA, ${monthYear(upgrade.atMs)})`,
+    upgrade && `Reinforcing the station (${upgrade.capacityKw} kVA, ${monthYear(upgrade.atMs)})`,
     battery && `A ${batterySize(battery)} battery is being installed (${monthYear(battery.atMs)})`,
   ].filter(Boolean);
   return (
@@ -201,6 +200,10 @@ export function GridPanel() {
       <p className="dh-note">
         Readings: winter {lastWinter} (coldest January/February evenings), summer {lastSummer} (sunniest middays). The next ones come after each season.
       </p>
+      <label className="dh-check" title="After each reading, every overloaded station with nothing on order gets the size its peak needs, worst first, paid from the treasury. A station the treasury can't pay for waits for the next reading.">
+        <input type="checkbox" checked={grid.getAutoReinforce()} onChange={(e) => grid.setAutoReinforce(e.target.checked)} />
+        Reinforce overloaded stations automatically, if the treasury has the money
+      </label>
 
       {selected ? <AreaDetails area={selected} now={now} /> : <p className="dh-note">Click a station or a building on the map to see its area.</p>}
 
