@@ -161,16 +161,17 @@ def _refresh_streets(bfs_number: int, data: dict, boundary_lv95) -> None:
     buildings_df = gwr.fetch_buildings(bfs_number)
     min_e, max_e = buildings_df["E-Gebaeudekoordinate"].min(), buildings_df["E-Gebaeudekoordinate"].max()
     min_n, max_n = buildings_df["N-Gebaeudekoordinate"].min(), buildings_df["N-Gebaeudekoordinate"].max()
-    segments = streets_source.fetch_segments(boundary_lv95, min_e, min_n, max_e, max_n)
+    footprint_by_egid = {
+        int(b["egid"]): [coords.lonlat_to_lv95(lon, lat) for lon, lat in b["footprint"]] for b in data["buildings"] if b.get("footprint") and b["egid"].isdigit()
+    }
+    footprints = [Polygon(ring) for ring in footprint_by_egid.values() if len(ring) >= 4]
+    segments = streets_source.fetch_segments(boundary_lv95, min_e, min_n, max_e, max_n, footprints)
     print(f"  {len(segments)} street segments, {sum(s.length_m for s in segments) / 1000:.1f} km")
     kept = {int(b["egid"]) for b in data["buildings"] if b["egid"].isdigit()}
     positions = {
         int(row[gwr.EGID_COL]): (float(row["E-Gebaeudekoordinate"]), float(row["N-Gebaeudekoordinate"]))
         for _, row in buildings_df.iterrows()
         if int(row[gwr.EGID_COL]) in kept
-    }
-    footprint_by_egid = {
-        int(b["egid"]): [coords.lonlat_to_lv95(lon, lat) for lon, lat in b["footprint"]] for b in data["buildings"] if b.get("footprint") and b["egid"].isdigit()
     }
     entrances = gwr.fetch_entrances(bfs_number, set(positions))
     segments_by_egid, _ = streets_source.link_buildings(segments, entrances, positions, footprint_by_egid)
@@ -290,7 +291,8 @@ def build(bfs_number: int) -> MunicipalityDataset:
     print("Fetching the street network (swissTLM3D)...")
     boundary = boundary_source.fetch_boundary(bfs_number)
     boundary_lv95 = [Polygon([coords.lonlat_to_lv95(lon, lat) for lon, lat in polygon[0]]) for polygon in boundary]
-    segments = streets_source.fetch_segments(boundary_lv95, min_e, min_n, max_e, max_n)
+    footprints = [Polygon(ring) for ring in footprint_by_egid.values() if len(ring) >= 4]
+    segments = streets_source.fetch_segments(boundary_lv95, min_e, min_n, max_e, max_n, footprints)
     print(f"  {len(segments)} street segments, {sum(s.length_m for s in segments) / 1000:.1f} km")
     entrances = gwr.fetch_entrances(bfs_number, egids)
     positions = {

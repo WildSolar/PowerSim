@@ -19,8 +19,9 @@ merged into a neighbour it meets end to end, so a segment may run past a junctio
 joined to it, and so is a junction left a metre or two beside a street it should meet. Street ends
 within NODE_SNAP_M of each other are one junction. Segments with at least MIN_INSIDE_M inside the
 municipality are kept.
-Motorways, service access roads, ferries and unnamed footpaths are left out; named paths
-stay (buildings are addressed from them).
+Motorways, service access roads and ferries are left out. Named paths stay (buildings are addressed
+from them), and so do unnamed footpaths among the buildings — through a park, down to a block of
+flats — but not those across fields and through woods.
 
 Buildings are linked to the segment(s) in front of them through GWR's entrance records:
 for each entrance, the nearest segment carrying the entrance's own street name, falling
@@ -31,6 +32,7 @@ borders (a building between two streets can be reached from either).
 from __future__ import annotations
 
 import math
+import time
 import unicodedata
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -57,8 +59,13 @@ ROAD_WIDTH_M = {
     12: 6.0,  # Platz
     4: 5.0,  # Verbindung (link roads at larger junctions)
 }
-# Paths: only kept when they carry a street name (buildings addressed from them).
+# Paths: kept when they carry a street name (buildings addressed from them), or run among buildings.
 NAMED_PATH_WIDTH_M = {15: 2.0, 16: 1.5}  # 2m Weg, 1m Weg
+# An unnamed path runs among buildings when at least this share of it is this close to one — or when
+# both its ends are, and it's no longer than a walk across a park.
+PATH_BUILDING_REACH_M = 30.0
+PATH_MIN_BUILT_SHARE = 0.5
+PATH_MAX_CROSSING_M = 150.0
 MAIN_ROAD_CODES = {8, 20}
 
 # Two stretches of one street count as side-by-side carriageways when this far apart (from a
@@ -126,6 +133,23 @@ class _Road:
     code: int
     dual: bool = False
     original_ends: tuple[tuple[float, float], tuple[float, float]] | None = field(default=None)
+    unnamed_path: bool = False
+
+
+def _identify_request(params: dict) -> list:
+    """One identify call's results. A failed call raises (after a few tries) rather than coming back
+    empty — an empty tile would be cached, and its roads silently missing."""
+    for attempt in range(4):
+        try:
+            response = requests.get(IDENTIFY_URL, params=params, timeout=90)
+            response.raise_for_status()
+            data = response.json()
+            if "results" in data:
+                return data["results"]
+        except (requests.RequestException, ValueError):
+            pass
+        time.sleep(2 * (attempt + 1))
+    raise RuntimeError(f"swissTLM3D identify failed for {params['geometry']}")
 
 
 def _identify(x0: float, y0: float, x1: float, y1: float, out: dict, depth: int = 0) -> None:
@@ -142,7 +166,7 @@ def _identify(x0: float, y0: float, x1: float, y1: float, out: dict, depth: int 
         "mapExtent": extent,
         "imageDisplay": "500,500,96",
     }
-    results = cached_json("tlm-roads", extent, lambda: requests.get(IDENTIFY_URL, params=params, timeout=90).json().get("results", []))
+    results = cached_json("tlm-roads", extent, lambda: _identify_request(params))
     if len(results) >= MAX_RESULTS and depth < 6:
         mx, my = (x0 + x1) / 2, (y0 + y1) / 2
         for quarter in ((x0, y0, mx, my), (mx, y0, x1, my), (x0, my, mx, y1), (mx, my, x1, y1)):
@@ -167,16 +191,37 @@ def _fetch_roads(min_e: float, min_n: float, max_e: float, max_n: float) -> list
         props = feature["properties"]
         code = props.get("objektart")
         name = props.get("strassenname") or None
-        width = ROAD_WIDTH_M.get(code) or (NAMED_PATH_WIDTH_M.get(code) if name else None)
+        width = ROAD_WIDTH_M.get(code) or NAMED_PATH_WIDTH_M.get(code)
         if width is None:
             continue
+        unnamed_path = code not in ROAD_WIDTH_M and not name
         geometry = feature["geometry"]
         parts = geometry["coordinates"] if geometry["type"] == "MultiLineString" else [geometry["coordinates"]]
         for part in parts:
             points = [(p[0], p[1]) for p in part]
             if len(points) >= 2:
-                roads.append(_Road(LineString(points), name, width, code))
+                roads.append(_Road(LineString(points), name, width, code, unnamed_path=unnamed_path))
     return roads
+
+
+def _keep_paths_among_buildings(roads: list[_Road], buildings: list[Polygon]) -> list[_Road]:
+    """Drops the unnamed footpaths that don't run among buildings (see PATH_BUILDING_REACH_M)."""
+    tree = STRtree(buildings) if buildings else None
+    kept = []
+    for road in roads:
+        if not road.unnamed_path:
+            kept.append(road)
+            continue
+        if tree is None:
+            continue
+        near = [buildings[int(k)] for k in tree.query(road.line.buffer(PATH_BUILDING_REACH_M))]
+        if not near:
+            continue
+        built = unary_union([b.buffer(PATH_BUILDING_REACH_M) for b in near])
+        ends_built = all(built.contains(Point(p)) for p in (road.line.coords[0], road.line.coords[-1]))
+        if road.line.intersection(built).length >= PATH_MIN_BUILT_SHARE * road.line.length or (ends_built and road.line.length <= PATH_MAX_CROSSING_M):
+            kept.append(road)
+    return kept
 
 
 def _tangent(line: LineString, distance: float) -> tuple[float, float]:
@@ -419,9 +464,12 @@ def _join_plain_bends(roads: list[_Road]) -> list[_Road]:
     return [r for r, a in zip(roads, alive) if a]
 
 
-def fetch_segments(boundary_lv95: list[Polygon], min_e: float, min_n: float, max_e: float, max_n: float) -> list[Segment]:
+def fetch_segments(
+    boundary_lv95: list[Polygon], min_e: float, min_n: float, max_e: float, max_n: float, buildings_lv95: list[Polygon] | None = None
+) -> list[Segment]:
+    """The street network over the box; `buildings_lv95` (footprints) decide which unnamed paths stay."""
     margin = 300
-    original = _fetch_roads(min_e - margin, min_n - margin, max_e + margin, max_n + margin)
+    original = _keep_paths_among_buildings(_fetch_roads(min_e - margin, min_n - margin, max_e + margin, max_n + margin), buildings_lv95 or [])
     roads = _collapse_dual_carriageways(original)
     roads = _absorb_unnamed_side_roads(roads)
     roads = _reattach(roads, original)
@@ -449,9 +497,10 @@ def fetch_segments(boundary_lv95: list[Polygon], min_e: float, min_n: float, max
         line = road.line
         if line.length < 1:
             continue
-        # A piece too short to keep (under MIN_KNOT_M) still ties its two junctions into one when the
-        # knots are contracted below, so it stays whatever lies inside the boundary.
-        if line.length >= MIN_KNOT_M and sum(line.intersection(poly).length for poly in inside) < MIN_INSIDE_M:
+        # A street mostly outside the boundary isn't the municipality's; a short piece inside it is —
+        # it may be what ties two junctions together.
+        inside_m = sum(line.intersection(poly).length for poly in inside)
+        if inside_m < MIN_INSIDE_M and inside_m < 0.5 * line.length:
             continue
         coords = [(x, y) for x, y, *_ in line.coords]
         segments.append(

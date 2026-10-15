@@ -42,6 +42,7 @@ export const CHANGELOG: Release[] = [
       "Grid: a neighbourhood battery being installed shows its size.",
       "District heating: where a river or lake heat pump may stand is shown as one clean area inside the municipality, instead of overlapping blotches.",
       "Streets that met within a couple of metres without being joined — a short connecting piece lost, a street drawn twice side by side — now meet, so pipes can follow them.",
+      "District heating: footpaths among the buildings — through a park, down to a block of flats — can carry pipes too, and some short stretches of street that were missing are back.",
     ],
   },
   {
