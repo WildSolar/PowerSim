@@ -30,6 +30,11 @@ export const BENCHMARK_WHOLESALE_RP_KWH = 9;
 export const REFERENCE_HOUSEHOLD_KWH = 4500;
 /** The share of a household's electricity used in off-peak hours (evenings, nights). */
 export const HOUSEHOLD_OFF_PEAK_SHARE = 0.3;
+/** The price ceiling (sim/tariffCap.ts): a typical household's average price may be at most the
+ * utility's costs per kWh — power bought, grid upkeep, the concession fee — plus this share, the
+ * regulator's "reasonable return" on what the utility has invested. */
+export const TARIFF_CAP_MARGIN = 0.2;
+
 /** What feed-in and district heat are judged against. */
 export const BENCHMARK_FEED_IN_RP_KWH = 8;
 export const BENCHMARK_DISTRICT_HEAT_RP_KWH = 12;

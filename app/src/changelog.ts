@@ -36,6 +36,7 @@ export const CHANGELOG: Release[] = [
     changed: [
       "Grid: only on-street chargers load their neighbourhood's transformer station. Fast-charging hubs and lorry charging parks have a transformer of their own, which comes with them.",
       "Grid: the utility no longer reinforces the worst overloaded station by itself — reinforcing is up to you (or the new automatic setting).",
+      "A price ceiling: the regulator holds the household electricity price to the utility's costs — power, grid, concession fee — plus a fifth. Prices page shows where you stand; a tariff over it can't be published.",
       "The utility now pays the town a concession fee on every kWh it sells, instead of handing over three quarters of its profit. The fee is set when you take office, at what the town took the year before, so your starting money is unchanged — but from then on everything the utility earns beyond the fee is yours, and so is a loss. What you build now pays you back in full: wind turbines, batteries, district heating plants and pipes, chargers. Solar on public buildings is credited with what it saves them and earns feeding in.",
       "The utility buys power on long-term contracts at the month's wholesale price for what the town draws beyond its own generation, hour by hour, instead of netting the whole month's surplus against it.",
     ],

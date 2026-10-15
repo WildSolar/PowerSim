@@ -8,7 +8,9 @@ import { market } from "../sim/market";
 import { stock } from "../sim/stock";
 import { useSimDay, useTariff } from "../sim/store";
 import type { TariffSheet } from "../sim/tariff";
-import { householdBillChf, previewReaction } from "../sim/tariffApproval";
+import { householdBillChf, householdRpKWh, previewReaction } from "../sim/tariffApproval";
+import { householdPriceCap } from "../sim/tariffCap";
+import { TARIFF_CAP_MARGIN } from "../config/tariff";
 import { tariffStore } from "../sim/tariffStore";
 import { DynamicPriceChart } from "./DynamicPriceChart";
 import "./tariffControl.css";
@@ -73,6 +75,9 @@ export function TariffControl() {
   const vsNow = (preview.billChf / householdBillChf(inForce) - 1) * 100;
   const vsAverage = (preview.billChf / preview.benchmarkChf - 1) * 100;
   const unchanged = published && sameSheet(draft, tariffStore.sheetFor(targetYear));
+  const cap = householdPriceCap(simDay);
+  const average = householdRpKWh(draft);
+  const overCap = average > cap.capRpKWh + 0.005;
 
   return (
     <div className="tariff-control">
@@ -125,6 +130,15 @@ export function TariffControl() {
           <span>Compared with the Swiss average (CHF {Math.round(preview.benchmarkChf).toLocaleString("en-GB")})</span>
           <span className={vsAverage > 0.5 ? "up" : vsAverage < -0.5 ? "down" : ""}>{signedPct(vsAverage)}</span>
         </div>
+        <div
+          className="tariff-preview-line"
+          title={`What the regulator allows: the power (${cap.wholesaleRpKWh.toFixed(1)} Rp), the grid (${cap.gridRpKWh.toFixed(1)} Rp) and the concession fee (${cap.concessionRpKWh.toFixed(1)} Rp) per kWh, plus ${Math.round(TARIFF_CAP_MARGIN * 100)}% return`}
+        >
+          <span>Average price, against the regulator&apos;s ceiling</span>
+          <span className={overCap ? "up" : ""}>
+            {average.toFixed(1)} of {cap.capRpKWh.toFixed(1)} Rp/kWh
+          </span>
+        </div>
         <div className="tariff-preview-line">
           <span>Expected reaction</span>
           <span className={`tariff-reaction ${reaction.tone}`}>{reaction.label}</span>
@@ -132,7 +146,13 @@ export function TariffControl() {
       </div>
 
       <div className="tariff-publish">
-        <button className="tariff-publish-btn" disabled={unchanged} onClick={() => tariffStore.publish(draft, simDay)}>
+        {overCap && (
+          <p className="tariff-over-cap">
+            Over the ceiling: ElCom, the federal regulator, holds a monopoly utility&apos;s household price to its costs plus a reasonable return —{" "}
+            {cap.capRpKWh.toFixed(1)} Rp/kWh on average for a typical household. Lower the electricity prices to publish.
+          </p>
+        )}
+        <button className="tariff-publish-btn" disabled={unchanged || overCap} onClick={() => tariffStore.publish(draft, simDay)}>
           {published ? `Publish again for ${targetYear}` : `Publish for ${targetYear}`}
         </button>
         <span className="tariff-deadline">

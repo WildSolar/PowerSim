@@ -378,6 +378,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
       p(
         "Like Swiss municipal utilities, yours buys its power on long-term contracts, at the month’s wholesale price, so a sudden spike in the market doesn’t hit it at once. But in an hour when the town makes more than it uses — local solar and wind beyond the town’s own use — the surplus goes to the spot market, at that hour’s price. With the whole region’s panels producing at once, that price sinks on sunny middays, and from the early 2030s it falls below zero on the sunniest: the utility then pays to get rid of the power, on top of the feed-in it pays the panels’ owners. Neighbourhood batteries, a dynamic tariff and smart charging move use into those hours, or keep the surplus for the evening.",
       ),
+      p(
+        "There is a ceiling, though. The utility is the only supplier its households have, so the federal regulator holds its household price to its costs: the power it buys, the grid's upkeep and the concession fee it pays the town, plus a reasonable return of a fifth on top. A tariff whose typical household price is over that can't be published; the page shows where you stand against it. When the market gets dearer, the ceiling rises with it.",
+      ),
       p("The same page shows the market prices now and a year ago, and where technology prices are heading (see \"Technology prices over time\")."),
       note(
         "A decision is made at the prices of its day and never revisited: a change only affects the decisions that follow. The grid’s upkeep per kWh is a fixed cost of the utility, not something you set. People judge the tariff by its typical bill, not by what each of them actually pays.",
