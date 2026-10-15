@@ -1,4 +1,4 @@
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import type { Building, PowerPlant } from "../data/types";
 import { mapFocus } from "../map/mapFocus";
 import { formatDate } from "../sim/calendar";
@@ -12,7 +12,8 @@ import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
 import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
-import { SupervisionNotice } from "./SupervisionNotice";
+import { ToolPanel } from "./ToolPanel";
+import { treasury } from "../sim/treasury";
 
 function monthYear(simTimeMs: number): string {
   return formatDate(simTimeMs).replace(/^\d+ /, "");
@@ -140,7 +141,11 @@ export function PublicBuildingsPanel({
     () => measures.getVersion(),
   );
   const now = useSimDay();
-  const [solarOrders, setSolarOrders] = useState(0); // solar orders don't announce themselves; this re-reads after one
+  // Solar orders (on a building's card) don't announce themselves, but they are paid: re-read then.
+  const solarOrders = useSyncExternalStore(
+    (listener) => treasury.subscribe(listener),
+    () => treasury.getVersion(),
+  );
 
   const rows = useMemo(
     () =>
@@ -170,10 +175,8 @@ export function PublicBuildingsPanel({
     mapFocus.focusBuilding(b);
   };
 
-  return (
-    <div className="district-heat-panel">
-      <h3 className="panel-title">Public buildings</h3>
-      <SupervisionNotice />
+  const overview = (
+    <>
       <div className="info-row">
         <span>Public buildings</span>
         <span className="info-value">{rows.length}</span>
@@ -190,17 +193,6 @@ export function PublicBuildingsPanel({
           {withChargers.length} · {points} points
         </span>
       </div>
-      <p className="dh-note">
-        Automatically: {solarMeasure ? `solar on ${solarMeasure.perYear} a year` : "no solar programme"},{" "}
-        {chargerMeasure ? `chargers at ${chargerMeasure.perYear} a year` : "no charger programme"} (Town hall → Measures). Or pick a building here or on the
-        map and order it directly.
-      </p>
-
-      {selected ? (
-        <PublicBuildingOrders building={selected} realPlants={realPlants} now={now} onOrdered={() => setSolarOrders((n) => n + 1)} />
-      ) : (
-        <p className="dh-note">Click a public building on the map or in the list below.</p>
-      )}
 
       <h4 className="dh-subtitle">All public buildings</h4>
       {rows.map(({ b, status }) => (
@@ -218,6 +210,26 @@ export function PublicBuildingsPanel({
           </span>
         </button>
       ))}
-    </div>
+      <p className="dh-note tool-list-hint">Click a building here or on the map: its card shows what it has, and what you can put on it.</p>
+    </>
   );
+
+  const build = (
+    <>
+      <p className="dh-note">
+        Automatically: {solarMeasure ? `solar on ${solarMeasure.perYear} a year` : "no solar programme"},{" "}
+        {chargerMeasure ? `chargers at ${chargerMeasure.perYear} a year` : "no charger programme"} — set in Town hall → Measures.
+      </p>
+      <p className="dh-note">
+        Or one at a time: pick a public building on the map or in the Overview&apos;s list, and order solar or chargers for it on its card.
+      </p>
+      {selected && (
+        <p className="dh-note">
+          Picked: <strong>{nameOf(selected)}</strong> — see its card on the right.
+        </p>
+      )}
+    </>
+  );
+
+  return <ToolPanel mode="publicBuildings" title="Public buildings" overview={overview} build={build} />;
 }

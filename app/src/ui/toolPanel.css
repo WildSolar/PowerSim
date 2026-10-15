@@ -1,0 +1,76 @@
+/* A planning tool's drawer (ToolPanel.tsx): two tabs, Overview and Build. */
+.tool-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 0 -14px 12px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tool-tabs button {
+  flex: 1;
+  padding: 6px 0 7px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.tool-tabs button:hover {
+  color: var(--ink);
+}
+
+.tool-tabs button.active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.tool-legend {
+  margin: 14px -14px -12px;
+  padding: 8px 14px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.tool-legend summary {
+  cursor: pointer;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.tool-legend[open] summary {
+  margin-bottom: 8px;
+}
+
+/* A clickable row in an overview list that opens its card. */
+.tool-list-hint {
+  margin: 2px 0 6px;
+}
+
+/* The card for one picked thing (InspectCard.tsx), where a building's panel stands. */
+.inspect-card {
+  padding: 16px;
+  font-size: 12px;
+}
+
+.inspect-card .inspect-kicker {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 2px;
+}
+
+.inspect-card h2 {
+  font-size: 17px;
+  margin-bottom: 10px;
+}

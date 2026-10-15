@@ -295,8 +295,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     chapter: "Building things",
     target: "tool-drawer",
     say: [
-      "{town}'s district heating network: what feeds it, how much of the winter peak its clean sources carry. Click streets on the map to plan an extension; buildings along it can connect when their heating is next replaced.",
-      "Further down: new heat sources — heat pumps on groundwater or a river, waste heat, wood. It's slow and costly work, but every connected building is a boiler gone for good.",
+      "Every planning tool has two tabs. Overview: what {town} has — its district heating networks, how much of the town they reach. Click a network, or a plant on the map, and its card shows what feeds it.",
+      "Build: new heat sources — heat pumps on groundwater or a river, waste heat, wood — and extending the pipes: click streets on the map, and buildings along them can connect when their heating is next replaced. Slow and costly work, but every connected building is a boiler gone for good.",
     ],
   },
   // --- 8. The town talks back ---

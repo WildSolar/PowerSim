@@ -25,9 +25,9 @@ function DesignationStatus({ d, now }: { d: AgriPvDesignation; now: number }) {
   return <span className="zn-status good">In force since {monthYear(d.effectiveAtMs)}</span>;
 }
 
-/** Farmland and Agri-PV, in the zoning layer's panel: what is zoned and built, how people take it,
- * and zoning the picked fields. */
-export function AgriPvSection() {
+/** Farmland and Agri-PV, in the zoning layer's panel: what is zoned and built and how people take
+ * it (the Overview), or zoning the picked fields (Build). */
+export function AgriPvSection({ part }: { part: "overview" | "build" }) {
   const version = useSyncExternalStore(
     (l) => agriPv.subscribe(l),
     () => agriPv.getVersion(),
@@ -59,12 +59,50 @@ export function AgriPvSection() {
 
   if (plots.length === 0) return null;
 
+  if (part === "build")
+    return (
+      <>
+        <h4 className="dh-subtitle">Farmland · Agri-PV</h4>
+        <p className="dh-note">
+          Solar over fields that stay farmed. Zone fields for it, and businesses with a big electricity use may build there, buying the power as it comes.
+        </p>
+        {selection.size === 0 ? (
+          <p className="dh-note">Click fields on the map (the green ones, outside the building zones) to zone them for Agri-PV.</p>
+        ) : quote.plotIds.length === 0 ? (
+          <p className="dh-note">The picked fields are zoned already, or on their way.</p>
+        ) : (
+          <div className="zn-quote">
+            <div className="zn-quote-title">{quote.title}</div>
+            <div className="info-row">
+              <span>Prime cropland</span>
+              <span className="info-value">{Math.round(quote.primeShare * 100)}%</span>
+            </div>
+            <div className="info-row">
+              <span>Planning cost</span>
+              <span className="info-value">{formatCHF(quote.costRp)}</span>
+            </div>
+            <div className="info-row">
+              <span>Public reaction</span>
+              <span className={`zn-reaction ${reaction.tone}`}>{reaction.label}</span>
+            </div>
+            <p className="dh-note">
+              Always goes to a public vote, which can strike it down; in force {AGRI_PV_LEAD_MONTHS} months after it&apos;s put forward. Some of the opposition stays
+              for as long as the zone is there{quote.primeShare > 0.3 ? " — more so on prime cropland" : ""}.
+            </p>
+            <div className="dh-actions">
+              <button className="dh-order" onClick={() => agriPv.submit(simClock.getSimTimeMs())}>
+                Put forward for {formatCHF(quote.costRp)}
+              </button>
+              <button onClick={() => agriPv.clearSelection()}>Clear</button>
+            </div>
+          </div>
+        )}
+      </>
+    );
+
   return (
     <>
       <h4 className="dh-subtitle">Farmland · Agri-PV</h4>
-      <p className="dh-note">
-        Solar over fields that stay farmed. Zone fields for it, and businesses with a big electricity use may build there, buying the power as it comes.
-      </p>
       <div className="info-row">
         <span>Farmland fields</span>
         <span className="info-value">
@@ -90,38 +128,6 @@ export function AgriPvSection() {
           ? "The Agri-PV dialogue is running: acceptance grows year by year."
           : "Acceptance grows a little with every field people get to see. The Agri-PV dialogue (Town hall → Measures, Advice) builds it faster."}
       </p>
-
-      {selection.size === 0 ? (
-        <p className="dh-note">Click fields on the map (the green ones, outside the building zones) to zone them for Agri-PV.</p>
-      ) : quote.plotIds.length === 0 ? (
-        <p className="dh-note">The picked fields are zoned already, or on their way.</p>
-      ) : (
-        <div className="zn-quote">
-          <div className="zn-quote-title">{quote.title}</div>
-          <div className="info-row">
-            <span>Prime cropland</span>
-            <span className="info-value">{Math.round(quote.primeShare * 100)}%</span>
-          </div>
-          <div className="info-row">
-            <span>Planning cost</span>
-            <span className="info-value">{formatCHF(quote.costRp)}</span>
-          </div>
-          <div className="info-row">
-            <span>Public reaction</span>
-            <span className={`zn-reaction ${reaction.tone}`}>{reaction.label}</span>
-          </div>
-          <p className="dh-note">
-            Always goes to a public vote, which can strike it down; in force {AGRI_PV_LEAD_MONTHS} months after it's put forward. Some of the opposition stays for
-            as long as the zone is there{quote.primeShare > 0.3 ? " — more so on prime cropland" : ""}.
-          </p>
-          <div className="dh-actions">
-            <button className="dh-order" onClick={() => agriPv.submit(simClock.getSimTimeMs())}>
-              Put forward for {formatCHF(quote.costRp)}
-            </button>
-            <button onClick={() => agriPv.clearSelection()}>Clear</button>
-          </div>
-        </div>
-      )}
 
       {designations.length > 0 &&
         designations.map((d) => (

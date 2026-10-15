@@ -7,6 +7,7 @@ import { CrashBoundary, CrashScreen } from "./ui/CrashScreen";
 import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
 import { TownHall, type TownHallSection } from "./ui/TownHall";
+import { clearInspected, InspectSlot, useInspected } from "./ui/InspectSlot";
 import { chartNav } from "./ui/chartNav";
 import { GuideCard, WelcomeBriefing, guide, type GuideStep } from "./ui/Onboarding";
 import { Tutorial } from "./ui/Tutorial";
@@ -107,6 +108,20 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
   const [colorMode, setColorMode] = useState<ColorMode>("none");
   const [townHall, setTownHall] = useState<TownHallSection | null>(null);
   const showTownHall = townHall !== null;
+  // What's picked in the open planning tool (a charger, a station, a network, a wind site) shows its
+  // own card where a building's panel stands: picking one lets go of the other.
+  const inspected = useInspected(colorMode);
+  useEffect(() => {
+    if (inspected) {
+      setSelectedEgid(null);
+      setSelectedEwid(null);
+    }
+  }, [inspected]);
+  const selectBuilding = (egid: string | null) => {
+    if (egid !== null) clearInspected();
+    setSelectedEgid(egid);
+    setSelectedEwid(null);
+  };
   // A chart link (PlotLink.tsx) opens the town hall on its Charts tab.
   useEffect(() => {
     chartNav.setOpener(() => setTownHall("charts"));
@@ -181,14 +196,14 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
       else if (publicCharging.getPlacing()) publicCharging.startPlacing(null);
       else if (selectedEwid !== null) setSelectedEwid(null);
       else if (selectedEgid !== null) setSelectedEgid(null);
-      else if (publicCharging.getSelectedId() !== null) publicCharging.select(null);
+      else if (inspected) clearInspected();
       else if (colorMode !== "none") setColorMode("none");
       else return;
       e.preventDefault();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [reportCardYear, showMenu, inboxSelection, showWiki, showTownHall, selectedEwid, selectedEgid, colorMode]);
+  }, [reportCardYear, showMenu, inboxSelection, showWiki, showTownHall, selectedEwid, selectedEgid, colorMode, inspected]);
 
   useEffect(() => {
     // A loaded game stays still until it is put back (applySave), then waits, paused.
@@ -318,10 +333,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
     return <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>Loading…</div>;
   }
 
-  const onSelectFromList = (egid: string) => {
-    setSelectedEgid(egid);
-    setSelectedEwid(null);
-  };
+  const onSelectFromList = (egid: string) => selectBuilding(egid);
   const toolPanel =
     colorMode === "districtHeat" ? (
       <DistrictHeatPanel />
@@ -354,10 +366,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         <MapView
           dataset={dataset}
           selectedEgid={selectedEgid}
-          onSelectBuilding={(egid) => {
-            setSelectedEgid(egid);
-            setSelectedEwid(null);
-          }}
+          onSelectBuilding={selectBuilding}
           colorMode={colorMode}
           keyboardEnabled={keyboardEnabled}
         />
@@ -365,10 +374,6 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         {isToolLayer(colorMode) ? (
           <aside className="tool-drawer" aria-label={layerLabel(colorMode)} data-tour="tool-drawer">
             {toolPanel}
-            <details className="drawer-legend" open>
-              <summary>Legend</summary>
-              <LayerLegend mode={colorMode} />
-            </details>
           </aside>
         ) : (
           <div className="map-legend" data-tour="legend">
@@ -377,7 +382,9 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
           </div>
         )}
         {!inboxSelection && <InboxToast onOpen={setInboxSelection} />}
-        {selectedDwelling && selectedBuilding ? (
+        {inspected ? (
+          <InspectSlot mode={colorMode} />
+        ) : selectedDwelling && selectedBuilding ? (
           <DwellingPanel
             building={selectedBuilding}
             dwelling={selectedDwelling}
@@ -423,10 +430,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         <InboxPanel
           initial={inboxSelection}
           onClose={() => setInboxSelection(null)}
-          onSelectBuilding={(egid) => {
-            setSelectedEgid(egid);
-            setSelectedEwid(null);
-          }}
+          onSelectBuilding={selectBuilding}
         />
       )}
       {showFeedback && <FeedbackDialog onClose={() => setShowFeedback(false)} />}
@@ -453,7 +457,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
           onStay={() => setInTutorial(false)}
         />
       )}
-      {dataset && !showBriefing && !gameOver && !finished && !tutorial && <GuideCard besidePanel={selectedEgid !== null} onAction={guideAction} />}
+      {dataset && !showBriefing && !gameOver && !finished && !tutorial && <GuideCard besidePanel={selectedEgid !== null || inspected !== null} onAction={guideAction} />}
       {showBriefing && dataset && !gameOver && (
         <WelcomeBriefing
           town={dataset.name}

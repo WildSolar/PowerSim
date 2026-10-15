@@ -19,7 +19,8 @@ import { formatCHF } from "./format";
 import { mapFocus } from "../map/mapFocus";
 import { useStockBuildings } from "./useStock";
 import "./districtHeatPanel.css";
-import { SupervisionNotice } from "./SupervisionNotice";
+import { InspectCard } from "./InspectCard";
+import { ToolPanel } from "./ToolPanel";
 import { PlotLink } from "./PlotLink";
 
 function percent(part: number, share: CoverageShare): string {
@@ -58,14 +59,45 @@ function useLastYearHeat(buildings: ReturnType<typeof useStockBuildings>, simDay
   return energy?.year === year ? energy.e : null;
 }
 
-/** One network: what feeds it, against its winter peak, and who made last year's heat. */
+/** How much of a network's winter peak its clean sources carry (0–1). */
+function cleanCover(network: DhNetworkInfo, peakW: number): number {
+  const cleanW = network.sources.filter((s) => s.kind && s.cleanW > 0).reduce((sum, s) => sum + s.cleanW, 0);
+  return peakW > 0 ? Math.min(1, cleanW / peakW) : 1;
+}
+
+/** The card for the network picked on the map (a plant, a piped street) or in a list: what feeds
+ * it, against its winter peak. */
+export function NetworkInspectCard() {
+  useSyncExternalStore(
+    (listener) => districtHeat.subscribe(listener),
+    () => districtHeat.getVersion(),
+  );
+  const simDay = useSimDay();
+  const buildings = useStockBuildings();
+  const network = districtHeat.pickedNetworkAt(simDay);
+  const facts = useMemo(() => {
+    if (!network) return null;
+    let connected = 0;
+    for (const b of buildings) {
+      if (existsAt(b, simDay) && networkStatusAt(b, simDay) === "connected" && districtHeat.networkOf(b.streetSegments, simDay)?.id === network.id) connected++;
+    }
+    return { connected, peakW: networkPeaksW(buildings, simDay).get(network.id) ?? 0 };
+  }, [network, buildings, simDay]);
+  if (!network || !facts) return null;
+  return (
+    <InspectCard kicker="District heating network" title={network.name} onClose={() => districtHeat.pickNetwork(null)}>
+      <NetworkCard network={network} peakW={facts.peakW} connected={facts.connected} />
+    </InspectCard>
+  );
+}
+
+/** One network: what feeds it, against its winter peak. */
 function NetworkCard({ network, peakW, connected }: { network: DhNetworkInfo; peakW: number; connected: number }) {
   const clean = network.sources.filter((s) => s.kind && s.cleanW > 0);
   const cleanW = clean.reduce((sum, s) => sum + s.cleanW, 0);
   const cover = peakW > 0 ? Math.min(1, cleanW / peakW) : 1;
   return (
-    <div className="dh-network">
-      <div className="dh-network-name">{network.name}</div>
+    <div>
       <div className="dh-note">
         {network.id < 0 ? "No pipes reach it yet: extend the network to it, or from it." : `${connected} building${connected === 1 ? "" : "s"} connected · winter peak ${formatMW(peakW)}`}
       </div>
@@ -347,13 +379,16 @@ export function DistrictHeatPanel() {
   const heatPerMetre = quote.lengthM > 0 ? demand.annualHeatKWh / quote.lengthM : 0;
   const hasPipes = stats.lengthKm > 0 || districtHeat.getSources().length > 0;
 
-  return (
-    <div className="district-heat-panel">
-      <h3 className="panel-title">
-        District heating <PlotLink chart="district-heat" title="District heat over time" />
-      </h3>
-      <SupervisionNotice />
+  const picked = districtHeat.pickedNetworkAt(simDay);
+  const pickNetwork = (n: DhNetworkInfo) => {
+    const source = n.sources.find((s) => !s.hidden) ?? n.sources[0];
+    if (!source) return;
+    districtHeat.pickNetwork({ sourceId: source.id });
+    mapFocus.request({ lon: source.lon, lat: source.lat, minZoom: 14.5 });
+  };
 
+  const overview = (
+    <>
       {fossilNetworks.length > 0 && (
         <div className="dh-network">
           <div className="dh-network-name">
@@ -372,7 +407,27 @@ export function DistrictHeatPanel() {
             : "No network is in service yet."}
         </p>
       ) : (
-        networks.map((n) => <NetworkCard key={n.id} network={n} peakW={stats.peaks.get(n.id) ?? 0} connected={stats.byNetwork.get(n.id) ?? 0} />)
+        <>
+          <h4 className="dh-subtitle">Networks</h4>
+          {networks.map((n) => {
+            const connected = stats.byNetwork.get(n.id) ?? 0;
+            return (
+              <button key={n.id} className={`ev-list-row${picked?.id === n.id ? " selected" : ""}`} onClick={() => pickNetwork(n)}>
+                <span className="ev-list-name">
+                  {n.name}
+                  <span className="dh-dim">
+                    {" "}
+                    · {n.id < 0 ? "no pipes yet" : `${connected} connected`}
+                  </span>
+                </span>
+                <span className="info-value" title="How much of the winter peak its clean sources carry">
+                  {n.id < 0 ? "–" : `${Math.round(cleanCover(n, stats.peaks.get(n.id) ?? 0) * 100)}% clean`}
+                </span>
+              </button>
+            );
+          })}
+          <p className="dh-note tool-list-hint">Click a network here, or a plant or piped street on the map, to see what feeds it.</p>
+        </>
       )}
       {lastYearClean !== null && (
         <p className="dh-note">
@@ -444,6 +499,11 @@ export function DistrictHeatPanel() {
         </>
       )}
 
+    </>
+  );
+
+  const build = (
+    <>
       <h4 className="dh-subtitle">New heat</h4>
       {draft ? (
         <DraftCard simDay={simDay} />
@@ -553,6 +613,17 @@ export function DistrictHeatPanel() {
           ))}
         </>
       )}
-    </div>
+    </>
+  );
+
+  return (
+    <ToolPanel
+      mode="districtHeat"
+      title="District heating"
+      titleExtra={<PlotLink chart="district-heat" title="District heat over time" />}
+      overview={overview}
+      build={build}
+      buildActive={!!draft || quote.segments.length > 0 || !!districtHeatLines.getDraft()}
+    />
   );
 }

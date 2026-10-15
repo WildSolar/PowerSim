@@ -9,11 +9,30 @@ import { wind, WIND_PHASE_LABEL, type WindSite } from "../sim/wind";
 import { formatCHF } from "./format";
 import "./districtHeatPanel.css";
 import "./zoningPanel.css";
-import { SupervisionNotice } from "./SupervisionNotice";
+import { InspectCard } from "./InspectCard";
+import { ToolPanel } from "./ToolPanel";
 import { PlotLink } from "./PlotLink";
 
 function monthYear(ms: number): string {
   return formatDate(ms).replace(/^\d+ /, "");
+}
+
+/** The card for the wind site picked on the map or in a list: its turbines, wind and neighbours,
+ * where it stands, and its next step. */
+export function WindSiteCard() {
+  useSyncExternalStore(
+    (l) => wind.subscribe(l),
+    () => wind.getVersion(),
+  );
+  const now = useSimDay();
+  const id = wind.getSelectedId();
+  const site = id ? wind.sitesAt(now).find((s) => s.id === id) : undefined;
+  if (!site) return null;
+  return (
+    <InspectCard kicker="Wind site" title={site.name ?? site.id} onClose={() => wind.select(null)}>
+      <SiteCard site={site} now={now} />
+    </InspectCard>
+  );
 }
 
 function SiteCard({ site, now }: { site: WindSite; now: number }) {
@@ -29,10 +48,7 @@ function SiteCard({ site, now }: { site: WindSite; now: number }) {
   const canRestart = (phase === "rejected" || phase === "struckDown") && wind.canStartZoning(site.id, now);
 
   return (
-    <div className="dh-network">
-      <button className="dh-link" style={{ fontWeight: 600 }} onClick={() => mapFocus.request({ lon: site.lon, lat: site.lat, minZoom: 14.5 })}>
-        {site.name ?? site.id}
-      </button>
+    <div>
       <div className="dh-note">
         {WIND_PHASE_LABEL[phase]}
         {p?.phaseUntilMs ? ` · until ${monthYear(p.phaseUntilMs)}` : ""}
@@ -128,12 +144,14 @@ export function WindPanel() {
   const sites = wind.sitesAt(now);
   const turning = wind.capacityAtKw(now);
 
-  return (
-    <div className="district-heat-panel">
-      <h3 className="panel-title">
-        Wind <PlotLink chart="electricity" title="Electricity made and used over time" />
-      </h3>
-      <SupervisionNotice />
+  const selectedId = wind.getSelectedId();
+  const pick = (site: WindSite) => {
+    wind.select(site.id);
+    mapFocus.request({ lon: site.lon, lat: site.lat, minZoom: 14.5 });
+  };
+
+  const overview = (
+    <>
       <p className="dh-note">
         Wind turbines make most of their power in winter, when solar makes least. But in Switzerland the road to one is long: a study, a zoning plan the voters decide
         on, a permit that is almost always appealed, and only then the build. Each step can fail, or take years longer than planned.
@@ -145,6 +163,26 @@ export function WindPanel() {
         </div>
       )}
 
+      {study === "none" && <p className="dh-note">Nothing is known yet about where turbines could stand: commission a study (Build).</p>}
+      {study === "running" && <p className="dh-note">The wind study is under way; results in {monthYear(wind.studyDoneAtMs() ?? now)}.</p>}
+      {study === "done" && sites.length === 0 && <p className="dh-note">The study found nowhere a turbine could stand: too close to homes everywhere, or too little wind.</p>}
+      {study === "done" && sites.length > 0 && (
+        <>
+          <h4 className="dh-subtitle">Sites the study found</h4>
+          {sites.map((s) => (
+            <button key={s.id} className={`ev-list-row${s.id === selectedId ? " selected" : ""}`} onClick={() => pick(s)}>
+              <span className="ev-list-name">{s.name ?? s.id}</span>
+              <span className="info-value">{WIND_PHASE_LABEL[wind.phaseOf(s.id)]}</span>
+            </button>
+          ))}
+          <p className="dh-note tool-list-hint">Click a site here or a turbine on the map: its card shows the next step.</p>
+        </>
+      )}
+    </>
+  );
+
+  const build = (
+    <>
       {study === "none" && (
         <>
           <p className="dh-note">Nothing is known yet about where turbines could stand. A study takes {WIND_STUDY_MONTHS} months: wind measurements and a site assessment.</p>
@@ -156,15 +194,22 @@ export function WindPanel() {
         </>
       )}
       {study === "running" && <p className="dh-note">The wind study is under way; results in {monthYear(wind.studyDoneAtMs() ?? now)}.</p>}
-      {study === "done" && sites.length === 0 && <p className="dh-note">The study found nowhere a turbine could stand: too close to homes everywhere, or too little wind.</p>}
+      {study === "done" && sites.length === 0 && <p className="dh-note">The study found nowhere a turbine could stand.</p>}
       {study === "done" && sites.length > 0 && (
         <>
-          <h4 className="dh-subtitle">Sites the study found</h4>
+          <p className="dh-note">Each site goes its own way — a zoning plan the voters decide on, a permit, the build. Pick a site to take its next step:</p>
           {sites.map((s) => (
-            <SiteCard key={s.id} site={s} now={now} />
+            <button key={s.id} className={`ev-list-row${s.id === selectedId ? " selected" : ""}`} onClick={() => pick(s)}>
+              <span className="ev-list-name">{s.name ?? s.id}</span>
+              <span className="info-value">{WIND_PHASE_LABEL[wind.phaseOf(s.id)]}</span>
+            </button>
           ))}
         </>
       )}
-    </div>
+    </>
+  );
+
+  return (
+    <ToolPanel mode="wind" title="Wind" titleExtra={<PlotLink chart="electricity" title="Electricity made and used over time" />} overview={overview} build={build} />
   );
 }

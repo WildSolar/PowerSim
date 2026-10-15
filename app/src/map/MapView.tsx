@@ -362,7 +362,7 @@ function districtHeatSitesGeoJSON(simTimeMs: number) {
   for (const s of districtHeat.getSources()) {
     if (s.hidden) continue;
     const state = s.fromMs <= simTimeMs ? "running" : "building";
-    features.push({ type: "Feature", properties: { state }, geometry: { type: "Point", coordinates: [s.lon, s.lat] } });
+    features.push({ type: "Feature", properties: { state, source: s.id }, geometry: { type: "Point", coordinates: [s.lon, s.lat] } });
     if (s.trunkM > 0) line([s.lon, s.lat], [s.feedLon, s.feedLat], state);
   }
   const draft = districtHeatSources.getDraft();
@@ -546,7 +546,7 @@ function windSitesGeoJSON(simTimeMs: number) {
     const n = project?.turbines ?? site.turbines.length;
     site.turbines.forEach((t, i) => {
       const used = i < n;
-      features.push({ type: "Feature", properties: { kind: "turbine", state: used ? bucket(phase) : "planned", used: used ? 1 : 0 }, geometry: { type: "Point", coordinates: [t.lon, t.lat] } });
+      features.push({ type: "Feature", properties: { kind: "turbine", site: site.id, state: used ? bucket(phase) : "planned", used: used ? 1 : 0 }, geometry: { type: "Point", coordinates: [t.lon, t.lat] } });
       if (used) {
         const ring: [number, number][] = [];
         const mPerLat = 111_320;
@@ -1414,7 +1414,26 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
           }
           const hit = map.queryRenderedFeatures(e.point, { layers: [POLY_LAYER_ID, POINT_LAYER_ID] })[0];
           const b = hit ? stock.lookup(String(hit.properties?.egid)) : undefined;
-          if (b) grid.select(grid.areaIdOf(b));
+          if (b) {
+            grid.select(grid.areaIdOf(b));
+            return;
+          }
+        }
+        if (colorModeRef.current === "wind") {
+          // A turbine (built or planned) opens its site's card.
+          const { x, y } = e.point;
+          const r = STREET_CLICK_TOLERANCE_PX;
+          const turbine = map.queryRenderedFeatures(
+            [
+              [x - r, y - r],
+              [x + r, y + r],
+            ],
+            { layers: [WIND_TURBINE_LAYER_ID] },
+          )[0];
+          if (turbine) {
+            wind.select(String(turbine.properties?.site));
+            return;
+          }
         }
         if (colorModeRef.current === "zoning") {
           const parcel = map.queryRenderedFeatures(e.point, { layers: [ZONE_FILL_LAYER_ID] })[0];
@@ -1475,6 +1494,19 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
             if (c) districtHeatSources.startDraft(c.kind, c.id);
             return;
           }
+          const plant = map
+            .queryRenderedFeatures(
+              [
+                [x - r, y - r],
+                [x + r, y + r],
+              ],
+              { layers: [DH_PLANT_LAYER_ID] },
+            )
+            .find((f) => f.properties?.source);
+          if (plant) {
+            districtHeat.pickNetwork({ sourceId: String(plant.properties?.source) });
+            return;
+          }
           const hit = map.queryRenderedFeatures(
             [
               [x - r, y - r],
@@ -1483,7 +1515,10 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
             { layers: [STREET_HIT_LAYER_ID] },
           )[0];
           if (hit) {
-            districtHeat.toggle(Number(hit.properties?.id));
+            const id = Number(hit.properties?.id);
+            // A piped street (or one being piped) shows its network; any other is picked for an extension.
+            if (districtHeat.stateAt(id, simClock.getSimTimeMs()) === "none" || districtHeat.getSelection().size > 0) districtHeat.toggle(id);
+            else districtHeat.pickNetwork({ segmentId: id });
             return;
           }
         }

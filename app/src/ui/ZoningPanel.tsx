@@ -12,7 +12,8 @@ import { useStockBuildings } from "./useStock";
 import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
 import "./zoningPanel.css";
-import { SupervisionNotice } from "./SupervisionNotice";
+import { ToolPanel } from "./ToolPanel";
+import { agriPv } from "../sim/agriPv";
 import { AgriPvSection } from "./AgriPvSection";
 
 const ZONE_LABEL: Record<SiteZone, string> = { residential: "Residential", mixed: "Mixed", centre: "Centre", work: "Work", public: "Public use" };
@@ -44,6 +45,10 @@ export function ZoningPanel() {
   const version = useSyncExternalStore(
     (listener) => zoning.subscribe(listener),
     () => zoning.getVersion(),
+  );
+  useSyncExternalStore(
+    (l) => agriPv.subscribe(l),
+    () => agriPv.getVersion(),
   );
   const simDay = useSimDay();
   const buildings = useStockBuildings();
@@ -86,10 +91,8 @@ export function ZoningPanel() {
     </button>
   );
 
-  return (
-    <div className="district-heat-panel zoning-panel">
-      <h3 className="panel-title">Zoning</h3>
-      <SupervisionNotice />
+  const overview = (
+    <>
       <div className="zn-plan">
         {(Object.keys(ZONE_LABEL) as SiteZone[])
           .filter((z) => (plan.byZone[z] ?? 0) > 0)
@@ -120,6 +123,24 @@ export function ZoningPanel() {
         </div>
       </div>
 
+      {changes.length > 0 && (
+        <>
+          <h4 className="dh-subtitle">Changes to the plan</h4>
+          {changes.map((c) => (
+            <div className="zn-change" key={c.id}>
+              <span className="zn-change-title">{c.title}</span>
+              <ChangeStatus change={c} now={simDay} />
+            </div>
+          ))}
+        </>
+      )}
+
+      <AgriPvSection part="overview" />
+    </>
+  );
+
+  const build = (
+    <>
       <h4 className="dh-subtitle">Change the plan</h4>
       <p className="dh-note">
         Click parcels on the map to pick them{selection.size > 0 ? ` (${selection.size} picked)` : ""}, or pick every parcel of a zone:
@@ -204,19 +225,9 @@ export function ZoningPanel() {
         </div>
       )}
 
-      <AgriPvSection />
-
-      {changes.length > 0 && (
-        <>
-          <h4 className="dh-subtitle">Changes to the plan</h4>
-          {changes.map((c) => (
-            <div className="zn-change" key={c.id}>
-              <span className="zn-change-title">{c.title}</span>
-              <ChangeStatus change={c} now={simDay} />
-            </div>
-          ))}
-        </>
-      )}
-    </div>
+      <AgriPvSection part="build" />
+    </>
   );
+
+  return <ToolPanel mode="zoning" title="Zoning" overview={overview} build={build} buildActive={selection.size > 0 || agriPv.getSelection().size > 0} />;
 }

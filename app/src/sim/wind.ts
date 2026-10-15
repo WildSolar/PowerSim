@@ -105,6 +105,8 @@ class Wind {
   private readonly listeners = new Set<() => void>();
   private version = 0;
   private localCache: { key: string; stances: Stances } | null = null;
+  /** The site picked on the map or in a list (UI state, not saved). */
+  private selectedId: string | null = null;
 
   init(dataset: MunicipalityDataset, buildingsProvider: () => Building[], seed: string): void {
     this.unsubscribeClock?.();
@@ -121,6 +123,7 @@ class Wind {
     this.town = dataset.name;
     this.lastDay = Math.floor(simClock.getSimTimeMs() / DAY_MS);
     this.localCache = null;
+    this.selectedId = null;
     this.unsubscribeClock = simClock.subscribe(() => this.advance(simClock.getSimTimeMs()));
     setExtraPlants("wind", (cutoffMs) => this.plantsBefore(cutoffMs));
     setLocalStances("wind", (atMs) => this.lastingStances(atMs));
@@ -442,6 +445,15 @@ class Wind {
   }
 
   // --- subscription ---
+
+  getSelectedId(): string | null {
+    return this.selectedId;
+  }
+
+  select(id: string | null): void {
+    this.selectedId = id;
+    this.notify();
+  }
 
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);

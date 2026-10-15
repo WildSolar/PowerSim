@@ -121,7 +121,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Map layers",
     blocks: [
       p(
-        "The dock on the left of the map has two kinds of layer. Views only colour the map, to show how things are; their legend sits in the map's lower left. Planning tools are where you act on the map: each opens a drawer beside the dock with its figures, its orders and its legend. Picking the open tool again closes it. The arrows at the foot of the dock fold it to a row of icons if you want more map.",
+        "The dock on the left of the map has two kinds of layer. Views only colour the map, to show how things are; their legend sits in the map's lower left. Planning tools are where you act on the map: each opens a drawer beside the dock in two tabs — Overview, with the town's figures, the lists and the legend, and Build, with what you can order. Whatever you pick on the map or in a list — a charger, a transformer station, a heating network, a wind site, a building — opens its own card on the right, with what it does and what can be done with it. Picking the open tool again closes it. The arrows at the foot of the dock fold it to a row of icons if you want more map.",
       ),
       p("Views:"),
       list([

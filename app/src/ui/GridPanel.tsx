@@ -10,10 +10,17 @@ import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
 import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
-import { SupervisionNotice } from "./SupervisionNotice";
+import { InspectCard } from "./InspectCard";
+import { ToolPanel } from "./ToolPanel";
 import { PlotLink } from "./PlotLink";
 
 const BUCKET_COLOR = Object.fromEntries(GRID_LEGEND.map((l) => [l.bucket, l.color]));
+
+/** Opens an area's card and brings its station into view. */
+function pickArea(a: GridArea): void {
+  grid.select(a.id);
+  mapFocus.request({ lon: a.lon, lat: a.lat, minZoom: 15.5 });
+}
 
 /** "CHF 350k", "CHF 1.05M" — for the narrow battery buttons. */
 function compactCHF(rp: number): string {
@@ -42,6 +49,29 @@ function LoadBar({ kw, capacityKw }: { kw: number; capacityKw: number }) {
   );
 }
 
+/** The card for the transformer area picked on the map or in a list: its station, its peaks
+ * against it, and reinforcing it or adding a battery. */
+export function StationCard() {
+  useSyncExternalStore(
+    (listener) => grid.subscribe(listener),
+    () => grid.getVersion(),
+  );
+  const now = useSimDay();
+  const id = grid.getSelectedId();
+  const area = id !== null ? grid.getArea(id) : undefined;
+  if (!area) return null;
+  return (
+    <InspectCard
+      kicker="Transformer station"
+      title={`Area ${area.name}`}
+      titleExtra={<PlotLink chart="transformer" param={String(area.id)} title="This transformer over time" />}
+      onClose={() => grid.select(null)}
+    >
+      <AreaDetails area={area} now={now} />
+    </InspectCard>
+  );
+}
+
 function AreaDetails({ area, now }: { area: GridArea; now: number }) {
   const capacity = grid.capacityAt(area, now);
   const options = grid.reinforceOptions(area, now);
@@ -52,15 +82,7 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
   const drawBlocked = drawKw > capacity;
   const feedInBlocked = feedInKw > capacity;
   return (
-    <div className="ev-site">
-      <div className="ev-site-head">
-        <span className="ev-site-name">
-          Transformer area {area.name} <PlotLink chart="transformer" param={String(area.id)} title="This transformer over time" />
-        </span>
-        <button className="ev-close" onClick={() => grid.select(null)} title="Deselect">
-          ✕
-        </button>
-      </div>
+    <>
       <div className="info-row">
         <span>Station</span>
         <span className="info-value">
@@ -135,7 +157,7 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
           </button>
         ))}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -166,7 +188,6 @@ export function GridPanel() {
   const now = useSimDay();
   const areas = grid.getAreas();
   const selectedId = grid.getSelectedId();
-  const selected = selectedId !== null ? grid.getArea(selectedId) : undefined;
 
   const ranked = useMemo(
     () => [...areas].sort((a, c) => grid.loadShare(c, now) - grid.loadShare(a, now)),
@@ -178,12 +199,10 @@ export function GridPanel() {
   const lastWinter = areas[0]?.winter?.year;
   const lastSummer = areas[0]?.summer?.year;
 
-  return (
-    <div className="district-heat-panel">
-      <h3 className="panel-title">
-        Electricity grid <PlotLink chart="overloaded" title="Overloaded transformers over time" />
-      </h3>
-      <SupervisionNotice />
+  const working = areas.filter((a) => grid.pendingUpgrade(a, now) || a.batteries.some((b) => b.atMs > now));
+
+  const overview = (
+    <>
       <div className="info-row">
         <span>Transformer areas</span>
         <span className="info-value">{areas.length}</span>
@@ -200,28 +219,60 @@ export function GridPanel() {
       <p className="dh-note">
         Readings: winter {lastWinter} (coldest January/February evenings), summer {lastSummer} (sunniest middays). The next ones come after each season.
       </p>
-      <label className="dh-check" title="After each reading, every overloaded station with nothing on order gets the size its peak needs, worst first, paid from the treasury. A station the treasury can't pay for waits for the next reading.">
-        <input type="checkbox" checked={grid.getAutoReinforce()} onChange={(e) => grid.setAutoReinforce(e.target.checked)} />
-        Reinforce overloaded stations automatically, if the treasury has the money
-      </label>
-
-      {selected ? <AreaDetails area={selected} now={now} /> : <p className="dh-note">Click a station or a building on the map to see its area.</p>}
-
       <h4 className="dh-subtitle">Most loaded areas</h4>
       {ranked.slice(0, 8).map((a) => (
         <button
           key={a.id}
           className={`ev-list-row${a.id === selectedId ? " selected" : ""}`}
-          onClick={() => {
-            grid.select(a.id);
-            mapFocus.request({ lon: a.lon, lat: a.lat, minZoom: 15.5 });
-          }}
+          onClick={() => pickArea(a)}
         >
           <span className="ev-list-name">{a.name}</span>
           <WorkInProgress area={a} now={now} />
           <span className="info-value">{Math.round(grid.loadShare(a, now) * 100)}%</span>
         </button>
       ))}
-    </div>
+      <p className="dh-note tool-list-hint">Click a station or a building on the map to see its area.</p>
+    </>
+  );
+
+  const build = (
+    <>
+      <p className="dh-note">
+        Pick a station on the map (or in the Overview&apos;s list) to reinforce it — a bigger transformer, the size of your choice — or to add a neighbourhood battery.
+      </p>
+      <label className="dh-check" title="After each reading, every overloaded station with nothing on order gets the size its peak needs, worst first, paid from the treasury. A station the treasury can't pay for waits for the next reading.">
+        <input type="checkbox" checked={grid.getAutoReinforce()} onChange={(e) => grid.setAutoReinforce(e.target.checked)} />
+        Reinforce overloaded stations automatically, if the treasury has the money
+      </label>
+      {working.length > 0 && (
+        <>
+          <h4 className="dh-subtitle">Work under way</h4>
+          {working.map((a) => {
+            const up = grid.pendingUpgrade(a, now);
+            const batteries = a.batteries.filter((b) => b.atMs > now);
+            return (
+              <button key={a.id} className={`ev-list-row${a.id === selectedId ? " selected" : ""}`} onClick={() => pickArea(a)}>
+                <span className="ev-list-name">{a.name}</span>
+                <span className="info-value">
+                  {up ? `${up.capacityKw} kVA, ${monthYear(up.atMs)}` : ""}
+                  {up && batteries.length > 0 ? " · " : ""}
+                  {batteries.length > 0 ? `${batteries.map(batterySize).join(", ")}, ${monthYear(batteries[batteries.length - 1].atMs)}` : ""}
+                </span>
+              </button>
+            );
+          })}
+        </>
+      )}
+    </>
+  );
+
+  return (
+    <ToolPanel
+      mode="grid"
+      title="Electricity grid"
+      titleExtra={<PlotLink chart="overloaded" title="Overloaded transformers over time" />}
+      overview={overview}
+      build={build}
+    />
   );
 }

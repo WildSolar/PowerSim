@@ -8,7 +8,7 @@ import { roofContracts, type RoofContract } from "../sim/roofContracts";
 import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
 import "./districtHeatPanel.css";
-import { SupervisionNotice } from "./SupervisionNotice";
+import { ToolPanel } from "./ToolPanel";
 import { PlotLink } from "./PlotLink";
 
 function monthYear(ms: number): string {
@@ -166,12 +166,56 @@ export function RoofSolarPanel({ buildings, onSelectBuilding }: { buildings: Bui
     if (b) mapFocus.focusBuilding(b);
   };
 
-  return (
-    <div className="district-heat-panel">
-      <h3 className="panel-title">
-        Roof solar <PlotLink chart="rooftop-solar" title="Rooftop solar over time" />
-      </h3>
-      <SupervisionNotice />
+  const overview = (
+    <>
+      <h4 className="dh-subtitle">Contracts</h4>
+      <div className="info-row">
+        <span>Offers awaiting an answer</span>
+        <span className="info-value">{stats.pending}</span>
+      </div>
+      <div className="info-row">
+        <span>The utility's arrays</span>
+        <span className="info-value">
+          {stats.built.length} · {Math.round(kwp(stats.built))} kWp
+        </span>
+      </div>
+      {stats.built.length > stats.inService.length && <p className="dh-note">{stats.built.length - stats.inService.length} still being installed.</p>}
+      <div className="info-row">
+        <span>Rent and upkeep</span>
+        <span className="info-value">{formatCHF(stats.yearlyCostRp)} a year</span>
+      </div>
+      <div className="info-row">
+        <span>Owners who built their own</span>
+        <span className="info-value">{stats.ownSolar}</span>
+      </div>
+      <div className="info-row">
+        <span>Offers declined</span>
+        <span className="info-value">{stats.declined}</span>
+      </div>
+
+      {stats.built.length > 0 && (
+        <>
+          <h4 className="dh-subtitle">The utility's arrays</h4>
+          {[...stats.built]
+            .sort((a, b) => (b.capacityKw ?? 0) - (a.capacityKw ?? 0))
+            .slice(0, 12)
+            .map((c) => (
+              <div className="info-row" key={c.id}>
+                <button className="dh-link" onClick={() => select(c.egid)}>
+                  {nameOf(lookup.get(c.egid), c.egid)}
+                </button>
+                <span className="info-value">{(c.capacityKw ?? 0).toFixed(0)} kWp</span>
+              </div>
+            ))}
+          {stats.built.length > 12 && <p className="dh-note">and {stats.built.length - 12} more.</p>}
+        </>
+      )}
+      <p className="dh-note tool-list-hint">Click a roof here or on the map: its card shows its contract, or what an array there would mean.</p>
+    </>
+  );
+
+  const build = (
+    <>
       <p className="dh-note">
         Rent large roofs and put the utility's own solar on them. An owner can accept, decline, or be prompted to build their own. The utility pays the build cost — the
         owner's price, less the federal payment — and keeps what the array makes, against the rent and its upkeep.
@@ -201,31 +245,6 @@ export function RoofSolarPanel({ buildings, onSelectBuilding }: { buildings: Bui
       </div>
       <p className="dh-note">Or click a roof on the map to see what an array there would mean, and offer just that one.</p>
 
-      <h4 className="dh-subtitle">Contracts</h4>
-      <div className="info-row">
-        <span>Offers awaiting an answer</span>
-        <span className="info-value">{stats.pending}</span>
-      </div>
-      <div className="info-row">
-        <span>The utility's arrays</span>
-        <span className="info-value">
-          {stats.built.length} · {Math.round(kwp(stats.built))} kWp
-        </span>
-      </div>
-      {stats.built.length > stats.inService.length && <p className="dh-note">{stats.built.length - stats.inService.length} still being installed.</p>}
-      <div className="info-row">
-        <span>Rent and upkeep</span>
-        <span className="info-value">{formatCHF(stats.yearlyCostRp)} a year</span>
-      </div>
-      <div className="info-row">
-        <span>Owners who built their own</span>
-        <span className="info-value">{stats.ownSolar}</span>
-      </div>
-      <div className="info-row">
-        <span>Offers declined</span>
-        <span className="info-value">{stats.declined}</span>
-      </div>
-
       {stats.accepted.length > 0 && (
         <>
           <h4 className="dh-subtitle">Accepted — to build within {ROOF_BUILD_WITHIN_MONTHS} months</h4>
@@ -251,23 +270,16 @@ export function RoofSolarPanel({ buildings, onSelectBuilding }: { buildings: Bui
         </>
       )}
 
-      {stats.built.length > 0 && (
-        <>
-          <h4 className="dh-subtitle">The utility's arrays</h4>
-          {[...stats.built]
-            .sort((a, b) => (b.capacityKw ?? 0) - (a.capacityKw ?? 0))
-            .slice(0, 12)
-            .map((c) => (
-              <div className="info-row" key={c.id}>
-                <button className="dh-link" onClick={() => select(c.egid)}>
-                  {nameOf(lookup.get(c.egid), c.egid)}
-                </button>
-                <span className="info-value">{(c.capacityKw ?? 0).toFixed(0)} kWp</span>
-              </div>
-            ))}
-          {stats.built.length > 12 && <p className="dh-note">and {stats.built.length - 12} more.</p>}
-        </>
-      )}
-    </div>
+    </>
+  );
+
+  return (
+    <ToolPanel
+      mode="roofSolar"
+      title="Roof solar"
+      titleExtra={<PlotLink chart="rooftop-solar" title="Rooftop solar over time" />}
+      overview={overview}
+      build={build}
+    />
   );
 }

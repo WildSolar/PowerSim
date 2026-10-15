@@ -12,7 +12,8 @@ import { formatCHF } from "./format";
 import { useStockBuildings } from "./useStock";
 import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
-import { SupervisionNotice } from "./SupervisionNotice";
+import { InspectCard } from "./InspectCard";
+import { ToolPanel } from "./ToolPanel";
 
 const YEAR_MS = 365.25 * 24 * 60 * 60_000;
 const QUARTER_HOUR_MS = 15 * 60_000;
@@ -129,6 +130,24 @@ function UsageHistory({ site, now }: { site: ChargingSite; now: number }) {
   );
 }
 
+/** The card for the charger picked on the map or in a list: who runs it, who relies on it, how
+ * full it is and was, and — the municipality's own — enlarging it. */
+export function ChargerCard() {
+  useSyncExternalStore(
+    (listener) => publicCharging.subscribe(listener),
+    () => publicCharging.getVersion(),
+  );
+  const now = useSimQuarterHour();
+  const selectedId = publicCharging.getSelectedId();
+  const site = selectedId ? publicCharging.getSite(selectedId) : undefined;
+  if (!site) return null;
+  return (
+    <InspectCard kicker={`${KIND_LABEL[site.kind]} charger`} title={site.name} onClose={() => publicCharging.select(null)}>
+      <SiteDetails site={site} now={now} />
+    </InspectCard>
+  );
+}
+
 function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
   const stats = publicCharging.stats(site, now);
   const building = now < site.openedAtMs;
@@ -138,13 +157,7 @@ function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
   const inUse = building ? 0 : publicCharging.pointsInUseAt(site, now);
 
   return (
-    <div className="ev-site">
-      <div className="ev-site-head">
-        <span className="ev-site-name">{site.name}</span>
-        <button className="ev-close" onClick={() => publicCharging.select(null)} title="Deselect">
-          ✕
-        </button>
-      </div>
+    <>
       <div className="info-row">
         <span>Run by</span>
         <span className="info-value">{owner}</span>
@@ -227,7 +240,7 @@ function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
           </div>
         </>
       )}
-    </div>
+    </>
   );
 }
 
@@ -239,12 +252,10 @@ export function EvChargingPanel() {
     () => publicCharging.getVersion(),
   );
   const simDay = useSimDay();
-  const now = useSimQuarterHour();
   const buildings = useStockBuildings();
   const placing = publicCharging.getPlacing();
   const coverage = publicCharging.getCoverage();
   const selectedId = publicCharging.getSelectedId();
-  const selected = selectedId ? publicCharging.getSite(selectedId) : undefined;
 
   const town = useMemo(() => {
     const standing = buildings.filter((b) => existsAt(b, simDay));
@@ -282,10 +293,8 @@ export function EvChargingPanel() {
   );
   const underConstruction = publicCharging.getSites().filter((s) => s.openedAtMs > simDay);
 
-  return (
-    <div className="district-heat-panel ev-charging-panel">
-      <h3 className="panel-title">EV charging</h3>
-      <SupervisionNotice />
+  const overview = (
+    <>
       <div className="ev-coverage" title="Show where each kind of charger reaches — everything inside the shaded area has one in reach (chargers being built included)">
         <span className="ev-coverage-label">Coverage</span>
         {(["ac", "dc", "fleet"] as ChargingKind[]).map((kind) => (
@@ -361,12 +370,45 @@ export function EvChargingPanel() {
         </div>
       </div>
 
-      {selected ? (
-        <SiteDetails site={selected} now={now} />
-      ) : (
-        <p className="dh-note">Click a charger on the map to see how it's used.</p>
+      {publicCharging.getSites().length > 0 && (
+        <>
+          <h4 className="dh-subtitle">Busiest chargers</h4>
+          <div className="ev-filters">
+            {OWNER_FILTERS.map((f) => (
+              <button key={f.id} className={`ev-filter${ownerFilter === f.id ? " on" : ""}`} onClick={() => setOwnerFilter(f.id)}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="ev-filters">
+            {KIND_FILTERS.map((f) => (
+              <button key={f.id} className={`ev-filter${kindFilter === f.id ? " on" : ""}`} onClick={() => setKindFilter(f.id)}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          {busiest.length === 0 && <p className="dh-note">No open chargers match these filters yet.</p>}
+          {busiest.map(({ site, users, capacity }) => (
+            <button
+              key={site.id}
+              className={`ev-list-row${site.id === selectedId ? " selected" : ""}`}
+              onClick={() => focusSite(site)}
+            >
+              <span className="ev-list-name">
+                {KIND_ICON[site.kind]}
+                {site.name}
+              </span>
+              <span className="info-value">{percent(users, capacity)}</span>
+            </button>
+          ))}
+          <p className="dh-note tool-list-hint">Click a charger here or on the map to see how it&apos;s used.</p>
+        </>
       )}
+    </>
+  );
 
+  const build = (
+    <>
       <h4 className="dh-subtitle">Build public chargers</h4>
       {placing ? (
         <>
@@ -414,43 +456,10 @@ export function EvChargingPanel() {
             );
           })}
           <p className="dh-note">
-            The municipality's chargers sell at the prices set in the tariff, and their upkeep is paid from the treasury.
+            The municipality's chargers sell at the prices set in the tariff, and their upkeep is paid from the treasury. To enlarge one of them, click it on the
+            map.
           </p>
         </div>
-      )}
-
-      {publicCharging.getSites().length > 0 && (
-        <>
-          <h4 className="dh-subtitle">Busiest chargers</h4>
-          <div className="ev-filters">
-            {OWNER_FILTERS.map((f) => (
-              <button key={f.id} className={`ev-filter${ownerFilter === f.id ? " on" : ""}`} onClick={() => setOwnerFilter(f.id)}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <div className="ev-filters">
-            {KIND_FILTERS.map((f) => (
-              <button key={f.id} className={`ev-filter${kindFilter === f.id ? " on" : ""}`} onClick={() => setKindFilter(f.id)}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-          {busiest.length === 0 && <p className="dh-note">No open chargers match these filters yet.</p>}
-          {busiest.map(({ site, users, capacity }) => (
-            <button
-              key={site.id}
-              className={`ev-list-row${site.id === selectedId ? " selected" : ""}`}
-              onClick={() => focusSite(site)}
-            >
-              <span className="ev-list-name">
-                {KIND_ICON[site.kind]}
-                {site.name}
-              </span>
-              <span className="info-value">{percent(users, capacity)}</span>
-            </button>
-          ))}
-        </>
       )}
 
       {underConstruction.length > 0 && (
@@ -464,6 +473,8 @@ export function EvChargingPanel() {
           ))}
         </>
       )}
-    </div>
+    </>
   );
+
+  return <ToolPanel mode="evCharging" title="EV charging" overview={overview} build={build} buildActive={!!placing} />;
 }

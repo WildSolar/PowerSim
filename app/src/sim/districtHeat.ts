@@ -192,6 +192,9 @@ class DistrictHeatNetwork {
   private version = 0;
   private topologies = new Map<string, Topology>();
   private lines: DhLine[] = [];
+  /** The network picked on the map or in a list (UI state, not saved): by one of its sources, or
+   * one of its piped streets — a network's id changes as pipes join it. */
+  private picked: { sourceId?: string; segmentId?: number } | null = null;
   private lastTopology: { atMs: number; version: number; topology: Topology } | null = null;
 
   init(dataset: MunicipalityDataset): void {
@@ -208,6 +211,7 @@ class DistrictHeatNetwork {
     this.forestHa = dh?.forestHa ?? 0;
     this.orders = [];
     this.lines = [];
+    this.picked = null;
     this.selection = new Set();
     this.version++;
     this.topologies.clear();
@@ -365,6 +369,25 @@ class DistrictHeatNetwork {
     treasury.recordPayout("districtHeat", atMs, line.costRp, "district-heat-line");
     this.notify();
     return true;
+  }
+
+  // --- the network being looked at ---
+
+  pickNetwork(picked: { sourceId?: string; segmentId?: number } | null): void {
+    this.picked = picked;
+    this.notifyListenersOnly();
+  }
+
+  getPicked(): { sourceId?: string; segmentId?: number } | null {
+    return this.picked;
+  }
+
+  /** The picked network as it stands at `atMs`, or null. */
+  pickedNetworkAt(atMs: number): DhNetworkInfo | null {
+    const p = this.picked;
+    if (!p) return null;
+    if (p.segmentId !== undefined) return this.networkOf([p.segmentId], atMs);
+    return this.networksAt(atMs).find((n) => n.sources.some((s) => s.id === p.sourceId)) ?? null;
   }
 
   getOrders(): NetworkOrder[] {
@@ -544,6 +567,13 @@ class DistrictHeatNetwork {
   private notify(): void {
     this.version++;
     this.topologies.clear();
+    this.listeners.forEach((l) => l());
+  }
+
+  /** A change that leaves the pipes and sources as they are (what's picked): no new topology. */
+  private notifyListenersOnly(): void {
+    this.version++;
+    this.lastTopology = null;
     this.listeners.forEach((l) => l());
   }
 
