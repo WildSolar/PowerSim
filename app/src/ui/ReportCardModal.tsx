@@ -165,6 +165,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
         { label: "Electricity sold to customers", rp: finances.current.consumerRevenueRp },
         { label: "Government allocation", rp: finances.current.governmentAllocationRp },
         { label: "District heat sold", rp: finances.current.districtHeatRevenueRp },
+        ...(finances.current.publicSolarSavingsRp > 0 ? [{ label: "Solar on public buildings: bills saved, power fed in", rp: finances.current.publicSolarSavingsRp }] : []),
         ...(finances.current.surplusSoldRp > 0 ? [{ label: "Surplus power sold (spot market)", rp: finances.current.surplusSoldRp }] : []),
         { label: "Public charging sold (municipal chargers)", rp: finances.current.publicChargingRevenueRp },
         { label: "Zoning levy", rp: finances.current.zoningLevyRp },
@@ -182,7 +183,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
         { label: "Public charger upkeep", rp: finances.current.publicChargingUpkeepRp },
         { label: "Roof rent and upkeep (utility's solar)", rp: finances.current.roofContractCostRp },
         { label: "Wind turbine upkeep", rp: finances.current.windUpkeepRp },
-        { label: "Utility profit handed to the town", rp: finances.current.profitTransferRp },
+        { label: "Concession fee to the town (the utility's)", rp: finances.current.profitTransferRp },
         ...PAYOUT_CATEGORIES.map((c) => ({ label: PAYOUT_LABEL[c], rp: finances.current.spendingRp[c] })),
       ]
     : [];

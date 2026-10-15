@@ -746,6 +746,13 @@ export function contractArrays(): { egid: string; capacityKw: number; installedA
   return out;
 }
 
+/** The municipality's own arrays on its public buildings (finances.ts credits what they save). */
+export function municipalArrays(): { egid: string; capacityKw: number; installedAtMs: number }[] {
+  const out: { egid: string; capacityKw: number; installedAtMs: number }[] = [];
+  for (const [egid, r] of adoptionByEgid) if (r.origin === "municipal") out.push({ egid, capacityKw: r.capacityKw, installedAtMs: r.installedAtMs });
+  return out;
+}
+
 /** A building's solar: its capacity, and when it was or will be installed (a register plant has
  * been there all along). Null without. */
 export function solarStatusOf(building: Building, realPlants: PowerPlant[]): { capacityKw: number; installedAtMs: number } | null {

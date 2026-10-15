@@ -1,10 +1,10 @@
 import { useState, useSyncExternalStore } from "react";
 import type { MunicipalityDataset } from "../data/types";
-import { toDateMs, toSimTimeMs } from "../sim/calendar";
+import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "../sim/calendar";
 import { debt } from "../sim/debt";
 import { approval } from "../sim/approval";
 import { simClock } from "../sim/engine";
-import { bookedFinances, operatingIncomeRp, type MunicipalFinances } from "../sim/finances";
+import { bookedFinances, concessionRpPerKWh, operatingIncomeRp, type MunicipalFinances } from "../sim/finances";
 import { treasury, type PayoutCategory, type PayoutsByCategory } from "../sim/treasury";
 import { useSimDay } from "../sim/store";
 import { BorrowingTab } from "./BorrowingTab";
@@ -70,6 +70,8 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
   const owed = debt.getLoans().reduce((s, l) => s + (l.status === "active" ? l.outstandingRp : 0), 0);
   const booked = bookedFinances();
   const last = booked[booked.length - 1] ?? null;
+  // The utility's own result, before the town's take (the public buildings' solar credit is the department's, not the utility's).
+  const utilityProfit = last ? utilityMarginRp(last) + last.profitTransferRp - last.publicSolarSavingsRp : 0;
 
   // Closing balances, year by year from the opening cash.
   let balance = treasury.openingBalanceRp();
@@ -93,7 +95,7 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
           <span className="borrow-value" style={{ color: running12 > allowanceRp ? "var(--bad)" : undefined }}>
             {formatCHF(running12)}
           </span>
-          <span className="borrow-note">against {formatCHF(allowanceRp)} taken in (allocation and utility profit share)</span>
+          <span className="borrow-note">against {formatCHF(allowanceRp)} taken in (allocation and what the utility earned you)</span>
         </div>
         <div>
           <span className="borrow-label">Debt</span>
@@ -117,7 +119,7 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
           {live.utilityMonths > 0 && (
             <tr>
               <td>
-                Municipal utility<span className="borrow-note"> · your share, {live.utilityMonths} month{live.utilityMonths === 1 ? "" : "s"} settled</span>
+                Municipal utility<span className="borrow-note"> · after the town&apos;s take, {live.utilityMonths} month{live.utilityMonths === 1 ? "" : "s"} settled</span>
               </td>
               <td className={live.utilityRp >= 0 ? "pos" : "neg"}>
                 {live.utilityRp >= 0 ? "+" : "−"}
@@ -151,7 +153,10 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
           })}
           <tr className="treasury-note-row">
             <td colSpan={2} className="borrow-note">
-              The utility settles each month once it is over: electricity and district heat sold, power and heat bought, the networks' upkeep. You keep a quarter of a profit; a loss is all yours.
+              The utility settles each month once it is over: electricity and district heat sold, power and heat bought, the networks&apos; upkeep.{" "}
+              {year > BASELINE_YEAR
+                ? `The town takes a concession fee of ${concessionRpPerKWh().toFixed(2)} Rp per kWh sold; the rest of the result, profit or loss, is yours — and with it what your own plants, batteries and pipes earn or save.`
+                : "The town takes three quarters of a profit; a loss is all yours."}
             </td>
           </tr>
         </tbody>
@@ -178,12 +183,22 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
               {last.windUpkeepRp > 0 && <Line label="Wind turbine upkeep" value={-last.windUpkeepRp} />}
               <tr className="treasury-total">
                 <td>The utility's profit</td>
-                <td className={utilityMarginRp(last) + last.profitTransferRp >= 0 ? "pos" : "neg"}>
-                  {utilityMarginRp(last) + last.profitTransferRp >= 0 ? "+" : "−"}
-                  {formatCHF(Math.abs(utilityMarginRp(last) + last.profitTransferRp))}
+                <td className={utilityProfit >= 0 ? "pos" : "neg"}>
+                  {utilityProfit >= 0 ? "+" : "−"}
+                  {formatCHF(Math.abs(utilityProfit))}
                 </td>
               </tr>
-              {last.profitTransferRp > 0 && <Line label={`Handed to the town's general account (${Math.round((1 - UTILITY_PROFIT_RETAINED_SHARE) * 100)}%)`} value={-last.profitTransferRp} />}
+              {last.profitTransferRp > 0 && (
+                <Line
+                  label={
+                    last.year > BASELINE_YEAR
+                      ? `Concession fee to the town (${concessionRpPerKWh().toFixed(2)} Rp per kWh sold)`
+                      : `Handed to the town's general account (${Math.round((1 - UTILITY_PROFIT_RETAINED_SHARE) * 100)}% of the profit)`
+                  }
+                  value={-last.profitTransferRp}
+                />
+              )}
+              {last.publicSolarSavingsRp > 0 && <Line label="Solar on public buildings: bills saved, power fed in" value={last.publicSolarSavingsRp} />}
               <tr className="treasury-total">
                 <td>Kept by the energy department</td>
                 <td className={utilityMarginRp(last) >= 0 ? "pos" : "neg"}>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { MunicipalityDataset } from "../data/types";
 import { toDateMs, toSimTimeMs } from "../sim/calendar";
-import { allocationSoFarRp, cachedCumulativeBalanceRp, computeCumulativeBalanceRp, departmentShareRp, settledUtilitySoFar } from "../sim/finances";
+import { allocationSoFarRp, cachedCumulativeBalanceRp, computeCumulativeBalanceRp, departmentUtilityRp, settledUtilitySoFar } from "../sim/finances";
 import { existsAt } from "../sim/lifetime";
 import { useSimDay } from "../sim/store";
 import { allocationApprovalFactor, approval } from "../sim/approval";
@@ -18,8 +18,9 @@ export interface LiveTreasury {
   budgetRp: number;
   /** How much of it has been paid so far. */
   allocationSoFarRp: number;
-  /** The department's share of the utility's result in the months settled so far this year (a
-   * quarter of a profit, all of a loss), and how many months that is. */
+  /** What the department keeps of the utility's result in the months settled so far this year (all
+   * of it beyond the town's concession fee, a loss too; and the public buildings' solar savings), and
+   * how many months that is. */
   utilityRp: number;
   utilityMonths: number;
   /** Subsidies paid out so far this year, as decisions happened. */
@@ -80,7 +81,7 @@ export function useLiveTreasury(dataset: MunicipalityDataset): LiveTreasury {
   const borrowedRp = treasury.received(yearStartMs, simDay + DAY_MS, "borrowing");
   const allocationPaidRp = allocationSoFarRp(budgetRp, year, simDay);
   const utility = settledUtilitySoFar(year, simDay + DAY_MS);
-  const utilityRp = departmentShareRp(utility.profitRp);
+  const utilityRp = departmentUtilityRp(year, utility);
   return {
     balanceRp: openingRp === null ? null : openingRp + allocationPaidRp + utilityRp - paidOutRp + receivedRp + borrowedRp,
     budgetRp,

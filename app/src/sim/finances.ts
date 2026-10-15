@@ -38,7 +38,7 @@
 
 import type { Building, PowerPlant } from "../data/types";
 import { consumptionSeriesW, electricityCostRp, flatCostRp } from "./billing";
-import { toDateMs, toSimTimeMs } from "./calendar";
+import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { energyKWh } from "./energy";
 import { allocationApprovalFactor, approval } from "./approval";
 import { GREEN_POWER_PREMIUM_RP_PER_KWH } from "../config/policy";
@@ -49,14 +49,14 @@ import { tariffStore } from "./tariffStore";
 import { PAYOUT_CATEGORIES, treasury, type PayoutsByCategory } from "./treasury";
 import { monthElectricity, monthHeatingTechnology } from "./yearReport";
 import { dhFixedCostRpPerYear, dhProductionCostRp } from "./districtHeatDispatch";
-import { UTILITY_PROFIT_RETAINED_SHARE } from "../config/treasury";
+import { PUBLIC_SOLAR_SELF_USE_SHARE, UTILITY_PROFIT_RETAINED_SHARE } from "../config/treasury";
 import { publicCharging } from "./publicCharging";
 import { irradianceWm2, PEAK_IRRADIANCE_WM2 } from "./pv";
 import { roofContracts } from "./roofContracts";
 import { agriPv } from "./agriPv";
 import { wind } from "./wind";
 import { windPowerW } from "./windPower";
-import { contractArrays } from "./solarAdoption";
+import { contractArrays, municipalArrays } from "./solarAdoption";
 import { grid } from "./grid";
 import { powerFlows } from "./spotMarket";
 
@@ -74,7 +74,9 @@ export interface MunicipalFinances {
   publicChargingUpkeepRp: number; // keeping those chargers running
   roofContractCostRp: number; // the utility's arrays on rented roofs: the rent, and their upkeep (roofContracts.ts)
   windUpkeepRp: number; // the utility's wind turbines (wind.ts)
-  profitTransferRp: number; // the utility's profit handed to the municipality's general account (all but the department's share)
+  profitTransferRp: number; // handed to the town's general account: the concession fee (three quarters of the profit, the year before the player took office)
+  deliveredKWh: number; // electricity sold to consumers — what the concession fee is reckoned on
+  publicSolarSavingsRp: number; // what the solar on public buildings saved them and earned feeding in — credited to the department, which paid for it
   zoningLevyRp: number; // value-capture levy on projects that gained from a zoning change (zoning.ts)
   borrowedRp: number; // money borrowed this year (debt.ts) — cash in, not income
   governmentAllocationRp: number; // this year's allocation from the overall government (a placeholder framing, see config/treasury.ts)
@@ -119,9 +121,15 @@ export interface UtilityMonth {
   publicChargingUpkeepRp: number;
   roofContractCostRp: number;
   windUpkeepRp: number;
+  /** Not money: electricity sold to consumers (kWh), what the concession fee is reckoned on. */
+  deliveredKWh: number;
+  /** Not the utility's: what the public buildings' panels saved and earned (Rp), the department's. */
+  publicSolarSavingsRp: number;
 }
 
 const UTILITY_KEYS: (keyof UtilityMonth)[] = [
+  "deliveredKWh",
+  "publicSolarSavingsRp",
   "consumerRevenueRp",
   "feedInPaidRp",
   "wholesaleCostRp",
@@ -154,10 +162,38 @@ export function utilityProfitRp(m: UtilityMonth): number {
   );
 }
 
-/** What the department keeps of the utility's profit so far: a quarter of a profit (the rest goes
- * to the town's general account), all of a loss. */
-export function departmentShareRp(profitRp: number): number {
-  return profitRp - Math.max(0, profitRp) * (1 - UTILITY_PROFIT_RETAINED_SHARE);
+/** The concession fee per kWh sold (Rp): three quarters of the utility's profit per kWh in the year
+ * before the player took office — what the town took then, now fixed. Zero if that year made a loss. */
+export function concessionRpPerKWh(): number {
+  const booked = financesCache.get(BASELINE_YEAR);
+  let profitRp = 0;
+  let kWh = 0;
+  if (booked) {
+    profitRp = utilityProfitRp(booked);
+    kWh = booked.deliveredKWh;
+  } else {
+    for (let m = 0; m < 12; m++) {
+      const month = utilityMonths.get(BASELINE_YEAR * 12 + m);
+      if (!month) continue;
+      profitRp += utilityProfitRp(month);
+      kWh += month.deliveredKWh;
+    }
+  }
+  return kWh > 0 ? (Math.max(0, profitRp) * (1 - UTILITY_PROFIT_RETAINED_SHARE)) / kWh : 0;
+}
+
+/** What the town's general account takes of the utility's result: the concession fee on what was
+ * sold — or, for the year before the player took office, three quarters of a profit (nothing of a
+ * loss). */
+export function townTakeRp(year: number, profitRp: number, deliveredKWh: number): number {
+  if (year <= BASELINE_YEAR) return Math.max(0, profitRp) * (1 - UTILITY_PROFIT_RETAINED_SHARE);
+  return deliveredKWh * concessionRpPerKWh();
+}
+
+/** What the department keeps of the utility's months so far: the result less the town's take — all
+ * of it beyond the fee, a loss too — and the public buildings' solar savings. */
+export function departmentUtilityRp(year: number, months: { profitRp: number; deliveredKWh: number; publicSolarSavingsRp: number }): number {
+  return months.profitRp - townTakeRp(year, months.profitRp, months.deliveredKWh) + months.publicSolarSavingsRp;
 }
 
 /** Settled months, by year * 12 + month: once a month is over and sampled, its accounts are final. */
@@ -205,6 +241,18 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
   const districtHeatKWh = heating.districtHeatingSpaceKWh;
   const midMonthMs = toSimTimeMs(Date.UTC(year, month, 15));
 
+  // Solar on public buildings: what it saved them and earned feeding in, the department's.
+  const publicArrays = municipalArrays();
+  const publicSolarKWh = energyKWh(
+    times,
+    times.map((t) => {
+      const sun = irradianceWm2(t) / PEAK_IRRADIANCE_WM2;
+      return publicArrays.reduce((sum, a) => sum + (a.installedAtMs <= t ? a.capacityKw * 1000 * sun : 0), 0);
+    }),
+  );
+  const retailRpKWh = (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2;
+  const publicSolarSavingsRp = publicSolarKWh * (PUBLIC_SOLAR_SELF_USE_SHARE * retailRpKWh + (1 - PUBLIC_SOLAR_SELF_USE_SHARE) * tariff.feedInPriceRpKWh);
+
   // The municipality's own public chargers sell at their own price. Their energy is part of the
   // town's metered consumption above, billed there at the household tariff — taken back out of
   // that line so it isn't counted twice.
@@ -238,22 +286,28 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
     publicChargingUpkeepRp: charging.upkeepRp,
     roofContractCostRp: roofContracts.yearlyCostRp(midMonthMs) / 12,
     windUpkeepRp: wind.upkeepRpPerYear(midMonthMs) / 12,
+    deliveredKWh: grossKWh,
+    publicSolarSavingsRp,
   };
 }
 
 /** The utility's settled months of a year up to `atMs`, in order from January (stopping at the
  * first not yet settled), summed. */
-export function settledUtilitySoFar(year: number, atMs: number): { months: number; profitRp: number } {
+export function settledUtilitySoFar(year: number, atMs: number): { months: number; profitRp: number; deliveredKWh: number; publicSolarSavingsRp: number } {
   let months = 0;
   let profitRp = 0;
+  let deliveredKWh = 0;
+  let publicSolarSavingsRp = 0;
   for (let m = 0; m < 12; m++) {
     if (toSimTimeMs(Date.UTC(year, m + 1, 1)) > atMs) break;
     const settled = utilityMonths.get(year * 12 + m);
     if (!settled) break;
     months++;
     profitRp += utilityProfitRp(settled);
+    deliveredKWh += settled.deliveredKWh;
+    publicSolarSavingsRp += settled.publicSolarSavingsRp;
   }
-  return { months, profitRp };
+  return { months, profitRp, deliveredKWh, publicSolarSavingsRp };
 }
 
 /** The government's allocation paid so far in a year: a twelfth at the start of each month. */
@@ -283,6 +337,8 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     publicChargingUpkeepRp,
     roofContractCostRp,
     windUpkeepRp,
+    deliveredKWh,
+    publicSolarSavingsRp,
   } = utility;
 
   const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
@@ -296,9 +352,9 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
   const borrowedRp = treasury.received(yearStartMs, yearEndMs, "borrowing");
   const dwellingsAtYearStart = buildings.reduce((sum, b) => sum + (existsAt(b, yearStartMs) ? b.dwellings.length : 0), 0);
   const governmentAllocationRp = treasury.allocationRp(dwellingsAtYearStart, allocationApprovalFactor(approval.atYearStart(year)));
-  // The utility's profit, most of which goes to the town's general account.
+  // The utility's profit, and what the town's general account takes of it (the concession fee).
   const profitRp = utilityProfitRp(utility);
-  const profitTransferRp = profitRp - departmentShareRp(profitRp);
+  const profitTransferRp = townTakeRp(year, profitRp, deliveredKWh);
   const netIncomeRp =
     consumerRevenueRp +
     districtHeatRevenueRp +
@@ -306,6 +362,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     surplusSoldRp +
     zoningLevyRp +
     borrowedRp +
+    publicSolarSavingsRp +
     governmentAllocationRp -
     feedInPaidRp -
     wholesaleCostRp -
@@ -333,6 +390,8 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     roofContractCostRp,
     windUpkeepRp,
     profitTransferRp,
+    deliveredKWh,
+    publicSolarSavingsRp,
     zoningLevyRp,
     borrowedRp,
     governmentAllocationRp,
@@ -388,6 +447,7 @@ export function operatingIncomeRp(f: MunicipalFinances): number {
     f.districtHeatRevenueRp +
     f.publicChargingRevenueRp +
     f.surplusSoldRp +
+    f.publicSolarSavingsRp +
     f.zoningLevyRp +
     f.governmentAllocationRp -
     f.feedInPaidRp -
@@ -426,7 +486,7 @@ export function liveBalanceRp(buildings: Building[], atMs: number, baselineYear:
   if (opening === null) return null;
   const dwellings = buildings.reduce((sum, b) => sum + (existsAt(b, yearStartMs) ? b.dwellings.length : 0), 0);
   const allocation = treasury.allocationRp(dwellings, allocationApprovalFactor(approval.atYearStart(year)));
-  const utility = departmentShareRp(settledUtilitySoFar(year, atMs).profitRp);
+  const utility = departmentUtilityRp(year, settledUtilitySoFar(year, atMs));
   return opening + allocationSoFarRp(allocation, year, atMs) + utility - treasury.paidOutTotal(yearStartMs, atMs) + treasury.received(yearStartMs, atMs);
 }
 
