@@ -38,7 +38,7 @@ export function ChartsTab() {
 
   const chart = CHARTS.find((c) => c.id === selection.id) ?? CHARTS[0];
   const options = chart.param?.options() ?? [];
-  const param = chart.param ? (options.find((o) => o.value === selection.param)?.value ?? String(grid.getSelectedId() ?? options[0]?.value ?? "")) : null;
+  const param = chart.param ? (options.find((o) => o.value === selection.param)?.value ?? chart.param.defaultValue?.() ?? options[0]?.value ?? "") : null;
   const data = chart.data(param, now);
 
   return (

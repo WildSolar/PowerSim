@@ -35,7 +35,7 @@ import type { DhCandidateData, DhNetworkData, MunicipalityDataset } from "../dat
 import { streets } from "./streets";
 import { treasury } from "./treasury";
 import { priceFactor } from "./costTrends";
-import { spendingFrozen } from "./fiscalRules";
+import { cannotPay } from "./fiscalRules";
 
 const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
 
@@ -283,7 +283,7 @@ class DistrictHeatNetwork {
 
   /** Orders a new heat source (districtHeatSources.ts): paid now, in service once built. */
   addSource(source: DhSource, atMs: number): boolean {
-    if (spendingFrozen(atMs)) return false;
+    if (cannotPay(source.costRp, atMs)) return false;
     this.sources.push(source);
     if (source.costRp > 0) treasury.recordPayout("districtHeat", atMs, source.costRp, `district-heat-source:${source.id}`);
     this.notify();
@@ -364,7 +364,7 @@ class DistrictHeatNetwork {
 
   /** Orders a direct line (priced by districtHeatLines.ts): paid now, in service once laid. */
   addLine(line: Omit<DhLine, "id">, atMs: number): boolean {
-    if (spendingFrozen(atMs)) return false;
+    if (cannotPay(line.costRp, atMs)) return false;
     this.lines.push({ ...line, id: this.lines.length });
     treasury.recordPayout("districtHeat", atMs, line.costRp, "district-heat-line");
     this.notify();
@@ -513,7 +513,7 @@ class DistrictHeatNetwork {
   /** Orders the planned extension: paid now, piped once built. Null if it doesn't connect. */
   order(atMs: number): NetworkOrder | null {
     const q = this.quote(atMs);
-    if (!q.connected || spendingFrozen(atMs)) return null;
+    if (!q.connected || cannotPay(q.costRp, atMs)) return null;
     const order: NetworkOrder = {
       id: this.orders.length,
       segments: q.segments,

@@ -98,7 +98,7 @@ export function subsidyCategoryForDecision(kind: DecisionLogKind): PayoutCategor
   }
 }
 
-interface Payout {
+export interface Payout {
   atMs: number;
   category: PayoutCategory;
   amountRp: number;
@@ -115,7 +115,7 @@ function zeroPayouts(): PayoutsByCategory {
  * due when a project that gains from a zoning change gets its permit, and borrowed money (debt.ts). */
 export type ReceiptKind = "zoningLevy" | "borrowing";
 
-interface Receipt {
+export interface Receipt {
   atMs: number;
   amountRp: number;
   ref: string;
@@ -149,6 +149,16 @@ class Treasury {
     this.payouts = [];
     this.receipts = [];
     this.notify();
+  }
+
+  /** Every payout, as recorded (the ledger, TreasuryLedger.tsx). */
+  getPayouts(): readonly Payout[] {
+    return this.payouts;
+  }
+
+  /** Every receipt (levies, loans), as recorded. */
+  getReceipts(): readonly Receipt[] {
+    return this.receipts;
   }
 
   recordPayout(category: PayoutCategory, atMs: number, amountRp: number, egid: string): void {

@@ -45,7 +45,7 @@ import type { Building, MunicipalityDataset, PowerPlant, WindSiteData } from "..
 import { approval, setLocalStances, type Stances } from "./approval";
 import { priceFactor } from "./costTrends";
 import { simClock } from "./engine";
-import { spendingFrozen } from "./fiscalRules";
+import { cannotPay, spendingFrozen } from "./fiscalRules";
 import { inbox } from "./inbox";
 import { existsAt } from "./lifetime";
 import { LocalProjection } from "./localGeo";
@@ -147,7 +147,7 @@ class Wind {
   }
 
   orderStudy(atMs: number): boolean {
-    if (this.studyOrderedAtMs !== null || spendingFrozen(atMs)) return false;
+    if (this.studyOrderedAtMs !== null || cannotPay(this.studyCostRp(atMs), atMs)) return false;
     this.studyOrderedAtMs = atMs;
     treasury.recordPayout("programs", atMs, this.studyCostRp(atMs), "wind-study");
     this.notify();
@@ -246,6 +246,7 @@ class Wind {
     if (!site || this.studyState(atMs) !== "done" || !this.canStartZoning(siteId, atMs) || spendingFrozen(atMs)) return false;
     const n = Math.max(1, Math.min(site.turbines.length, turbines));
     const costRp = this.zoningCostRp(n);
+    if (cannotPay(costRp, atMs)) return false;
     const voteKey = `wind:${siteId}:${Math.floor(atMs)}`;
     const p: WindProject = {
       siteId,
@@ -292,7 +293,7 @@ class Wind {
   /** Applies for the permit, once the zone is in force: the impact assessment is paid now. */
   applyForPermit(siteId: string, atMs: number): boolean {
     const p = this.projects.get(siteId);
-    if (!p || p.phase !== "zoned" || spendingFrozen(atMs)) return false;
+    if (!p || p.phase !== "zoned" || cannotPay(this.permitCostRp(), atMs)) return false;
     p.phase = "permitting";
     p.phaseFromMs = atMs;
     p.phaseUntilMs = atMs + WIND_PERMIT_MONTHS * MONTH_MS;
@@ -306,8 +307,9 @@ class Wind {
   /** Builds the permitted turbines: paid now, turning a year on. */
   build(siteId: string, atMs: number): boolean {
     const p = this.projects.get(siteId);
-    if (!p || p.phase !== "permitted" || spendingFrozen(atMs)) return false;
+    if (!p || p.phase !== "permitted") return false;
     const costRp = this.buildCostRp(p.turbines, atMs);
+    if (cannotPay(costRp, atMs)) return false;
     p.phase = "building";
     p.phaseFromMs = atMs;
     p.phaseUntilMs = atMs + WIND_BUILD_MONTHS * MONTH_MS;

@@ -326,6 +326,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
       p(
         "The utility settles each month once it is over: what customers paid for electricity and district heat, less the power it bought, the cost of making district heat (fuel, the heat pumps' power, heat bought from incinerators), the solar it paid for, and the upkeep of the grid, the pipes, the heat plants and the chargers. Like Swiss municipal utilities, it pays the town a concession fee on every kWh it sells — set when you took office, at what the town took the year before (three quarters of that year's profit). Everything beyond the fee is your department's, a loss too: so what you build pays you back in full — a wind turbine's power, a battery's savings, the customers a new pipe brings. Solar on public buildings counts as well: what the panels save the buildings and earn feeding in is credited to you. Each month's result reaches the treasury a few days after the month ends; the year's accounts are closed on 31 December. You set the utility's prices in Town hall → Prices, once a year; what it pays for power follows the market (see \"Tariffs & energy prices\").",
       ),
+      p(
+        "Town hall → Treasury → Ledger lists every franc in and out, newest first: each month's allocation and the utility's month, every subsidy paid (with the building), every order, levy, loan and interest payment. Filter it by kind and by year; its total is what that selection did to the balance.",
+      ),
       note(
         "Federal and cantonal grants — the ones every heat pump, solar system and renovation already gets — aren't municipal money; only your own top-up is. Gas, oil and petrol are bought from outside suppliers, never through the utility. The department's share of the utility profit (about CHF 1.4 million a year at the starting prices) and the allocation (about CHF 3.3 million) are small next to a serious subsidy programme, so what you fund matters.",
       ),
@@ -340,7 +343,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       ),
       list([
         "Bank loans: an amount and a term of 5, 10 or 20 years, repaid in equal monthly instalments (Town hall → Treasury → Borrowing). The rate is the market rate plus a margin for the department's credit rating, fixed for the life of the loan; longer loans cost a little more. Loans can be repaid early.",
-        "The overdraft: if the balance falls below zero, it is covered automatically — at a steep premium, charged every month.",
+        "The overdraft: if the balance falls below zero, it is covered automatically — at a steep premium, charged every month. Only what you don't order yourself can take it there — the subsidies households claim, the running costs of what's in force: an order the treasury can't pay is refused. Borrow first.",
         "Green bonds: sold to the town's own residents for ten years, with interest every year and the money repaid at the end. Residents accept a little less interest for a local green cause, and buy as much as they want — a couple of hundred francs each at most, more when the climate-minded are content, so a bond may raise less than offered. They only hold so much of the town's green bonds at once: until earlier ones are repaid, each new one raises less. Offering one goes down well. The money is earmarked: within two years as much has to go into green investment, or the paper calls it greenwashing and the climate-minded turn away. At most one a year.",
         "Federal decarbonisation loans: 0.25% over 20 years, but only against decarbonisation investments already made — up to half of the last twelve months' — and only so much a year; the money arrives after three months.",
       ]),
@@ -964,7 +967,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "A transformer — each winter's peak draw and summer's peak feed-in at one station, against its capacity. “Overloaded transformers” counts the stations over their limit at each reading.",
         "Modal split — how residents get around, with the share of electric cars.",
         "Approval — month by month, against the 50% you need on election day.",
-        "Emissions, spending and the utility's accounts — year by year, as each year is counted and booked.",
+        "Emissions, spending and the utility's accounts — year by year, as each year is counted and booked. Spending can show one kind on its own, and the utility's accounts any one of their lines, month by month — what the power bought costs before and after your turbines and batteries, say.",
       ]),
       note("Monthly charts fill in as each month ends; yearly ones with each Year in Review. Readings of the grid come after each winter and each summer, as in \"The electricity grid\"."),
     ],

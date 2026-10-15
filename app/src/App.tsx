@@ -8,6 +8,7 @@ import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
 import { TownHall, type TownHallSection } from "./ui/TownHall";
 import { clearInspected, InspectSlot, useInspected } from "./ui/InspectSlot";
+import { RefusedPurchaseToast } from "./ui/RefusedPurchaseToast";
 import { chartNav } from "./ui/chartNav";
 import { GuideCard, WelcomeBriefing, guide, type GuideStep } from "./ui/Onboarding";
 import { Tutorial } from "./ui/Tutorial";
@@ -414,6 +415,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
       {townHall && (
         <TownHall dataset={liveDataset ?? dataset} transparency={transparency} section={townHall} onSection={setTownHall} onClose={() => setTownHall(null)} />
       )}
+      <RefusedPurchaseToast onOpenTreasury={() => setTownHall("treasury")} />
       {showWiki && <WikiPanel onClose={() => setShowWiki(false)} />}
       {showMenu && (
         <GameMenu

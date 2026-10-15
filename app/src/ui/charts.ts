@@ -14,10 +14,10 @@ import { MOBILITY_MODE_CATALOG } from "../config/mobility";
 import { approval } from "../sim/approval";
 import { BASELINE_YEAR, MONTH_NAMES, toDateMs, toSimTimeMs } from "../sim/calendar";
 import { cachedEmissionsForYear, EMISSIONS_SOURCE_COLOR } from "../sim/emissions";
-import { bookedFinances } from "../sim/finances";
+import { bookedFinances, townTakeRp, utilityProfitRp, type UtilityMonth } from "../sim/finances";
 import { grid } from "../sim/grid";
 import { monthRecords, type MonthRecord } from "../sim/monthRecords";
-import { treasury, type PayoutCategory } from "../sim/treasury";
+import { PAYOUT_CATEGORIES, PAYOUT_LABEL, treasury, type PayoutCategory } from "../sim/treasury";
 import { DEVICE_CATEGORIES } from "./deviceCategories";
 
 export interface ChartSeries {
@@ -55,6 +55,8 @@ export interface ChartData {
 export interface ChartParam {
   label: string;
   options: () => { value: string; label: string }[];
+  /** The option picked when none is (else the first). */
+  defaultValue?: () => string | null;
 }
 
 export interface ChartDef {
@@ -319,10 +321,24 @@ const SPENDING_GROUPS: { key: string; label: string; color: string; of: PayoutCa
   { key: "debt", label: "Interest and repayments", color: "#b23a2e", of: ["interest", "debtRepayment"] },
 ];
 
-function spendingChart(nowMs: number): ChartData {
+function spendingOptions(): { value: string; label: string }[] {
+  return [{ value: "groups", label: "By kind, all together" }, ...PAYOUT_CATEGORIES.map((c) => ({ value: c, label: PAYOUT_LABEL[c] }))];
+}
+
+function spendingChart(param: string | null, nowMs: number): ChartData {
   const last = Math.floor(nowYear(nowMs));
   const years = Array.from({ length: last - BASELINE_YEAR + 1 }, (_, i) => BASELINE_YEAR + i);
   const paid = years.map((y) => treasury.paidOut(toSimTimeMs(Date.UTC(y, 0, 1)), toSimTimeMs(Date.UTC(y + 1, 0, 1))));
+  const one = param && param !== "groups" ? (param as PayoutCategory) : null;
+  if (one)
+    return {
+      xs: years.map((y) => y + 0.5),
+      xLabels: years.map((y) => (y === last ? `${y} so far` : String(y))),
+      ...axis(nowMs),
+      unit: "kCHF",
+      bars: true,
+      series: [{ key: one, label: PAYOUT_LABEL[one], color: "#2a78d6", kind: "stack", values: paid.map((p) => p[one] / 100 / 1000) }],
+    };
   return {
     xs: years.map((y) => y + 0.5),
     xLabels: years.map((y) => (y === last ? `${y} so far` : String(y))),
@@ -334,7 +350,44 @@ function spendingChart(nowMs: number): ChartData {
   };
 }
 
-function utilityChart(nowMs: number): ChartData {
+/** The utility's accounts line by line (and the department's credit for public solar). */
+const UTILITY_LINES: { key: keyof UtilityMonth | "concessionFee"; label: string; cost: boolean }[] = [
+  { key: "consumerRevenueRp", label: "Electricity sold to consumers", cost: false },
+  { key: "surplusSoldRp", label: "Surplus sold on the spot market", cost: false },
+  { key: "districtHeatRevenueRp", label: "District heat sold", cost: false },
+  { key: "publicChargingRevenueRp", label: "Public charging sold", cost: false },
+  { key: "wholesaleCostRp", label: "Electricity bought over contracts", cost: true },
+  { key: "feedInPaidRp", label: "Solar feed-in paid to owners", cost: true },
+  { key: "gridMaintenanceCostRp", label: "Grid upkeep", cost: true },
+  { key: "districtHeatPurchaseRp", label: "Making district heat", cost: true },
+  { key: "districtHeatUpkeepRp", label: "District heating upkeep", cost: true },
+  { key: "publicChargingUpkeepRp", label: "Public charger upkeep", cost: true },
+  { key: "roofContractCostRp", label: "Roof rent and upkeep (utility's solar)", cost: true },
+  { key: "windUpkeepRp", label: "Wind turbine upkeep", cost: true },
+  { key: "concessionFee", label: "Concession fee to the town", cost: true },
+  { key: "publicSolarSavingsRp", label: "Solar on public buildings (credited to you)", cost: false },
+];
+
+function utilityOptions(): { value: string; label: string }[] {
+  return [{ value: "overview", label: "Sales, costs and result (yearly)" }, ...UTILITY_LINES.map((l) => ({ value: l.key, label: `${l.label} (monthly)` }))];
+}
+
+function utilityChart(param: string | null, nowMs: number): ChartData {
+  const line = UTILITY_LINES.find((l) => l.key === param);
+  if (line) {
+    // Month by month, as each was settled.
+    const { records, ...m } = monthly(nowMs, (r) => !!r.utility);
+    const value = (r: MonthRecord) => {
+      const u = r.utility!;
+      const year = Math.floor(r.month / 12);
+      return line.key === "concessionFee" ? townTakeRp(year, utilityProfitRp(u), u.deliveredKWh) : (u[line.key] as number);
+    };
+    return {
+      ...m,
+      unit: "kCHF",
+      series: [{ key: line.key, label: line.label, color: line.cost ? "#eb6834" : "#2a78d6", kind: "line", values: records.map((r) => value(r) / 100 / 1000) }],
+    };
+  }
   const list = bookedFinances();
   const k = (rp: number) => rp / 100 / 1000;
   const sales = list.map((f) => f.consumerRevenueRp + f.districtHeatRevenueRp + f.publicChargingRevenueRp + f.surplusSoldRp);
@@ -419,7 +472,7 @@ export const CHARTS: ChartDef[] = [
     group: "Grid",
     title: "A transformer",
     description: "Each winter's peak draw and each summer's peak solar feed-in at one transformer station, against its capacity.",
-    param: { label: "Transformer", options: transformerOptions },
+    param: { label: "Transformer", options: transformerOptions, defaultValue: () => (grid.getSelectedId() !== null ? String(grid.getSelectedId()) : null) },
     data: transformerChart,
   },
   {
@@ -454,15 +507,17 @@ export const CHARTS: ChartDef[] = [
     id: "spending",
     group: "Books",
     title: "Spending",
-    description: "What the department paid out each year, by kind.",
-    data: (_, now) => spendingChart(now),
+    description: "What the department paid out each year, by kind — or one kind on its own.",
+    param: { label: "Show", options: spendingOptions },
+    data: spendingChart,
   },
   {
     id: "utility",
     group: "Books",
     title: "The utility's accounts",
-    description: "What the municipal utility sold and what it cost each booked year, and the result.",
-    data: (_, now) => utilityChart(now),
+    description: "What the municipal utility sold and what it cost each booked year, and the result — or any line of its accounts, month by month.",
+    param: { label: "Show", options: utilityOptions },
+    data: utilityChart,
   },
 ];
 

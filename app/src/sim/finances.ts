@@ -58,6 +58,7 @@ import { wind } from "./wind";
 import { windPowerW } from "./windPower";
 import { contractArrays, municipalArrays } from "./solarAdoption";
 import { grid } from "./grid";
+import { monthRecords } from "./monthRecords";
 import { powerFlows } from "./spotMarket";
 
 export interface MunicipalFinances {
@@ -210,6 +211,7 @@ export function settleUtilityMonth(buildings: Building[], realPlants: PowerPlant
     inFlight = computeUtilityMonth(buildings, realPlants, year, month)
       .then((m) => {
         utilityMonths.set(key, m);
+        monthRecords.record(key, { utility: m }); // for the charts, line by line
         treasury.notifyBooked(); // the live balance takes it in
         return m;
       })

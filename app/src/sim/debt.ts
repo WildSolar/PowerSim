@@ -56,7 +56,7 @@ import { allocationApprovalFactor, approval, setDebtPenalty, setUtilityShare } f
 import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { simClock } from "./engine";
 import { departmentUtilityShareRp, latestBookedFinances, liveBalanceRp, operatingIncomeRp } from "./finances";
-import { setSpendingFreeze } from "./fiscalRules";
+import { setBalanceCheck, setSpendingFreeze } from "./fiscalRules";
 import { interestRates } from "./interestRates";
 import { existsAt } from "./lifetime";
 import { treasury } from "./treasury";
@@ -131,6 +131,8 @@ class Debt {
     this.ratingIndex = this.earnedRatingIndex(now);
     this.betterSinceMs = null;
     setSpendingFreeze(() => this.supervised);
+    // Just after `atMs`: what was paid at that very moment (an order a moment ago) counts.
+    setBalanceCheck((atMs) => this.balanceRp(atMs + 1));
     setDebtPenalty((atMs) => this.penaltyPoints(atMs));
     setUtilityShare(() => {
       const booked = latestBookedFinances();

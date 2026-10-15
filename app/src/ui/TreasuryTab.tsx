@@ -8,13 +8,14 @@ import { bookedFinances, concessionRpPerKWh, operatingIncomeRp, type MunicipalFi
 import { treasury, type PayoutCategory, type PayoutsByCategory } from "../sim/treasury";
 import { useSimDay } from "../sim/store";
 import { BorrowingTab } from "./BorrowingTab";
+import { TreasuryLedger } from "./TreasuryLedger";
 import { formatCHF } from "./format";
 import { useLiveTreasury } from "./useLiveTreasury";
 import "./borrowing.css";
 import { UTILITY_PROFIT_RETAINED_SHARE } from "../config/treasury";
 import { PlotLink } from "./PlotLink";
 
-type Section = "accounts" | "borrowing";
+type Section = "accounts" | "ledger" | "borrowing";
 
 /** How the ledger's payout categories read in the accounts. */
 const GROUPS: { label: string; categories: PayoutCategory[]; note?: string }[] = [
@@ -45,11 +46,14 @@ export function TreasuryTab({ dataset, initialSection = "accounts" }: { dataset:
         <button className={section === "accounts" ? "active" : ""} onClick={() => setSection("accounts")}>
           🧾 Accounts
         </button>
+        <button className={section === "ledger" ? "active" : ""} onClick={() => setSection("ledger")}>
+          📒 Ledger
+        </button>
         <button className={section === "borrowing" ? "active" : ""} onClick={() => setSection("borrowing")}>
           🏦 Borrowing
         </button>
       </div>
-      {section === "accounts" ? <Accounts dataset={dataset} /> : <BorrowingTab />}
+      {section === "accounts" ? <Accounts dataset={dataset} /> : section === "ledger" ? <TreasuryLedger dataset={dataset} /> : <BorrowingTab />}
     </div>
   );
 }

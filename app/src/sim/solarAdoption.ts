@@ -112,7 +112,7 @@ import {
 } from "../config/homeBattery";
 import { interpolateCurve } from "../config/curve";
 import { priceFactor } from "./costTrends";
-import { spendingFrozen } from "./fiscalRules";
+import { cannotPay, spendingFrozen } from "./fiscalRules";
 
 const DAY_MS = 24 * 60 * 60_000;
 const YEAR_MS = 365.25 * DAY_MS;
@@ -635,7 +635,7 @@ export function municipalSolarQuote(building: Building, realPlants: PowerPlant[]
  * today, generating once installed a few months on — the same as the measure does, but chosen. */
 export function installMunicipalSolarNow(building: Building, realPlants: PowerPlant[], atMs: number): boolean {
   const quote = municipalSolarQuote(building, realPlants, atMs);
-  if (!quote || spendingFrozen(atMs)) return false;
+  if (!quote || cannotPay(quote.costRp, atMs)) return false;
   const year = new Date(toDateMs(atMs)).getUTCFullYear();
   const installCostRp = quote.capacityKw * installCostRpPerKwp(quote.capacityKw, priceFactorInYear("solar", year));
   const installedAtMs = atMs + MUNICIPAL_SOLAR_INSTALL_MONTHS * (YEAR_MS / 12);
@@ -721,6 +721,7 @@ export function installContractSolar(building: Building, realPlants: PowerPlant[
   if (adoptionByEgid.has(building.egid) || realPvEgids(realPlants).has(building.egid) || spendingFrozen(atMs)) return null;
   const array = roofArray(building, atMs);
   if (!array) return null;
+  if (cannotPay(Math.max(0, array.installCostRp - array.federalRp) + array.batteryRp, atMs)) return null;
   const installedAtMs = atMs + months * (YEAR_MS / 12);
   if (array.battery) {
     batteryByEgid.set(building.egid, { installedAtMs, ...array.battery, costRp: array.batteryRp, municipalSubsidyRp: 0, origin: "municipal", gridCondition: true });

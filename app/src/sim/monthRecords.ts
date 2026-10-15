@@ -13,6 +13,7 @@
  */
 
 import type { CategoryEnergyKWh } from "./energy";
+import type { UtilityMonth } from "./finances";
 
 export interface MonthRecord {
   /** year * 12 + month (0-based). */
@@ -30,6 +31,8 @@ export interface MonthRecord {
   boughtKWh?: number;
   soldKWh?: number;
   storedKWh?: number;
+  /** The utility's month as it was settled (finances.ts): every line of its accounts. */
+  utility?: UtilityMonth;
 }
 
 class MonthRecords {

@@ -201,3 +201,55 @@
 .treasury-years {
   font-size: 12px;
 }
+
+/* The Treasury's ledger (TreasuryLedger.tsx). */
+.ledger-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 4px 0 10px;
+}
+
+.ledger-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.ledger-filters select {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 6px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-2);
+}
+
+.ledger-total {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-table .ledger-date {
+  white-space: nowrap;
+  color: var(--ink-3);
+  width: 1%;
+}
+
+.ledger-more {
+  margin-top: 8px;
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}

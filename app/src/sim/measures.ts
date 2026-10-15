@@ -23,7 +23,7 @@ import { measureUnavailableReason } from "./measureAvailability";
 import { MEASURE_BY_ID } from "./measureCatalog";
 import { defaultParams, sanitizeParams, type MeasureDef, type MeasureParams } from "./measureTypes";
 import { treasury } from "./treasury";
-import { spendingFrozen } from "./fiscalRules";
+import { cannotPay, spendingFrozen } from "./fiscalRules";
 
 const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
 const DAY_MS = 24 * 60 * 60_000;
@@ -236,6 +236,7 @@ class MeasureEngine {
 
     const ctx = { residents: this.dwellingCount(now) * RESIDENTS_PER_DWELLING };
     const oneOffRp = def.oneOffCostRp?.(params, ctx) ?? 0;
+    if (oneOffRp > 0 && cannotPay(oneOffRp, now)) return false;
     if (oneOffRp > 0) treasury.recordPayout(def.costCategory ?? "programs", now, oneOffRp, id);
 
     const state: MeasureState = existing ?? { active: null, pending: null, enactedAtMs: now, vote: null };

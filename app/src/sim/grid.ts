@@ -56,7 +56,7 @@ import { dailyMeanTempC } from "./weather";
 import { setGridLimits } from "./gridLimits";
 import { heatPumpPowerW } from "./heatPump";
 import { policyStore } from "./policy";
-import { spendingFrozen } from "./fiscalRules";
+import { cannotPay, spendingFrozen } from "./fiscalRules";
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
@@ -539,7 +539,7 @@ class Grid {
     if (!area || spendingFrozen(atMs)) return;
     const options = this.reinforceOptions(area, atMs);
     const option = toKw === undefined ? options[0] : options.find((o) => o.kw === toKw);
-    if (!option) return;
+    if (!option || cannotPay(option.costRp, atMs)) return;
     area.upgrades.push({ atMs: atMs + REINFORCE_MONTHS * MONTH_MS, capacityKw: option.kw });
     treasury.recordPayout("grid", atMs, option.costRp, `grid-${areaId}`);
     this.notify();
@@ -549,7 +549,7 @@ class Grid {
   addBattery(areaId: number, atMs: number, sizeIndex = 0): void {
     const area = this.areas[areaId];
     const size = GRID_BATTERY_SIZES[sizeIndex];
-    if (!area || !size || spendingFrozen(atMs)) return;
+    if (!area || !size || cannotPay(gridBatteryCostRp(sizeIndex, atMs), atMs)) return;
     area.batteries.push({ atMs: atMs + BATTERY_MONTHS * MONTH_MS, kw: size.kw, kwh: size.kwh });
     treasury.recordPayout("grid", atMs, gridBatteryCostRp(sizeIndex, atMs), `grid-battery-${areaId}`);
     this.notify();

@@ -56,7 +56,7 @@ import { toDateMs, toSimTimeMs } from "./calendar";
 import { priceFactor } from "./costTrends";
 import { energyKWh } from "./energy";
 import { simClock } from "./engine";
-import { spendingFrozen } from "./fiscalRules";
+import { cannotPay } from "./fiscalRules";
 import { historyTimeSteps, sampleBuildingCategorySeries } from "./history";
 import { existsAt } from "./lifetime";
 import { LocalProjection, pointInPolygon, type XY } from "./localGeo";
@@ -273,7 +273,7 @@ class AgriPv {
    * and it always goes to the voters before it comes into force. */
   submit(atMs: number): AgriPvDesignation | null {
     const q = this.quote();
-    if (q.plotIds.length === 0 || spendingFrozen(atMs)) return null;
+    if (q.plotIds.length === 0 || cannotPay(q.costRp, atMs)) return null;
     const d: AgriPvDesignation = {
       id: this.nextId++,
       plotIds: q.plotIds,

@@ -600,3 +600,11 @@
     display: none;
   }
 }
+
+/* An order refused for want of money (RefusedPurchaseToast.tsx): above the inbox's toast. */
+.refused-toast {
+  bottom: 70px;
+  z-index: 40;
+  white-space: normal;
+  text-align: left;
+}

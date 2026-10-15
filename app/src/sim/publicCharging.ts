@@ -67,7 +67,7 @@ import { tariffStore } from "./tariffStore";
 import { treasury } from "./treasury";
 import { priceFactor } from "./costTrends";
 import type { CostTrendId } from "../config/costTrends";
-import { spendingFrozen } from "./fiscalRules";
+import { cannotPay, spendingFrozen } from "./fiscalRules";
 
 const DAY_MS = 24 * 60 * 60_000;
 const MONTH_MS = (365.25 * DAY_MS) / 12;
@@ -664,7 +664,7 @@ class PublicCharging {
   /** Orders a municipal site at the street nearest to (lon, lat) — on-street with `points` charge
    * points (4, 8 or 12): paid now, open once built. */
   build(kind: ChargingKind, lon: number, lat: number, atMs: number, points = BUILD_SPEC[kind].points): ChargingSite | null {
-    if (spendingFrozen(atMs)) return null;
+    if (cannotPay(buildCostRp(kind, atMs, sizeOf(kind, points).points), atMs)) return null;
     const snapped = streets.snapToStreet(lon, lat) ?? { lon, lat, distanceM: 0, street: null };
     const spec = BUILD_SPEC[kind];
     points = sizeOf(kind, points).points; // only the sizes on offer
@@ -696,6 +696,7 @@ class PublicCharging {
     if (!site || site.owner !== "municipal" || spendingFrozen(atMs)) return false;
     const planned = this.plannedPoints(site);
     if (toPoints <= planned || !sizesFor(site.kind).some((s) => s.points === toPoints)) return false;
+    if (cannotPay(upgradeCostRp(site.kind, planned, toPoints, atMs), atMs)) return false;
     const readyAtMs = Math.max(atMs + (UPGRADE_MONTHS[site.kind] ?? 0) * MONTH_MS, site.openedAtMs);
     site.expansions.push({ atMs: readyAtMs, points: toPoints - planned });
     treasury.recordPayout("charging", atMs, upgradeCostRp(site.kind, planned, toPoints, atMs), site.id);

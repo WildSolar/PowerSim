@@ -15,6 +15,7 @@
  * results some months later.
  */
 
+import { cannotPay } from "./fiscalRules";
 import { BLOC_ORDER, type Bloc } from "../config/approval";
 import {
   EVALUATION_COST_CHF,
@@ -89,7 +90,8 @@ class Studies {
 
   // --- evaluations ---
 
-  commissionEvaluation(category: SubsidyCategory, atMs: number): EvaluationStudy {
+  commissionEvaluation(category: SubsidyCategory, atMs: number): EvaluationStudy | null {
+    if (cannotPay(EVALUATION_COST_CHF * 100, atMs)) return null;
     const study: EvaluationStudy = {
       id: this.nextId++,
       category,
@@ -125,7 +127,8 @@ class Studies {
 
   // --- opinion surveys ---
 
-  commissionSurvey(atMs: number): OpinionSurvey {
+  commissionSurvey(atMs: number): OpinionSurvey | null {
+    if (cannotPay(SURVEY_COST_CHF * 100, atMs)) return null;
     const survey: OpinionSurvey = { id: this.nextId++, commissionedAtMs: atMs, readyAtMs: atMs + SURVEY_MONTHS * MONTH_MS, result: null };
     this.surveys.push(survey);
     treasury.recordPayout("programs", atMs, SURVEY_COST_CHF * 100, `survey-${survey.id}`);
