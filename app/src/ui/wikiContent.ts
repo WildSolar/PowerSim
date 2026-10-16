@@ -527,7 +527,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Rezoning a parcel to another use changes what gets built on its open land, and what its old buildings become when they are replaced: a factory in what is now a residential zone becomes flats — and comes up for replacement sooner, because it no longer fits. Public-use land stays as it is.",
         "Densifying (one or two floors more than the plan allows today) lets new and replacement buildings go higher and hold more homes, and makes replacing old buildings there pay sooner. You can take the extra floors back, too.",
-        "A district heating priority zone allows no new oil or gas heating at all. A new building on a street with a district heating pipe must connect; one replacing its heating may still choose a heat pump. The District heating tool shows these zones too, so extensions can follow them.",
+        "A district heating priority zone allows no new oil or gas heating at all. A building on a street with a district heating pipe must connect — a new one when it's built, an existing one when its heating is next replaced; district heat is then its only choice. The District heating tool shows these zones too, so extensions can follow them.",
         "A high-standard zone requires new and replacement buildings to reach Minergie-P, with a full roof of solar panels.",
         "Outside the building zones, farmland can be zoned for Agri-PV (see \"Agri-PV\").",
       ]),

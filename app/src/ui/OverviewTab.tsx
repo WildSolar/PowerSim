@@ -1,6 +1,6 @@
 import { useSyncExternalStore, type ReactNode } from "react";
 import type { MunicipalityDataset } from "../data/types";
-import { approval } from "../sim/approval";
+import { approval, votePct } from "../sim/approval";
 import { formatDate, toDateMs } from "../sim/calendar";
 import { cachedEmissionsForYear } from "../sim/emissions";
 import { MEASURE_CATALOG } from "../sim/measureCatalog";
@@ -157,7 +157,7 @@ export function OverviewTab({ dataset, onOpen }: { dataset: MunicipalityDataset;
                   <li key={v.def.id}>
                     <span className="ov-vote-date">{monthYear(v.atMs)}</span>
                     <span>{v.def.title}</span>
-                    <span className={`ov-vote-poll ${v.pollYes >= 50 ? "good" : "bad"}`}>{Math.round(v.pollYes)}% yes</span>
+                    <span className={`ov-vote-poll ${v.pollYes >= 50 ? "good" : "bad"}`}>{votePct(v.pollYes)}% yes</span>
                   </li>
                 ))}
               </ul>

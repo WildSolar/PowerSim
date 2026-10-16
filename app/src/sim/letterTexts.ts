@@ -3,6 +3,7 @@
  * draw. Plain functions returning a subject and paragraphs; nothing here decides anything.
  */
 
+import { votePct } from "./approval";
 import type { Bloc } from "../config/approval";
 
 export interface LetterText {
@@ -130,19 +131,20 @@ export function heatOfferText(site: string, potentialMwh: number, mw: number, ye
 }
 
 export function voteResultText(title: string, accepted: boolean, yesShare: number, againFrom: string | null): LetterText {
-  const yes = Math.round(yesShare);
+  const yes = votePct(yesShare);
+  const no = votePct(100 - yesShare);
   return accepted
     ? {
         subject: `Vote result: ${title} accepted`,
         paragraphs: [
-          `The voters have accepted “${title}”, with ${yes}% in favour and ${100 - yes}% against.`,
+          `The voters have accepted “${title}”, with ${yes}% in favour and ${no}% against.`,
           "The decision stands, and the council may carry on as planned. A clear win at the ballot box also does the council's standing some good.",
         ],
       }
     : {
         subject: `Vote result: ${title} rejected`,
         paragraphs: [
-          `The voters have rejected “${title}”: only ${yes}% voted in favour, ${100 - yes}% against.`,
+          `The voters have rejected “${title}”: only ${yes}% voted in favour, ${no}% against.`,
           `The decision is struck down with immediate effect; money already spent on it stays spent. A defeat at the ballot box costs the council some standing.${againFrom ? ` By custom, the council will not put the same proposal to the voters again before ${againFrom}.` : ""}`,
         ],
       };

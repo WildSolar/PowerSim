@@ -163,8 +163,12 @@ function candidatesAt(
   const tariff = tariffStore.at(atMs);
   const estimate = annualHeatingEstimate(building, atMs);
   const scale = sizeScale(building);
-  const fossilBanned = policyStore.get().fossilHeatingInstallBanned || zoning.fossilHeatingBannedAt(building, atMs);
+  const priorityZone = zoning.fossilHeatingBannedAt(building, atMs);
+  const fossilBanned = policyStore.get().fossilHeatingInstallBanned || priorityZone;
   const gridBlocked = gridDrawBlockedAt(building, atMs);
+  // In a district heating priority zone, a building the pipes reach has to connect: district heat
+  // is its only choice.
+  const mustConnect = priorityZone && (incumbent === "districtHeating" || districtHeat.servesAt(building.streetSegments, atMs));
   const avgElecRpKWh = (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2;
 
   const candidates = HEATING_SYSTEM_ORDER.map((id) => {
@@ -198,6 +202,7 @@ function candidatesAt(
         (id === "districtHeating" ? incumbent === "districtHeating" || districtHeat.servesAt(building.streetSegments, atMs) : true) &&
         !(fossilBanned && (id === "gasBoiler" || id === "oilBoiler")) &&
         !(isHeatPump(id) && !isHeatPump(incumbent) && gridBlocked) &&
+        !(mustConnect && id !== "districtHeating") &&
         sited,
       annualizedCostRp: installCostRp / spec.lifetimeMeanYears + runningCostRpFor(id, estimate, tariff, avgElecRpKWh) + siteRunningRp,
       lifetimeMeanYears: spec.lifetimeMeanYears,

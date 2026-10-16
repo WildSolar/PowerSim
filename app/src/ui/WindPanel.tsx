@@ -1,7 +1,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { TURBINE_KW, WIND_LOCAL_RADIUS_M, WIND_PERMIT_MONTHS, WIND_STUDY_MONTHS, WIND_ZONING_MONTHS } from "../config/wind";
 import { mapFocus } from "../map/mapFocus";
-import { approval } from "../sim/approval";
+import { approval, votePct } from "../sim/approval";
 import { formatDate } from "../sim/calendar";
 import { simClock } from "../sim/engine";
 import { useSimDay } from "../sim/store";
@@ -97,7 +97,7 @@ function SiteCard({ site, now }: { site: WindSite; now: number }) {
       {phase === "zoning" &&
         (() => {
           const vote = p?.voteKey ? approval.getVoteInfo(p.voteKey, null, now) : null;
-          return vote ? <p className="dh-note">Public vote {monthYear(vote.atMs)} · poll {Math.round(vote.pollYes)}% yes</p> : null;
+          return vote ? <p className="dh-note">Public vote {monthYear(vote.atMs)} · poll {votePct(vote.pollYes)}% yes</p> : null;
         })()}
       {phase === "zoned" && (
         <div className="dh-actions">

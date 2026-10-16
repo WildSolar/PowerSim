@@ -36,6 +36,7 @@ export const CHANGELOG: Release[] = [
     changed: [
       "Grid: only on-street chargers load their neighbourhood's transformer station. Fast-charging hubs and lorry charging parks have a transformer of their own, which comes with them.",
       "Grid: the utility no longer reinforces the worst overloaded station by itself — reinforcing is up to you (or the new automatic setting).",
+      "District heating priority zones: a building whose street is piped must connect when its heating is next replaced, not only when it's new — district heat is then its only choice.",
       "Treasury → Ledger: every franc in and out, newest first, filterable by kind and year.",
       "Charts: spending can show one kind on its own, and the utility's accounts any single line, month by month (what the power bought costs, for instance).",
       "An order the treasury can't pay is refused — borrow first. Subsidies and running costs can still take the balance below zero, into the costly overdraft.",
@@ -46,6 +47,8 @@ export const CHANGELOG: Release[] = [
     ],
     fixed: [
       "Grid: a neighbourhood battery being installed shows its size.",
+      "Vote results and polls show one decimal, rounded down — a measure that fell just short no longer reads “only 50% voted yes”.",
+      "The utility's accounts count the Agri-PV fields' power the way the town's generation does (snow on the panels, a feed-in limit).",
       "District heating: where a river or lake heat pump may stand is shown as one clean area inside the municipality, instead of overlapping blotches.",
       "Streets that met within a couple of metres without being joined — a short connecting piece lost, a street drawn twice side by side — now meet, so pipes can follow them.",
       "District heating: footpaths among the buildings — through a park, down to a block of flats — can carry pipes too, and some short stretches of street that were missing are back.",

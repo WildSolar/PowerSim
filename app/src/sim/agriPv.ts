@@ -329,8 +329,9 @@ class AgriPv {
 
   // --- the fields ---
 
-  /** The fields generating before `cutoffMs`, as plants on no building (solarAdoption.ts). */
-  private plantsBefore(cutoffMs: number): PowerPlant[] {
+  /** The fields generating before `cutoffMs`, as plants on no building (solarAdoption.ts, and the
+   * utility's accounts, finances.ts). */
+  plantsBefore(cutoffMs: number): PowerPlant[] {
     const plants: PowerPlant[] = [];
     for (const f of this.fields) {
       if (f.installedAtMs >= cutoffMs) continue;

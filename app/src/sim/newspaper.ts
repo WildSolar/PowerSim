@@ -10,7 +10,7 @@
 
 import { SUMMER_MEASURED_MONTH, WINTER_MEASURED_MONTH } from "../config/grid";
 import type { Building, MunicipalityDataset } from "../data/types";
-import { approval, type ApprovalEvent } from "./approval";
+import { approval, type ApprovalEvent, votePct } from "./approval";
 import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { debt, type DebtEvent } from "./debt";
 import { districtHeat } from "./districtHeat";
@@ -145,7 +145,7 @@ class Newspaper {
     // Votes, elections, warnings.
     for (const e of this.approvalEvents.filter((x) => inMonth(x.atMs))) {
       if (e.kind === "voteHeld") {
-        const pct = Math.round(e.yesShare);
+        const pct = votePct(e.yesShare);
         items.push({
           priority: 100,
           headline: e.accepted ? `Voters back ${e.title}` : `Voters reject ${e.title}`,

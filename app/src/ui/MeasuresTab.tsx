@@ -13,7 +13,7 @@ import {
   type MeasureParams,
   type MeasureTopic,
 } from "../sim/measureTypes";
-import { approval } from "../sim/approval";
+import { approval, votePct } from "../sim/approval";
 import { measures } from "../sim/measures";
 import { measureUnavailableReason } from "../sim/measureAvailability";
 import { subsidisedDecisions, type SubsidyCategory } from "../sim/additionality";
@@ -203,12 +203,12 @@ function MeasureDetail({ def, nowMs, onClose }: { def: MeasureDef; nowMs: number
       {def.subsidyCategory && <SubsidyEvidence category={def.subsidyCategory} nowMs={nowMs} />}
       {vote && (
         <div className="measure-vote">
-          Public vote in {formatDate(vote.atMs).replace(/^\d+ /, "")} — latest poll: {Math.round(vote.pollYes)}% in favour
+          Public vote in {formatDate(vote.atMs).replace(/^\d+ /, "")} — latest poll: {votePct(vote.pollYes)}% in favour
         </div>
       )}
       {!vote && lastVote && (
         <div className={`measure-vote-result ${lastVote.accepted ? "accepted" : "rejected"}`}>
-          {lastVote.accepted ? "Accepted" : "Rejected"} by the voters in {monthYear(lastVote.atMs)}: {Math.round(lastVote.yesShare)}% yes, {100 - Math.round(lastVote.yesShare)}% no.
+          {lastVote.accepted ? "Accepted" : "Rejected"} by the voters in {monthYear(lastVote.atMs)}: {votePct(lastVote.yesShare)}% yes, {votePct(100 - lastVote.yesShare)}% no.
           {moratoriumUntil !== null && ` It can't be put forward again before ${monthYear(moratoriumUntil)}.`}
         </div>
       )}
@@ -243,10 +243,10 @@ function measureStatus(def: MeasureDef, nowMs: number): { label: string; tone: S
 /** The line under a card's summary: for a measure in force what it is doing, otherwise how it would go down. */
 function cardFooter(def: MeasureDef, nowMs: number): { text: string; tone?: "good" | "bad" | "warn" } {
   const vote = approval.getVoteInfo(def.id, def, nowMs);
-  if (vote) return { text: `Public vote ${monthYear(vote.atMs)} · poll ${Math.round(vote.pollYes)}% yes`, tone: "warn" };
+  if (vote) return { text: `Public vote ${monthYear(vote.atMs)} · poll ${votePct(vote.pollYes)}% yes`, tone: "warn" };
   const until = measures.moratoriumUntilMs(def.id, nowMs);
   const lastVote = measures.lastVote(def.id);
-  if (until !== null && lastVote) return { text: `Rejected ${monthYear(lastVote.atMs)} (${Math.round(lastVote.yesShare)}% yes) · again from ${monthYear(until)}`, tone: "bad" };
+  if (until !== null && lastVote) return { text: `Rejected ${monthYear(lastVote.atMs)} (${votePct(lastVote.yesShare)}% yes) · again from ${monthYear(until)}`, tone: "bad" };
   const state = measures.getState(def.id);
   const params = state?.pending?.params ?? state?.active ?? null;
   if (state?.active && def.subsidyCategory) {

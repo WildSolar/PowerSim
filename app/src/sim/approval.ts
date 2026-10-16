@@ -62,6 +62,12 @@ import { treasury } from "./treasury";
 
 const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
 
+/** A vote's or a poll's share, for the player: one decimal, always rounded down — so a measure that
+ * fell just short never reads "50% voted yes". */
+export function votePct(share: number): string {
+  return (Math.floor(share * 10 + 1e-9) / 10).toFixed(1);
+}
+
 export interface ApprovalLogEntry {
   atMs: number;
   text: string;
@@ -473,11 +479,11 @@ class ApprovalEngine {
     const accepted = yes >= 50;
     if (accepted) {
       this.shiftAll(VOTE_WON_POINTS * this.sensitivity);
-      this.addLog(nowMs, `Voters approved ${vote.title} (${Math.round(yes)}% in favour).`);
+      this.addLog(nowMs, `Voters approved ${vote.title} (${votePct(yes)}% in favour).`);
     } else {
       for (const b of BLOC_ORDER) this.shift(b, -(vote.stances[b] ?? 0) * ENACT_SHOCK_POINTS * this.sensitivity * REPEAL_RECOVERY_FRACTION);
       this.shiftAll(-VOTE_LOST_POINTS * this.sensitivity);
-      this.addLog(nowMs, `Voters rejected ${vote.title} (${Math.round(yes)}% in favour). It is struck down.`);
+      this.addLog(nowMs, `Voters rejected ${vote.title} (${votePct(yes)}% in favour). It is struck down.`);
     }
     vote.resolve(accepted, nowMs, yes);
     this.emit({ kind: "voteHeld", key: id, title: vote.title, atMs: nowMs, accepted, yesShare: yes, stances: vote.stances });

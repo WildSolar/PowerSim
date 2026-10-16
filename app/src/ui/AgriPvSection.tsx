@@ -1,7 +1,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { AGRI_PV_LEAD_MONTHS } from "../config/agriPv";
 import { agriPv, partnerName, type AgriPvDesignation } from "../sim/agriPv";
-import { approval } from "../sim/approval";
+import { approval, votePct } from "../sim/approval";
 import { formatDate } from "../sim/calendar";
 import { simClock } from "../sim/engine";
 import { policyStore } from "../sim/policy";
@@ -20,7 +20,7 @@ function hectares(m2: number): string {
 function DesignationStatus({ d, now }: { d: AgriPvDesignation; now: number }) {
   if (d.rejected) return <span className="zn-status bad">Struck down by the voters</span>;
   const vote = approval.getVoteInfo(`agriPv:${d.id}`, null, now);
-  if (vote) return <span className="zn-status">Public vote {monthYear(vote.atMs)} · poll {Math.round(vote.pollYes)}% yes</span>;
+  if (vote) return <span className="zn-status">Public vote {monthYear(vote.atMs)} · poll {votePct(vote.pollYes)}% yes</span>;
   if (d.effectiveAtMs > now) return <span className="zn-status">In force from {monthYear(d.effectiveAtMs)}</span>;
   return <span className="zn-status good">In force since {monthYear(d.effectiveAtMs)}</span>;
 }

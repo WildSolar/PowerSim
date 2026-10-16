@@ -2,7 +2,7 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { MAX_EXTRA_FLOORS, REZONE_TARGETS, ZONING_LEAD_MONTHS } from "../config/zoning";
 import type { SiteZone } from "../data/types";
 import { ZONING_LEGEND } from "../map/colorModes";
-import { approval } from "../sim/approval";
+import { approval, votePct } from "../sim/approval";
 import { formatDate } from "../sim/calendar";
 import { simClock } from "../sim/engine";
 import { useSimDay } from "../sim/store";
@@ -34,7 +34,7 @@ function sameAction(a: ZoningAction, b: ZoningAction): boolean {
 function ChangeStatus({ change, now }: { change: ZoningChange; now: number }) {
   if (change.rejected) return <span className="zn-status bad">Struck down by the voters</span>;
   const vote = approval.getVoteInfo(`zoning:${change.id}`, null, now);
-  if (vote) return <span className="zn-status">Public vote {monthYear(vote.atMs)} · poll {Math.round(vote.pollYes)}% yes</span>;
+  if (vote) return <span className="zn-status">Public vote {monthYear(vote.atMs)} · poll {votePct(vote.pollYes)}% yes</span>;
   if (change.effectiveAtMs > now) return <span className="zn-status">In force from {monthYear(change.effectiveAtMs)}</span>;
   return <span className="zn-status good">In force since {monthYear(change.effectiveAtMs)}</span>;
 }

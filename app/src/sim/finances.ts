@@ -51,7 +51,7 @@ import { monthElectricity, monthHeatingTechnology } from "./yearReport";
 import { dhFixedCostRpPerYear, dhProductionCostRp } from "./districtHeatDispatch";
 import { PUBLIC_SOLAR_SELF_USE_SHARE, UTILITY_PROFIT_RETAINED_SHARE } from "../config/treasury";
 import { publicCharging } from "./publicCharging";
-import { irradianceWm2, PEAK_IRRADIANCE_WM2 } from "./pv";
+import { irradianceWm2, PEAK_IRRADIANCE_WM2, pvPowerWAt } from "./pv";
 import { roofContracts } from "./roofContracts";
 import { agriPv } from "./agriPv";
 import { wind } from "./wind";
@@ -264,7 +264,12 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
   // what they make (the utility keeps it, saving power it would buy at wholesale).
   // Agri-PV fields too — and their partners take that energy instead of buying it (they still pay
   // for the grid).
-  const fieldsW = times.map((t) => (agriPv.capacityAtKw(t) * 1000 * irradianceWm2(t)) / PEAK_IRRADIANCE_WM2);
+  // What the fields made, as the town's generation counts it (snow on the panels, a feed-in limit).
+  const fields = agriPv.plantsBefore(times[times.length - 1] + 1);
+  const fieldsW = times.map((t) => {
+    const sun = irradianceWm2(t);
+    return fields.reduce((sum, p) => sum - pvPowerWAt(p, t, sun), 0);
+  });
   const ppaKWh = energyKWh(times, fieldsW);
   // And the utility's wind turbines: no feed-in for what they make.
   const turbines = effectivePowerPlantsAtWind(midMonthMs);
