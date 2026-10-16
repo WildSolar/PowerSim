@@ -39,7 +39,7 @@ import { existsAt } from "./lifetime";
 import { market } from "./market";
 import { isPublicBuilding } from "./publicBuildings";
 import { hashSeed, mulberry32 } from "./rng";
-import { considerOwnSolarNow, contractArrays, installContractSolar, roofArray, solarStatusOf, specificYieldKWhPerKwp } from "./solarAdoption";
+import { considerOwnSolarNow, contractArrays, installContractSolar, roofArray, setOwnerSolarHold, solarStatusOf, typicalYieldKWhPerKwp } from "./solarAdoption";
 
 const DAY_MS = 24 * 60 * 60_000;
 const MONTH_MS = (365.25 * DAY_MS) / 12;
@@ -123,6 +123,10 @@ class RoofContracts {
     this.lastDay = Math.floor(now / DAY_MS);
     this.lastMonth = monthIndex(now);
     this.unsubscribeClock = simClock.subscribe(() => this.advance(simClock.getSimTimeMs()));
+    setOwnerSolarHold((egid, atMs) => {
+      const c = this.latest(egid);
+      return !!c && (c.status === "offered" || (c.status === "accepted" && (c.buildByMs ?? Infinity) > atMs));
+    });
     this.notify();
   }
 
@@ -187,8 +191,12 @@ class RoofContracts {
   quote(b: Building, atMs: number, rent = this.rent): RoofQuote | null {
     const array = roofArray(b, atMs);
     if (!array) return null;
-    const yieldKWh = array.capacityKw * specificYieldKWhPerKwp(atMs);
-    const valueRp = yieldKWh * market.price("wholesale", atMs);
+    // Planned on a typical year's sun and the market's underlying price (not this month's spike or
+    // this year's weather): it moves only as panels and prices change over the years, the rent you
+    // offer, and whether the grid here needs a battery with the array.
+    const year = new Date(toDateMs(atMs)).getUTCFullYear();
+    const yieldKWh = array.capacityKw * typicalYieldKWhPerKwp();
+    const valueRp = yieldKWh * market.basePrice("wholesale", year);
     const rentRp = rent * array.areaM2 * 100;
     const upkeepRp = array.capacityKw * ROOF_UPKEEP_CHF_PER_KWP_YEAR * 100;
     const costRp = Math.max(0, array.installCostRp - array.federalRp) + array.batteryRp;
@@ -303,6 +311,10 @@ class RoofContracts {
       } else if (c.status === "accepted" && (c.buildByMs ?? Infinity) <= nowMs) {
         c.status = "lapsed";
         changed = true;
+      } else if (c.status === "accepted" && this.hasOwnSolar(c.egid)) {
+        // Solar of the owner's own on the roof after all (decided before the offer): the contract is void.
+        c.status = "ownSolar";
+        changed = true;
       }
     }
     const month = monthIndex(nowMs);
@@ -311,6 +323,11 @@ class RoofContracts {
       this.lastMonth = month;
     }
     if (changed) this.notify();
+  }
+
+  private hasOwnSolar(egid: string): boolean {
+    const b = this.buildingsProvider().find((x) => x.egid === egid);
+    return !!b && solarStatusOf(b, this.realPlants) !== null;
   }
 
   /** What an owner wants for their roof (CHF per m² a year), drawn once per building. */

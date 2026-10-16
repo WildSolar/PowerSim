@@ -82,7 +82,7 @@ export function RoofContractCard({ building, now }: { building: Building; now: n
   }
   return (
     <div className="public-orders">
-      {c?.status === "ownSolar" && <p className="dh-note">Your offer prompted the owner to put up solar of their own.</p>}
+      {c?.status === "ownSolar" && <p className="dh-note">The owner put up solar of their own instead — the contract is off.</p>}
       {!eligibility.ok ? (
         <p className="dh-note">{eligibility.reason}</p>
       ) : (
@@ -99,7 +99,7 @@ export function RoofContractCard({ building, now }: { building: Building; now: n
               <span>Build cost</span>
               <span className="info-value">{formatCHF(quote.costRp)}</span>
             </div>
-            <div className="info-row" title="What its output saves buying power at today's wholesale price">
+            <div className="info-row" title="A typical year's output, valued at what the utility would otherwise pay for the power (the market's underlying price this year)">
               <span>A year's output</span>
               <span className="info-value">
                 {Math.round(quote.yieldKWh / 1000)} MWh · {formatCHF(quote.valueRp)}

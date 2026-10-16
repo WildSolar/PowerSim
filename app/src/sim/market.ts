@@ -51,6 +51,11 @@ class Market {
     return base * (1 + SHOCK_EXPOSURE[commodity] * lift);
   }
 
+  /** The underlying price in a year, without the shocks: what to plan a long-lived investment on. */
+  basePrice(commodity: Commodity, year: number): number {
+    return interpolateCurve(MARKET_BASE[commodity], year);
+  }
+
   /** A price averaged over the months of a calendar year. */
   yearAverage(commodity: Commodity, year: number): number {
     let sum = 0;

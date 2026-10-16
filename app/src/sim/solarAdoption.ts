@@ -68,7 +68,7 @@ import {
 } from "../config/solar";
 import { NEW_BUILD_VOLUNTARY_SOLAR_SHARE } from "../config/stock";
 import { consumptionSeriesW, hourOfDayAt } from "./billing";
-import { toDateMs, toSimTimeMs } from "./calendar";
+import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { logCandidateDecision } from "./decisionLog";
 import { LocalProjection, PointGrid } from "./localGeo";
 import { buildingGroup } from "./buildingGroup";
@@ -682,6 +682,27 @@ export function roofPotentialKw(building: Building, year: number): number {
   return (building.footprintAreaM2 ?? 0) * usable * kwpPerM2At(year);
 }
 
+let typicalYield: { baseline: number; kWh: number } | null = null;
+
+/** A typical year's output from 1 kWp (kWh): the mean of five years of this town's sun — what to
+ * plan a 25-year array on, rather than one year's weather. */
+export function typicalYieldKWhPerKwp(): number {
+  if (!typicalYield || typicalYield.baseline !== BASELINE_YEAR) {
+    let sum = 0;
+    for (let y = 0; y < 5; y++) sum += specificYieldKWhPerKwp(toSimTimeMs(Date.UTC(BASELINE_YEAR + y, 6, 1)));
+    typicalYield = { baseline: BASELINE_YEAR, kWh: sum / 5 };
+  }
+  return typicalYield.kWh;
+}
+
+// roofContracts.ts: an owner with an offer to answer, or a contract accepted and not yet built,
+// doesn't go solar on their own meanwhile.
+let ownerHold: (egid: string, atMs: number) => boolean = () => false;
+
+export function setOwnerSolarHold(hold: (egid: string, atMs: number) => boolean): void {
+  ownerHold = hold;
+}
+
 /** A year of output from 1 kWp in the year of `atMs` (kWh): the full-load hours of this town's sun. */
 export function specificYieldKWhPerKwp(atMs: number): number {
   const year = new Date(toDateMs(atMs)).getUTCFullYear();
@@ -780,7 +801,7 @@ function processMonth(buildings: Building[], realPlants: PowerPlant[], year: num
   // neighbour count and heating history.
   const ceiling = monthlyChance(Math.min(MAX_ANNUAL_HAZARD, BASE_ANNUAL_HAZARD * RENEWAL_BOOST_MULTIPLIER * NEIGHBOR_BOOST_CAP * outreachHazardMultiplier(policy) * priceMultiplier));
   for (const building of buildings) {
-    if (adoptionByEgid.has(building.egid)) continue;
+    if (adoptionByEgid.has(building.egid) || ownerHold(building.egid, yearStartMs)) continue;
     const draw = mulberry32(hashSeed(building.egid, "solar-hazard", String(year), String(month)))();
     if (draw >= ceiling) continue;
     if (!isEligible(building, realPlants, year, yearStartMs)) continue;
