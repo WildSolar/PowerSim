@@ -47,7 +47,8 @@ export const CHANGELOG: Release[] = [
     ],
     fixed: [
       "Grid: a neighbourhood battery being installed shows its size.",
-      "Roof contracts: an owner who has an offer to answer, or has accepted one, no longer puts up solar of their own meanwhile — which could leave a Build button that did nothing. The projected net for the utility is planned on a typical year's sun and the market's underlying price, so it no longer jumps with each month's price or year's weather.",
+      "Grid: a station's card shows each peak as measured, and — with a battery in the area — what is left of it on the station, instead of a bare 0 kW when the battery covers it.",
+            "Roof contracts: an owner who has an offer to answer, or has accepted one, no longer puts up solar of their own meanwhile — which could leave a Build button that did nothing. The projected net for the utility is planned on a typical year's sun and the market's underlying price, so it no longer jumps with each month's price or year's weather.",
             "Vote results and polls show one decimal, rounded down — a measure that fell just short no longer reads “only 50% voted yes”.",
       "The utility's accounts count the Agri-PV fields' power the way the town's generation does (snow on the panels, a feed-in limit).",
       "District heating: where a river or lake heat pump may stand is shown as one clean area inside the municipality, instead of overlapping blotches.",

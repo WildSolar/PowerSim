@@ -72,6 +72,30 @@ export function StationCard() {
   );
 }
 
+/** A peak as read, and — with a battery in the area — what is left of it on the station. */
+function PeakRows({ label, title, measuredKw, onStationKw, batteryKw, capacityKw, top = false }: { label: string; title: string; measuredKw: number; onStationKw: number; batteryKw: number; capacityKw: number; top?: boolean }) {
+  const share = Math.round((onStationKw / capacityKw) * 100);
+  return (
+    <>
+      <div className="info-row" title={title} style={top ? { marginTop: 6 } : undefined}>
+        <span>{label}</span>
+        <span className="info-value">
+          {Math.round(measuredKw)} kW{batteryKw > 0 ? "" : ` · ${share}%`}
+        </span>
+      </div>
+      {batteryKw > 0 && (
+        <div className="info-row" title={`The battery covers up to ${batteryKw} kW of the peak`}>
+          <span>…on the station, with the battery</span>
+          <span className="info-value">
+            {Math.round(onStationKw)} kW · {share}%
+          </span>
+        </div>
+      )}
+      <LoadBar kw={onStationKw} capacityKw={capacityKw} />
+    </>
+  );
+}
+
 function AreaDetails({ area, now }: { area: GridArea; now: number }) {
   const capacity = grid.capacityAt(area, now);
   const options = grid.reinforceOptions(area, now);
@@ -89,20 +113,24 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
           {capacity} kVA{battery > 0 ? ` + ${battery} kW battery` : ""}
         </span>
       </div>
-      <div className="info-row" title="The highest draw on the coldest evenings of the last winter, less what batteries cover">
-        <span>Winter peak {area.winter ? `(${area.winter.year})` : ""}</span>
-        <span className="info-value">
-          {Math.round(drawKw)} kW · {Math.round((drawKw / capacity) * 100)}%
-        </span>
-      </div>
-      <LoadBar kw={drawKw} capacityKw={capacity} />
-      <div className="info-row" style={{ marginTop: 6 }} title="The highest feed-in from rooftop solar on the sunniest middays of the last summer, less what batteries cover">
-        <span>Summer solar feed-in {area.summer ? `(${area.summer.year})` : ""}</span>
-        <span className="info-value">
-          {Math.round(feedInKw)} kW · {Math.round((feedInKw / capacity) * 100)}%
-        </span>
-      </div>
-      <LoadBar kw={feedInKw} capacityKw={capacity} />
+      <PeakRows
+        label={`Winter peak draw${area.winter ? ` (${area.winter.year})` : ""}`}
+        title="The highest draw on the coldest evenings of the last winter (read on 1 March)"
+        measuredKw={area.winter?.peakKw ?? 0}
+        onStationKw={drawKw}
+        batteryKw={battery}
+        capacityKw={capacity}
+      />
+      <PeakRows
+        label={`Summer solar feed-in${area.summer ? ` (${area.summer.year})` : ""}`}
+        title="The highest feed-in from rooftop solar on the sunniest middays of the last summer (read on 1 September)"
+        measuredKw={area.summer?.exportKw ?? 0}
+        onStationKw={feedInKw}
+        batteryKw={battery}
+        capacityKw={capacity}
+        top
+      />
+      <p className="dh-note">Peaks are read twice a year; a reinforcement or a battery changes what they are measured against straight away, not the readings themselves.</p>
       {(drawBlocked || feedInBlocked) && (
         <p className="dh-warning">
           Overloaded:{" "}
