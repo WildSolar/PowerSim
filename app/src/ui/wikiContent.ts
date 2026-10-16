@@ -744,9 +744,12 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Every year, each building without panels has a chance that its owner seriously considers them. That chance grows for a few years after the heating is replaced (a natural moment to think about the roof), the more neighbours already have panels, with the municipality's solar campaign, and as panels get cheaper (see \"Technology prices over time\"). Buildings over 200 years old are treated as protected and don't get panels.",
       ),
       p(
+        "Some roofs never get panels, however good the deal: about one building in five has a roof that faces the wrong way, lies in the shade of its neighbours, trees or the hillside, or is too cluttered with dormers, skylights and chimneys to be worth it — one in three among buildings from before 1920, with their complex roofs and protected streetscapes. So does a roof too small to hold a worthwhile array. Buildings put up while you're in office are designed with panels in mind. Such a roof can't be rented for the utility's solar either, nor a public building's roof given panels.",
+      ),
+      p(
         "An owner who considers it compares a system covering the usable part of the roof with going without: its price (cheaper per kWp the bigger it is), less the federal payment every installation gets and any municipal subsidy, against the electricity it would save and what it earns feeding the rest into the grid at the feed-in price. Panels get more efficient over the years, so the same roof holds more later. A municipal subsidy is paid from the treasury the day a building installs.",
       ),
-      note("A building puts up panels once; they last about as long as the game. Panels on a building that is torn down go with it."),
+      note("A building puts up panels once; they last about as long as the game. Panels on a building that is torn down go with it. Which roofs are unsuited is the game's draw, not a survey of the real roofs."),
     ],
   },
   {

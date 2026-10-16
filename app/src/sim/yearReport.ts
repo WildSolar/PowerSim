@@ -317,9 +317,15 @@ function recordMonthElectricity(buildings: Building[], year: number, month: numb
   const turbines = plants.filter((p) => p.technology === "Wind");
   const windKWh = turbines.length > 0 ? energyKWh(times, times.map((t) => turbines.reduce((sum, p) => sum + windPowerW(p, t), 0))) : 0;
   let builtKw = 0;
-  for (const p of plants) if (p.technology === "Photovoltaic" && p.egid && (p.activeToMs === undefined || p.activeToMs > endMs)) builtKw += p.capacityKw ?? 0;
+  const builtByEgid = new Map<string, number>();
+  for (const p of plants)
+    if (p.technology === "Photovoltaic" && p.egid && (p.activeToMs === undefined || p.activeToMs > endMs)) {
+      builtKw += p.capacityKw ?? 0;
+      builtByEgid.set(p.egid, (builtByEgid.get(p.egid) ?? 0) + (p.capacityKw ?? 0));
+    }
+  // A roof with panels counts at least what's on it (a real array on a roof the game rates unsuited).
   let potentialKw = 0;
-  for (const b of buildings) if (existsAt(b, endMs)) potentialKw += roofPotentialKw(b, year);
+  for (const b of buildings) if (existsAt(b, endMs)) potentialKw += Math.max(roofPotentialKw(b, year), builtByEgid.get(b.egid) ?? 0);
   // At the month's last sample, which the pass above has already asked about: counting never
   // settles a household's choice sooner than the game would have.
   const census = mobilityCensus(buildings, times[times.length - 1]);

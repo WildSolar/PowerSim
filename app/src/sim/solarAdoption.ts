@@ -55,6 +55,10 @@
 
 import type { Building, PowerPlant } from "../data/types";
 import {
+  MIN_ARRAY_AREA_M2,
+  OLD_ROOF_BEFORE_YEAR,
+  UNSUITED_ROOF_SHARE,
+  UNSUITED_ROOF_SHARE_OLD,
   BASE_ANNUAL_HAZARD,
   SOLAR_PRICE_HAZARD_ELASTICITY,
   MAX_ANNUAL_HAZARD,
@@ -223,8 +227,24 @@ function neighborList(buildings: Building[]): Map<string, string[]> {
   return list;
 }
 
+/** The share of a building's footprint panels could cover (usableRoofFractionFromDraw), or 0 if its
+ * roof can't take panels at all: unsuited outright (UNSUITED_ROOF_SHARE — never a building finished
+ * from the starting year on, designed for them), or with too little usable area left for an array.
+ * Everything that sizes a rooftop array goes through this, so they all agree on which roofs count. */
+export function usableRoofFraction(building: Building): number {
+  const fraction = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
+  if ((building.footprintAreaM2 ?? 0) * fraction < MIN_ARRAY_AREA_M2) return 0;
+  const built = building.constructionYear;
+  if (built == null || built < BASELINE_YEAR) {
+    const share = built != null && built < OLD_ROOF_BEFORE_YEAR ? UNSUITED_ROOF_SHARE_OLD : UNSUITED_ROOF_SHARE;
+    if (mulberry32(hashSeed(building.egid, "solar-unsuited"))() < share) return 0;
+  }
+  return fraction;
+}
+
 function isEligible(building: Building, realPlants: PowerPlant[], year: number, monthStartMs: number): boolean {
   if (building.footprintAreaM2 == null || building.footprintAreaM2 <= 0) return false;
+  if (usableRoofFraction(building) <= 0) return false;
   if (!existsAt(building, monthStartMs)) return false; // not yet built (or already demolished) at the start of the month
   if (building.constructionYear != null && year - building.constructionYear > AGE_EXCLUSION_YEARS) return false;
   if (realPvEgids(realPlants).has(building.egid)) return false;
@@ -373,8 +393,7 @@ function evaluateAdoption(
   policy: Policy,
   hazardContext: HazardContext,
 ): SolarAdoptionRecord | null {
-  const usableDraw = mulberry32(hashSeed(building.egid, "solar-usable-fraction"))();
-  const usableFraction = usableRoofFractionFromDraw(usableDraw);
+  const usableFraction = usableRoofFraction(building);
   const capacityKw = (building.footprintAreaM2 ?? 0) * usableFraction * kwpPerM2At(year);
   if (capacityKw <= 0) return null;
   // A large array can't connect plainly while its area's summer feed-in is over the grid's capacity —
@@ -565,7 +584,8 @@ export function municipalSolarCandidates(buildings: Building[], realPlants: Powe
       (b.footprintAreaM2 ?? 0) >= MUNICIPAL_SOLAR_MIN_FOOTPRINT_M2 &&
       existsAt(b, atMs) &&
       !adoptionByEgid.has(b.egid) &&
-      !realEgids.has(b.egid),
+      !realEgids.has(b.egid) &&
+      usableRoofFraction(b) > 0,
   );
 }
 
@@ -588,7 +608,7 @@ function installMunicipalSolar(buildings: Building[], realPlants: PowerPlant[], 
     (a, b) => hashSeed(a.egid, "municipal-solar", String(yearStartMs)) - hashSeed(b.egid, "municipal-solar", String(yearStartMs)),
   );
   for (const building of candidates.slice(0, count)) {
-    const usable = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
+    const usable = usableRoofFraction(building);
     const capacityKw = (building.footprintAreaM2 ?? 0) * usable * kwpPerM2At(year);
     if (capacityKw <= 0) continue;
     const installCostRp = capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year));
@@ -617,11 +637,11 @@ const MUNICIPAL_SOLAR_INSTALL_MONTHS = 3;
 
 /** What putting solar on one public building at `atMs` would mean: its full usable roof, and what
  * the treasury pays for it (the price less the federal payment). Null if it has solar already (or
- * has it coming) or no roof to speak of. */
+ * has it coming) or a roof that can't take panels (usableRoofFraction). */
 export function municipalSolarQuote(building: Building, realPlants: PowerPlant[], atMs: number): { capacityKw: number; costRp: number; batteryKwh: number | null } | null {
   if (adoptionByEgid.has(building.egid) || realPvEgids(realPlants).has(building.egid)) return null;
   const year = new Date(toDateMs(atMs)).getUTCFullYear();
-  const usable = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
+  const usable = usableRoofFraction(building);
   const capacityKw = (building.footprintAreaM2 ?? 0) * usable * kwpPerM2At(year);
   if (capacityKw <= 0) return null;
   const installCostRp = capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year));
@@ -661,7 +681,7 @@ export function installMunicipalSolarNow(building: Building, realPlants: PowerPl
  * a full grid area requires of a large one. */
 export function roofArray(building: Building, atMs: number): { capacityKw: number; areaM2: number; installCostRp: number; federalRp: number; battery: { kwh: number; kw: number; feedInCap: number | null } | null; batteryRp: number } | null {
   const year = new Date(toDateMs(atMs)).getUTCFullYear();
-  const usable = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
+  const usable = usableRoofFraction(building);
   const areaM2 = (building.footprintAreaM2 ?? 0) * usable;
   const capacityKw = areaM2 * kwpPerM2At(year);
   if (capacityKw <= 0) return null;
@@ -678,7 +698,7 @@ export function roofArray(building: Building, atMs: number): { capacityKw: numbe
 
 /** What the usable part of a building's roof could take, at the panels of `year` (kWp). */
 export function roofPotentialKw(building: Building, year: number): number {
-  const usable = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
+  const usable = usableRoofFraction(building);
   return (building.footprintAreaM2 ?? 0) * usable * kwpPerM2At(year);
 }
 
@@ -977,7 +997,7 @@ export function effectivePowerPlantsAt(buildings: Building[], realPlants: PowerP
  * subsidy ledger (the federal one-off subsidy still applies). */
 export function registerNewBuildSolar(building: Building, builtAtMs: number, rules: ConstructionRules, voluntaryDraw: number): void {
   const year = new Date(toDateMs(builtAtMs)).getUTCFullYear();
-  const usableFraction = usableRoofFractionFromDraw(mulberry32(hashSeed(building.egid, "solar-usable-fraction"))());
+  const usableFraction = usableRoofFraction(building);
   const usableCapacityKw = (building.footprintAreaM2 ?? 0) * usableFraction * kwpPerM2At(year);
   if (usableCapacityKw <= 0) return;
 

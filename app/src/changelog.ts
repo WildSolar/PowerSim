@@ -34,6 +34,7 @@ export const CHANGELOG: Release[] = [
       "A tutorial, on the start screen: your first weeks as the newly elected mayor, with your chief of staff showing you the job step by step — the map and its views, the clock, the Town hall and its measures, the planning tools, your mail and your first Year in Review. It highlights what to click, and plays as a small game of its own.",
     ],
     changed: [
+      "Rooftop solar: about one roof in five (one in three on buildings from before 1920) can't take panels at all — wrong orientation, shade, too many obstacles, or too small — so even generous incentives no longer cover every roof in town. The rooftop solar chart's potential counts only the roofs that can.",
       "Grid: only on-street chargers load their neighbourhood's transformer station. Fast-charging hubs and lorry charging parks have a transformer of their own, which comes with them.",
       "Grid: the utility no longer reinforces the worst overloaded station by itself — reinforcing is up to you (or the new automatic setting).",
       "District heating priority zones: a building whose street is piped must connect when its heating is next replaced, not only when it's new — district heat is then its only choice.",

@@ -84,7 +84,7 @@ export function PublicBuildingOrders({
       {solarQuote?.batteryKwh != null && (
         <p className="dh-note">The grid here is full at summer middays: the array can only connect with a battery that keeps its feed-in to half its rating.</p>
       )}
-      {!solar && !solarQuote && <p className="dh-note">No roof to put panels on.</p>}
+      {!solar && !solarQuote && <p className="dh-note">Its roof isn't suited to panels: it faces the wrong way, lies in shade or is too cluttered.</p>}
 
       <div className="info-row" style={{ marginTop: 6 }}>
         <span>🔌 Chargers</span>

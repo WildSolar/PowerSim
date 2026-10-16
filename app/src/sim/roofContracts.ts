@@ -39,7 +39,7 @@ import { existsAt } from "./lifetime";
 import { market } from "./market";
 import { isPublicBuilding } from "./publicBuildings";
 import { hashSeed, mulberry32 } from "./rng";
-import { considerOwnSolarNow, contractArrays, installContractSolar, roofArray, setOwnerSolarHold, solarStatusOf, typicalYieldKWhPerKwp } from "./solarAdoption";
+import { considerOwnSolarNow, contractArrays, installContractSolar, roofArray, setOwnerSolarHold, solarStatusOf, typicalYieldKWhPerKwp, usableRoofFraction } from "./solarAdoption";
 
 const DAY_MS = 24 * 60 * 60_000;
 const MONTH_MS = (365.25 * DAY_MS) / 12;
@@ -168,6 +168,7 @@ class RoofContracts {
     if (isPublicBuilding(b)) return { ok: false, reason: "A public building's roof is the municipality's own: put solar on it in the Public buildings layer." };
     if (!existsAt(b, atMs)) return { ok: false, reason: "The building isn't standing." };
     if (solarStatusOf(b, this.realPlants)) return { ok: false, reason: "It has solar already." };
+    if (usableRoofFraction(b) <= 0) return { ok: false, reason: "The roof isn't suited to panels: it faces the wrong way, lies in shade or is too cluttered." };
     const c = this.latest(b.egid);
     if (c?.status === "offered") return { ok: false, reason: "The owner is considering your offer." };
     if (c?.status === "accepted") return { ok: false, reason: "The owner has accepted: build the array." };

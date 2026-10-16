@@ -59,6 +59,19 @@ export const USABLE_FRACTION_LOG_SPREAD = 3; // +-1.5 "octaves" -> roughly an 8x
 export const MIN_USABLE_FRACTION = 0.05;
 export const MAX_USABLE_FRACTION = 1.3;
 
+// Not every roof can take panels at all, however good the deal: facing north, shaded by neighbours,
+// trees or the hillside, too cluttered with dormers, skylights and plant, or protected (an old
+// town centre, a listed building). Drawn once per building; a building from before
+// OLD_ROOF_BEFORE_YEAR more often (complex roofs, protected streetscapes). A building finished from
+// the starting year on was designed with panels in mind. This project's estimate, in line with
+// Sonnendach.ch rating roughly a third of Swiss roof area as poorly suited: a building with no
+// worthwhile surface at all is the smaller share.
+export const UNSUITED_ROOF_SHARE = 0.2;
+export const UNSUITED_ROOF_SHARE_OLD = 0.35;
+export const OLD_ROOF_BEFORE_YEAR = 1920;
+// Panels covering less than this (m²) aren't worth an installation: such a roof counts as unsuited.
+export const MIN_ARRAY_AREA_M2 = 10;
+
 // Install cost curve: CHF 3'000/kWp @ 7kWp -> CHF 2'000/kWp @ 25kWp, fit as
 // costPerKwp = A * capacityKw^-EXPONENT, floored for large commercial roofs
 // (where fixed costs like scaffolding/connection stop shrinking per kWp).
