@@ -47,6 +47,7 @@ export const CHANGELOG: Release[] = [
     ],
     fixed: [
       "Grid: a neighbourhood battery being installed shows its size.",
+      "Grid: a neighbourhood battery takes the top off a peak only as far as its storage lasts through it, not simply its power — a 500 kWh battery shaves about 200 kW off a 600 kW winter evening peak.",
       "Grid: a station's card shows each peak as measured, and — with a battery in the area — what is left of it on the station, instead of a bare 0 kW when the battery covers it.",
             "Roof contracts: an owner who has an offer to answer, or has accepted one, no longer puts up solar of their own meanwhile — which could leave a Build button that did nothing. The projected net for the utility is planned on a typical year's sun and the market's underlying price, so it no longer jumps with each month's price or year's weather.",
             "Vote results and polls show one decimal, rounded down — a measure that fell just short no longer reads “only 50% voted yes”.",

@@ -16,6 +16,8 @@
  */
 
 import {
+  SUMMER_PEAK_HUMP,
+  WINTER_PEAK_HUMP,
   AUTO_REINFORCE_HEADROOM,
   BATTERY_MONTHS,
   GRID_BATTERY_SIZES,
@@ -96,6 +98,17 @@ function stationSizeFor(kw: number): number {
 function nextStationSize(kw: number): number {
   for (const size of TRANSFORMER_SIZES_KVA) if (size > kw) return size;
   return (Math.floor(kw / MULTI_TRANSFORMER_STEP_KVA) + 1) * MULTI_TRANSFORMER_STEP_KVA;
+}
+
+/** How much a battery can take off the top of a peak (kW): at most its power, and as much as its
+ * storage lasts. Shaving the top `x` off a triangular hump `h` high and `w` hours wide takes
+ * w·x²/(2h) kWh; beyond the hump, every further kW takes the whole w hours. */
+export function shavedKw(peakKw: number, battery: { kw: number; kwh: number }, hump: { share: number; hours: number }): number {
+  if (peakKw <= 0 || battery.kw <= 0) return 0;
+  const h = peakKw * hump.share;
+  const wholeHumpKWh = 0.5 * h * hump.hours;
+  const byStorage = battery.kwh <= wholeHumpKWh ? Math.sqrt((2 * h * battery.kwh) / hump.hours) : h + (battery.kwh - wholeHumpKWh) / hump.hours;
+  return Math.min(battery.kw, byStorage, peakKw);
 }
 
 /** The street most of these buildings are addressed on. */
@@ -371,10 +384,27 @@ class Grid {
     return area.batteries.reduce((sum, b) => sum + (b.atMs <= atMs ? b.kw : 0), 0);
   }
 
-  /** The last readings, less what the area's batteries cover. */
+  /** The area's batteries in service at `atMs`, together: power (kW) and storage (kWh). */
+  batteriesAt(area: GridArea, atMs: number): { kw: number; kwh: number } {
+    let kw = 0;
+    let kwh = 0;
+    for (const b of area.batteries)
+      if (b.atMs <= atMs) {
+        kw += b.kw;
+        kwh += b.kwh ?? b.kw * 2;
+      }
+    return { kw, kwh };
+  }
+
+  /** The last readings, less what the area's batteries can shave off them (shavedKw). */
   effectivePeaks(area: GridArea, atMs: number): { drawKw: number; feedInKw: number } {
-    const battery = this.batteryKwAt(area, atMs);
-    return { drawKw: Math.max(0, (area.winter?.peakKw ?? 0) - battery), feedInKw: Math.max(0, (area.summer?.exportKw ?? 0) - battery) };
+    const battery = this.batteriesAt(area, atMs);
+    const draw = area.winter?.peakKw ?? 0;
+    const feedIn = area.summer?.exportKw ?? 0;
+    return {
+      drawKw: Math.max(0, draw - shavedKw(draw, battery, WINTER_PEAK_HUMP)),
+      feedInKw: Math.max(0, feedIn - shavedKw(feedIn, battery, SUMMER_PEAK_HUMP)),
+    };
   }
 
   /** Peak use as a share of capacity, the larger of the two directions. */

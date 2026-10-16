@@ -84,7 +84,7 @@ function PeakRows({ label, title, measuredKw, onStationKw, batteryKw, capacityKw
         </span>
       </div>
       {batteryKw > 0 && (
-        <div className="info-row" title={`The battery covers up to ${batteryKw} kW of the peak`}>
+        <div className="info-row" title={`The battery's ${batteryKw} kW take ${Math.round(measuredKw - onStationKw)} kW off this peak — as much as its storage lasts through it`}>
           <span>…on the station, with the battery</span>
           <span className="info-value">
             {Math.round(onStationKw)} kW · {share}%
@@ -173,7 +173,7 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
           </div>
         </>
       )}
-      <div className="dh-note" style={{ marginTop: 6 }} title="A battery covers its power of the area's peak — the winter evening draw and the summer midday feed-in alike — and stores two hours of it">
+      <div className="dh-note" style={{ marginTop: 6 }} title="A battery takes the top off the area's peaks — the winter evening draw and the summer midday feed-in alike: at most its power, and only as much as its storage lasts through the peak">
         Add a neighbourhood battery ({BATTERY_MONTHS} months): <PlotLink chart="trade" title="Power bought, sold and shifted by batteries" />
       </div>
       <div className="ev-sizes">

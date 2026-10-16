@@ -45,3 +45,11 @@ export const GRID_BATTERY_SIZES: { kw: number; kwh: number; costChf: number }[] 
   { kw: 1000, kwh: 2000, costChf: 1_050_000 },
 ];
 export const BATTERY_MONTHS = 6;
+
+// How much of a peak a neighbourhood battery can shave depends on its storage as well as its power:
+// a peak is a hump on top of the rest of the day, and holding the station below a level means
+// covering everything above it for as long as the hump lasts. The hump is taken as a triangle this
+// share of the peak high and this many hours wide — the winter evening peak rising above the
+// afternoon's level, the summer feed-in rising from nothing at dawn to its midday top.
+export const WINTER_PEAK_HUMP = { share: 0.4, hours: 6 };
+export const SUMMER_PEAK_HUMP = { share: 1, hours: 8 };

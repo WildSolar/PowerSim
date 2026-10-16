@@ -714,7 +714,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "New buildings are always connected.",
       ]),
       p(
-        "Nobody reinforces the grid but you, paid from the treasury: reinforcing an area, or adding a neighbourhood battery (250 kW, 500 kW or 1 MW, storing two hours; it covers its power of the peak either way, is ready after six months, and gets cheaper over the years).",
+        "Nobody reinforces the grid but you, paid from the treasury: reinforcing an area, or adding a neighbourhood battery (250 kW, 500 kW or 1 MW, storing two hours; ready after six months, and cheaper over the years). A battery takes the top off the area's peaks, the winter evening draw and the summer midday feed-in alike — at most its power, and only as much as its storage lasts: the evening peak builds over several hours, so a small battery shaves less than its power, and a big one against a small area far less than its power.",
       ),
       p(
         "Reinforcing puts in a new station of the size you choose, cables included, ready after nine months. A new station replaces the old one whatever its size, so going straight to the size you will need costs less than getting there in steps — but the money is spent now. One order per station at a time.",
