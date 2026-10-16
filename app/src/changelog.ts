@@ -22,8 +22,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
-    version: "0.3.0",
-    date: null,
+    version: "0.4.0",
+    date: "2026-10-16",
+    title: "The grid, the money, and a guided start",
+    summary:
+      "The grid is yours to run: reinforce stations when and as far as you choose, store surplus in batteries, and sell what's left hour by hour. The utility pays the town a fixed concession fee, so what you build pays you back in full, and a new ledger and charts show where every franc and kilowatt-hour went. Plus district heating lines off the streets, roofs that can't take panels, and a tutorial for your first weeks in office.",
     added: [
       "District heating: lay a direct line off the streets, from one junction to another along a course you draw — to bring a plant's heat across town the short way, or to join two networks. Its price depends on what it crosses: cheap through fields, dear across roads, under houses or over water.",
       "Grid: choose the size when you reinforce a transformer station. A new station replaces the old one, so one step to the size you need costs less than several small ones; one order per station at a time.",
@@ -50,8 +53,8 @@ export const CHANGELOG: Release[] = [
       "Grid: a neighbourhood battery being installed shows its size.",
       "Grid: a neighbourhood battery takes the top off a peak only as far as its storage lasts through it, not simply its power — a 500 kWh battery shaves about 200 kW off a 600 kW winter evening peak.",
       "Grid: a station's card shows each peak as measured, and — with a battery in the area — what is left of it on the station, instead of a bare 0 kW when the battery covers it.",
-            "Roof contracts: an owner who has an offer to answer, or has accepted one, no longer puts up solar of their own meanwhile — which could leave a Build button that did nothing. The projected net for the utility is planned on a typical year's sun and the market's underlying price, so it no longer jumps with each month's price or year's weather.",
-            "Vote results and polls show one decimal, rounded down — a measure that fell just short no longer reads “only 50% voted yes”.",
+      "Roof contracts: an owner who has an offer to answer, or has accepted one, no longer puts up solar of their own meanwhile — which could leave a Build button that did nothing. The projected net for the utility is planned on a typical year's sun and the market's underlying price, so it no longer jumps with each month's price or year's weather.",
+      "Vote results and polls show one decimal, rounded down — a measure that fell just short no longer reads “only 50% voted yes”.",
       "The utility's accounts count the Agri-PV fields' power the way the town's generation does (snow on the panels, a feed-in limit).",
       "District heating: where a river or lake heat pump may stand is shown as one clean area inside the municipality, instead of overlapping blotches.",
       "Streets that met within a couple of metres without being joined — a short connecting piece lost, a street drawn twice side by side — now meet, so pipes can follow them.",
