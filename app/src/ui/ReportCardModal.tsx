@@ -15,6 +15,12 @@ import { CONSUMPTION_CATEGORIES } from "./deviceCategories";
 import { formatCHF, formatCO2 } from "./format";
 import { PieChart, type PieSlice } from "./PieChart";
 import { useYearCategoryEnergy } from "./useYearCategoryEnergy";
+
+// The year's electricity by use, round the pie in this order: neighbours stay easy to tell apart,
+// also when the district heating heat pumps or the cooling are too small to show (checked with the
+// palette validator, the last slice next to the first).
+const OVERALL_PIE_ORDER = ["fridge", "lighting", "plugLoad", "ac", "ev", "cooking", "commercial", "laundry", "waterHeating", "dhHeatPump", "heatPump"] as const;
+const DH_HEAT_PUMP_COLOR = "#7a4fb5";
 import { useYearEmissions, BASELINE_YEAR, NET_ZERO_TARGET_YEAR } from "./useYearEmissions";
 import { useYearFinances } from "./useYearFinances";
 import { useYearHeatingReport } from "./useYearHeatingReport";
@@ -101,7 +107,11 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
 
   const { data: overallEnergy, loading: overallLoading } = useYearCategoryEnergy(dataset, year);
   const overallSlices: PieSlice[] = overallEnergy
-    ? CONSUMPTION_CATEGORIES.map((c) => ({ key: c.key, label: c.label, icon: c.icon, color: c.color, valueKWh: overallEnergy[c.key] }))
+    ? OVERALL_PIE_ORDER.map((key) => {
+        if (key === "dhHeatPump") return { key, label: "District heating heat pumps", icon: "🏭", color: DH_HEAT_PUMP_COLOR, valueKWh: overallEnergy.dhHeatPumpKWh };
+        const c = CONSUMPTION_CATEGORIES.find((x) => x.key === key)!;
+        return { key: c.key, label: c.label, icon: c.icon, color: c.color, valueKWh: overallEnergy[c.key] };
+      })
     : [];
 
   const { data: heatingReport, loading: heatingLoading } = useYearHeatingReport(dataset.buildings, year);

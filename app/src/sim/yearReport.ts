@@ -319,6 +319,13 @@ export async function prefetchMonth(buildings: Building[], realPlants: PowerPlan
   await monthMobilityFuel(buildings, year, month);
 }
 
+/** What the district heating heat pumps drew over the year (kWh): the utility's own use, on top of
+ * the categories (the report card's pie shows it beside them). */
+export async function yearDhHeatPumpKWh(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<number> {
+  const months = await yearElectricity(buildings, realPlants, year);
+  return months.reduce((sum, m) => sum + energyKWh(m.times, m.dhHeatPumpW), 0);
+}
+
 /** The year's energy per category (the report card's "Energy by category" pie). */
 export async function yearCategoryEnergyKWh(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<CategoryEnergyKWh> {
   const months = await yearElectricity(buildings, realPlants, year);
@@ -723,8 +730,7 @@ export function computeHeatingRenewalTally(buildings: Building[], year: number):
  * grid-electricity figure, read off the shared year pass. */
 export async function computeNetElectricityKWh(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<number> {
   const energy = await yearCategoryEnergyKWh(buildings, realPlants, year);
-  const months = await yearElectricity(buildings, realPlants, year);
-  const dhHeatPumpKWh = months.reduce((sum, m) => sum + energyKWh(m.times, m.dhHeatPumpW), 0);
+  const dhHeatPumpKWh = await yearDhHeatPumpKWh(buildings, realPlants, year);
   return (
     dhHeatPumpKWh +
     energy.fridge +
