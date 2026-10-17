@@ -2,7 +2,7 @@ import type { Building } from "../data/types";
 import { ENERGY_CLASS_CATALOG, ENERGY_CLASS_ORDER } from "../sim/energyClass";
 import { currentHeatingSystemId } from "../sim/heatingRenewal";
 import type { BuildingChargingAccess } from "../sim/publicCharging";
-import type { ChargingKind } from "../config/charging";
+import { QOS_FLOOR, type QosKind } from "../config/charging";
 
 export type ColorMode =
   | "none"
@@ -271,19 +271,25 @@ export const WIND_SITE_COLORS = { planned: "#6f6d66", underWay: "#2a78d6", ready
 // Farmland in the zoning layer, by where it stands for Agri-PV (sim/agriPv.ts).
 export const FARM_PLOT_COLORS = { farmland: "#9cbf73", planned: "#e6c229", zoned: "#e6c229", fieldBuilding: "#3d5a80", field: "#3d5a80" } as const;
 
+// The EV charging layer: what most of a building's households could do — charge at home, or rely
+// on public chargers of this quality (publicCharging.ts). Below the floor, an electric car is no
+// option.
 export const EV_CHARGING_LEGEND: LegendEntry[] = [
   { bucket: "home", label: "Can charge at home", color: "#1baf7a" },
-  { bucket: "public", label: "On-street charger with room nearby", color: "#2a78d6" },
-  { bucket: "fastOnly", label: "Only a fast-charging hub", color: "#8fb8e8" },
-  { bucket: "full", label: "Chargers nearby are full", color: "#eb6834" },
-  { bucket: "none", label: "No charger nearby", color: "#b23a2e" },
+  { bucket: "q4", label: "Public charging very good (75%+)", color: "#174a8c" },
+  { bucket: "q3", label: "Good (50–75%)", color: "#2a78d6" },
+  { bucket: "q2", label: "Fair (25–50%)", color: "#7fb0e8" },
+  { bucket: "q1", label: "Poor (10–25%)", color: "#c9dcf2" },
+  { bucket: "none", label: "Too little for an electric car", color: "#b23a2e" },
   { bucket: "noHouseholds", label: "No households", color: UNKNOWN_COLOR },
 ];
 
 /** A building's bucket on the EV charging layer: by what most of its households could do. */
 export function evChargingBucket(access: BuildingChargingAccess | undefined): string {
   if (!access) return "noHouseholds";
-  return access.atHome * 2 >= access.households ? "home" : access.others;
+  if (access.atHome * 2 >= access.households) return "home";
+  const q = access.qos;
+  return q >= 0.75 ? "q4" : q >= 0.5 ? "q3" : q >= 0.25 ? "q2" : q >= QOS_FLOOR ? "q1" : "none";
 }
 
 // Charging sites by how full they are: room to spare -> filling up -> full.
@@ -306,8 +312,8 @@ export const HEAT_USE_LEGEND: { bucket: string; label: string; color: string }[]
 ];
 export const TUNNEL_COLOR = "#7a5230";
 
-// The coverage overlays, one per kind of charger.
-export const COVERAGE_COLOR: Record<ChargingKind, string> = { ac: "#2a78d6", dc: "#0e9aa7", fleet: "#7a4fd1" };
+// The coverage overlays (how far each kind of charger reaches along the streets), one per kind.
+export const COVERAGE_COLOR: Record<QosKind, string> = { ac: "#2a78d6", shop: "#d0761e", dc: "#0e9aa7", fleet: "#7a4fd1" };
 
 export const CONSTRUCTION_COLOR = "#f2b01e";
 

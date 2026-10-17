@@ -22,6 +22,20 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.5.0",
+    date: null,
+    added: [
+      "Workplace charging: some drivers can charge where they work — more each year as employers equip their car parks, and more with the new workplace charging programme (Town hall → Measures).",
+      "A home's panel shows where each driver's electric car charges, or how good the charging would be if they went electric.",
+    ],
+    changed: [
+      "Charging an electric car without a charger at home is now a matter of degree: a quality from 0 to 100% made up of the chargers around — best close by and fading with the distance along the streets, not as the crow flies — and of how busy they are, plus charging at work for those who can. Different kinds add up; below 10% an electric car is ruled out. The better the charging, the smaller the hassle that weighs against an electric car.",
+      "Chargers in shops' car parks count as their own kind: a top-up while shopping, reaching further than an on-street charger but doing less.",
+      "EV charging layer: buildings are coloured by the quality of public charging, and the coverage toggles and a charger's reach follow the streets.",
+      "A car can share its charging among several chargers (and work), and a busy charger takes new cars up to a quarter over its room, worth less the fuller it gets.",
+    ],
+  },
+  {
     version: "0.4.0",
     date: "2026-10-16",
     title: "The grid, the money, and a guided start",

@@ -14,7 +14,7 @@
  */
 
 import { BLOC_ORDER, type Bloc } from "../config/approval";
-import { REACH_M } from "../config/charging";
+import { DEMAND_RADIUS_M } from "../config/charging";
 import {
   BLOC_SENDERS,
   CHARGER_REQUEST_MIN_UNMET,
@@ -421,10 +421,10 @@ class Letters {
     const spots = publicCharging.unmetDemandSpots(atMs - 6 * MONTH_MS, atMs).filter((s) => s.kind === "ac");
     let best: { lon: number; lat: number; n: number } | null = null;
     for (const s of spots) {
-      const n = spots.filter((o) => metres(o.lon, o.lat, s.lon, s.lat) < REACH_M.ac).length;
+      const n = spots.filter((o) => metres(o.lon, o.lat, s.lon, s.lat) < DEMAND_RADIUS_M.ac).length;
       if (!best || n > best.n) best = { lon: s.lon, lat: s.lat, n };
     }
-    if (best && best.n >= CHARGER_REQUEST_MIN_UNMET && !taken((t) => t.kind === "charger" && metres(t.lon, t.lat, best.lon, best.lat) < 2 * REACH_M.ac)) {
+    if (best && best.n >= CHARGER_REQUEST_MIN_UNMET && !taken((t) => t.kind === "charger" && metres(t.lon, t.lat, best.lon, best.lat) < 2 * DEMAND_RADIUS_M.ac)) {
       const street = streets.snapToStreet(best.lon, best.lat)?.street ?? null;
       options.push({ bloc: "drivers", target: { kind: "charger", lon: best.lon, lat: best.lat, street }, ask: `a public charger near ${street ?? "their street"}`, focus: { lon: best.lon, lat: best.lat } });
     }
@@ -524,7 +524,7 @@ class Letters {
       case "charger": {
         const site = publicCharging
           .getSites()
-          .find((s) => s.kind === "ac" && s.openedAtMs >= r.atMs - 30 * DAY_MS && metres(s.lon, s.lat, t.lon, t.lat) <= REACH_M.ac && (s.owner === "municipal" || s.openedAtMs <= nowMs));
+          .find((s) => s.kind === "ac" && s.openedAtMs >= r.atMs - 30 * DAY_MS && metres(s.lon, s.lat, t.lon, t.lat) <= DEMAND_RADIUS_M.ac && (s.owner === "municipal" || s.openedAtMs <= nowMs));
         if (!site) return "open";
         return site.owner === "municipal" ? "granted" : "resolvedByOthers";
       }

@@ -26,7 +26,7 @@ export function FleetSection({ building, simTimeMs }: { building: Building; simT
       charging?.kind === "depot"
         ? "charges at its own yard"
         : charging?.kind === "public"
-          ? `charges at ${publicCharging.getSite(charging.siteId)?.name ?? "a public charger"}`
+          ? `charges at ${charging.siteIds.map((id) => publicCharging.getSite(id)?.name ?? "a public charger").join(" and ")}`
           : v.depot
             ? "has a yard to charge in"
             : "no yard to charge in";

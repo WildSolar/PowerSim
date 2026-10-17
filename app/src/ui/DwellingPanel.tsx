@@ -1,7 +1,7 @@
 import type { Building, Dwelling, PowerPlant } from "../data/types";
 import { dynamicTariff } from "../sim/dynamicTariff";
 import { dwellingDevicePowerW } from "../sim/devices";
-import { mobilityChargingPowerW, mobilityRenewalLog, mobilitySlotSummaries, evSessionForSlot, slotChargingPowerW } from "../sim/mobility";
+import { mobilityChargingPowerW, mobilityRenewalLog, mobilitySlotSummaries, evSessionForSlot, slotCharging, slotChargingPowerW, type SlotCharging } from "../sim/mobility";
 import { isOffPeakHour, tariffKey } from "../sim/tariff";
 import {
   historyTimeSteps,
@@ -42,6 +42,29 @@ function formatHourOfDay(ms: number): string {
   const hh = Math.floor(h);
   const mm = Math.round((h - hh) * 60);
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+function percentOf(share: number): string {
+  return `${Math.round(share * 100)}%`;
+}
+
+/** A slot's charging, in a line: where its electric car charges in public, or how it could charge
+ * one (nothing to say for one charging at home). */
+function ChargingNote({ charging }: { charging: SlotCharging }) {
+  if (charging.kind === "home") return null;
+  if (charging.kind === "public")
+    return <div className="ev-session-note">Charges {charging.sources.map((s) => `${s.name.startsWith("at ") ? s.name : `at ${s.name}`} (${percentOf(s.share)})`).join(", ")}.</div>;
+  const where = charging.sources.map((s) => (s.name === "at work" ? "at work" : `${s.name}, ${s.distanceM >= 1000 ? `${(s.distanceM / 1000).toFixed(1)} km` : `${Math.round(s.distanceM / 10) * 10} m`}`));
+  return (
+    <div
+      className="ev-session-note"
+      title="Without a charger at home, an electric car relies on the public chargers around — the closer along the streets and the less busy, the better — and on charging at work, for those who can. Below 10% it isn't an option."
+    >
+      No charger at home. Public charging here: {percentOf(charging.qos)}
+      {charging.usable ? "" : " — too little for an electric car"}
+      {where.length > 0 ? ` (${where.join("; ")})` : ""}.
+    </div>
+  );
 }
 
 export function DwellingPanel({ building, dwelling, allBuildings, realPlants, onBack, onClose }: DwellingPanelProps) {
@@ -112,9 +135,11 @@ export function DwellingPanel({ building, dwelling, allBuildings, realPlants, on
 
       <h3 className="section-heading">Mobility</h3>
       {mobilitySlots.map((slot) => {
+        const charging = slotCharging(building, dwelling, slot.slotIndex, simTimeMs);
         const isCarEV = slot.vehicleType === "carEV";
-        const slotW = slotChargingPowerW(building.egid, dwelling, slot.slotIndex, slot.mode, slot.vehicleType, simTimeMs, tariff);
-        const session = isCarEV ? evSessionForSlot(building.egid, dwelling, slot.slotIndex, dayIndex, tariff) : null;
+        const atHome = isCarEV && charging?.kind !== "public";
+        const slotW = atHome ? slotChargingPowerW(building.egid, dwelling, slot.slotIndex, slot.mode, slot.vehicleType, simTimeMs, tariff) : 0;
+        const session = atHome ? evSessionForSlot(building.egid, dwelling, slot.slotIndex, dayIndex, tariff) : null;
         const sessionStartsOffPeak =
           session && isOffPeakHour(tariff, ((((session.startMs % DAY_MS) + DAY_MS) % DAY_MS) / 3_600_000));
         return (
@@ -128,12 +153,13 @@ export function DwellingPanel({ building, dwelling, allBuildings, realPlants, on
                   </span>
                 )}
               </span>
-              {isCarEV ? (
+              {atHome ? (
                 <span className={`device-watts${slotW === 0 ? " off" : ""}`}>{formatWatts(slotW)}</span>
               ) : (
-                <span className="device-status">No charging</span>
+                <span className="device-status">{isCarEV ? "Charges away" : "No charging"}</span>
               )}
             </div>
+            {charging && <ChargingNote charging={charging} />}
             {session && (
               <div className="ev-session-note">
                 Tonight: {formatHourOfDay(session.startMs)}–{formatHourOfDay(session.endMs)}

@@ -844,7 +844,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Separately, a car wears out after about 14 years and a bike after 8–10, and is replaced by the same kind. Whether the new one is electric is a real choice, made like a heating replacement (see \"When things wear out\"): the price less grants, the running costs (electricity against petrol, at the prices in Town hall → Prices), and how the owner leans. The electric share at the start is the town's real one, from the federal vehicle register.",
       ),
       p(
-        "An electric car needs somewhere to charge. A home that can charge at home pays the household electricity price; one that can't — most flats — needs a public charger with room in reach, pays its price and puts up with the hassle. With no such charger, an electric car isn't an option for it (see \"Public charging\"). About a third of electric car owners wait for the night rate, if the car will still be charged by morning; a day's driving takes 6–16 kWh.",
+        "An electric car needs somewhere to charge. A home that can charge at home pays the household electricity price; one that can't — most flats — relies on public chargers and, for some, charging at work: it pays their price and puts up with the hassle, and with too little of it, an electric car isn't an option (see \"Public charging\"). About a third of electric car owners wait for the night rate, if the car will still be charged by morning; a day's driving takes 6–16 kWh.",
       ),
       p("A home's panel shows how its people get around, and every change of car, bike or habit."),
       note("E-bikes use too little electricity to show, and an ordinary bike almost always wins over an e-bike on price."),
@@ -855,22 +855,37 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Public charging",
     blocks: [
       p(
-        "Whether a home can charge at home — its own parking space, a wallbox allowed — is fixed: most house owners can, only about a third of flats can. The rest can run an electric car only with a public charger they can rely on in reach: an on-street charger within about 300 m (it charges overnight, so it must be a walk away), or a fast-charging hub within 1.5 km (a weekly errand). Without one, an electric car is ruled out when their car is next replaced.",
+        "Whether a home can charge at home — its own parking space, a wallbox allowed — is fixed: most house owners can, only about a third of flats can. The rest rely on charging elsewhere, and how well that works is a matter of degree: the quality of their charging, from 0 to 100% — roughly, how much of it they can do without trouble.",
       ),
       p(
-        "With one, the household weighs the electric car as always (see \"Cars, bikes & getting around\"), but its running cost is the charger's price plus the hassle of charging in public — more the further away the charger, and more as it fills up. An empty on-street charger next door makes an electric car about as good a deal as a petrol one, so where chargers are, and what they cost, tips many decisions.",
+        "Each public charger offers it to the homes around: best close by, fading with the distance along the streets — not as the crow flies, so a railway or a river with no crossing near counts against it:",
       ),
       list([
-        "On-street chargers are cheap to build and to charge at, but serve only the streets around them, and a busy one means nights without a free spot.",
-        "Fast-charging hubs cost ten times as much and charge more per kWh, but serve everyone within 1.5 km, hold far more vehicles per point, and being busy hardly matters. Where on-street chargers are full, people turn to a hub. Your own hubs charge what you set: cheap, they win over many households — and fill up.",
-        "Lorry charging parks are for businesses' lorries and vans only: four or eight high-power bays with room for about four lorries each, serving the whole town. Only the municipality builds them. Around 30 Rp/kWh, they fill up; at 40, only lorries without a depot use them.",
-        "Room: an on-street point serves about 3 cars that rely on it, a fast-charging point about 30. A van takes about two cars' room, a lorry about twenty. A vehicle stays with the charger it picked until it is replaced, and a full charger takes no new ones.",
+        "On-street chargers — up to 90%: the car charges overnight while you sleep, so it must be a walk away. Full within about 200 m on foot, gone by 500 m.",
+        "Fast-charging hubs — up to 50%: a weekly stop with a wait. Full within about 1 km by road, fading out by 4 km.",
+        "Shops' car parks — up to 30%: a top-up while you shop. Within about 500 m by road, fading out by 3 km. They come with the town; you can't build them.",
+        "Charging at work — 45%, for drivers whose employer has chargers in its car park: about one in eight today, more each year as employers equip theirs, and more with the workplace charging programme. It doesn't depend on where you live.",
       ]),
       p(
-        "The town starts with its real public chargers, run privately. Private operators react every New Year: where people would have gone electric with an on-street charger close by but found none with room, they add points or open new on-street sites. They charge 45 Rp/kWh on-street and 55 Rp/kWh at fast chargers, and leave hubs to you.",
+        "A busy charger is less use. Once an on-street charger is more than about 60% full, finding a free spot gets harder, and when full it is worth less than half as much; a hub hardly suffers until it is nearly full. A quarter over its room, a charger takes nobody new.",
       ),
       p(
-        "To build your own, open the EV charging tool, pick a kind and size, and click where it should go; it lands at the nearest street, and a blue circle shows who it would serve:",
+        "Different kinds of charging add up, each covering part of what the others leave: an on-street charger next door (90%) and charging at work (45%) make 95%. Two of the same kind don't: two hubs do the same job, so only the better one counts.",
+      ),
+      p(
+        "Below 10%, an electric car is ruled out when the car is next replaced. Above, the household weighs the electric car as always (see \"Cars, bikes & getting around\"), but its running cost is the chargers' price plus a hassle that shrinks as the quality rises — about CHF 750 a year at 10%, about CHF 130 with an empty on-street charger next door, which makes an electric car about as good a deal as a petrol one. So where chargers are, how busy they are and what they cost tips many decisions. The car then does its charging at its chargers in proportion to what each contributes, and stays with them until it is replaced.",
+      ),
+      list([
+        "On-street chargers are cheap to build and to charge at, but serve only the streets around them, and fill up quickly.",
+        "Fast-charging hubs cost ten times as much and charge more per kWh, but serve a wide area, hold far more vehicles per point, and being busy hardly matters. A hub alone makes an electric car a close call for many; with on-street chargers or charging at work besides, it tips the balance. Your own hubs charge what you set: cheap, they win over many households — and fill up.",
+        "Lorry charging parks are for businesses' lorries and vans only: four or eight high-power bays with room for about four lorries each, serving the whole town. Only the municipality builds them. Around 30 Rp/kWh, they fill up; at 40, only lorries without a depot use them.",
+        "Room: an on-street point serves about 3 cars that rely on it fully, a fast-charging point about 30 — a car doing half its charging there takes half the room. A van takes about two cars' room, a lorry about twenty.",
+      ]),
+      p(
+        "The town starts with its real public chargers, run privately. Private operators react every New Year: where people would have gone electric with an empty on-street charger next door but didn't, they add points to busy sites or open new on-street ones. They charge 45 Rp/kWh on-street and 55 Rp/kWh at fast chargers, and leave hubs to you.",
+      ),
+      p(
+        "To build your own, open the EV charging tool, pick a kind and size, and click where it should go; it lands at the nearest street, and blue lines show how far along the streets it would reach — the stronger, the better the charging there:",
       ),
       list([
         "On-street: 4 points for CHF 60,000, 8 for 100,000 or 12 for 135,000, ready in 4–6 months. It can be enlarged later, for the difference plus CHF 15,000, in three months.",
@@ -881,9 +896,11 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "A charger is paid the day it is ordered; after that, the municipality earns what it sells and pays its upkeep. Building big from the start is cheaper, if the demand is there; build costs follow technology prices. Chargers at the municipality's own buildings are ordered in the Public buildings tool. The right-to-charge law obliges landlords to allow wallboxes, so some households who couldn't charge at home now can.",
       ),
       p(
-        "The EV charging tool shows every charger from green (room to spare) to red (full), larger for more points: yours as circles, private ones as squares, with a black ring around a hub and a violet one around a lorry park. Buildings are coloured by what most of their households could do. The coverage toggles shade where on-street chargers, hubs or lorry parks reach, so the gaps stand out. The drawer shows how the town's households stand, how many wanted an electric car last year but had nowhere to charge, and for the charger you click: who runs it, its price, who relies on it, how busy it is and its use year by year.",
+        "The EV charging tool shows every charger from green (room to spare) to red (full), larger for more points: yours as circles, private ones as squares, with a black ring around a hub and a violet one around a lorry park. Buildings are coloured by what most of their households could do: charge at home, or the quality of public charging there, from very good to too little for an electric car (charging at work, each person's own, aside). The coverage toggles show how far on-street chargers, shops, hubs and lorry parks reach along the streets, so the gaps stand out. The drawer shows how the town's households stand, how many drivers can charge at work, how many wanted an electric car last year but lacked the charging, and for the charger you click: who runs it, its price and reach, who relies on it, how busy it is and its use year by year. A home's panel shows, for each of its drivers, where their electric car charges — or how good the charging would be if they went electric.",
       ),
-      note("Charging distances, how many cars a point serves, the hassle and the chargers' costs are estimates. Public charging isn't on a home's bill, and charging at work isn't part of the game."),
+      note(
+        "How much each kind of charging does, how fast it fades, how many cars a point serves, the hassle and the chargers' costs are estimates. Which shop car parks count as shops is read from the chargers' names. Charging at work is drawn where people work, off the town's grid, and public charging isn't on a home's bill.",
+      ),
     ],
   },
   {
@@ -894,13 +911,13 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Businesses run vans and lorries too. How many are registered in the town, and how many are electric, comes from the federal vehicle register where it is available (otherwise the Swiss average for a town of its size); they are spread over the buildings by floor area and use — warehouses, industry and workshops get the most, shops fewer, offices few. About one in eight is a lorry. A building's panel lists its vans and lorries, and where the electric ones charge.",
       ),
       p(
-        "Each vehicle lasts about ten years and is replaced by the same kind of decision as a household's car, only more businesslike. An electric van costs more to buy but far less to run, above all when it charges overnight in its own yard at the night rate — once a charger is installed: a wallbox for a van (about CHF 3,000), a high-power charger and usually a stronger connection for a lorry (about CHF 80,000). Most vehicles at industry and warehouses have a yard, fewer at shops and offices. Without one, a business needs a public charger with room — a van on-street, at a hub or a lorry park, a lorry only at a hub or a lorry park.",
+        "Each vehicle lasts about ten years and is replaced by the same kind of decision as a household's car, only more businesslike. An electric van costs more to buy but far less to run, above all when it charges overnight in its own yard at the night rate — once a charger is installed: a wallbox for a van (about CHF 3,000), a high-power charger and usually a stronger connection for a lorry (about CHF 80,000). Most vehicles at industry and warehouses have a yard, fewer at shops and offices. Without one, a business relies on public chargers, the same way a household without a charger at home does (see \"Public charging\") — a van on-street, at a hub or a lorry park, a lorry only at a hub or a lorry park.",
       ),
       p(
         "Lorries pay the heavy vehicle fee (LSVA) on diesel — about CHF 18,000 a year for a local delivery lorry — and electric lorries are exempt through 2030. Until then an electric lorry is the cheaper choice for a business with a depot. A lorry without one needs room at a hub (where it takes about twenty cars' worth) or a lorry charging park, which only you build. Vans without a yard rarely go electric: charging in public costs them more than the diesel they save.",
       ),
       list([
-        "Their electricity counts as car charging — in the business's yard, or at the public charger.",
+        "Their electricity counts as car charging — in the business's yard, or at public chargers.",
         "Their diesel counts toward transport emissions.",
         "A federal end to new petrol and diesel car sales covers vans, not lorries.",
       ]),

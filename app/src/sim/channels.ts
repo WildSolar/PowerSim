@@ -40,6 +40,7 @@ export interface Channels {
   progressiveNudgeRp: number; // Rp/year added to every household's progressive lean (climate-awareness campaigns)
   agriPvDialogue: number; // 0 or 1: the Agri-PV dialogue runs, building acceptance of solar on farmland (agriPv.ts)
   homeChargingBoost: number; // 0-1: share of the households who couldn't charge at home who now can (right to charge)
+  workChargingBoost: number; // 0-1: share of the drivers who couldn't charge at work who now can (workplace charging programme)
   publicBuildingChargerSitesPerYear: number; // charging sites the municipality puts at its own buildings each year
   publicBuildingChargerPoints: number; // how many points each of those gets
   heatPumpLoadControlShare: number; // 0-1: heat pumps the utility may switch off in turns at peaks
@@ -83,6 +84,7 @@ export const CHANNEL_DEFAULTS: Channels = {
   progressiveNudgeRp: 0,
   agriPvDialogue: 0,
   homeChargingBoost: 0,
+  workChargingBoost: 0,
   publicBuildingChargerSitesPerYear: 0,
   publicBuildingChargerPoints: 4,
   heatPumpLoadControlShare: 0,
@@ -131,6 +133,7 @@ const COMBINERS: { [K in keyof Channels]: Combiner<Channels[K]> } = {
   progressiveNudgeRp: sum,
   agriPvDialogue: max,
   homeChargingBoost: max,
+  workChargingBoost: max,
   publicBuildingChargerSitesPerYear: sum,
   publicBuildingChargerPoints: max,
   heatPumpLoadControlShare: max,

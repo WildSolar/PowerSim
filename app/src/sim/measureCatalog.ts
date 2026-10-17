@@ -148,6 +148,19 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     effects: (p) => ({ publicBuildingChargerSitesPerYear: num(p, "perYear"), publicBuildingChargerPoints: Number(p.points ?? 4) }),
     approval: () => ({ climate: 0.4, drivers: 0.2, tenants: 0.15 }),
   },
+  {
+    id: "workplace-charging",
+    category: "subsidy",
+    topic: "mobility",
+    title: "Workplace charging programme",
+    summary:
+      "Grants and advice for employers to put chargers in their staff car parks. More drivers can then charge at work — a good part of their week's charging, wherever they live — which helps most those without a charger at home or close by. A running cost, in proportion to how many employers it reaches.",
+    params: [{ kind: "slider", key: "reach", label: "Employers it reaches", min: 0, max: 60, step: 10, unit: "% of those without chargers", default: 30 }],
+    leadTimeMonths: 12,
+    effects: (p) => ({ workChargingBoost: num(p, "reach") / 100 }),
+    annualCostRp: (p, ctx) => (num(p, "reach") / 100) * ctx.residents * 6 * CHF,
+    approval: () => ({ climate: 0.25, drivers: 0.15, business: 0.1 }),
+  },
 
   {
     id: "heat-pump-load-control",

@@ -87,6 +87,19 @@ class StreetNetwork {
     return this.segments[id];
   }
 
+  /** A segment's line in metres, in the network's own local projection (toXY). */
+  lineXY(id: number): XY[] {
+    return this.linesXY[id] ?? [];
+  }
+
+  toXY(lon: number, lat: number): XY {
+    return this.projection.toXY(lon, lat);
+  }
+
+  toLonLat(x: number, y: number): [number, number] {
+    return this.projection.toLonLat(x, y);
+  }
+
   /** Every junction along a segment, ends included. */
   nodesOf(id: number): number[] {
     const s = this.segments[id];

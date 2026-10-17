@@ -1,10 +1,23 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { BUILD_SPEC, CARS_PER_POINT, REACH_M, type ChargingKind } from "../config/charging";
+import { BUILD_SPEC, CARS_PER_POINT, MAX_FILL, QOS_CURVE, QOS_FLOOR, type ChargingKind, type QosKind } from "../config/charging";
 import { COVERAGE_COLOR } from "../map/colorModes";
 import { formatDate, toDateMs, toSimTimeMs } from "../sim/calendar";
 import { simClock } from "../sim/engine";
 import { existsAt } from "../sim/lifetime";
-import { buildCostRp, buildMonthsFor, sizesFor, upgradeCostRp, publicCharging, siteCapacityAt, sitePriceRpPerKWh, type ChargingSite, type VehicleCounts } from "../sim/publicCharging";
+import {
+  buildCostRp,
+  buildMonthsFor,
+  qosKindOf,
+  qosReachM,
+  sizesFor,
+  upgradeCostRp,
+  publicCharging,
+  siteCapacityAt,
+  sitePriceRpPerKWh,
+  workChargingShareAt,
+  type ChargingSite,
+  type VehicleCounts,
+} from "../sim/publicCharging";
 import { fleets } from "../sim/fleet";
 import { mapFocus } from "../map/mapFocus";
 import { useSimDay } from "../sim/store";
@@ -20,9 +33,20 @@ const QUARTER_HOUR_MS = 15 * 60_000;
 const HISTORY_YEARS = 8;
 
 const KIND_LABEL: Record<ChargingKind, string> = { ac: "On-street", dc: "Fast charging", fleet: "Lorries and vans only" };
+/** "200 m", "1 km", "1.5 km". */
+function distanceLabel(m: number): string {
+  return m >= 1000 ? `${Number((m / 1000).toFixed(1))} km` : `${m} m`;
+}
+
+/** How far a kind of charger reaches, for the player: full quality up to here, nothing from there. */
+function reachLabel(kind: QosKind): string {
+  const how = kind === "ac" ? "on foot" : "by road";
+  return `best within ${distanceLabel(QOS_CURVE[kind].plateauM)} ${how}, fading out by ${distanceLabel(qosReachM(kind))}`;
+}
+
 const BUILD_HINT: Record<ChargingKind, string> = {
-  ac: "Cars and vans within 300 m, charging overnight",
-  dc: "Cars and vans within 1.5 km, and lorries",
+  ac: `Cars and vans charging overnight — ${reachLabel("ac")}`,
+  dc: `Cars and vans, and lorries — ${reachLabel("dc")}`,
   fleet: "Businesses' lorries and vans only, across the town",
 };
 const KIND_ICON: Record<ChargingKind, string> = { ac: "", dc: "⚡ ", fleet: "🚚 " };
@@ -72,8 +96,14 @@ const KIND_FILTERS: { id: KindFilter; label: string }[] = [
 ];
 const BUSIEST_COUNT = 6;
 
-const COVERAGE_LABEL: Record<ChargingKind, string> = { ac: "On-street", dc: "Fast charging", fleet: "Lorry parks" };
-const NONE_YET: Record<ChargingKind, string> = { ac: "No on-street chargers yet", dc: "No fast-charging hubs yet", fleet: "No lorry charging parks yet" };
+const COVERAGE_KINDS: QosKind[] = ["ac", "shop", "dc", "fleet"];
+const COVERAGE_LABEL: Record<QosKind, string> = { ac: "On-street", shop: "Shops", dc: "Fast charging", fleet: "Lorry parks" };
+const NONE_YET: Record<QosKind, string> = {
+  ac: "No on-street chargers yet",
+  shop: "No chargers in shops' car parks",
+  dc: "No fast-charging hubs yet",
+  fleet: "No lorry charging parks yet",
+};
 
 function formatMWh(kWh: number): string {
   return kWh >= 10_000 ? `${Math.round(kWh / 1000)} MWh` : `${(kWh / 1000).toFixed(1)} MWh`;
@@ -142,7 +172,7 @@ export function ChargerCard() {
   const site = selectedId ? publicCharging.getSite(selectedId) : undefined;
   if (!site) return null;
   return (
-    <InspectCard kicker={`${KIND_LABEL[site.kind]} charger`} title={site.name} onClose={() => publicCharging.select(null)}>
+    <InspectCard kicker={site.shop ? "Charger in a shop's car park" : `${KIND_LABEL[site.kind]} charger`} title={site.name} onClose={() => publicCharging.select(null)}>
       <SiteDetails site={site} now={now} />
     </InspectCard>
   );
@@ -172,17 +202,26 @@ function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
         <span>Price</span>
         <span className="info-value">{sitePriceRpPerKWh(site)} Rp/kWh</span>
       </div>
+      {site.kind !== "fleet" && (
+        <div
+          className="info-row"
+          title={`How much of a household's charging it can do at best: ${Math.round(QOS_CURVE[qosKindOf(site)].ceiling * 100)}%, less the further away along the streets, and less as it fills up. The blue lines on the map show how far it reaches.`}
+        >
+          <span>Reach</span>
+          <span className="info-value">{reachLabel(qosKindOf(site))}</span>
+        </div>
+      )}
       {building ? (
         <p className="dh-note">Being built — opens {formatDate(site.openedAtMs)}.</p>
       ) : (
         <>
-          <div className="info-row">
+          <div className="info-row" title="Vehicles that do some or all of their charging here">
             <span>Relying on it</span>
             <span className="info-value">{vehicleList(stats.vehicles)}</span>
           </div>
           <div
             className="info-row"
-            title={`Each charge point serves about ${CARS_PER_POINT[site.kind]} cars that rely on it; a van takes about two cars' room, a lorry about twenty. A full site takes no new vehicles.`}
+            title={`Each charge point serves about ${CARS_PER_POINT[site.kind]} cars that rely on it fully (one charging half its needs here takes half that room); a van takes about two cars' room, a lorry about twenty. The fuller it gets, the less use it is to anyone — a busy charger means hunting for a free spot — and past ${Math.round(MAX_FILL * 100)}% it takes nobody new.`}
           >
             <span>Room taken</span>
             <span className="info-value">
@@ -260,11 +299,12 @@ export function EvChargingPanel() {
   const town = useMemo(() => {
     const standing = buildings.filter((b) => existsAt(b, simDay));
     let households = 0;
-    const byAccess = { home: 0, public: 0, fastOnly: 0, full: 0, none: 0 };
+    const byAccess = { home: 0, q4: 0, q3: 0, q2: 0, q1: 0, none: 0 };
     for (const access of publicCharging.householdAccess(standing, simDay).values()) {
       households += access.households;
       byAccess.home += access.atHome;
-      byAccess[access.others] += access.households - access.atHome;
+      const q = access.qos;
+      byAccess[q >= 0.75 ? "q4" : q >= 0.5 ? "q3" : q >= 0.25 ? "q2" : q >= QOS_FLOOR ? "q1" : "none"] += access.households - access.atHome;
     }
     return {
       households,
@@ -295,14 +335,14 @@ export function EvChargingPanel() {
 
   const overview = (
     <>
-      <div className="ev-coverage" title="Show where each kind of charger reaches — everything inside the shaded area has one in reach (chargers being built included)">
+      <div className="ev-coverage" title="Show how far each kind of charger reaches along the streets — the stronger the colour, the better the charging there (chargers being built included)">
         <span className="ev-coverage-label">Coverage</span>
-        {(["ac", "dc", "fleet"] as ChargingKind[]).map((kind) => (
+        {COVERAGE_KINDS.map((kind) => (
           <button
             key={kind}
             className={`ev-coverage-toggle${coverage.has(kind) ? " on" : ""}`}
-            disabled={!publicCharging.getSites().some((s) => s.kind === kind)}
-            title={publicCharging.getSites().some((s) => s.kind === kind) ? undefined : NONE_YET[kind]}
+            disabled={!publicCharging.getSites().some((s) => qosKindOf(s) === kind)}
+            title={publicCharging.getSites().some((s) => qosKindOf(s) === kind) ? reachLabel(kind) : NONE_YET[kind]}
             onClick={() => publicCharging.toggleCoverage(kind)}
           >
             <span className="ev-coverage-swatch" style={{ background: COVERAGE_COLOR[kind] }} />
@@ -317,7 +357,7 @@ export function EvChargingPanel() {
           {town.usage.sites} · {town.usage.points} points
         </span>
       </div>
-      <div className="info-row" title="Electric cars of households without home charging, and businesses' vans and lorries without a yard to charge in, each booked to the public charger it relies on">
+      <div className="info-row" title="Electric cars of households without home charging, and businesses' vans and lorries without a yard to charge in, that rely on public chargers">
         <span>Charging publicly</span>
         <span className="info-value">{vehicleList(town.usage.vehicles)}</span>
       </div>
@@ -329,30 +369,41 @@ export function EvChargingPanel() {
       </div>
       <UsageBar used={town.usage.users} capacity={town.usage.capacity} />
 
-      <div className="ev-access" title="Of every household in the municipality, whether or not it has an electric car yet">
+      <div
+        className="ev-access"
+        title="Of every household in the municipality, whether or not it has an electric car yet. For those who can't charge at home: how much of their charging the public chargers around could do — how close they are along the streets, and how busy. Charging at work comes on top, for those who can."
+      >
         <div className="info-row">
           <span>Households that can charge at home</span>
           <span className="info-value">{percent(town.byAccess.home, town.households)}</span>
         </div>
         <div className="info-row">
-          <span>…else an on-street charger with room</span>
-          <span className="info-value">{percent(town.byAccess.public, town.households)}</span>
+          <span>…else public charging very good (75%+)</span>
+          <span className="info-value">{percent(town.byAccess.q4, town.households)}</span>
         </div>
         <div className="info-row">
-          <span>…only a fast-charging hub</span>
-          <span className="info-value">{percent(town.byAccess.fastOnly, town.households)}</span>
+          <span>…good (50–75%)</span>
+          <span className="info-value">{percent(town.byAccess.q3, town.households)}</span>
         </div>
         <div className="info-row">
-          <span>…only full chargers nearby</span>
-          <span className="info-value">{percent(town.byAccess.full, town.households)}</span>
+          <span>…fair (25–50%)</span>
+          <span className="info-value">{percent(town.byAccess.q2, town.households)}</span>
         </div>
         <div className="info-row">
-          <span>…no charger nearby</span>
+          <span>…poor (10–25%)</span>
+          <span className="info-value">{percent(town.byAccess.q1, town.households)}</span>
+        </div>
+        <div className="info-row">
+          <span>…too little for an electric car</span>
           <span className="info-value">{percent(town.byAccess.none, town.households)}</span>
         </div>
       </div>
-      <div className="info-row" title="Households and businesses that bought a petrol or diesel vehicle in the last 12 months but would have gone electric with a public charger close by. Private operators build on-street chargers where this gathers; lorries need a fast-charging hub, which they leave to the municipality.">
-        <span>Wanted an EV, no charger (12 mo.)</span>
+      <div className="info-row" title="Drivers whose employer has chargers in its car park — more each year, and more with a workplace charging programme. It adds to whatever public charging they have near home.">
+        <span>Drivers who can charge at work</span>
+        <span className="info-value">{percent(workChargingShareAt(simDay), 1)}</span>
+      </div>
+      <div className="info-row" title="Households and businesses that bought a petrol or diesel vehicle in the last 12 months but would have gone electric with an empty public charger next door. Private operators build on-street chargers where this gathers; lorries need a fast-charging hub, which they leave to the municipality.">
+        <span>Wanted an EV, lacked charging (12 mo.)</span>
         <span className="info-value">{town.unmet}</span>
       </div>
       <div className="ev-access" title="Businesses' goods vehicles — the town's total is from the federal vehicle register">
@@ -415,8 +466,8 @@ export function EvChargingPanel() {
           <p className="dh-note">
             Click on the map where the{" "}
             {placing.kind === "ac" ? `${placing.points} on-street chargers` : `${BUILD_SPEC[placing.kind].label.toLowerCase()} (${placing.points} points)`} should
-            go — placed at the nearest street. The blue circle shows who {placing.kind === "ac" ? "they'd" : "it'd"} serve (
-            {REACH_M[placing.kind] >= 1000 ? `${REACH_M[placing.kind] / 1000} km` : `${REACH_M[placing.kind]} m`}).
+            go — placed at the nearest street. The blue lines show how far along the streets {placing.kind === "ac" ? "they'd" : "it'd"} reach: the stronger, the
+            better the charging there ({reachLabel(placing.kind)}).
           </p>
           <div className="dh-actions">
             <button onClick={() => publicCharging.startPlacing(null)}>Cancel</button>
