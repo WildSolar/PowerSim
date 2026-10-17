@@ -25,7 +25,7 @@ export const CHANGELOG: Release[] = [
     version: "0.5.1",
     date: null,
     fixed: [
-      "The game no longer stalls for a moment at the turn of each month: the month's accounts and the grid's meter readings are worked out bit by bit in the background as the month goes by, so little is left to do when it ends.",
+      "The game no longer stalls for a moment at the turn of each month or year: the month's accounts and the grid's meter readings are worked out bit by bit in the background as the month goes by, so little is left to do when it ends, and drivers charging in public take their yearly look at their chargers spread over the year rather than all on New Year's Day.",
     ],
   },
   {

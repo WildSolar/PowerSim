@@ -658,22 +658,28 @@ class PublicCharging {
 
   /** Who looks at their charging again (mobility.ts for households' cars, fleet.ts for businesses'
    * vans and lorries): called for each vehicle with bookings, as `(slotKey, slot, atMs, changed)` —
-   * every New Year (`changed` null), and at the start of a month in which a site opened or grew
-   * (`changed`: those sites). */
+   * once a year, each vehicle at the start of a month of its own (`changed` null), and at the start
+   * of a month in which a site opened or grew (`changed`: those sites). */
   addReviewer(review: (slotKey: string, slot: unknown, atMs: number, changed: ChargingSite[] | null) => void): void {
     this.reviewers.push(review);
   }
 
-  /** The vehicles' review at the start of month `month` (year * 12 + month), if it calls for one. */
+  /** The vehicles' review at the start of month `month` (year * 12 + month): the twelfth of them whose
+   * yearly look is due, and — if a site opened or grew the month before — those that have it in reach. */
   private reviewRound(month: number): boolean {
     const atMs = toSimTimeMs(Date.UTC(Math.floor(month / 12), month % 12, 1));
     const fromMs = toSimTimeMs(Date.UTC(Math.floor((month - 1) / 12), (month + 11) % 12, 1));
-    const changed = month % 12 === 0 ? null : this.sites.filter((s) => (s.openedAtMs >= fromMs && s.openedAtMs < atMs) || s.expansions.some((e) => e.atMs >= fromMs && e.atMs < atMs));
-    if (changed && changed.length === 0) return false;
-    const due: [string, unknown][] = [];
-    for (const [key, list] of this.bySlot) if (list.some((a) => a.fromMs <= atMs && atMs < a.toMs)) due.push([key, list[list.length - 1].slot]);
-    for (const [key, slot] of due) for (const review of this.reviewers) review(key, slot, atMs, changed);
-    return true;
+    const changed = this.sites.filter((s) => (s.openedAtMs >= fromMs && s.openedAtMs < atMs) || s.expansions.some((e) => e.atMs >= fromMs && e.atMs < atMs));
+    let reviewed = false;
+    for (const [key, list] of [...this.bySlot]) {
+      if (!list.some((a) => a.fromMs <= atMs && atMs < a.toMs)) continue;
+      const yearly = hashSeed(key, "charging-review") % 12 === month % 12;
+      if (!yearly && changed.length === 0) continue;
+      const slot = list[list.length - 1].slot;
+      for (const review of this.reviewers) review(key, slot, atMs, yearly ? null : changed);
+      reviewed = true;
+    }
+    return reviewed;
   }
 
   /** The public sites a vehicle's current bookings are at, `atMs` (charging at work aside). */

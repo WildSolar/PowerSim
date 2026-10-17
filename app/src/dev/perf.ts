@@ -16,6 +16,7 @@ import { buildingPowerW } from "../sim/buildingPower";
 import { snowDepthCm } from "../sim/snow";
 import { sampleMunicipalityLast24h } from "../sim/rollingHistory";
 import { simClock } from "../sim/engine";
+import { tariffDeadline } from "../sim/tariffDeadline";
 import { startDevTiming, stopDevTiming } from "../sim/devTiming";
 import { tariffStore } from "../sim/tariffStore";
 import { historyTimeSteps, sampleMunicipalityCategorySeries, type CategorySeries } from "../sim/history";
@@ -61,6 +62,17 @@ function unthrottledYield(): Promise<void> {
   });
 }
 
+/** Moves the clock to `atMs`, getting past the tariff deadline's hold on the way (this year's prices
+ * kept, as autoplay.ts does). */
+async function jumpTo(atMs: number): Promise<void> {
+  for (let i = 0; i < 5; i++) {
+    simClock.pauseAt(atMs);
+    await sleep(50);
+    if (!tariffDeadline.get()) return;
+    tariffDeadline.keepPrices();
+  }
+}
+
 async function sleep(ms: number): Promise<void> {
   const until = performance.now() + ms;
   do await unthrottledYield();
@@ -71,7 +83,7 @@ async function sleep(ms: number): Promise<void> {
  * each section has finished, and the longest the main thread was blocked meanwhile. While it runs,
  * zero-delay setTimeouts (the computations' own yields) go through a MessageChannel instead, so the
  * numbers match a visible tab even when the browser pane is hidden. */
-export async function timeYearEndReport(waitForPrefetch = true): Promise<Record<string, number | string>> {
+export async function timeYearEndReport(waitForPrefetch = true, prefill = true): Promise<Record<string, unknown>> {
   const realSetTimeout = window.setTimeout;
   window.setTimeout = ((handler: TimerHandler, ms?: number, ...args: unknown[]) => {
     if (ms || typeof handler !== "function") return realSetTimeout(handler, ms, ...args);
@@ -80,34 +92,59 @@ export async function timeYearEndReport(waitForPrefetch = true): Promise<Record<
   }) as typeof window.setTimeout;
   try {
     const year = new Date(toDateMs(simClock.getSimTimeMs())).getUTCFullYear();
-    simClock.pauseAt(toSimTimeMs(Date.UTC(year, 11, 31, 23, 0)));
+    await jumpTo(toSimTimeMs(Date.UTC(year, 11, 31, 23, 0)));
     await sleep(200);
     // In normal play the months before December were sampled in the background long before New Year.
     const prefetchStart = performance.now();
     while (waitForPrefetch && yearPassPrefetchBusy() && performance.now() - prefetchStart < 120_000) await sleep(100);
+    // What the background would have taken of December ahead (yearPassPrefetch.ts).
+    let prefilled = 0;
+    if (prefill) {
+      const realPlants = (await (await fetch(dataUrl("schlieren.json"))).json()).powerPlants;
+      const at = toSimTimeMs(Date.UTC(year, 11, 31, 23, 0));
+      while (prefillMonthSample(stock.getAll(), realPlants, at) || grid.prefillReading(at)) {
+        prefilled++;
+        await unthrottledYield();
+      }
+    }
+    await sleep(300);
+    startDevTiming();
+    const profiler = startProfiler();
     const t0 = performance.now();
     // A jump rather than setSpeed: the clock runs on requestAnimationFrame, which a hidden tab never fires.
     simClock.pauseAt(toSimTimeMs(Date.UTC(year + 1, 0, 1, 0, 1)));
+    const notifyMs = Math.round(performance.now() - t0);
     while (reportCardStore.get() === null) await sleep(10);
-    const out: Record<string, number | string> = {
+    const out: Record<string, unknown> = {
       year,
+      prefilled,
       prefetchWaitMs: Math.round(t0 - prefetchStart),
+      notifyMs,
       msUntilShown: Math.round(performance.now() - t0),
     };
     const shownAt = performance.now();
     let last = shownAt;
     let longestBlockMs = 0;
+    const blocks: { at: number; ms: number }[] = [];
+    let lastCheck = 0;
     for (;;) {
-      await sleep(20);
+      await unthrottledYield();
       const now = performance.now();
-      longestBlockMs = Math.max(longestBlockMs, now - last - 20);
+      longestBlockMs = Math.max(longestBlockMs, now - last);
+      if (now - last > 30) blocks.push({ at: Math.round(last - t0), ms: Math.round(now - last) });
       last = now;
-      const shell = document.querySelector(".report-card-shell");
-      if (!shell) continue;
-      const headings = [...shell.querySelectorAll("h2")];
-      const pending = headings.filter(
-        (h) => h.nextElementSibling?.classList.contains("loading-note") || h.nextElementSibling?.nextElementSibling?.classList.contains("loading-note"),
-      );
+      if (now - lastCheck < 50) continue;
+      lastCheck = now;
+      const shell = document.querySelector(".year-review");
+      if (!shell) {
+        if (now - shownAt > 120_000) break;
+        continue;
+      }
+      const headings = [...shell.querySelectorAll("h2, h3")];
+      const pending = headings.filter((h) => {
+        const section = h.parentElement;
+        return !!section?.querySelector(".loading-note") || section?.querySelector(".yr-value")?.textContent === "…";
+      });
       for (const h of headings) {
         const key = `ms done: ${h.textContent}`;
         if (!(key in out) && !pending.includes(h)) out[key] = Math.round(now - shownAt);
@@ -115,8 +152,12 @@ export async function timeYearEndReport(waitForPrefetch = true): Promise<Record<
       if (pending.length === 0 || now - shownAt > 120_000) break;
     }
     out.msAllSections = Math.round(performance.now() - shownAt);
-    out.reportText = (document.querySelector(".report-card-shell") as HTMLElement | null)?.innerText.replace(/\s+/g, " ").slice(0, 900) ?? "";
+    out.reportText = (document.querySelector(".year-review") as HTMLElement | null)?.innerText.replace(/\s+/g, " ").slice(0, 900) ?? "";
     out.longestMainThreadBlockMs = Math.round(longestBlockMs);
+    out.blocks = blocks;
+    out.blockedMs = blocks.reduce((sum, b) => sum + b.ms, 0);
+    out.pieces = stopDevTiming();
+    out.profile = await summarizeProfile(profiler);
     return out;
   } finally {
     window.setTimeout = realSetTimeout;
@@ -312,7 +353,7 @@ export async function timeMonthTurn(wrap: [Record<string, unknown>, string][] = 
     };
     const d = new Date(toDateMs(simClock.getSimTimeMs()));
     const turn = turnAtMs ?? toSimTimeMs(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + monthsAhead, 1));
-    simClock.pauseAt(turn - 30 * 60_000);
+    await jumpTo(turn - 30 * 60_000);
     await sleep(300);
     while (yearPassPrefetchBusy()) await sleep(100);
     // What the background would have taken ahead during the month (yearPassPrefetch.ts).

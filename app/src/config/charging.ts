@@ -80,7 +80,7 @@ export const MAX_FILL = 1.25;
 // on, and at most QOS_MAX_SOURCES are.
 export const QOS_FLOOR = 0.1;
 
-// A vehicle relying on public charging looks at its charging again every New Year, and when a
+// A vehicle relying on public charging looks at its charging again once a year, and when a
 // charger within its reach opens or grows: it moves (to other chargers, or to a wallbox of its own)
 // if that saves at least this much a year, hassle included — so it doesn't flit between two
 // chargers that are much the same.
