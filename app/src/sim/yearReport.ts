@@ -527,12 +527,14 @@ function recordMonthAssets(buildings: Building[], year: number, month: number, p
   for (const p of plants) if (p.battery && (p.activeToMs === undefined || p.activeToMs > endMs)) homeBatteryKwh += p.battery.kwh;
   const coverage = networkCoverage(standing, endMs);
   const share = (c: { total: number; connected: number; withinReach: number }, which: "connected" | "withinReach") => (c.total > 0 ? c[which] / c.total : 0);
-  const usage = publicCharging.townUsage(endMs);
+  // Who charges where is only known from the start on: the months before it take the start's.
+  const chargingMs = Math.max(endMs, 0);
+  const usage = publicCharging.townUsage(chargingMs);
   let households = 0;
   let withWallbox = 0;
   let without = 0;
   let qosSum = 0;
-  for (const a of publicCharging.householdAccess(standing, endMs).values()) {
+  for (const a of publicCharging.householdAccess(standing, chargingMs).values()) {
     households += a.households;
     withWallbox += a.atHome;
     without += a.households - a.atHome;

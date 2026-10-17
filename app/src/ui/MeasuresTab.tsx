@@ -25,7 +25,7 @@ import { BLOC_LABEL, BLOC_ORDER } from "../config/approval";
 import { EVALUATION_COST_CHF, EVALUATION_LOOKBACK_YEARS, EVALUATION_MONTHS, SURVEY_COST_CHF, SURVEY_MONTHS } from "../config/studies";
 import { useSimDay } from "../sim/store";
 import { treasury } from "../sim/treasury";
-import { formatCHF } from "./format";
+import { formatCHF, formatCHFCompact } from "./format";
 import "./measures.css";
 import "./measuresPage.css";
 import { SupervisionNotice } from "./SupervisionNotice";
@@ -260,11 +260,11 @@ function RemovalProjection({ sharePct, nowMs }: { sharePct: number; nowMs: numbe
   const t = (x: number) => `${Math.round(x).toLocaleString("de-CH")} t`;
   return (
     <div className="measure-note" title="Contracts buy for what is left of the town's emissions, up to the share set, once those are down to a fifth of the baseline year's — paid each January for the year before, at that year's price per tonne (falling over time).">
-      At full cover: about {formatCHF(coverT * price * 100)} a year — {t(coverT)} at CHF {Math.round(price)} a tonne this year.{" "}
+      At full cover: about {formatCHFCompact(coverT * price * 100)} a year — {t(coverT)} at CHF {Math.round(price)} a tonne this year.{" "}
       {lastT === null
         ? `It applies once the town's emissions are down to ${t(lineT)} a year (a fifth of ${BASELINE_YEAR}'s).`
         : lastT <= lineT
-          ? `Last year's ${t(lastT)} are within the line (${t(lineT)}): it would buy ${t(Math.min(coverT, lastT))}, about ${formatCHF(Math.min(coverT, lastT) * price * 100)}.`
+          ? `Last year's ${t(lastT)} are within the line (${t(lineT)}): it would buy ${t(Math.min(coverT, lastT))}, about ${formatCHFCompact(Math.min(coverT, lastT) * price * 100)}.`
           : `It applies once the town's emissions are down to ${t(lineT)} a year; last year they were ${t(lastT)} (${Math.round((lastT / (baseline.totalKgCO2 / 1000)) * 100)}% of ${BASELINE_YEAR}'s).`}
     </div>
   );

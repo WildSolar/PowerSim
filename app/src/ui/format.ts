@@ -22,6 +22,13 @@ export function formatCHF(rp: number): string {
   return `CHF ${chf.toLocaleString("de-CH", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
 }
 
+/** formatCHF, in millions from a million up (CHF 2.72 M). */
+export function formatCHFCompact(rp: number): string {
+  const chf = rp / 100;
+  if (Math.abs(chf) < 1_000_000) return formatCHF(rp);
+  return `CHF ${(chf / 1_000_000).toLocaleString("de-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} M`;
+}
+
 export function formatCO2(kg: number): string {
   const abs = Math.abs(kg);
   if (abs >= 1_000_000) return `${(kg / 1_000_000).toFixed(2)} kt CO₂`;

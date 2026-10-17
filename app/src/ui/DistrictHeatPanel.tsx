@@ -127,7 +127,8 @@ function NetworkCard({ network, peakW, connected, year }: { network: DhNetworkIn
           <div className="info-row dh-total" title="The clean sources together, against the winter peak of the buildings connected now">
             <span>Clean capacity</span>
             <span className="info-value">
-              {formatMW(cleanW)} of {formatMW(peakW)}
+              {formatMW(cleanW)}
+              {peakW > 0 && ` · ${Math.round((cleanW / peakW) * 100)}% of the peak`}
             </span>
           </div>
           <div className="info-row" title={spareW >= 0 ? "How much more peak load the clean sources can take before the boilers start on the coldest days" : "How much of the winter peak the boilers have to make"}>
