@@ -9,10 +9,13 @@ import type { HeatingSystemId } from "./heatingSystems";
 import type { VehicleTypeId } from "./mobilitySystems";
 import { policyStore } from "./policy";
 
-/** Flat municipal grant, Rp, for installing this heating system (heat pumps only). A grant targeted
- * at early replacements is paid only when `early` (a working boiler replaced before its time). */
-export function municipalHeatingSubsidyRp(id: HeatingSystemId, early = false): number {
+/** Flat municipal grant, Rp, for installing this heating system: a heat pump (a grant targeted at
+ * early replacements is paid only when `early` — a working boiler replaced before its time), or a
+ * first connection to district heating (`incumbent`: what it replaces; one already connected
+ * only renews its substation). */
+export function municipalHeatingSubsidyRp(id: HeatingSystemId, early = false, incumbent: HeatingSystemId | null = null): number {
   const p = policyStore.get();
+  if (id === "districtHeating") return incumbent === "districtHeating" ? 0 : p.dhConnectionSubsidyRp;
   if (id !== "airHeatPump" && id !== "groundHeatPump") return 0;
   return p.heatPumpGrantEarlyOnly && !early ? 0 : p.heatPumpSubsidyRp;
 }

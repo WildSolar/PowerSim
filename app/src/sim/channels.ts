@@ -23,6 +23,7 @@ export interface Channels {
 
   // Heating, mobility, retrofits
   heatPumpSubsidyRp: number; // flat municipal grant per heat pump installed
+  dhConnectionSubsidyRp: number; // flat municipal grant per building newly connected to district heating
   heatPumpGrantEarlyOnly: boolean; // ...paid only when it replaces a working oil or gas boiler early
   evSubsidyRp: number; // flat municipal grant per electric car bought
   evGrantEarlyOnly: boolean; // ...paid only when it replaces a working petrol or diesel car early
@@ -70,6 +71,7 @@ export const CHANNEL_DEFAULTS: Channels = {
   homeBatterySubsidyGridFriendly: false,
   municipalSolarBuildingsPerYear: 0,
   heatPumpSubsidyRp: 0,
+  dhConnectionSubsidyRp: 0,
   heatPumpGrantEarlyOnly: false,
   evSubsidyRp: 0,
   evGrantEarlyOnly: false,
@@ -119,6 +121,7 @@ const COMBINERS: { [K in keyof Channels]: Combiner<Channels[K]> } = {
   homeBatterySubsidyGridFriendly: any,
   municipalSolarBuildingsPerYear: sum,
   heatPumpSubsidyRp: sum,
+  dhConnectionSubsidyRp: sum,
   heatPumpGrantEarlyOnly: any,
   evSubsidyRp: sum,
   evGrantEarlyOnly: any,

@@ -42,6 +42,7 @@ function percent(x: number): string {
 
 const SHARED_NOTE: Partial<Record<SubsidyCategory, string>> = {
   vehicle: "All vehicle grants together (electric vehicle grant and scrappage bonus).",
+  heating: "All heating grants together (heat pump grant and district heating connection grant).",
 };
 
 /** What a subsidy programme is known to have done: its uptake, always (the treasury pays it, so the

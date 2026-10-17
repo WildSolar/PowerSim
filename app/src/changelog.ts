@@ -25,6 +25,7 @@ export const CHANGELOG: Release[] = [
     version: "0.5.0",
     date: null,
     added: [
+      "District heating connection grant, a new measure: a flat sum off every first connection to district heating, paid as owners connect. It counts with the heat pump grant in the treasury and in evaluation studies.",
       "Workplace charging: some drivers can charge where they work — more each year as employers equip their car parks, and more with the new workplace charging programme (Town hall → Measures).",
       "A home's panel shows where each driver's electric car charges, or how good the charging would be if they went electric.",
       "Agri-PV comes in three kinds — vertical rows between the crops, fixed rows over orchards and vines, and rows tracking the sun — each with its own output over the day. A field is built over its whole area, 0.3–0.8 MWp per hectare depending on the kind; its business takes the power up to part of its own use and the utility buys the rest at the feed-in price.",

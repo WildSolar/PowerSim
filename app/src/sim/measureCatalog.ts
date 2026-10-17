@@ -82,6 +82,19 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     approval: (p) => (p.target === "early" ? { homeowners: 0.35, tenants: 0.05, business: 0.05, climate: 0.6 } : { homeowners: 0.6, tenants: 0.1, business: 0.1, climate: 0.6 }),
   },
   {
+    id: "district-heat-connection-grant",
+    category: "subsidy",
+    topic: "heating",
+    subsidyCategory: "heating",
+    title: "District heating connection grant",
+    summary:
+      "A flat municipal grant towards connecting a building to district heating — the pipe from the street and the substation, about CHF 22,000 for a house, more for a block of flats. Paid to every owner who connects where the pipes run, most of whom would have anyway; it tips those weighing district heat against a heat pump or a new boiler, and prompts some to give up a working boiler early. Buildings already connected don't get it again.",
+    params: [{ kind: "slider", key: "amount", label: "Grant", min: 0, max: 20000, step: 500, unit: "CHF each", default: 5000 }],
+    leadTimeMonths: 1,
+    effects: (p) => ({ dhConnectionSubsidyRp: num(p, "amount") * CHF }),
+    approval: () => ({ homeowners: 0.45, tenants: 0.05, business: 0.1, climate: 0.4 }),
+  },
+  {
     id: "ev-grant",
     category: "subsidy",
     topic: "mobility",
