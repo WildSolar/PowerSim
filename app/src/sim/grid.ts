@@ -15,6 +15,7 @@
  * until the next reading.
  */
 
+import { timed } from "./devTiming";
 import {
   SUMMER_PEAK_HUMP,
   WINTER_PEAK_HUMP,
@@ -160,6 +161,9 @@ class Grid {
   private realPlants: PowerPlant[] = [];
   private buildingsProvider: () => Building[] = () => [];
   private measuredWinter = -Infinity;
+  /** Reading samples taken ahead, by instant (readingSample), and the reading instants by season and year. */
+  private readingSamples = new Map<number, number[]>();
+  private readingTimesMemo = new Map<string, number[]>();
   private measuredSummer = -Infinity;
   /** The player's setting: reinforce overloaded stations after each reading, money permitting. */
   private autoReinforce = false;
@@ -213,6 +217,8 @@ class Grid {
       area.startCapacityKw = stationSizeFor(Math.max(1, peak * headroom));
       for (const r of area.readings ?? []) r.capacityKw = area.startCapacityKw;
     }
+    this.readingSamples = new Map();
+    this.readingTimesMemo = new Map();
     this.measuredWinter = startYear;
     this.measuredSummer = startYear;
 
@@ -456,24 +462,61 @@ class Grid {
     return days.slice(0, SUMMER_PEAK_DAYS).map((d) => d.t);
   }
 
+  /** A season's reading instants for `year` (they follow from the weather alone, so are known ahead). */
+  private readingTimes(season: "winter" | "summer", year: number): number[] {
+    const key = `${season}:${year}`;
+    let times = this.readingTimesMemo.get(key);
+    if (!times) {
+      times = season === "winter" ? this.winterTimes(year) : this.summerTimes(year);
+      this.readingTimesMemo.set(key, times);
+    }
+    return times;
+  }
+
+  /** Every area's total power at one reading instant (W; feed-in negative) — taken once, as soon as
+   * the instant is past (prefillReading) or at the reading. */
+  private readingSample(season: "winter" | "summer", t: number): number[] {
+    let sums = this.readingSamples.get(t);
+    if (sums) return sums;
+    sums = new Array<number>(this.areas.length).fill(0);
+    const all = this.buildingsProvider();
+    const plants = effectivePowerPlantsAt(all, this.realPlants, t);
+    const snow = snowDepthCm(t);
+    // Heat pumps under load control: at a winter peak, part of them are switched off in turns.
+    const controlled = season === "winter" ? policyStore.get().heatPumpLoadControlShare * LOAD_CONTROL_OFF_SHARE_AT_PEAK : 0;
+    for (const b of all) {
+      if (!existsAt(b, t)) continue;
+      sums[this.areaIdOf(b)] += buildingPowerW(b, t, plants, snow) - (controlled > 0 ? controlled * heatPumpPowerW(b, t) : 0);
+    }
+    // On-street chargers hang off the local station; a fast-charging hub or a lorry park has its own
+    // transformer on the medium-voltage grid (it comes with the site, config/charging.ts).
+    for (const site of publicCharging.getSites()) if (site.kind === "ac") sums[this.siteAreaId(site.lon, site.lat)] += publicCharging.siteLoadW(site, t);
+    this.readingSamples.set(t, sums);
+    return sums;
+  }
+
+  /** Takes one sample of a reading still to come whose instant is past (yearPassPrefetch.ts, in the
+   * background) — so the reading itself finds its samples taken. True if it took one. */
+  prefillReading(nowMs: number): boolean {
+    const year = new Date(toDateMs(nowMs)).getUTCFullYear();
+    for (const season of ["winter", "summer"] as const) {
+      if ((season === "winter" ? this.measuredWinter : this.measuredSummer) >= year) continue;
+      for (const t of this.readingTimes(season, year)) {
+        if (t > nowMs - HOUR_MS || this.readingSamples.has(t)) continue;
+        timed("prefill: grid reading", () => this.readingSample(season, t));
+        return true;
+      }
+    }
+    return false;
+  }
+
   /** Reads every area's meters for a season: the highest total draw (winter) or feed-in (summer). */
   private measure(season: "winter" | "summer", year: number): void {
-    const times = season === "winter" ? this.winterTimes(year) : this.summerTimes(year);
-    const all = this.buildingsProvider();
+    const times = this.readingTimes(season, year);
     const peaks = new Array<number>(this.areas.length).fill(0);
     for (const t of times) {
-      const sums = new Array<number>(this.areas.length).fill(0);
-      const plants = effectivePowerPlantsAt(all, this.realPlants, t);
-      const snow = snowDepthCm(t);
-      // Heat pumps under load control: at a winter peak, part of them are switched off in turns.
-      const controlled = season === "winter" ? policyStore.get().heatPumpLoadControlShare * LOAD_CONTROL_OFF_SHARE_AT_PEAK : 0;
-      for (const b of all) {
-        if (!existsAt(b, t)) continue;
-        sums[this.areaIdOf(b)] += buildingPowerW(b, t, plants, snow) - (controlled > 0 ? controlled * heatPumpPowerW(b, t) : 0);
-      }
-      // On-street chargers hang off the local station; a fast-charging hub or a lorry park has its own
-      // transformer on the medium-voltage grid (it comes with the site, config/charging.ts).
-      for (const site of publicCharging.getSites()) if (site.kind === "ac") sums[this.siteAreaId(site.lon, site.lat)] += publicCharging.siteLoadW(site, t);
+      const sums = this.readingSample(season, t);
+      this.readingSamples.delete(t);
       sums.forEach((w, i) => {
         const kw = season === "winter" ? w / 1000 : -w / 1000;
         if (kw > peaks[i]) peaks[i] = kw;
@@ -613,7 +656,14 @@ class Grid {
   // --- saving (saveGame.ts) ---
 
   snapshot() {
-    return { areas: this.areas, areaOfEgid: this.areaOfEgid, measuredWinter: this.measuredWinter, measuredSummer: this.measuredSummer, autoReinforce: this.autoReinforce };
+    return {
+      areas: this.areas,
+      areaOfEgid: this.areaOfEgid,
+      measuredWinter: this.measuredWinter,
+      measuredSummer: this.measuredSummer,
+      autoReinforce: this.autoReinforce,
+      readingSamples: [...this.readingSamples],
+    };
   }
 
   restore(s: ReturnType<Grid["snapshot"]>): void {
@@ -621,6 +671,7 @@ class Grid {
     this.areaOfEgid = s.areaOfEgid;
     this.measuredWinter = s.measuredWinter;
     this.measuredSummer = s.measuredSummer;
+    this.readingSamples = new Map(s.readingSamples ?? []);
     this.autoReinforce = s.autoReinforce ?? false;
     this.road = this.roadFor(this.areas.map((a) => [a.x, a.y] as XY));
     this.siteAreas = new Map();

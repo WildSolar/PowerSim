@@ -53,6 +53,7 @@
  * useLivePowerPlants.ts, which calls effectivePowerPlantsAt first.
  */
 
+import { timed } from "./devTiming";
 import type { Building, PowerPlant } from "../data/types";
 import {
   MIN_ARRAY_AREA_M2,
@@ -192,7 +193,7 @@ function batteryPreferenceRp(egid: string): number {
   return (HOME_BATTERY_PREFERENCE_CHF_PER_YEAR + HOME_BATTERY_PREFERENCE_SPREAD_CHF_PER_YEAR * (2 * u - 1)) * 100;
 }
 let watermarkMonth: number | null = null; // year * 12 + month (0-based) of the last month decided
-let neighborListCache: Map<string, string[]> | null = null;
+let neighborIndex: NeighborIndex | null = null;
 let realPvEgidsCache: Set<string> | null = null;
 
 function realPvEgids(realPlants: PowerPlant[]): Set<string> {
@@ -202,28 +203,41 @@ function realPvEgids(realPlants: PowerPlant[]): Set<string> {
   return realPvEgidsCache;
 }
 
-let neighborListFor: Building[] | null = null;
+/** The buildings near each other, for the neighbours a roof counts (countAdoptedNeighbors): one
+ * spatial index of every building the stock has had, topped up when it gains new ones (a new array
+ * identity, see stock.ts), and each roof's neighbours looked up only when it's asked about — only
+ * the few roofs whose owners look into solar in a month are. */
+interface NeighborIndex {
+  grid: PointGrid;
+  projection: LocalProjection;
+  /** The array last topped up from, and each building's position. */
+  from: Building[] | null;
+  at: Map<string, [number, number]>;
+  /** Each roof's neighbours found so far (cleared when buildings are added). */
+  found: Map<string, string[]>;
+}
 
-/** Buildings within NEIGHBOR_RADIUS_M of each other, via a spatial grid rather than
- * an all-pairs scan (which does not scale to a 48k-building city). Rebuilt whenever
- * the stock changes (a new array identity, see stock.ts), so new buildings count
- * as neighbours too. */
-function neighborList(buildings: Building[]): Map<string, string[]> {
-  if (neighborListCache && neighborListFor === buildings) return neighborListCache;
-  const projection = new LocalProjection(buildings[0]?.lon ?? 0, buildings[0]?.lat ?? 0);
-  const grid = new PointGrid(NEIGHBOR_RADIUS_M);
-  const list = new Map<string, string[]>();
-  for (const b of buildings) {
-    const [x, y] = projection.toXY(b.lon, b.lat);
-    grid.insert(b.egid, x, y);
-    list.set(b.egid, []);
+function neighborsOf(egid: string, buildings: Building[]): string[] {
+  if (!neighborIndex) {
+    neighborIndex = { grid: new PointGrid(NEIGHBOR_RADIUS_M), projection: new LocalProjection(buildings[0]?.lon ?? 0, buildings[0]?.lat ?? 0), from: null, at: new Map(), found: new Map() };
   }
-  for (const b of buildings) {
-    const [x, y] = projection.toXY(b.lon, b.lat);
-    for (const id of grid.query(x, y, NEIGHBOR_RADIUS_M)) if (id !== b.egid) list.get(b.egid)!.push(id);
+  const index = neighborIndex;
+  if (index.from !== buildings) {
+    for (const b of buildings) {
+      if (index.at.has(b.egid)) continue;
+      const [x, y] = index.projection.toXY(b.lon, b.lat);
+      index.grid.insert(b.egid, x, y);
+      index.at.set(b.egid, [x, y]);
+      index.found.clear();
+    }
+    index.from = buildings;
   }
-  neighborListCache = list;
-  neighborListFor = buildings;
+  let list = index.found.get(egid);
+  if (!list) {
+    const p = index.at.get(egid);
+    list = p ? index.grid.query(p[0], p[1], NEIGHBOR_RADIUS_M).filter((id) => id !== egid) : [];
+    index.found.set(egid, list);
+  }
   return list;
 }
 
@@ -252,7 +266,7 @@ function isEligible(building: Building, realPlants: PowerPlant[], year: number, 
 }
 
 function countAdoptedNeighbors(egid: string, buildings: Building[], realPlants: PowerPlant[], yearStartMs: number): number {
-  const neighbors = neighborList(buildings).get(egid) ?? [];
+  const neighbors = neighborsOf(egid, buildings);
   const realEgids = realPvEgids(realPlants);
   let count = 0;
   for (const n of neighbors) {
@@ -895,7 +909,7 @@ function registeredCapacityByEgid(realPlants: PowerPlant[]): Map<string, { kw: n
 function ensureAdvancedThroughMonth(buildings: Building[], realPlants: PowerPlant[], targetMonth: number): void {
   if (watermarkMonth === null) watermarkMonth = targetMonth - 1;
   for (let m = watermarkMonth + 1; m <= targetMonth; m++) {
-    processMonth(buildings, realPlants, Math.floor(m / 12), m % 12);
+    timed("solar adoption month", () => processMonth(buildings, realPlants, Math.floor(m / 12), m % 12));
     watermarkMonth = m;
   }
 }
@@ -1181,6 +1195,5 @@ export function restoreSolar(saved: SolarSnapshot): void {
   batteryByEgid.clear();
   for (const [egid, record] of saved.batteries) batteryByEgid.set(egid, record);
   watermarkMonth = saved.watermarkMonth;
-  neighborListCache = null;
-  neighborListFor = null;
+  neighborIndex = null;
 }

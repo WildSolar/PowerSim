@@ -36,6 +36,7 @@
  * month's market price for wholesale power (tariffStore.ts).
  */
 
+import { timedAsync } from "./devTiming";
 import type { Building, PowerPlant } from "../data/types";
 import { consumptionSeriesW, electricityCostRp, flatCostRp } from "./billing";
 import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
@@ -208,7 +209,7 @@ export function settleUtilityMonth(buildings: Building[], realPlants: PowerPlant
   if (settled) return Promise.resolve(settled);
   let inFlight = utilityInFlight.get(key);
   if (!inFlight) {
-    inFlight = computeUtilityMonth(buildings, realPlants, year, month)
+    inFlight = timedAsync("utility month (span)", () => computeUtilityMonth(buildings, realPlants, year, month))
       .then((m) => {
         utilityMonths.set(key, m);
         monthRecords.record(key, { utility: m }); // for the charts, line by line

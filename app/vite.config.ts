@@ -61,4 +61,8 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['maplibre-gl'],
   },
+  // Lets the dev harness sample call stacks with the JS Self-Profiling API (dev/perf.ts).
+  server: {
+    headers: { 'Document-Policy': 'js-profiling' },
+  },
 })

@@ -27,6 +27,7 @@
  * them (any number per frame, so fast-forward just works). Never rewinds.
  */
 
+import { timed } from "./devTiming";
 import {
   CLUSTER_ADJACENT_GAP_M,
   CLUSTER_JOIN_PROBABILITY,
@@ -371,13 +372,15 @@ class StockStore {
    * `nowMs`. Decision chains otherwise commit only when something happens to look at them; this makes
    * each one commit under the policy and prices of the time, and record its subsidy payout. */
   commitDecisions(nowMs: number): void {
-    for (const b of this.all) {
-      if (!existsAt(b, nowMs)) continue;
-      energyClassAt(b, nowMs);
-      currentHeatingSystemId(b, nowMs);
-      commitVehicleDecisions(b, nowMs);
-      fleets.commit(b, nowMs);
-    }
+    timed("household decisions", () => {
+      for (const b of this.all) {
+        if (!existsAt(b, nowMs)) continue;
+        energyClassAt(b, nowMs);
+        currentHeatingSystemId(b, nowMs);
+        commitVehicleDecisions(b, nowMs);
+        fleets.commit(b, nowMs);
+      }
+    });
   }
 
   // --- setup ---

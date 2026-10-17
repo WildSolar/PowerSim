@@ -104,9 +104,12 @@ class Newspaper {
   private advance(nowMs: number): void {
     const month = monthIndex(nowMs);
     if (this.lastMonth === null || month <= this.lastMonth) return;
-    // Each month that has ended gets its edition (a long jump: only the last one).
-    this.publish(month - 1);
+    // Each month that has ended gets its edition (a long jump: only the last one) — printed a moment
+    // later, in a task of its own, rather than along with everything else the month's end sets off.
     this.lastMonth = month;
+    setTimeout(() => {
+      if (this.lastMonth === month) this.publish(month - 1);
+    }, 0);
   }
 
   private publish(month: number): void {

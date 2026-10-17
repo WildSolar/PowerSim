@@ -32,6 +32,7 @@
  * where its driver works, mostly outside the town.
  */
 
+import { timed } from "./devTiming";
 import {
   BUILD_SPEC,
   SITE_SIZES,
@@ -1038,7 +1039,7 @@ class PublicCharging {
     const month = monthOf(atMs);
     while (this.lastReviewMonth < month) {
       this.lastReviewMonth++;
-      changed = this.reviewRound(this.lastReviewMonth) || changed;
+      changed = timed("charging review", () => this.reviewRound(this.lastReviewMonth!)) || changed;
     }
     if (changed) this.notify();
   }

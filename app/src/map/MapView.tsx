@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { timed } from "../sim/devTiming";
 import { Map as MlMap, Marker, NavigationControl, Popup, setWorkerUrl, type GeoJSONSource, type MapMouseEvent } from "maplibre-gl";
 // MapLibre finds its worker next to its own file, which a production build bundles away: hand it
 // the worker as Vite builds it.
@@ -249,7 +250,11 @@ function gridLayerKey(simTimeMs: number): string {
   return `${grid.getSelectedId()}|${grid.getZonesVersion()}|${grid.getAreas().map((a) => `${grid.bucket(a, simTimeMs)}:${grid.capacityAt(a, simTimeMs)}`).join(",")}`;
 }
 
-function buildingsToGeoJSON(
+function buildingsToGeoJSON(...args: Parameters<typeof buildingsToGeoJSONUntimed>): ReturnType<typeof buildingsToGeoJSONUntimed> {
+  return timed("map: buildings rebuilt", () => buildingsToGeoJSONUntimed(...args));
+}
+
+function buildingsToGeoJSONUntimed(
   allBuildings: Building[],
   plants: PowerPlant[],
   simTimeMs: number,

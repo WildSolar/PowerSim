@@ -8,12 +8,15 @@ import { dataUrl } from "../data/loadDataset";
 import { toDateMs, toSimTimeMs } from "../sim/calendar";
 import { reportCardStore } from "../sim/reportCardStore";
 import { yearPassPrefetchBusy } from "../sim/yearPassPrefetch";
+import { prefillMonthSample } from "../sim/yearReport";
+import { grid } from "../sim/grid";
 import { stock } from "../sim/stock";
 import { treasury } from "../sim/treasury";
 import { buildingPowerW } from "../sim/buildingPower";
 import { snowDepthCm } from "../sim/snow";
 import { sampleMunicipalityLast24h } from "../sim/rollingHistory";
 import { simClock } from "../sim/engine";
+import { startDevTiming, stopDevTiming } from "../sim/devTiming";
 import { tariffStore } from "../sim/tariffStore";
 import { historyTimeSteps, sampleMunicipalityCategorySeries, type CategorySeries } from "../sim/history";
 import {
@@ -263,4 +266,154 @@ export async function runPerf(year?: number): Promise<Record<string, number>> {
   out.resultNetKWh = Math.round(net);
   out.resultFuelL = Math.round(fuel);
   return out;
+}
+
+/** Crosses into the next calendar month and times what happens: each clock listener's share of the
+ * crossing itself, chosen methods wherever they run, and every stretch the main thread is blocked
+ * for more than 30 ms until the background month work (yearPassPrefetch) is done. Run in a game; it
+ * leaves the clock paused just after the turn. `wrap`: extra [object, method] pairs to time. */
+export async function timeMonthTurn(wrap: [Record<string, unknown>, string][] = [], turnAtMs?: number, prefill = true, monthsAhead = 1): Promise<Record<string, unknown>> {
+  const realSetTimeout = window.setTimeout;
+  window.setTimeout = ((handler: TimerHandler, ms?: number, ...args: unknown[]) => {
+    if (ms || typeof handler !== "function") return realSetTimeout(handler, ms, ...args);
+    unthrottledYield().then(() => handler(...args));
+    return 0;
+  }) as typeof window.setTimeout;
+  const clock = simClock as unknown as { listeners: Set<() => void>; notify: () => void };
+  const realNotify = clock.notify;
+  const listenerMs = new Map<string, number>();
+  const methodMs = new Map<string, { ms: number; calls: number }>();
+  const restores: (() => void)[] = [];
+  try {
+    for (const [obj, name] of wrap) {
+      const fn = obj[name] as (...a: unknown[]) => unknown;
+      const label = `${(obj.constructor as { name?: string })?.name ?? "?"}.${name}`;
+      obj[name] = function (this: unknown, ...a: unknown[]) {
+        const t0 = performance.now();
+        try {
+          return fn.apply(this, a);
+        } finally {
+          const m = methodMs.get(label) ?? { ms: 0, calls: 0 };
+          m.ms += performance.now() - t0;
+          m.calls++;
+          methodMs.set(label, m);
+        }
+      };
+      restores.push(() => (obj[name] = fn));
+    }
+    clock.notify = function () {
+      let index = 0;
+      for (const listener of clock.listeners) {
+        const t0 = performance.now();
+        listener();
+        const key = `${index++}: ${listener.toString().replace(/\s+/g, " ").slice(0, 60)}`;
+        listenerMs.set(key, (listenerMs.get(key) ?? 0) + performance.now() - t0);
+      }
+    };
+    const d = new Date(toDateMs(simClock.getSimTimeMs()));
+    const turn = turnAtMs ?? toSimTimeMs(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + monthsAhead, 1));
+    simClock.pauseAt(turn - 30 * 60_000);
+    await sleep(300);
+    while (yearPassPrefetchBusy()) await sleep(100);
+    // What the background would have taken ahead during the month (yearPassPrefetch.ts).
+    let prefilled = 0;
+    if (prefill) {
+      const realPlants = (await (await fetch(dataUrl("schlieren.json"))).json()).powerPlants;
+      while (prefillMonthSample(stock.getAll(), realPlants, turn - 30 * 60_000) || grid.prefillReading(turn - 30 * 60_000)) {
+        prefilled++;
+        await unthrottledYield();
+      }
+    }
+    await sleep(500);
+    listenerMs.clear();
+    methodMs.clear();
+    startDevTiming();
+    const profiler = startProfiler();
+    const t0 = performance.now();
+    simClock.pauseAt(turn + 5 * 60_000);
+    const notifyMs = performance.now() - t0;
+    const blocks: { at: number; ms: number }[] = [];
+    let last = performance.now();
+    while (performance.now() - t0 < 4000 || yearPassPrefetchBusy()) {
+      await unthrottledYield();
+      const now = performance.now();
+      if (now - last > 30) blocks.push({ at: Math.round(last - t0), ms: Math.round(now - last) });
+      last = now;
+      if (now - t0 > 120_000) break;
+    }
+    const round = (m: Map<string, number>) => Object.fromEntries([...m].filter(([, v]) => v >= 1).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, Math.round(v)]));
+    return {
+      month: new Date(toDateMs(turn)).toISOString().slice(0, 7),
+      prefilled,
+      notifyMs: Math.round(notifyMs),
+      listeners: round(listenerMs),
+      methods: Object.fromEntries([...methodMs].sort((a, b) => b[1].ms - a[1].ms).map(([k, v]) => [k, `${Math.round(v.ms)} ms / ${v.calls}`])),
+      blocks,
+      blockedMs: blocks.reduce((s, b) => s + b.ms, 0),
+      pieces: stopDevTiming(),
+      profile: await summarizeProfile(profiler),
+      totalMs: Math.round(performance.now() - t0),
+    };
+  } finally {
+    clock.notify = realNotify;
+    for (const r of restores) r();
+    window.setTimeout = realSetTimeout;
+  }
+}
+
+// --- sampling call stacks (the JS Self-Profiling API; the dev server sends the header it needs) ---
+
+interface ProfilerTrace {
+  frames: { name: string; resourceId?: number; line?: number }[];
+  stacks: { frameId: number; parentId?: number }[];
+  samples: { timestamp: number; stackId?: number }[];
+  resources: string[];
+}
+interface SelfProfiler {
+  stop(): Promise<ProfilerTrace>;
+}
+
+function startProfiler(): SelfProfiler | null {
+  const P = (window as unknown as { Profiler?: new (o: { sampleInterval: number; maxBufferSize: number }) => SelfProfiler }).Profiler;
+  if (!P) return null;
+  try {
+    return new P({ sampleInterval: 1, maxBufferSize: 200_000 });
+  } catch {
+    return null;
+  }
+}
+
+/** The functions the samples were in: by time spent in them alone ("self") and including what they
+ * called ("total"), in ms (one sample ~ one ms), the top ones each. */
+async function summarizeProfile(profiler: SelfProfiler | null): Promise<unknown> {
+  if (!profiler) return "no profiler (needs the dev server's Document-Policy header and a Chromium browser)";
+  const trace = await profiler.stop();
+  const label = (frameId: number) => {
+    const f = trace.frames[frameId];
+    const file = f.resourceId !== undefined ? (trace.resources[f.resourceId] ?? "").replace(/^.*\/src\//, "").replace(/\?.*$/, "") : "";
+    return `${f.name || "(anonymous)"} ${file}${f.line ? `:${f.line}` : ""}`;
+  };
+  const self = new Map<string, number>();
+  const total = new Map<string, number>();
+  let busy = 0;
+  for (let i = 1; i < trace.samples.length; i++) {
+    const sample = trace.samples[i];
+    if (sample.stackId === undefined) continue;
+    const ms = Math.min(50, sample.timestamp - trace.samples[i - 1].timestamp);
+    busy += ms;
+    const seen = new Set<string>();
+    let stackId: number | undefined = sample.stackId;
+    let first = true;
+    while (stackId !== undefined) {
+      const stack: { frameId: number; parentId?: number } = trace.stacks[stackId];
+      const key = label(stack.frameId);
+      if (first) self.set(key, (self.get(key) ?? 0) + ms);
+      first = false;
+      if (!seen.has(key)) total.set(key, (total.get(key) ?? 0) + ms);
+      seen.add(key);
+      stackId = stack.parentId;
+    }
+  }
+  const top = (m: Map<string, number>, n: number) => Object.fromEntries([...m].sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => [k, Math.round(v)]));
+  return { busyMs: Math.round(busy), self: top(self, 25), total: top(total, 40) };
 }

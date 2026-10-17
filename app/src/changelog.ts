@@ -22,6 +22,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.5.1",
+    date: null,
+    fixed: [
+      "The game no longer stalls for a moment at the turn of each month: the month's accounts and the grid's meter readings are worked out bit by bit in the background as the month goes by, so little is left to do when it ends.",
+    ],
+  },
+  {
     version: "0.5.0",
     date: "2026-10-17",
     title: "Charging, rooftops and fields",

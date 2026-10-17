@@ -13,6 +13,11 @@
  * began (the first report covers the whole calendar year), after a short delay so it doesn't compete
  * with loading. One month at a time, with a pause in between, so the background work stays in small
  * pieces the player doesn't feel.
+ *
+ * In between, it gets ahead of the next month's end: whenever nothing else is queued, it takes the
+ * samples of the month in progress whose instants are already past (yearReport.ts's
+ * prefillMonthSample) and the grid's meter readings likewise (grid.ts's prefillReading), one at a
+ * time with a pause — so the month's end finds most of its work done.
  */
 
 import type { PowerPlant } from "../data/types";
@@ -20,10 +25,12 @@ import { toDateMs } from "./calendar";
 import { simClock } from "./engine";
 import { stock } from "./stock";
 import { settleUtilityMonth } from "./finances";
-import { prefetchMonth } from "./yearReport";
+import { prefetchMonth, prefillMonthSample } from "./yearReport";
+import { grid } from "./grid";
 
 const START_DELAY_MS = 5000;
 const PAUSE_BETWEEN_MONTHS_MS = 200;
+const PAUSE_BETWEEN_SAMPLES_MS = 40;
 
 let busy = false;
 
@@ -43,6 +50,16 @@ export function startYearPassPrefetch(realPlants: PowerPlant[]): () => void {
   let stopped = false;
   let working = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let prefillTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // One sample ahead, then another after a pause while there are any due; idle otherwise.
+  const prefill = () => {
+    prefillTimer = null;
+    if (stopped || working || queue.length > 0) return;
+    const now = simClock.getSimTimeMs();
+    const took = prefillMonthSample(stock.getAll(), realPlants, now) || grid.prefillReading(now);
+    if (took) prefillTimer = setTimeout(prefill, PAUSE_BETWEEN_SAMPLES_MS);
+  };
 
   const work = async () => {
     timer = null;
@@ -71,7 +88,10 @@ export function startYearPassPrefetch(realPlants: PowerPlant[]): () => void {
 
   const unsubscribe = simClock.subscribe(() => {
     const month = monthIndexAt(simClock.getSimTimeMs());
-    if (month <= lastMonth) return;
+    if (month <= lastMonth) {
+      if (prefillTimer === null && !working && queue.length === 0) prefillTimer = setTimeout(prefill, PAUSE_BETWEEN_SAMPLES_MS);
+      return;
+    }
     for (let m = lastMonth; m < month; m++) queue.push(m);
     lastMonth = month;
     schedule(0);
@@ -81,6 +101,7 @@ export function startYearPassPrefetch(realPlants: PowerPlant[]): () => void {
     stopped = true;
     busy = false;
     if (timer !== null) clearTimeout(timer);
+    if (prefillTimer !== null) clearTimeout(prefillTimer);
     unsubscribe();
   };
 }
