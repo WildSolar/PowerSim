@@ -81,7 +81,9 @@ import { measures } from "./sim/measures";
 import { treasury } from "./sim/treasury";
 import type { Difficulty } from "./config/difficulty";
 import { startYearEndWatcher } from "./sim/yearEndWatcher";
-import { startYearPassPrefetch } from "./sim/yearPassPrefetch";
+import { settleMonthsBeforeStart, startYearPassPrefetch } from "./sim/yearPassPrefetch";
+
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 // The simulation's state lives in many module-level singletons and caches (policy,
 // tariffs, solar adoption, decision log, per-year finances/emissions...), so a page
@@ -103,6 +105,7 @@ if (import.meta.env.DEV) import("./dev/autoplay").then((m) => Object.assign(wind
 /** A run: a new game of `slug`, or — with `restore` — a saved one picked up where it was left. */
 function Game({ slug, difficulty, transparency, restore, tutorial = false }: { slug: string; difficulty: Difficulty; transparency: boolean; restore?: SaveFile; tutorial?: boolean }) {
   const [dataset, setDataset] = useState<MunicipalityDataset | null>(null);
+  const [loadingNote, setLoadingNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedEgid, setSelectedEgid] = useState<string | null>(null);
   const [selectedEwid, setSelectedEwid] = useState<string | null>(null);
@@ -221,7 +224,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
     // Set up once: React may run this effect twice (StrictMode), and the modules are singletons.
     let cancelled = false;
     loadDataset(dataUrl(`${slug}.json`))
-      .then((loaded) => {
+      .then(async (loaded) => {
         if (cancelled) return;
         loadPar(slug, difficulty); // what doing nothing scores here, if computed
         measures.init(difficulty); // before the stock: it registers the town size the measures' costs scale with
@@ -271,6 +274,14 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         }
         tariffDeadline.init(); // after a load, so it watches from the saved moment on
         crashes.setRun({ slug, municipality: loaded.name, difficulty, transparency }); // for the crash screen and reports
+        // A new game starts with the year so far counted (a saved one carries its accounts).
+        if (!restore) {
+          const speed = simClock.getSpeed();
+          simClock.setSpeed(0); // no game time passes behind the loading screen
+          await settleMonthsBeforeStart(loaded.powerPlants, (month) => setLoadingNote(`Counting the year so far: ${MONTH_NAMES[month]}…`));
+          simClock.setSpeed(speed);
+          if (cancelled) return;
+        }
         setDataset(loaded);
       })
       .catch((e: Error) => setError(e.message));
@@ -331,7 +342,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
     return <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>Failed to load dataset: {error}</div>;
   }
   if (!dataset) {
-    return <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>Loading…</div>;
+    return <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>{loadingNote ?? "Loading…"}</div>;
   }
 
   const onSelectFromList = (egid: string) => selectBuilding(egid);

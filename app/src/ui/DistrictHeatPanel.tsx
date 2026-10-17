@@ -7,7 +7,7 @@ import { zeroDhEnergy, type DhEnergyKWh } from "../sim/districtHeatDispatch";
 import { candidateName, districtHeatSources, type PlacedKind } from "../sim/districtHeatSources";
 import { districtHeatLines } from "../sim/districtHeatLines";
 import { simClock } from "../sim/engine";
-import { networkCoverage, networkPeaksW, networkStatusAt, streetDemand, type CoverageShare } from "../sim/districtHeatStats";
+import { networkCoverage, networkPeaksW, networkStatusAt, networkYearProjection, streetDemand, type CoverageShare } from "../sim/districtHeatStats";
 import { heatPumpSiting } from "../sim/heatPumpSiting";
 import { OIL_ENERGY_KWH_PER_LITER } from "../sim/heatingSystems";
 import { existsAt } from "../sim/lifetime";
@@ -81,21 +81,29 @@ export function NetworkInspectCard() {
     for (const b of buildings) {
       if (existsAt(b, simDay) && networkStatusAt(b, simDay) === "connected" && districtHeat.networkOf(b.streetSegments, simDay)?.id === network.id) connected++;
     }
-    return { connected, peakW: networkPeaksW(buildings, simDay).get(network.id) ?? 0 };
+    const cleanW = network.sources.filter((s) => s.kind && s.cleanW > 0).reduce((sum, s) => sum + s.cleanW, 0);
+    return { connected, peakW: networkPeaksW(buildings, simDay).get(network.id) ?? 0, year: network.id >= 0 ? networkYearProjection(buildings, network.id, cleanW, simDay) : null };
   }, [network, buildings, simDay]);
   if (!network || !facts) return null;
   return (
     <InspectCard kicker="District heating network" title={network.name} onClose={() => districtHeat.pickNetwork(null)}>
-      <NetworkCard network={network} peakW={facts.peakW} connected={facts.connected} />
+      <NetworkCard network={network} peakW={facts.peakW} connected={facts.connected} year={facts.year} />
     </InspectCard>
   );
 }
 
-/** One network: what feeds it, against its winter peak. */
-function NetworkCard({ network, peakW, connected }: { network: DhNetworkInfo; peakW: number; connected: number }) {
+function formatMWh(kWh: number): string {
+  return kWh >= 10_000_000 ? `${Math.round(kWh / 1_000_000)} GWh` : kWh >= 1_000_000 ? `${(kWh / 1_000_000).toFixed(1)} GWh` : `${Math.round(kWh / 1000).toLocaleString("de-CH")} MWh`;
+}
+
+/** One network: what feeds it, against its winter peak — how much room the clean sources leave
+ * before the boilers start, and if they don't carry it all, the boilers' share at the peak and over
+ * a year. */
+function NetworkCard({ network, peakW, connected, year }: { network: DhNetworkInfo; peakW: number; connected: number; year: { heatKWh: number; boilerKWh: number } | null }) {
   const clean = network.sources.filter((s) => s.kind && s.cleanW > 0);
   const cleanW = clean.reduce((sum, s) => sum + s.cleanW, 0);
   const cover = peakW > 0 ? Math.min(1, cleanW / peakW) : 1;
+  const spareW = cleanW - peakW;
   return (
     <div>
       <div className="dh-note">
@@ -116,6 +124,24 @@ function NetworkCard({ network, peakW, connected }: { network: DhNetworkInfo; pe
             <span>{network.fossil === "gas" ? "Gas" : "Oil"} boilers</span>
             <span className="info-value">for the rest</span>
           </div>
+          <div className="info-row dh-total" title="The clean sources together, against the winter peak of the buildings connected now">
+            <span>Clean capacity</span>
+            <span className="info-value">
+              {formatMW(cleanW)} of {formatMW(peakW)}
+            </span>
+          </div>
+          <div className="info-row" title={spareW >= 0 ? "How much more peak load the clean sources can take before the boilers start on the coldest days" : "How much of the winter peak the boilers have to make"}>
+            <span>{spareW >= 0 ? "Room before the boilers start" : "Boilers at the winter peak"}</span>
+            <span className="info-value">{spareW >= 0 ? formatMW(spareW) : `${formatMW(-spareW)} (${Math.round((1 - cover) * 100)}%)`}</span>
+          </div>
+          {year && year.boilerKWh > 0 && (
+            <div className="info-row" title="Projected over the coming year: on each day, the heat the connected buildings need above what the clean sources carry">
+              <span>Boiler heat a year (projected)</span>
+              <span className="info-value">
+                {formatMWh(year.boilerKWh)} · {Math.round((year.boilerKWh / Math.max(1, year.heatKWh)) * 100)}%
+              </span>
+            </div>
+          )}
           <div className="dh-bar" title="How much of the winter peak the clean sources can carry; the boilers make the rest">
             <div className="dh-bar-fill" style={{ width: `${cover * 100}%` }} />
           </div>

@@ -22,6 +22,23 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.0",
+    date: null,
+    added: [
+      "District heating: a network's card adds up its clean sources against its winter peak — the room left before the boilers start, or how much of the peak they make and their heat over a year (projected).",
+      "Carbon removal contracts: the measure shows what they would cost at the share you set, and how far the town's emissions still are from the point where they apply.",
+    ],
+    changed: [
+      "Grid: about a quarter fewer transformer stations, each serving a bit more — bigger ones in large towns.",
+      "Home and neighbourhood batteries get cheaper faster, to about half today's price in the long run.",
+      "Private operators build out public charging faster: new sites where fewer would-be drivers gather, more of them a year, bigger expansions — and up to two shops' car parks a year.",
+      "District heating: an incinerator or a treatment plant can be drawn on in stages — what you don't take stays on offer, though each stage pays its own fixed costs and trunk line.",
+    ],
+    fixed: [
+      "A new game starts with the treasury as it stands that day — the year so far counted while the game loads — instead of catching up month by month.",
+    ],
+  },
+  {
     version: "0.5.1",
     date: "2026-10-17",
     fixed: [

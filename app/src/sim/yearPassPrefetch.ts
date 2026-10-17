@@ -44,6 +44,19 @@ function monthIndexAt(simTimeMs: number): number {
   return d.getUTCFullYear() * 12 + d.getUTCMonth();
 }
 
+/** Settles the months of the current year that were already over when the game began — sampled for
+ * the year's report, the utility's accounts booked — so a new game starts with the treasury as it
+ * stands that day rather than catching up month by month. Run while the game loads; `onProgress`
+ * hears which month is being counted (0-11). */
+export async function settleMonthsBeforeStart(realPlants: PowerPlant[], onProgress: (month: number) => void): Promise<void> {
+  const now = monthIndexAt(simClock.getSimTimeMs());
+  for (let m = now - (now % 12); m < now; m++) {
+    onProgress(m % 12);
+    await prefetchMonth(stock.getAll(), realPlants, Math.floor(m / 12), m % 12);
+    await settleUtilityMonth(stock.getAll(), realPlants, Math.floor(m / 12), m % 12);
+  }
+}
+
 export function startYearPassPrefetch(realPlants: PowerPlant[]): () => void {
   const queue: number[] = [];
   let lastMonth = monthIndexAt(simClock.getSimTimeMs());

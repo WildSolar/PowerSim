@@ -1,6 +1,8 @@
 import { useState, useSyncExternalStore } from "react";
+import { cachedEmissionsForYear, removalPriceChfPerT } from "../sim/emissions";
+import { REMOVAL_CAP_SHARE } from "../config/removals";
 import { X } from "lucide-react";
-import { formatDate } from "../sim/calendar";
+import { BASELINE_YEAR, formatDate, toDateMs } from "../sim/calendar";
 import { MEASURE_CATALOG } from "../sim/measureCatalog";
 import {
   defaultParams,
@@ -202,6 +204,7 @@ function MeasureDetail({ def, nowMs, onClose }: { def: MeasureDef; nowMs: number
         {def.referendum === "optional" && <span>May go to a public vote if contested</span>}
       </div>
       {def.subsidyCategory && <SubsidyEvidence category={def.subsidyCategory} nowMs={nowMs} />}
+      {def.costCategory === "removals" && <RemovalProjection sharePct={draft.share as number} nowMs={nowMs} />}
       {vote && (
         <div className="measure-vote">
           Public vote in {formatDate(vote.atMs).replace(/^\d+ /, "")} — latest poll: {votePct(vote.pollYes)}% in favour
@@ -242,6 +245,31 @@ function measureStatus(def: MeasureDef, nowMs: number): { label: string; tone: S
 }
 
 /** The line under a card's summary: for a measure in force what it is doing, otherwise how it would go down. */
+/** What carbon removal contracts would cost, as far as the years counted so far tell: the share of
+ * the baseline year's emissions they cover at this year's price per tonne, once they apply — and how
+ * far last year's emissions still are from the line where they start to. */
+function RemovalProjection({ sharePct, nowMs }: { sharePct: number; nowMs: number }) {
+  const year = new Date(toDateMs(nowMs)).getUTCFullYear();
+  const baseline = cachedEmissionsForYear(BASELINE_YEAR);
+  if (!baseline) return <div className="measure-note">Its cost follows the town's emissions: a projection appears once {BASELINE_YEAR} has been counted.</div>;
+  const last = year - 1 > BASELINE_YEAR ? cachedEmissionsForYear(year - 1) : null;
+  const price = removalPriceChfPerT(year);
+  const coverT = (Math.min(sharePct / 100, REMOVAL_CAP_SHARE) * baseline.totalKgCO2) / 1000;
+  const lineT = (REMOVAL_CAP_SHARE * baseline.totalKgCO2) / 1000;
+  const lastT = last ? last.totalKgCO2 / 1000 : null;
+  const t = (x: number) => `${Math.round(x).toLocaleString("de-CH")} t`;
+  return (
+    <div className="measure-note" title="Contracts buy for what is left of the town's emissions, up to the share set, once those are down to a fifth of the baseline year's — paid each January for the year before, at that year's price per tonne (falling over time).">
+      At full cover: about {formatCHF(coverT * price * 100)} a year — {t(coverT)} at CHF {Math.round(price)} a tonne this year.{" "}
+      {lastT === null
+        ? `It applies once the town's emissions are down to ${t(lineT)} a year (a fifth of ${BASELINE_YEAR}'s).`
+        : lastT <= lineT
+          ? `Last year's ${t(lastT)} are within the line (${t(lineT)}): it would buy ${t(Math.min(coverT, lastT))}, about ${formatCHF(Math.min(coverT, lastT) * price * 100)}.`
+          : `It applies once the town's emissions are down to ${t(lineT)} a year; last year they were ${t(lastT)} (${Math.round((lastT / (baseline.totalKgCO2 / 1000)) * 100)}% of ${BASELINE_YEAR}'s).`}
+    </div>
+  );
+}
+
 function cardFooter(def: MeasureDef, nowMs: number): { text: string; tone?: "good" | "bad" | "warn" } {
   const vote = approval.getVoteInfo(def.id, def, nowMs);
   if (vote) return { text: `Public vote ${monthYear(vote.atMs)} · poll ${votePct(vote.pollYes)}% yes`, tone: "warn" };

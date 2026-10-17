@@ -34,6 +34,8 @@ import {
   SUMMER_PEAK_DAYS,
   SUMMER_PEAK_HOUR,
   TARGET_AREA_PEAK_KW,
+  AREA_PEAK_REFERENCE_KW,
+  AREA_PEAK_SIZE_EXPONENT,
   TRANSFORMER_SIZES_KVA,
   WINTER_MEASURED_MONTH,
   WINTER_PEAK_DAYS,
@@ -241,7 +243,8 @@ class Grid {
       return { b, x, y, w: Math.max(0.5, load.get(b.egid) ?? 0) };
     });
     const total = points.reduce((sum, p) => sum + p.w, 0);
-    const k = Math.max(1, Math.round(total / TARGET_AREA_PEAK_KW));
+    const targetKw = TARGET_AREA_PEAK_KW * Math.pow(total / AREA_PEAK_REFERENCE_KW, AREA_PEAK_SIZE_EXPONENT);
+    const k = Math.max(1, Math.round(total / targetKw));
     const seeded = [...points].sort((a, c) => hashSeed(a.b.egid, "grid-seed") - hashSeed(c.b.egid, "grid-seed"));
     let centres = seeded.slice(0, k).map((p) => ({ x: p.x, y: p.y }));
     const assignment = new Array<number>(points.length).fill(0);

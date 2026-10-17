@@ -2,8 +2,13 @@
 // stations are or how big, so the areas are drawn from the buildings themselves and sized like a
 // real network would have been. Placeholders to balance.
 
-// Transformer areas are sized so each serves roughly this winter peak (a typical MV/LV station).
-export const TARGET_AREA_PEAK_KW = 500;
+// Transformer areas are sized so each serves roughly this winter peak (a typical MV/LV station) in
+// a town whose own winter peak is AREA_PEAK_REFERENCE_KW. A bigger town has somewhat bigger stations
+// on average (denser streets, more large buildings), a smaller one somewhat smaller: the target
+// scales with the town's total peak to the power AREA_PEAK_SIZE_EXPONENT.
+export const TARGET_AREA_PEAK_KW = 650;
+export const AREA_PEAK_REFERENCE_KW = 15_000;
+export const AREA_PEAK_SIZE_EXPONENT = 0.15;
 // Standard transformer sizes (kVA, taken as kW); bigger stations have two or more units.
 export const TRANSFORMER_SIZES_KVA = [250, 400, 630, 800, 1000, 1250, 1600];
 export const MULTI_TRANSFORMER_STEP_KVA = 1000;

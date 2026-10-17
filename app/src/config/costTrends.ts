@@ -62,8 +62,9 @@ export const COST_TRENDS: Record<CostTrendId, CostTrend> = {
   chargerDc: { label: "Fast-charging hub", level: 0.6, years: 8 },
   chargerFleet: { label: "Lorry charging park", level: 0.55, years: 8 },
   depotCharger: { label: "Depot charger", level: 0.6, years: 8 },
-  // Cells keep getting cheaper, but inverters, installation and (for a station) the site and grid
-  // connection are much of the price — so batteries fall, but not dramatically.
-  gridBattery: { label: "Neighbourhood battery", level: 0.7, years: 10 },
-  homeBattery: { label: "Home battery", level: 0.7, years: 10 },
+  // Cells keep getting cheaper fast, and with them the rest of a battery system as it becomes a
+  // standard product; inverters, installation and (for a station) the site and grid connection
+  // hold some of the price up.
+  gridBattery: { label: "Neighbourhood battery", level: 0.45, years: 8 },
+  homeBattery: { label: "Home battery", level: 0.5, years: 8 },
 };

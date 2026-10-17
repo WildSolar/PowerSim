@@ -14,6 +14,8 @@ import { annualHeatDemandKWh, currentHeatingSystemId, initialHeatingSystemId } f
 import { existsAt } from "./lifetime";
 import { gfaOf } from "./newBuild";
 import { spaceHeatingThermalDemandW } from "./spaceHeating";
+import { dailyMeanTempC } from "./weather";
+import { COMFORT_TEMP_C, HEATING_THRESHOLD_C } from "../config/heating";
 
 /** "noHeating": no heating system the game replaces — mostly garages, sheds and storage (the
  * building register's annexes, numbered like "Schulstrasse 7.1"), also wood or unrecorded
@@ -67,6 +69,37 @@ export function sizeUnreportedSources(buildings: Building[], startMs: number): v
     const peakW = network ? (peaks.get(network.id) ?? 0) : 0;
     districtHeat.setCleanW(s.id, peakW * DH_UNKNOWN_CAPACITY_HEADROOM * (s.unsizedShare ?? 1));
   }
+}
+
+const DAY_MS = 24 * 3_600_000;
+const projectionCache = new Map<string, { heatKWh: number; boilerKWh: number }>();
+
+/** A network's year as it stands: the heat its connected buildings need over the coming year (pipe
+ * losses included), and how much of it the boilers would make — day by day, whatever the network
+ * needs above what its clean sources (`cleanW`) carry. The year's heat is spread over the days by
+ * how cold each is (the heating model's own threshold and setpoint); within a day the load is taken
+ * as even, so the boilers' share comes out a little low on the coldest days. */
+export function networkYearProjection(buildings: Building[], networkId: number, cleanW: number, atMs: number): { heatKWh: number; boilerKWh: number } {
+  const connected = buildings.filter(
+    (b) => existsAt(b, atMs) && currentHeatingSystemId(b, atMs) === "districtHeating" && (districtHeat.networkOf(b.streetSegments, atMs)?.id ?? -1) === networkId,
+  );
+  const year = new Date(toDateMs(atMs)).getUTCFullYear();
+  const key = `${networkId}:${year}:${Math.round(cleanW)}:${connected.length}`;
+  const cached = projectionCache.get(key);
+  if (cached) return cached;
+  const heatKWh = connected.reduce((sum, b) => sum + cachedAnnualDemandKWh(b, atMs), 0) * (1 + DH_NETWORK_LOSS_SHARE);
+  const weights: number[] = [];
+  for (let d = 0; d < 365; d++) {
+    const t = dailyMeanTempC(atMs + d * DAY_MS);
+    weights.push(t < HEATING_THRESHOLD_C ? Math.max(0, COMFORT_TEMP_C - t) : 0);
+  }
+  const total = weights.reduce((a, w) => a + w, 0);
+  const cleanDayKWh = (cleanW / 1000) * 24;
+  const boilerKWh = total > 0 ? weights.reduce((sum, w) => sum + Math.max(0, (heatKWh * w) / total - cleanDayKWh), 0) : 0;
+  const result = { heatKWh, boilerKWh };
+  if (projectionCache.size > 200) projectionCache.clear();
+  projectionCache.set(key, result);
+  return result;
 }
 
 const demandCache = new Map<string, number>(); // `${egid}:${year}` -> kWh

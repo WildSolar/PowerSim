@@ -188,19 +188,19 @@ export const UPGRADE_MONTHS: Partial<Record<ChargingKind, number>> = { ac: 3, dc
 // bought an electric car with an empty on-street charger next door, but didn't): a busy site with demand around
 // it gets more points, and where enough demand gathers with no charger nearby, a new on-street
 // site opens — after OPERATOR_BUILD_MONTHS.
-export const OPERATOR_NEW_SITE_MIN_DEMAND = 4;
-export const OPERATOR_MAX_NEW_SITES_PER_YEAR = 3;
+export const OPERATOR_NEW_SITE_MIN_DEMAND = 3;
+export const OPERATOR_MAX_NEW_SITES_PER_YEAR = 5;
 export const OPERATOR_NEW_SITE_POINTS = 4;
-export const OPERATOR_EXPAND_POINTS = 2;
+export const OPERATOR_EXPAND_POINTS = 4;
 export const OPERATOR_MAX_POINTS = 12;
-export const OPERATOR_EXPAND_AT_USE = 0.8;
-export const OPERATOR_BUILD_MONTHS = 6;
+export const OPERATOR_EXPAND_AT_USE = 0.7;
+export const OPERATOR_BUILD_MONTHS = 4;
 // The demand left over may also bring chargers to a shop's car park: a large shop (a retail
 // building of at least this footprint, its car park without chargers yet) with enough of that
 // demand within DEMAND_RADIUS_M.shop gets a few points, as a service to its customers.
 export const OPERATOR_SHOP_MIN_FOOTPRINT_M2 = 800;
-export const OPERATOR_NEW_SHOP_MIN_DEMAND = 6;
-export const OPERATOR_MAX_NEW_SHOPS_PER_YEAR = 1;
+export const OPERATOR_NEW_SHOP_MIN_DEMAND = 4;
+export const OPERATOR_MAX_NEW_SHOPS_PER_YEAR = 2;
 export const OPERATOR_SHOP_POINTS = 4;
 export const OPERATOR_SHOP_POWER_KW = 22;
 // No new shop chargers this close to a shop's car park that has some: the same shopping area (and

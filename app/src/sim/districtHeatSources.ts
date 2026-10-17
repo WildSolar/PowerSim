@@ -174,16 +174,33 @@ class DistrictHeatSources {
     return toSimTimeMs(Date.UTC(year, Math.floor(rng() * 12), 1 + Math.floor(rng() * 27)));
   }
 
-  /** The candidates on offer at `atMs` and not yet drawn on. */
+  /** The candidates on offer at `atMs` with heat left to take: a plant drawn on only in part keeps the
+   * rest on offer, for another plant later (each paying its own way — fixed costs and trunk line
+   * again). A factory's waste heat comes on one contract, so it goes all at once. */
   availableCandidates(atMs: number): DhCandidateData[] {
-    const used = new Set(districtHeat.getSources().map((s) => s.candidateId));
-    return districtHeat.getCandidates().filter((c) => !used.has(c.id) && this.offerAtMs(c) <= atMs);
+    return districtHeat.getCandidates().filter((c) => {
+      if (this.offerAtMs(c) > atMs) return false;
+      if (c.kind === "industry") return this.stagesOn(c) === 0;
+      return this.candidateMaxMw(c) >= DH_SOURCE_SPECS[c.kind].minMw - 1e-9;
+    });
   }
 
-  /** The heat a candidate can give (MW), less what a starting network already draws there — and no
-   * more than one plant of its kind can take. */
+  /** The heat a candidate can still give (MW): its potential, less what a starting network and the
+   * plants already ordered draw there — and no more than one plant of its kind can take. */
   candidateMaxMw(c: DhCandidateData): number {
-    return Math.min(DH_SOURCE_SPECS[c.kind].maxMw, this.candidatePotentialMw(c));
+    return Math.min(DH_SOURCE_SPECS[c.kind].maxMw, Math.max(0, this.candidatePotentialMw(c) - this.drawnMw(c)));
+  }
+
+  /** What the plants ordered on a candidate draw (MW), and how many there are. */
+  private drawnMw(c: DhCandidateData): number {
+    return districtHeat
+      .getSources()
+      .filter((s) => !s.existing && s.candidateId === c.id)
+      .reduce((sum, s) => sum + (Number.isFinite(s.cleanW) ? s.cleanW / 1e6 : 0), 0);
+  }
+
+  private stagesOn(c: DhCandidateData): number {
+    return districtHeat.getSources().filter((s) => !s.existing && s.candidateId === c.id).length;
   }
 
   private candidatePotentialMw(c: DhCandidateData): number {
@@ -272,6 +289,8 @@ class DistrictHeatSources {
     let feed: DraftQuote["feed"] = null;
     if (candidate) {
       name = candidate.kind === "industry" ? `${candidateName(candidate)} waste heat` : candidate.name;
+      const stages = this.stagesOn(candidate);
+      if (stages > 0) name = `${name}, stage ${stages + 1}`;
       maxMw = Math.min(maxMw, this.candidateMaxMw(candidate));
       trunkM = candidate.trunkM;
       feed = { node: candidate.node, lon: candidate.feedLon, lat: candidate.feedLat };
