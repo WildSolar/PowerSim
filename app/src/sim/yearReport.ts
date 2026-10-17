@@ -46,7 +46,7 @@ import { tariffStore } from "./tariffStore";
 import { dwellingWaterHeaterProfile, waterHeaterPowerW, waterHeatingKind, type WaterHeaterProfile } from "./waterHeating";
 import { dailyMeanTempC, weatherAt } from "./weather";
 import { districtHeat, type DhNetworkInfo } from "./districtHeat";
-import { addDhEnergy, dispatchInstant, zeroDhEnergy, type DhEnergyKWh } from "./districtHeatDispatch";
+import { addDhEnergy, dhHeatPumpPowerW, dispatchInstant, zeroDhEnergy, type DhEnergyKWh } from "./districtHeatDispatch";
 import { monthRecords } from "./monthRecords";
 import { DH_SOURCE_SPECS } from "../config/districtHeat";
 import { mobilityCensus } from "./mobility";
@@ -106,6 +106,8 @@ export interface YearElectricityMonth {
   series: CategorySeries;
   /** The part of the consumption on the dynamic tariff (dynamicTariff.ts). */
   dynamicW: number[];
+  /** What the district heating heat pumps draw (W): the utility's own use, not sold to anyone. */
+  dhHeatPumpW: number[];
 }
 
 const electricityByMonth = new Map<number, Promise<YearElectricityMonth>>();
@@ -218,6 +220,7 @@ const TECHNOLOGY_SERIES_KEYS = [
   "directElectricWaterW",
   "dhOilW",
   "dhGasW",
+  "dhHeatPumpPowerW",
 ] as const;
 
 function joinTechnologySeries(parts: TechnologySeriesW[]): TechnologySeriesW {
@@ -289,10 +292,13 @@ export function monthElectricity(buildings: Building[], realPlants: PowerPlant[]
     const series = joinCategorySeries(samples.map((s) => s.series));
     const monthEndMs = toSimTimeMs(Date.UTC(year, month + 1, 1));
     const plants = effectivePowerPlantsAt(buildings, realPlants, monthEndMs - 1);
-    timed("month electricity: record", () => recordMonthElectricity(buildings, year, month, times, series, plants, monthEndMs - 1));
+    // The district heating heat pumps' draw, instant by instant, from the month's heat pass (the
+    // same instants).
+    const dhHeatPumpW = (await monthHeatingTechnology(buildings, year, month)).dhHeatPumpW ?? times.map(() => 0);
+    timed("month electricity: record", () => recordMonthElectricity(buildings, year, month, times, series, dhHeatPumpW, plants, monthEndMs - 1));
     await yieldToEventLoop();
     timed("month assets: record", () => recordMonthAssets(buildings, year, month, plants, monthEndMs - 1));
-    return { times, series, dynamicW: samples.map((s) => s.dynamicW) };
+    return { times, series, dynamicW: samples.map((s) => s.dynamicW), dhHeatPumpW };
   }, "month electricity");
 }
 
@@ -335,9 +341,12 @@ export interface HeatingTechnologyEnergyKWh {
   directElectricWaterKWh: number;
   /** Who made the district heat (districtHeatDispatch.ts) — delivered heat plus the pipes' losses. */
   districtHeat: DhEnergyKWh;
+  /** A month's: what the networks' heat pumps drew at each of its sampled instants (W) — the month's
+   * electricity pass adds it to the town's (monthElectricity). */
+  dhHeatPumpW?: number[];
 }
 
-type TechnologyAmount = Exclude<keyof HeatingTechnologyEnergyKWh, "districtHeat">;
+type TechnologyAmount = Exclude<keyof HeatingTechnologyEnergyKWh, "districtHeat" | "dhHeatPumpW">;
 const TECHNOLOGY_AMOUNTS: TechnologyAmount[] = [
   "airHeatPumpSpaceKWh",
   "groundHeatPumpSpaceKWh",
@@ -376,6 +385,8 @@ interface TechnologySeriesW {
   dhSourceW: Map<string, number[]>;
   dhOilW: number[];
   dhGasW: number[];
+  /** What the networks' heat pumps draw from the grid (W). */
+  dhHeatPumpPowerW: number[];
   /** Each network's clean heat and boiler heat (by its name). */
   dhNetworkW?: Map<string, { clean: number[]; boiler: number[] }>;
 }
@@ -398,6 +409,7 @@ function sampleTechnologySeries(buildings: Building[], times: number[]): Technol
     dhSourceW: new Map(),
     dhOilW: [],
     dhGasW: [],
+    dhHeatPumpPowerW: [],
     dhNetworkW: new Map(),
   };
   for (const [i, t] of times.entries()) {
@@ -459,6 +471,7 @@ function sampleTechnologySeries(buildings: Building[], times: number[]): Technol
     }
     out.dhOilW.push(production.oilW);
     out.dhGasW.push(production.gasW);
+    out.dhHeatPumpPowerW.push(dhHeatPumpPowerW(production.bySource, t));
     for (const [name, w] of production.byNetwork) {
       let series = out.dhNetworkW!.get(name);
       if (!series) {
@@ -506,6 +519,7 @@ export function monthHeatingTechnology(buildings: Building[], year: number, mont
         boilerOilKWh: energyKWh(times, series.dhOilW),
         boilerGasKWh: energyKWh(times, series.dhGasW),
       },
+      dhHeatPumpW: series.dhHeatPumpPowerW,
     };
   }, "month heating");
 }
@@ -513,7 +527,7 @@ export function monthHeatingTechnology(buildings: Building[], year: number, mont
 /** Keeps a month's electricity in the record the charts read (monthRecords.ts): use by category,
  * what wind made of the local generation, rooftop solar against its potential, and the modal split
  * at the month's end. */
-function recordMonthElectricity(buildings: Building[], year: number, month: number, times: number[], series: CategorySeries, plants: PowerPlant[], endMs: number): void {
+function recordMonthElectricity(buildings: Building[], year: number, month: number, times: number[], series: CategorySeries, dhHeatPumpW: number[], plants: PowerPlant[], endMs: number): void {
   const energy = categoryEnergyFromSeries(times, series);
   const turbines = plants.filter((p) => p.technology === "Wind");
   const windKWh = turbines.length > 0 ? energyKWh(times, times.map((t) => turbines.reduce((sum, p) => sum + windPowerW(p, t), 0))) : 0;
@@ -530,9 +544,16 @@ function recordMonthElectricity(buildings: Building[], year: number, month: numb
   // At the month's last sample, which the pass above has already asked about: counting never
   // settles a household's choice sooner than the game would have.
   const census = mobilityCensus(buildings, times[times.length - 1]);
-  const flows = powerFlows(times, consumptionSeriesW(series), series.solarW, grid.batteriesInService(toSimTimeMs(Date.UTC(year, month, 15))), 0);
+  const flows = powerFlows(
+    times,
+    consumptionSeriesW(series).map((w, i) => w + dhHeatPumpW[i]),
+    series.solarW,
+    grid.batteriesInService(toSimTimeMs(Date.UTC(year, month, 15))),
+    0,
+  );
   monthRecords.record(year * 12 + month, {
     electricityKWh: { ...energy, solar: Math.max(0, energy.solar - windKWh) },
+    dhHeatPumpKWh: energyKWh(times, dhHeatPumpW),
     windKWh,
     solarBuiltKw: builtKw,
     solarPotentialKw: potentialKw,
@@ -698,11 +719,14 @@ export function computeHeatingRenewalTally(buildings: Building[], year: number):
 }
 
 /** Net municipality-wide electricity consumption for the given calendar year — every device
- * category minus solar generation — for emissions.ts's grid-electricity figure, read off the
- * shared year pass. */
+ * category and the district heating heat pumps, minus solar generation — for emissions.ts's
+ * grid-electricity figure, read off the shared year pass. */
 export async function computeNetElectricityKWh(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<number> {
   const energy = await yearCategoryEnergyKWh(buildings, realPlants, year);
+  const months = await yearElectricity(buildings, realPlants, year);
+  const dhHeatPumpKWh = months.reduce((sum, m) => sum + energyKWh(m.times, m.dhHeatPumpW), 0);
   return (
+    dhHeatPumpKWh +
     energy.fridge +
     energy.lighting +
     energy.cooking +

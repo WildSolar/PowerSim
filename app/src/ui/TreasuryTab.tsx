@@ -179,7 +179,7 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
               <Line label="Surplus sold on the spot market" value={last.surplusSoldRp} />
               <Line label="Grid upkeep" value={-last.gridMaintenanceCostRp} />
               {last.districtHeatRevenueRp > 0 && <Line label="District heat sold" value={last.districtHeatRevenueRp} />}
-              {last.districtHeatPurchaseRp > 0 && <Line label="Making district heat (fuel, power, heat bought)" value={-last.districtHeatPurchaseRp} />}
+              {last.districtHeatPurchaseRp > 0 && <Line label="Making district heat (fuel, heat bought)" value={-last.districtHeatPurchaseRp} />}
               {last.districtHeatUpkeepRp > 0 && <Line label="District heating upkeep: pipes, plants, contracts" value={-last.districtHeatUpkeepRp} />}
               {last.publicChargingRevenueRp > 0 && <Line label="Public charging sold (municipal chargers)" value={last.publicChargingRevenueRp} />}
               {last.publicChargingUpkeepRp > 0 && <Line label="Public charger upkeep" value={-last.publicChargingUpkeepRp} />}

@@ -71,7 +71,7 @@ export interface MunicipalFinances {
   surplusSoldRp: number; // what the town's surplus fetched on the spot market — below zero when sunny middays drive the price under it
   gridMaintenanceCostRp: number; // wires/upkeep cost, scaled to gross electricity delivered to consumers
   districtHeatRevenueRp: number; // district heat sold to connected buildings, at the tariff's district heating price
-  districtHeatPurchaseRp: number; // making that heat: fuel, the heat pumps' power, heat bought (less wood plants' power sold)
+  districtHeatPurchaseRp: number; // making that heat: fuel, heat bought (less wood plants' power sold) — the heat pumps' power is bought with the town's
   districtHeatUpkeepRp: number; // the pipes, the plants, factory contracts and concessions
   publicChargingRevenueRp: number; // sold at the municipality's own public chargers, at the tariff's public charging prices
   publicChargingUpkeepRp: number; // keeping those chargers running
@@ -241,12 +241,14 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
   // The year's sheet (one per year); wholesale power at the month's market price.
   const tariff: Tariff = tariffStore.at(toSimTimeMs(Date.UTC(year, month, 15)));
   const greenShare = policyStore.get().greenPowerShare / 100;
-  const { times, series, dynamicW } = await monthElectricity(buildings, realPlants, year, month);
+  const { times, series, dynamicW, dhHeatPumpW } = await monthElectricity(buildings, realPlants, year, month);
   const consumptionW = consumptionSeriesW(series);
   const grossKWh = energyKWh(times, consumptionW);
+  // The district heating heat pumps: the utility's own use — bought with the rest, sold to no one.
+  const withHeatPumpsW = consumptionW.map((w, i) => w + dhHeatPumpW[i]);
   // Hour by hour: what the town drew beyond what it made, bought over the contracts; the surplus,
   // sold on the spot market — after the neighbourhood batteries took what they could.
-  const flows = powerFlows(times, consumptionW, series.solarW, grid.batteriesInService(toSimTimeMs(Date.UTC(year, month, 15))), tariff.wholesalePriceRpKWh);
+  const flows = powerFlows(times, withHeatPumpsW, series.solarW, grid.batteriesInService(toSimTimeMs(Date.UTC(year, month, 15))), tariff.wholesalePriceRpKWh);
 
   // District heat: the heat delivered and who made it (the report's heating-technology pass), and
   // the upkeep of the pipes and plants.

@@ -48,6 +48,7 @@ import { setLocalStances } from "./approval";
 import { toSimTimeMs } from "./calendar";
 import { priceFactor } from "./costTrends";
 import { districtHeat, type DhSource } from "./districtHeat";
+import { dhHeatingSeasonCop } from "./districtHeatDispatch";
 import { heatPumpSiting } from "./heatPumpSiting";
 import { existsAt } from "./lifetime";
 import { LocalProjection, pointInPolygon, type XY } from "./localGeo";
@@ -126,7 +127,8 @@ export function plantCapexRp(kind: DhSourceKind, mw: number, atMs: number): numb
 /** What a kWh of heat from `kind` costs to make at `atMs`'s prices, before fixed costs (Rp). */
 export function runningRpPerKWh(kind: DhSourceKind, atMs: number): number {
   const power = market.price("wholesale", atMs);
-  const cop = DH_SOURCE_SPECS[kind].cop;
+  // A heat pump's power at its winter efficiency: it makes most of its heat then.
+  const cop = dhHeatingSeasonCop(kind);
   if (cop) return power / cop;
   if (kind === "wood") return (DH_WOOD_FUEL_RP_PER_KWH - DH_WOOD_POWER_EFFICIENCY * power) / DH_WOOD_HEAT_EFFICIENCY;
   if (kind === "incinerator") return DH_INCINERATOR_HEAT_RP_PER_KWH;

@@ -122,6 +122,15 @@ const ELECTRICITY_GROUPS: { key: string; label: string; color: string; of: (keyo
 function electricityChart(nowMs: number): ChartData {
   const { records, ...m } = monthly(nowMs, (r) => !!r.electricityKWh);
   const stacks = ELECTRICITY_GROUPS.map((g) => ({ ...g, values: records.map((r) => g.of.reduce((s, k) => s + r.electricityKWh![k], 0)) }));
+  // The district heating heat pumps, after hot water (the utility's own use).
+  if (records.some((r) => (r.dhHeatPumpKWh ?? 0) > 0))
+    stacks.splice(stacks.findIndex((g) => g.key === "waterHeating") + 1, 0, {
+      key: "dhHeatPump",
+      label: "District heating heat pumps",
+      color: "#7a4fb5",
+      of: [],
+      values: records.map((r) => r.dhHeatPumpKWh ?? 0),
+    });
   const solar = records.map((r) => r.electricityKWh!.solar);
   const wind = records.map((r) => r.windKWh ?? 0);
   const { unit, scale } = energyUnit(Math.max(stackMax(stacks, records.length), ...solar, ...wind));
@@ -694,7 +703,7 @@ export const CHARTS: ChartDef[] = [
     id: "electricity",
     group: "Energy",
     title: "Electricity",
-    description: "What the town used each month, by what used it, and what its solar panels and wind turbines made.",
+    description: "What the town used each month, by what used it — the district heating networks' heat pumps included — and what its solar panels and wind turbines made.",
     data: (_, now) => electricityChart(now),
   },
   {

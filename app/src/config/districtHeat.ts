@@ -100,6 +100,15 @@ export const DH_SOURCE_SPECS: Record<DhSourceKind, DhSourceSpec> = {
   other: { label: "Other clean heat", merit: 6, cop: null, capexChfAt1Mw: 0, capexFixedChf: 0, upkeepChfPerKwYear: 10, buildMonths: 0, minMw: 0, maxMw: 0 },
 };
 
+// A river or lake heat pump follows the water: about 4 °C in late winter, 20 °C in late summer. Its
+// COP above is the one at the year's mean water temperature, a share better or worse per °C — so it
+// does worst in winter, when the network needs it most. Waste water and groundwater keep a steady
+// temperature year round, and so a steady COP.
+export const DH_SURFACE_WATER_MEAN_C = 12;
+export const DH_SURFACE_WATER_AMPLITUDE_C = 8;
+export const DH_SURFACE_WATER_WARMEST_DAY = 220; // early August
+export const DH_COP_CHANGE_PER_DEGREE = 0.025;
+
 // Incinerators: what a plant could sell the town is a share of what it delivers today plus what it
 // turns into electricity (taking heat costs ~1 kWh of power per 3 kWh of heat) — the rest goes to
 // its existing customers and the neighbours. Sold per kWh.
