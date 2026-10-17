@@ -18,7 +18,7 @@ import { dailyMeanTempC } from "./weather";
 import { COMFORT_TEMP_C, HEATING_THRESHOLD_C } from "../config/heating";
 
 /** "noHeating": no heating system the game replaces — mostly garages, sheds and storage (the
- * building register's annexes, numbered like "Schulstrasse 7.1"), also wood or unrecorded
+ * building register's annexes, numbered like "Schulstrasse 7.1"), also electric or unrecorded
  * heating — so nothing that could ever switch to district heat. */
 export type NetworkStatus = "connected" | "connectable" | "outOfReach" | "noHeating";
 

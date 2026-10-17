@@ -17,9 +17,9 @@ export {
   type HeatingSystemId,
   type HeatingSystemSpec,
 } from "../config/heating";
-import { GAS_BOILER_EFFICIENCY, OIL_BOILER_EFFICIENCY, DISTRICT_HEATING_EFFICIENCY, type HeatingSystemId } from "../config/heating";
+import { GAS_BOILER_EFFICIENCY, OIL_BOILER_EFFICIENCY, DISTRICT_HEATING_EFFICIENCY, WOOD_PELLET_BOILER_EFFICIENCY, type HeatingSystemId } from "../config/heating";
 
-export const HEATING_SYSTEM_ORDER: HeatingSystemId[] = ["airHeatPump", "groundHeatPump", "districtHeating", "gasBoiler", "oilBoiler"];
+export const HEATING_SYSTEM_ORDER: HeatingSystemId[] = ["airHeatPump", "groundHeatPump", "districtHeating", "woodPellet", "gasBoiler", "oilBoiler"];
 
 /** Validated (validate_palette.js, light mode) — ui/ReportCardModal.tsx's
  * water-heating-by-kind pie. Deliberately reuses airHeatPump's green (both
@@ -30,8 +30,9 @@ export const WATER_HEATING_KIND_COLOR: Record<"heatPump" | "direct", string> = {
   direct: "#2a78d6",
 };
 
-export function fuelEfficiency(fuel: "gasBoiler" | "oilBoiler" | "districtHeating"): number {
+export function fuelEfficiency(fuel: "gasBoiler" | "oilBoiler" | "districtHeating" | "woodPellet"): number {
   if (fuel === "gasBoiler") return GAS_BOILER_EFFICIENCY;
   if (fuel === "oilBoiler") return OIL_BOILER_EFFICIENCY;
+  if (fuel === "woodPellet") return WOOD_PELLET_BOILER_EFFICIENCY;
   return DISTRICT_HEATING_EFFICIENCY;
 }

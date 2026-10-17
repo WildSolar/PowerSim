@@ -211,6 +211,7 @@ const TECHNOLOGY_SERIES_KEYS = [
   "gasBoilerSpaceW",
   "oilBoilerSpaceW",
   "districtHeatingSpaceW",
+  "woodPelletSpaceW",
   "heatPumpWaterW",
   "directElectricWaterW",
   "dhOilW",
@@ -317,6 +318,7 @@ export interface HeatingTechnologyEnergyKWh {
   gasBoilerSpaceKWh: number;
   oilBoilerSpaceKWh: number;
   districtHeatingSpaceKWh: number;
+  woodPelletSpaceKWh: number;
   heatPumpWaterKWh: number;
   directElectricWaterKWh: number;
   /** Who made the district heat (districtHeatDispatch.ts) — delivered heat plus the pipes' losses. */
@@ -330,6 +332,7 @@ const TECHNOLOGY_AMOUNTS: TechnologyAmount[] = [
   "gasBoilerSpaceKWh",
   "oilBoilerSpaceKWh",
   "districtHeatingSpaceKWh",
+  "woodPelletSpaceKWh",
   "heatPumpWaterKWh",
   "directElectricWaterKWh",
 ];
@@ -341,6 +344,7 @@ function zeroTechnologyEnergy(): HeatingTechnologyEnergyKWh {
     gasBoilerSpaceKWh: 0,
     oilBoilerSpaceKWh: 0,
     districtHeatingSpaceKWh: 0,
+    woodPelletSpaceKWh: 0,
     heatPumpWaterKWh: 0,
     directElectricWaterKWh: 0,
     districtHeat: zeroDhEnergy(),
@@ -353,6 +357,7 @@ interface TechnologySeriesW {
   gasBoilerSpaceW: number[];
   oilBoilerSpaceW: number[];
   districtHeatingSpaceW: number[];
+  woodPelletSpaceW: number[];
   heatPumpWaterW: number[];
   directElectricWaterW: number[];
   /** District heat production by source, and by the boilers (districtHeatDispatch.ts). */
@@ -373,6 +378,7 @@ function sampleTechnologySeries(buildings: Building[], times: number[]): Technol
     gasBoilerSpaceW: [],
     oilBoilerSpaceW: [],
     districtHeatingSpaceW: [],
+    woodPelletSpaceW: [],
     heatPumpWaterW: [],
     directElectricWaterW: [],
     dhSourceW: new Map(),
@@ -387,6 +393,7 @@ function sampleTechnologySeries(buildings: Building[], times: number[]): Technol
     let gas = 0;
     let oil = 0;
     let district = 0;
+    let wood = 0;
     let hpWater = 0;
     let directWater = 0;
     // Each network's load, for the dispatch.
@@ -401,6 +408,7 @@ function sampleTechnologySeries(buildings: Building[], times: number[]): Technol
         else if (heatingId === "groundHeatPump") ground += thermalW;
         else if (heatingId === "gasBoiler") gas += thermalW;
         else if (heatingId === "oilBoiler") oil += thermalW;
+        else if (heatingId === "woodPellet") wood += thermalW;
         else {
           district += thermalW;
           const network = districtHeat.networkOf(building.streetSegments, t);
@@ -422,6 +430,7 @@ function sampleTechnologySeries(buildings: Building[], times: number[]): Technol
     out.gasBoilerSpaceW.push(gas);
     out.oilBoilerSpaceW.push(oil);
     out.districtHeatingSpaceW.push(district);
+    out.woodPelletSpaceW.push(wood);
     out.heatPumpWaterW.push(hpWater);
     out.directElectricWaterW.push(directWater);
     const production = dispatchInstant(dhLoads, dhOrphanW);
@@ -465,6 +474,7 @@ export function monthHeatingTechnology(buildings: Building[], year: number, mont
       gasBoilerSpaceKWh: energyKWh(times, series.gasBoilerSpaceW),
       oilBoilerSpaceKWh: energyKWh(times, series.oilBoilerSpaceW),
       districtHeatingSpaceKWh: energyKWh(times, series.districtHeatingSpaceW),
+      woodPelletSpaceKWh: energyKWh(times, series.woodPelletSpaceW),
       heatPumpWaterKWh: energyKWh(times, series.heatPumpWaterW),
       directElectricWaterKWh: energyKWh(times, series.directElectricWaterW),
       districtHeat: {
@@ -565,6 +575,7 @@ function recordMonthHeating(year: number, month: number, times: number[], series
       airHeatPump: energyKWh(times, series.airHeatPumpSpaceW),
       groundHeatPump: energyKWh(times, series.groundHeatPumpSpaceW),
       districtHeating: energyKWh(times, series.districtHeatingSpaceW),
+      wood: energyKWh(times, series.woodPelletSpaceW),
     },
     districtHeatKWh,
   });
@@ -595,6 +606,8 @@ export function spaceHeatingKWhFor(technology: HeatingTechnologyEnergyKWh, id: H
       return technology.oilBoilerSpaceKWh;
     case "districtHeating":
       return technology.districtHeatingSpaceKWh;
+    case "woodPellet":
+      return technology.woodPelletSpaceKWh;
   }
 }
 

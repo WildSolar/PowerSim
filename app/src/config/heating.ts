@@ -12,7 +12,7 @@
 
 import type { CurvePoint } from "./curve";
 
-export type HeatingSystemId = "gasBoiler" | "oilBoiler" | "districtHeating" | "airHeatPump" | "groundHeatPump";
+export type HeatingSystemId = "gasBoiler" | "oilBoiler" | "districtHeating" | "airHeatPump" | "groundHeatPump" | "woodPellet";
 
 export interface HeatingSystemSpec {
   id: HeatingSystemId;
@@ -92,12 +92,34 @@ export const HEATING_SYSTEM_CATALOG: Record<HeatingSystemId, HeatingSystemSpec> 
     greenness: -1.3,
     color: "#b23a2e",
   },
+  // Wood: the register's wood boilers and stoves (logs, pellets, chips), all counted as a pellet
+  // boiler. Only kept where there already is one (heatingRenewal.ts): it needs a store room and
+  // deliveries, and towns discourage new wood heating for the fine dust.
+  woodPellet: {
+    id: "woodPellet",
+    label: "Wood boiler",
+    icon: "🪵",
+    lifetimeMeanYears: 20,
+    baseInstallCostRp: 35_000_00, // boiler, pellet store and feed
+    replacementInstallCostRp: 24_000_00, // a new boiler on the existing store
+    subsidyRp: 0,
+    greenness: 0.5,
+    color: "#9c5b16",
+  },
 };
 
 export const GAS_BOILER_EFFICIENCY = 0.9; // typical modern gas boiler
 export const OIL_BOILER_EFFICIENCY = 0.85; // typical oil boiler — somewhat less efficient than gas
 export const DISTRICT_HEATING_EFFICIENCY = 1.0; // price is already per kWh of heat delivered
 export const OIL_ENERGY_KWH_PER_LITER = 10; // "Heizöl extra leicht" — standard rule-of-thumb energy density
+export const WOOD_PELLET_BOILER_EFFICIENCY = 0.88;
+// What a kWh of wood pellets costs (Rp; about CHF 400 a tonne today, 4.8 kWh a kg) — no market
+// shocks, creeping up as demand grows.
+export const WOOD_PELLET_PRICE_RP_PER_KWH: CurvePoint[] = [
+  { x: 2026, y: 8.5 },
+  { x: 2040, y: 9.5 },
+  { x: 2050, y: 10 },
+];
 
 // --- heatingRenewal.ts: the renewal-decision engine's own parameters ---
 

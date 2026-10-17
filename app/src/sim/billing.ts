@@ -53,7 +53,7 @@ import { dailyMeanTempC, weatherAt } from "./weather";
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 
-export type HeatingFuel = "gasBoiler" | "oilBoiler" | "districtHeating" | null;
+export type HeatingFuel = "gasBoiler" | "oilBoiler" | "districtHeating" | "woodPellet" | null;
 
 /** null for a heat-pump building (billed as electricity instead) or any source
  * with no price input (wood, "andere", unspecified). Resolved as of the *end*
@@ -63,7 +63,7 @@ export type HeatingFuel = "gasBoiler" | "oilBoiler" | "districtHeating" | null;
  * rather than real inaccuracy. */
 export function heatingFuelType(building: Building, atSimTimeMs: number): HeatingFuel {
   const id = currentHeatingSystemId(building, atSimTimeMs);
-  return id === "gasBoiler" || id === "oilBoiler" || id === "districtHeating" ? id : null;
+  return id === "gasBoiler" || id === "oilBoiler" || id === "districtHeating" || id === "woodPellet" ? id : null;
 }
 
 /** The fuel actually burned/delivered, in kW — thermal demand divided by the
@@ -97,7 +97,7 @@ function heatingFuelCostAndQuantity(
     const liters = fuelKWh / OIL_ENERGY_KWH_PER_LITER;
     return { costRp: liters * tariff.oilPriceRpPerLiter, quantity: liters };
   }
-  const priceRpKWh = fuel === "gasBoiler" ? tariff.gasPriceRpKWh : tariff.districtHeatingPriceRpKWh;
+  const priceRpKWh = fuel === "gasBoiler" ? tariff.gasPriceRpKWh : fuel === "woodPellet" ? tariff.woodPelletPriceRpKWh : tariff.districtHeatingPriceRpKWh;
   return { costRp: fuelKWh * priceRpKWh, quantity: fuelKWh };
 }
 

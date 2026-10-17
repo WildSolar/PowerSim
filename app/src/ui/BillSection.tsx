@@ -14,6 +14,7 @@ const HEATING_FUEL_LABEL: Record<Exclude<HeatingFuel, null>, string> = {
   gasBoiler: "🔥 Gas heating",
   oilBoiler: "🛢️ Oil heating",
   districtHeating: "🏭 District heating",
+  woodPellet: "🪵 Wood heating",
 };
 
 /** The unit each fuel's quantity is actually priced/sold in — liters for oil,
@@ -22,6 +23,7 @@ const HEATING_FUEL_UNIT: Record<Exclude<HeatingFuel, null>, string> = {
   gasBoiler: "kWh",
   oilBoiler: "L",
   districtHeating: "kWh",
+  woodPellet: "kWh",
 };
 
 export interface BillSectionProps {

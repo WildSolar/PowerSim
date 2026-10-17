@@ -30,6 +30,7 @@ export const CHANGELOG: Release[] = [
       "New charts: solar and wind built (rooftop, Agri-PV, wind), batteries, district heating pipes and the share of buildings, floor area and heat demand they reach, public charging's room against what's taken, and the share of households with a wallbox and how good public charging is for the rest.",
     ],
     changed: [
+      "Wood heating is now a heating system of its own: the buildings the register lists as heating with wood — logs, pellets or chips, in a boiler or a stove — burn wood pellets, wear out and are replaced like any other heating (by wood again, or by a heat pump, district heat or a boiler). It counts as clean. New wood heating isn't installed where there was none.",
       "Grid: about a quarter fewer transformer stations, each serving a bit more — bigger ones in large towns.",
       "Home and neighbourhood batteries get cheaper faster, to about half today's price in the long run.",
       "Private operators build out public charging faster: new sites where fewer would-be drivers gather, more of them a year, bigger expansions — and up to two shops' car parks a year.",

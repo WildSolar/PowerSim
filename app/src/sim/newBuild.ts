@@ -59,6 +59,12 @@ const HEATING_STRINGS: Record<HeatingSystemId, HeatingStrings> = {
     hotWaterGenerator: "Heizkessel (generisch)",
     hotWaterEnergySource: "Heizöl",
   },
+  woodPellet: {
+    heatingGenerator: "Heizkessel (generisch) für ein Gebäude",
+    heatingEnergySource: "Holz (Pellets)",
+    hotWaterGenerator: "Heizkessel (generisch)",
+    hotWaterEnergySource: "Holz (Pellets)",
+  },
 };
 
 export interface AttributeContext {

@@ -83,6 +83,8 @@ export function initialHeatingSystemId(building: Building): HeatingSystemId | nu
   if (building.heatingEnergySource === "Gas") return "gasBoiler";
   if (building.heatingEnergySource === "Heizöl") return "oilBoiler";
   if (building.heatingEnergySource?.startsWith("Fernwärme")) return "districtHeating";
+  // Logs, pellets or chips, in a boiler or a stove: all counted as a wood boiler.
+  if (building.heatingEnergySource?.startsWith("Holz")) return "woodPellet";
   return null;
 }
 
@@ -137,6 +139,7 @@ function runningCostRpFor(id: HeatingSystemId, estimate: AnnualHeatingEstimate, 
   const consumedKWh = estimate.thermalKWh / fuelEfficiency(id);
   if (id === "oilBoiler") return (consumedKWh / OIL_ENERGY_KWH_PER_LITER) * tariff.oilPriceRpPerLiter;
   if (id === "gasBoiler") return consumedKWh * tariff.gasPriceRpKWh;
+  if (id === "woodPellet") return consumedKWh * tariff.woodPelletPriceRpKWh;
   return consumedKWh * tariff.districtHeatingPriceRpKWh;
 }
 
@@ -203,6 +206,9 @@ function candidatesAt(
         !(fossilBanned && (id === "gasBoiler" || id === "oilBoiler")) &&
         !(isHeatPump(id) && !isHeatPump(incumbent) && gridBlocked) &&
         !(mustConnect && id !== "districtHeating") &&
+        // Wood only where there is wood heating already: a new one needs a store room and
+        // deliveries, and the town discourages it for the fine dust.
+        !(id === "woodPellet" && (newBuild || incumbent !== "woodPellet")) &&
         sited,
       annualizedCostRp: installCostRp / spec.lifetimeMeanYears + runningCostRpFor(id, estimate, tariff, avgElecRpKWh) + siteRunningRp,
       lifetimeMeanYears: spec.lifetimeMeanYears,

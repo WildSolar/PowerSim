@@ -8,7 +8,7 @@ const OUTLOOK_YEARS = 10;
 
 const GROUPS: { title: string; ids: CostTrendId[] }[] = [
   { title: "Vehicles", ids: ["carEV", "carICE", "bikeElectric", "vanEV", "vanDiesel", "truckEV", "truckDiesel"] },
-  { title: "Heating", ids: ["airHeatPump", "groundHeatPump", "districtHeating", "gasBoiler", "oilBoiler"] },
+  { title: "Heating", ids: ["airHeatPump", "groundHeatPump", "districtHeating", "woodPellet", "gasBoiler", "oilBoiler"] },
   { title: "Buildings", ids: ["solar", "homeBattery", "insulation"] },
   { title: "Infrastructure", ids: ["chargerAc", "chargerDc", "chargerFleet", "depotCharger", "gridBattery", "districtHeatPipes"] },
 ];

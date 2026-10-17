@@ -32,6 +32,7 @@ export interface TariffSheet {
 export interface Tariff extends TariffSheet {
   oilPriceRpPerLiter: number; // per liter of heating oil burned
   gasPriceRpKWh: number; // per kWh of gas burned (not thermal delivered — see billing.ts)
+  woodPelletPriceRpKWh: number; // per kWh of wood pellets burned
   petrolPriceRpPerLiter: number; // per liter of petrol/diesel burned by an ICE car — see mobility.ts
   wholesalePriceRpKWh: number; // what the DSO pays upstream per net kWh purchased — see finances.ts
   gridMaintenanceRpKWh: number; // the DSO's own wires/upkeep cost per kWh delivered — see finances.ts

@@ -25,6 +25,7 @@ export type CostTrendId =
   | "districtHeating"
   | "gasBoiler"
   | "oilBoiler"
+  | "woodPellet"
   | "solar"
   | "insulation"
   | "districtHeatPipes"
@@ -55,6 +56,7 @@ export const COST_TRENDS: Record<CostTrendId, CostTrend> = {
   districtHeating: { label: "District heat connection", level: 1, years: 15 },
   gasBoiler: { label: "Gas boiler", level: 1.15, years: 15 },
   oilBoiler: { label: "Oil boiler", level: 1.2, years: 15 },
+  woodPellet: { label: "Wood boiler", level: 1.05, years: 15 },
   solar: { label: "Rooftop solar", level: 0.7, years: 10 },
   insulation: { label: "Insulation work", level: 1.1, years: 20 },
   districtHeatPipes: { label: "District heating pipes", level: 1.1, years: 20 },

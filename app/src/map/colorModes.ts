@@ -61,6 +61,7 @@ export const HEATING_LEGEND: LegendEntry[] = [
   { bucket: "fossil", label: "Fossil (gas / oil)", color: "#eb6834" },
   { bucket: "districtHeat", label: "District heat", color: "#4a3aa7" },
   { bucket: "heatPump", label: "Heat pump / ambient", color: "#1baf7a" },
+  { bucket: "wood", label: "Wood", color: "#9c5b16" },
   { bucket: "electric", label: "Direct electric", color: "#2a78d6" },
   { bucket: "other", label: "Other / unknown", color: UNKNOWN_COLOR },
 ];
@@ -78,7 +79,8 @@ export function heatingBucket(source: string | null): string {
     return "heatPump";
   }
   if (source === "Elektrizität") return "electric";
-  return "other"; // wood/biomass, "Unbestimmt", "Andere", "Keine", null — each too small to earn its own hue
+  if (source?.startsWith("Holz")) return "wood";
+  return "other"; // "Unbestimmt", "Andere", "Keine", null — each too small to earn its own hue
 }
 
 /** MapLibre `match` expression mapping a precomputed bucket property to its legend color.
@@ -341,5 +343,6 @@ export function buildingHeatingBucketAt(building: Building, simTimeMs: number): 
   if (id === "airHeatPump" || id === "groundHeatPump") return "heatPump";
   if (id === "gasBoiler" || id === "oilBoiler") return "fossil";
   if (id === "districtHeating") return "districtHeat";
+  if (id === "woodPellet") return "wood";
   return heatingBucket(building.heatingEnergySource);
 }

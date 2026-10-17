@@ -159,10 +159,11 @@ function heatChart(nowMs: number): ChartData {
     ["airHeatPump", "airHeatPump"],
     ["groundHeatPump", "groundHeatPump"],
     ["districtHeating", "districtHeating"],
+    ["wood", "woodPellet"],
     ["gas", "gasBoiler"],
     ["oil", "oilBoiler"],
   ] as const;
-  const raw = keys.map(([k]) => records.map((r) => r.heatingKWh![k]));
+  const raw = keys.map(([k]) => records.map((r) => r.heatingKWh![k] ?? 0));
   const { unit, scale } = energyUnit(stackMax(raw.map((values) => ({ values })), records.length));
   return {
     ...m,

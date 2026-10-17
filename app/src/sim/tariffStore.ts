@@ -12,6 +12,8 @@
  * year's own sheet.
  */
 
+import { interpolateCurve } from "../config/curve";
+import { WOOD_PELLET_PRICE_RP_PER_KWH } from "../config/heating";
 import { GRID_UPKEEP_RP_PER_KWH } from "../config/market";
 import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { simClock } from "./engine";
@@ -135,6 +137,7 @@ class TariffStore {
       ...this.sheetFor(yearOf(atMs)),
       oilPriceRpPerLiter: market.price("oil", atMs),
       gasPriceRpKWh: market.price("gas", atMs),
+      woodPelletPriceRpKWh: interpolateCurve(WOOD_PELLET_PRICE_RP_PER_KWH, yearOf(atMs)),
       petrolPriceRpPerLiter: market.price("petrol", atMs),
       wholesalePriceRpKWh: market.price("wholesale", atMs),
       gridMaintenanceRpKWh: GRID_UPKEEP_RP_PER_KWH,

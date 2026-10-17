@@ -20,7 +20,7 @@ export interface MonthRecord {
   month: number;
   electricityKWh?: CategoryEnergyKWh;
   windKWh?: number;
-  heatingKWh?: { oil: number; gas: number; airHeatPump: number; groundHeatPump: number; districtHeating: number };
+  heatingKWh?: { oil: number; gas: number; airHeatPump: number; groundHeatPump: number; districtHeating: number; wood?: number };
   /** District heat made, by what made it ("Wood chips", "Oil boilers"…). */
   districtHeatKWh?: Record<string, number>;
   solarBuiltKw?: number;

@@ -273,7 +273,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       ),
       list([
         "Electricity: what the town draws from the grid, less the solar it feeds back, times how clean Swiss electricity is that year. The national grid gets cleaner over the decades whatever you do; your levers are how much the town draws, and green power as the default for its customers.",
-        "Gas and oil heating: the fuel actually burned for heating. Every boiler replaced by a heat pump or district heat takes its share away.",
+        "Gas and oil heating: the fuel actually burned for heating. Every boiler replaced by a heat pump or district heat takes its share away. Wood heating counts as clean, as in Switzerland's own inventory: the CO₂ a tree took up is given back.",
         "District heating: the oil and gas its boilers burn, and the electricity its heat pumps use (see \"Heat for district heating\"). Wood and waste heat count as clean.",
         "Transport: the petrol and diesel burned by households' cars and businesses' vans and lorries. Public transport, cycling and walking count as zero.",
       ]),
@@ -426,7 +426,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       ),
       p("When something wears out, its owner chooses what replaces it the way real owners do:"),
       list([
-        "What is possible: district heating only if a pipe runs in the street (see \"District heating network\"), a heat pump only where the ground and the neighbours allow (see \"Where a heat pump may go\"), an electric car only with somewhere to charge (see \"Public charging\") — unless petrol and diesel cars are banned, when a household without a charger goes electric anyway and gets by with fast chargers and charging at work.",
+        "What is possible: wood heating only where there is a wood boiler or stove already (it needs a store room and deliveries, and towns discourage new ones for the fine dust), district heating only if a pipe runs in the street (see \"District heating network\"), a heat pump only where the ground and the neighbours allow (see \"Where a heat pump may go\"), an electric car only with somewhere to charge (see \"Public charging\") — unless petrol and diesel cars are banned, when a household without a charger goes electric anyway and gets by with fast chargers and charging at work.",
         "What it costs over its life: the price less any grants, plus what it costs to run at the prices of the day.",
         "Whether it's worth the bother: owners stay with what they know unless something else is clearly better — a single house won't chase a small saving the way a large block's management might.",
         "Leaning: some owners lean green, some stick to what they know, and a close call can go either way. Information measures make owners judge more sharply; a climate campaign tips close calls a little.",
