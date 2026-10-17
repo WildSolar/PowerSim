@@ -23,22 +23,25 @@ export interface Release {
 export const CHANGELOG: Release[] = [
   {
     version: "0.5.0",
-    date: null,
+    date: "2026-10-17",
+    title: "Charging, rooftops and fields",
+    summary:
+      "Charging an electric car without a charger at home is now a matter of degree — how close the chargers are along the streets, how busy, and whether you can charge at work — and a wallbox is something a household buys when it pays, not something the law hands out. Drivers move to better chargers as they open. Rooftop panels face every way, softening the town's midday peak, and Agri-PV comes in three kinds sized to their fields. Plus a grant for connecting to district heating.",
     added: [
-      "District heating connection grant, a new measure: a flat sum off every first connection to district heating, paid as owners connect. It counts with the heat pump grant in the treasury and in evaluation studies.",
       "Workplace charging: some drivers can charge where they work — more each year as employers equip their car parks, and more with the new workplace charging programme (Town hall → Measures).",
-      "A home's panel shows where each driver's electric car charges, or how good the charging would be if they went electric.",
-      "Agri-PV comes in three kinds — vertical rows between the crops, fixed rows over orchards and vines, and rows tracking the sun — each with its own output over the day. A field is built over its whole area, 0.3–0.8 MWp per hectare depending on the kind; its business takes the power up to part of its own use and the utility buys the rest at the feed-in price.",
-      "Rooftop solar: each building's panels face their own way — south, east, west, flat-roof rows — so the town's roofs no longer all peak at the same moment; the midday peak on the grid is lower, with the same output over the year. Owners weigh panels, and the utility a roof contract, on what that roof would make; home batteries plan their day on their own roof's sun. A building's panel says which way its panels face.",
       "Private operators equip large shops' car parks with chargers where people around would go electric with better charging.",
-      "Drivers charging in public look again every New Year, and when a charger within their reach opens or grows: they move to better chargers, or put in a wallbox, if it saves them CHF 100 a year — so a new charger relieves crowded ones nearby within a month.",
+      "District heating connection grant, a new measure: a flat sum off every first connection to district heating, paid as owners connect. It counts with the heat pump grant in the treasury and in evaluation studies.",
+      "A home's panel shows where each driver's electric car charges, or how good the charging would be if they went electric.",
     ],
     changed: [
       "Charging an electric car without a charger at home is now a matter of degree: a quality from 0 to 100% made up of the chargers around — best close by and fading with the distance along the streets, not as the crow flies — and of how busy they are, plus charging at work for those who can. Different kinds add up; below 10% an electric car is ruled out. The better the charging, the smaller the hassle that weighs against an electric car.",
       "Charging at home takes a wallbox, and being allowed one isn't having one: a household puts it in when it buys an electric car — CHF 2,500 at a house, 4,000 in a shared car park, more where only the right to charge got the landlord to agree — and only if that beats the public chargers around. The right to charge now widens who may, rather than handing out wallboxes, and the EV charging layer shows green only where most households actually have one.",
+      "Drivers charging in public look again every New Year, and when a charger within their reach opens or grows: they move to better chargers, or put in a wallbox, if it saves them CHF 100 a year — so a new charger relieves crowded ones nearby within a month.",
       "Chargers in shops' car parks count as their own kind: a top-up while shopping, reaching further than an on-street charger but doing less.",
-      "EV charging layer: buildings are coloured by the quality of public charging, and the coverage toggles and a charger's reach follow the streets.",
       "A car can share its charging among several chargers (and work), and a busy charger takes new cars up to a quarter over its room, worth less the fuller it gets.",
+      "EV charging layer: buildings are coloured by the quality of public charging, and the coverage toggles and a charger's reach follow the streets.",
+      "Rooftop solar: each building's panels face their own way — south, east, west, flat-roof rows — so the town's roofs no longer all peak at the same moment; the midday peak on the grid is lower, with the same output over the year. Owners weigh panels, and the utility a roof contract, on what that roof would make; home batteries plan their day on their own roof's sun. A building's panel says which way its panels face.",
+      "Agri-PV comes in three kinds — vertical rows between the crops, fixed rows over orchards and vines, and rows tracking the sun — each with its own output over the day. A field is built over its whole area, 0.3–0.8 MWp per hectare depending on the kind; its business takes the power up to part of its own use and the utility buys the rest at the feed-in price.",
     ],
   },
   {
