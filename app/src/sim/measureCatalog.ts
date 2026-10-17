@@ -395,7 +395,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "mobility",
     title: "Right to charge at home",
     summary:
-      "Landlords and owners' associations may no longer refuse a charging point in the building's car park. Many more flat-dwellers can charge at home — the biggest barrier to an electric car in town — though never all: some buildings have no parking at all. Tenants and drivers like it; property owners bear the installation work.",
+      "Landlords and owners' associations may no longer refuse a wallbox in the building's car park. Many more flat-dwellers may then put one in when they buy an electric car — at their own cost, a little higher where the landlord drags their feet — which removes the biggest barrier to an electric car in town, though never for all: some buildings have no parking at all. Tenants and drivers like it; property owners bear the disruption.",
     params: [{ kind: "slider", key: "coverage", label: "Households it reaches", min: 0, max: 80, step: 10, unit: "% of those who can't charge at home", default: 50 }],
     leadTimeMonths: 12,
     effects: (p) => ({ homeChargingBoost: num(p, "coverage") / 100 }),

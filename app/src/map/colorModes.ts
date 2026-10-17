@@ -271,16 +271,16 @@ export const WIND_SITE_COLORS = { planned: "#6f6d66", underWay: "#2a78d6", ready
 // Farmland in the zoning layer, by where it stands for Agri-PV (sim/agriPv.ts).
 export const FARM_PLOT_COLORS = { farmland: "#9cbf73", planned: "#e6c229", zoned: "#e6c229", fieldBuilding: "#3d5a80", field: "#3d5a80" } as const;
 
-// The EV charging layer: what most of a building's households could do — charge at home, or rely
-// on public chargers of this quality (publicCharging.ts). Below the floor, an electric car is no
-// option.
+// The EV charging layer: buildings where most households have a wallbox, and elsewhere the quality
+// of public charging around (publicCharging.ts) — below the floor, too little to rely on. Whether
+// a household may put in a wallbox shows in the drawer and a home's panel.
 export const EV_CHARGING_LEGEND: LegendEntry[] = [
-  { bucket: "home", label: "Can charge at home", color: "#1baf7a" },
+  { bucket: "home", label: "Most have a wallbox", color: "#1baf7a" },
   { bucket: "q4", label: "Public charging very good (75%+)", color: "#174a8c" },
   { bucket: "q3", label: "Good (50–75%)", color: "#2a78d6" },
   { bucket: "q2", label: "Fair (25–50%)", color: "#7fb0e8" },
   { bucket: "q1", label: "Poor (10–25%)", color: "#c9dcf2" },
-  { bucket: "none", label: "Too little for an electric car", color: "#b23a2e" },
+  { bucket: "none", label: "Too little to rely on", color: "#b23a2e" },
   { bucket: "noHouseholds", label: "No households", color: UNKNOWN_COLOR },
 ];
 

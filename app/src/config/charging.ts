@@ -6,13 +6,24 @@ import type { BuildingGroup } from "./stock";
 
 // --- Charging at home ---
 
-// The chance a household can charge at home (own parking space, a wallbox allowed), by building.
-// Most owners of a house can; many flat-dwellers, renters especially, can't.
+// The chance a household may put in a wallbox (its own parking space, a wallbox allowed), by
+// building. Most owners of a house may; many flat-dwellers, renters especially, may not. The right
+// to charge raises it for the rest.
 export const HOME_CHARGING_SHARE: Partial<Record<BuildingGroup, number>> = {
   houseSingle: 0.85,
   apartments: 0.35,
 };
 export const HOME_CHARGING_SHARE_OTHER = 0.35; // flats in mixed-use and other buildings
+
+// Being allowed isn't having one: a household puts in a wallbox when it buys an electric car and
+// charging at home beats the public chargers around. What it costs, installation included (CHF):
+// in a house's garage or carport; in a block of flats' shared car park (its wiring and load
+// management shared out) — and more where only the right to charge makes the landlord or the
+// owners' association agree. Spread over the wallbox's life in the decision; a household keeps
+// its wallbox for later cars. Placeholders to balance.
+export const WALLBOX_COST_CHF = { house: 2500, flat: 4000 };
+export const WALLBOX_RIGHT_TO_CHARGE_EXTRA_CHF = 1500;
+export const WALLBOX_LIFETIME_YEARS = 15;
 
 // --- Public sites ---
 

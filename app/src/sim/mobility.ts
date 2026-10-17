@@ -74,6 +74,7 @@ import { existsAt } from "./lifetime";
 import { priceFactor } from "./costTrends";
 import { gridDrawBlockedAt } from "./gridLimits";
 import { EARLY_SWITCH } from "../config/earlySwitch";
+import { WALLBOX_LIFETIME_YEARS } from "../config/charging";
 import { earlyCandidates, earlySwitchChance } from "./earlySwitch";
 
 // --- slot count --------------------------------------------------------------
@@ -156,57 +157,82 @@ function avgElecRpKWh(tariff: Tariff): number {
   return (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2;
 }
 
-/** How a household would charge an electric car bought at `atMs`: at home, relying on public
- * charging (and charging at work) good enough to (see publicCharging.ts), or not at all — `option`
- * then being what little there is. */
-type ChargingAccess = { kind: "home" } | { kind: "public"; option: ChargingOption } | { kind: "none"; option: ChargingOption | null };
+/** The two ways a household could charge an electric car bought at `atMs`: at home — `wallboxRp`
+ * still to pay for a wallbox (0 if it has one), null if it may not put one in or the grid has no
+ * room for a new one — and relying on public chargers and charging at work (`option`, see
+ * publicCharging.ts). */
+interface ChargingAccess {
+  building: Building;
+  dwelling: Dwelling;
+  wallboxRp: number | null;
+  option: ChargingOption;
+}
 
-function chargingAccessAt(egid: string, ewid: string, slotIndex: number, atMs: number, incumbent: VehicleTypeId): ChargingAccess | null {
+function chargingAccessAt(egid: string, ewid: string, slotIndex: number, atMs: number): ChargingAccess | null {
   const building = publicCharging.lookupBuilding(egid);
   const dwelling = building?.dwellings.find((d) => d.ewid === ewid);
   if (!building || !dwelling) return null;
-  // A new wallbox needs room on the grid; a household replacing an electric car keeps its own.
-  const wallboxAllowed = incumbent === "carEV" || !gridDrawBlockedAt(building, atMs);
-  if (wallboxAllowed && publicCharging.homeChargingAt(building, dwelling)) return { kind: "home" };
   const option = publicCharging.chargingOption(building, atMs, CAR_NEED, workQosFor(egid, ewid, slotIndex, atMs));
-  return usableOption(option) ? { kind: "public", option } : { kind: "none", option };
+  if (publicCharging.hasWallboxAt(building, dwelling, atMs)) return { building, dwelling, wallboxRp: 0, option };
+  // A new wallbox needs room on the grid.
+  const wallboxRp = gridDrawBlockedAt(building, atMs) ? null : publicCharging.wallboxCostRp(building, dwelling, atMs);
+  return { building, dwelling, wallboxRp, option };
 }
 
-/** Books a newly bought electric car to the charging it relies on — under the ban, whatever little
- * there is. */
-function bookCharging(key: string, slot: unknown, access: ChargingAccess, atMs: number): void {
-  if (access.kind !== "home" && access.option) publicCharging.assign(key, slot, access.option, atMs);
+/** Where an electric car would charge — whichever costs less a year: at home (the energy at the
+ * household price, plus the wallbox still to buy spread over its life), or at public chargers (their
+ * price, plus the hassle) if they're good enough to rely on; "none" if neither. And what that costs
+ * a year. */
+function evChargingChoice(access: ChargingAccess | null, tariff: Tariff): { where: "home" | "public" | "none"; runningRp: number } {
+  const annualKWh = (ANNUAL_CAR_KM / 100) * EV_CAR_KWH_PER_100KM;
+  if (!access) return { where: "home", runningRp: annualKWh * avgElecRpKWh(tariff) };
+  const homeRp = access.wallboxRp === null ? Infinity : annualKWh * avgElecRpKWh(tariff) + access.wallboxRp / WALLBOX_LIFETIME_YEARS;
+  const publicRp = usableOption(access.option) ? annualKWh * access.option.priceRpPerKWh + access.option.hassleRp : Infinity;
+  if (homeRp === Infinity && publicRp === Infinity) return { where: "none", runningRp: Infinity };
+  return homeRp <= publicRp ? { where: "home", runningRp: homeRp } : { where: "public", runningRp: publicRp };
 }
 
+/** Sets up a newly bought electric car's charging: a wallbox put in, or the public chargers it relies
+ * on booked — under the ban with nothing good enough, whatever little there is. */
+function setUpCharging(key: string, slot: unknown, access: ChargingAccess | null, where: "home" | "public" | "none", atMs: number): void {
+  if (!access) return;
+  if (where === "home") publicCharging.installWallbox(access.building, access.dwelling, atMs);
+  else if (access.option.sources.length > 0) publicCharging.assign(key, slot, access.option, atMs);
+}
+
+/** The candidates of a car purchase with this charging: the electric car's running cost from
+ * evChargingChoice — without any way to charge, out (but costed as if an empty on-street charger
+ * were next door, so the decision records whether it was wanted) — set up once chosen. */
+function carCandidatesFor(tariff: Tariff, atMs: number, incumbent: VehicleTypeId, access: ChargingAccess | null, key: string, slot: () => unknown, early = false): RenewalCandidate<VehicleTypeId>[] {
+  const choice = evChargingChoice(access, tariff);
+  const hypothetical = publicCharging.hypotheticalOption("car");
+  const annualKWh = (ANNUAL_CAR_KM / 100) * EV_CAR_KWH_PER_100KM;
+  const runningRp = choice.where === "none" ? annualKWh * hypothetical.priceRpPerKWh + hypothetical.hassleRp : choice.runningRp;
+  return carCandidatesAt(tariff, atMs, incumbent, { runningRp, available: choice.where !== "none" }, (chosenAtMs) => setUpCharging(key, slot(), access, choice.where, chosenAtMs), early);
+}
+
+/** `ev`: what running an electric car would cost a year (its charging), and whether it can be
+ * charged at all. */
 function carCandidatesAt(
   tariff: Tariff,
   atMs: number,
   incumbent: VehicleTypeId,
-  access: ChargingAccess,
+  ev: { runningRp: number; available: boolean },
   onElectricChosen: (atMs: number) => void,
   early = false,
 ): RenewalCandidate<VehicleTypeId>[] {
-  const annualKWh = (ANNUAL_CAR_KM / 100) * EV_CAR_KWH_PER_100KM;
-  // Without charging good enough to rely on, an electric car is out — but its cost is still worked
-  // out as if an on-street charger were next door, so the decision records whether it was wanted.
-  const publicCost = access.kind === "public" ? access.option : access.kind === "none" ? publicCharging.hypotheticalOption("car") : null;
   return CAR_VEHICLE_ORDER.map((id) => {
     const spec = VEHICLE_TYPE_CATALOG[id];
     const beforeMunicipalRp = Math.max(0, spec.baseInstallCostRp * priceFactor(id, atMs) - spec.subsidyRp);
     const scrappageRp = id === "carEV" && incumbent === "carICE" ? policyStore.get().iceScrappageBonusRp : 0;
     const municipalRp = Math.min(municipalVehicleSubsidyRp(id, early) + scrappageRp, beforeMunicipalRp);
     const installCostRp = beforeMunicipalRp - municipalRp;
-    const runningCostRp =
-      id === "carEV"
-        ? publicCost
-          ? annualKWh * publicCost.priceRpPerKWh + publicCost.hassleRp
-          : annualKWh * avgElecRpKWh(tariff)
-        : (ANNUAL_CAR_KM / 100) * ICE_CAR_L_PER_100KM * tariff.petrolPriceRpPerLiter;
+    const runningCostRp = id === "carEV" ? ev.runningRp : (ANNUAL_CAR_KM / 100) * ICE_CAR_L_PER_100KM * tariff.petrolPriceRpPerLiter;
     return {
       id,
-      // Under the ban a household with no charging good enough goes electric anyway, and gets by
-      // with whatever there is.
-      available: id === "carEV" ? access.kind !== "none" || policyStore.get().iceCarPurchaseBanned : !policyStore.get().iceCarPurchaseBanned,
+      // Under the ban a household with no way to charge goes electric anyway, and gets by with
+      // whatever there is.
+      available: id === "carEV" ? ev.available || policyStore.get().iceCarPurchaseBanned : !policyStore.get().iceCarPurchaseBanned,
       annualizedCostRp: installCostRp / spec.lifetimeMeanYears + runningCostRp,
       lifetimeMeanYears: spec.lifetimeMeanYears,
       municipalSubsidyRp: municipalRp,
@@ -283,8 +309,7 @@ function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "c
     lifetimeMeanYearsFor: (id) => VEHICLE_TYPE_CATALOG[id].lifetimeMeanYears,
     candidatesAt: (atMs, incumbent) => {
       if (kind === "bike") return bikeCandidatesAt(tariffStore.at(atMs), atMs);
-      const access: ChargingAccess = chargingAccessAt(egid, ewid, slotIndex, atMs, incumbent) ?? { kind: "home" };
-      return carCandidatesAt(tariffStore.at(atMs), atMs, incumbent, access, (chosenAtMs) => bookCharging(key, slotHandleFor(egid, ewid, slotIndex), access, chosenAtMs));
+      return carCandidatesFor(tariffStore.at(atMs), atMs, incumbent, chargingAccessAt(egid, ewid, slotIndex, atMs), key, () => slotHandleFor(egid, ewid, slotIndex));
     },
     early:
       kind === "car"
@@ -299,8 +324,7 @@ function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "c
               ),
             candidatesAt: (atMs, incumbent, ageYears) => {
               const tariff = tariffStore.at(atMs);
-              const access: ChargingAccess = chargingAccessAt(egid, ewid, slotIndex, atMs, incumbent) ?? { kind: "home" };
-              const base = carCandidatesAt(tariff, atMs, incumbent, access, (chosenAtMs) => bookCharging(key, slotHandleFor(egid, ewid, slotIndex), access, chosenAtMs), true);
+              const base = carCandidatesFor(tariff, atMs, incumbent, chargingAccessAt(egid, ewid, slotIndex, atMs), key, () => slotHandleFor(egid, ewid, slotIndex), true);
               const keep = (ANNUAL_CAR_KM / 100) * ICE_CAR_L_PER_100KM * tariff.petrolPriceRpPerLiter;
               return earlyCandidates(base, incumbent, keep, ageYears, EARLY_SWITCH.car);
             },
@@ -323,14 +347,15 @@ function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "c
   return renewalEventsUpTo(params, simTimeMs);
 }
 
-/** Whether a household without home charging that just bought a car other than an electric one
- * would have gone electric with an empty on-street charger next door — the same decision, re-run
- * with that charger (publicCharging.hypotheticalOption). */
+/** Whether a household that couldn't charge at home and just bought a car other than an electric
+ * one would have gone electric with an empty on-street charger next door — the same decision,
+ * re-run with that charger (publicCharging.hypotheticalOption). */
 function wouldGoElectricWithCharger(egid: string, ewid: string, slotIndex: number, incumbent: VehicleTypeId, atMs: number): boolean {
-  const building = publicCharging.lookupBuilding(egid);
-  const dwelling = building?.dwellings.find((d) => d.ewid === ewid);
-  if (!building || !dwelling || publicCharging.homeChargingAt(building, dwelling)) return false;
-  const candidates = carCandidatesAt(tariffStore.at(atMs), atMs, incumbent, { kind: "public", option: publicCharging.hypotheticalOption("car") }, () => {});
+  const access = chargingAccessAt(egid, ewid, slotIndex, atMs);
+  if (!access || access.wallboxRp !== null) return false;
+  const nearby = publicCharging.hypotheticalOption("car");
+  const annualKWh = (ANNUAL_CAR_KM / 100) * EV_CAR_KWH_PER_100KM;
+  const candidates = carCandidatesAt(tariffStore.at(atMs), atMs, incumbent, { runningRp: annualKWh * nearby.priceRpPerKWh + nearby.hassleRp, available: true }, () => {});
   const bias = biasStrengthRp(egid, ewid, slotIndex, "car") + policyStore.get().progressiveNudgeRp;
   return chooseNext(candidates, incumbent, VEHICLE_UNCERTAINTY_FRACTION, bias).chosen === "carEV";
 }
@@ -378,18 +403,22 @@ function slotHandleFor(egid: string, ewid: string, slotIndex: number): SlotHandl
   return dwelling ? (slotHandles(egid, dwelling)[slotIndex] ?? null) : null;
 }
 
-/** The electric cars already on the road at game start whose households can't charge at home are
- * booked to the charging each would rely on, as far as there's room (building by building, in the
- * register's order) — so the real chargers start out with their users. One that finds nothing
- * keeps its car but isn't counted at any charger. Run once, after the stock is loaded and before
- * the clock moves. */
+/** The electric cars already on the road at game start: a household that can charge at home has a
+ * wallbox; the others' cars are booked to the charging each would rely on, as far as there's room
+ * (building by building, in the register's order) — so the real chargers start out with their
+ * users. One that finds nothing keeps its car but isn't counted at any charger. Run once, after
+ * the stock is loaded and before the clock moves. */
 export function bookInitialPublicCharging(buildings: Building[]): void {
   for (const building of buildings) {
     if (!existsAt(building, 0)) continue;
     for (const dwelling of building.dwellings) {
-      if (publicCharging.homeChargingAt(building, dwelling)) continue;
+      const atHome = publicCharging.homeChargingAt(building, dwelling, { atStart: true });
       for (const h of slotHandles(building.egid, dwelling)) {
         if (initialVehicleType(building.egid, dwelling.ewid, h.slotIndex, "car") !== "carEV" || handleMode(h, 0) !== "car") continue;
+        if (atHome) {
+          publicCharging.installWallbox(building, dwelling, 0);
+          continue;
+        }
         const option = publicCharging.chargingOption(building, 0, CAR_NEED, workQosFor(building.egid, dwelling.ewid, h.slotIndex, 0));
         if (option.sources.length > 0) publicCharging.assign(vehicleEntityKey(building.egid, dwelling.ewid, h.slotIndex, "car"), h, option, 0);
       }
@@ -492,12 +521,21 @@ export function slotChargingPowerW(
 // --- UI summary ------------------------------------------------------------
 
 /** How a slot's car charges, for the dwelling panel: an electric one at home, or at the public
- * sources it is booked to (with their shares); another car, how it could if it went electric — at
- * home, or relying on public charging of this quality (from these sources). Null outside car mode. */
+ * sources it is booked to (with their shares); another car, how it could if it went electric — the
+ * wallbox it has or may put in (and at what cost), and the quality of public charging (from these
+ * sources). Null outside car mode. */
 export type SlotCharging =
   | { kind: "home" }
   | { kind: "public"; sources: { name: string; share: number }[] }
-  | { kind: "could"; qos: number; usable: boolean; sources: { name: string; distanceM: number; share: number }[] };
+  | {
+      kind: "could";
+      hasWallbox: boolean;
+      wallboxRp: number | null;
+      prefers: "home" | "public" | "none";
+      qos: number;
+      usable: boolean;
+      sources: { name: string; distanceM: number; share: number }[];
+    };
 
 export function slotCharging(building: Building, dwelling: Dwelling, slotIndex: number, simTimeMs: number): SlotCharging | null {
   const h = slotHandles(building.egid, dwelling)[slotIndex];
@@ -508,14 +546,16 @@ export function slotCharging(building: Building, dwelling: Dwelling, slotIndex: 
     if (bookings.length === 0) return { kind: "home" };
     return { kind: "public", sources: bookings.sort((a, b) => b.share - a.share).map((a) => ({ name: name(a.siteId), share: a.share })) };
   }
-  const access = chargingAccessAt(building.egid, dwelling.ewid, slotIndex, simTimeMs, "carICE");
-  if (!access || access.kind === "home") return { kind: "home" };
+  const access = chargingAccessAt(building.egid, dwelling.ewid, slotIndex, simTimeMs);
+  if (!access) return null;
   const option = access.option;
-  if (!option) return { kind: "could", qos: 0, usable: false, sources: [] };
   return {
     kind: "could",
+    hasWallbox: publicCharging.hasWallboxAt(building, dwelling, simTimeMs),
+    wallboxRp: access.wallboxRp,
+    prefers: evChargingChoice(access, tariffStore.at(simTimeMs)).where,
     qos: option.qos,
-    usable: access.kind === "public",
+    usable: usableOption(option),
     sources: option.sources.map((s) => ({ name: s.site ? s.site.name : "at work", distanceM: s.distanceM, share: s.share })),
   };
 }

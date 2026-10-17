@@ -299,10 +299,11 @@ export function EvChargingPanel() {
   const town = useMemo(() => {
     const standing = buildings.filter((b) => existsAt(b, simDay));
     let households = 0;
-    const byAccess = { home: 0, q4: 0, q3: 0, q2: 0, q1: 0, none: 0 };
+    const byAccess = { home: 0, mayInstall: 0, q4: 0, q3: 0, q2: 0, q1: 0, none: 0 };
     for (const access of publicCharging.householdAccess(standing, simDay).values()) {
       households += access.households;
       byAccess.home += access.atHome;
+      byAccess.mayInstall += access.mayInstall;
       const q = access.qos;
       byAccess[q >= 0.75 ? "q4" : q >= 0.5 ? "q3" : q >= 0.25 ? "q2" : q >= QOS_FLOOR ? "q1" : "none"] += access.households - access.atHome;
     }
@@ -371,14 +372,14 @@ export function EvChargingPanel() {
 
       <div
         className="ev-access"
-        title="Of every household in the municipality, whether or not it has an electric car yet. For those who can't charge at home: how much of their charging the public chargers around could do — how close they are along the streets, and how busy. Charging at work comes on top, for those who can."
+        title="Of every household in the municipality, whether or not it has an electric car yet. For those without a wallbox: how much of their charging the public chargers around could do — how close they are along the streets, and how busy. Charging at work comes on top, for those who can. A household that may put in a wallbox weighs its cost against relying on public chargers when it buys an electric car."
       >
         <div className="info-row">
-          <span>Households that can charge at home</span>
+          <span>Households with a wallbox</span>
           <span className="info-value">{percent(town.byAccess.home, town.households)}</span>
         </div>
         <div className="info-row">
-          <span>…else public charging very good (75%+)</span>
+          <span>Without a wallbox: public charging very good (75%+)</span>
           <span className="info-value">{percent(town.byAccess.q4, town.households)}</span>
         </div>
         <div className="info-row">
@@ -394,8 +395,12 @@ export function EvChargingPanel() {
           <span className="info-value">{percent(town.byAccess.q1, town.households)}</span>
         </div>
         <div className="info-row">
-          <span>…too little for an electric car</span>
+          <span>…too little to rely on</span>
           <span className="info-value">{percent(town.byAccess.none, town.households)}</span>
+        </div>
+        <div className="info-row" title="Households without a wallbox that have their own parking space and may put one in — or may by the right to charge. They weigh its cost against public charging when they buy an electric car.">
+          <span>Without a wallbox, but may put one in</span>
+          <span className="info-value">{percent(town.byAccess.mayInstall, town.households)}</span>
         </div>
       </div>
       <div className="info-row" title="Drivers whose employer has chargers in its car park — more each year, and more with a workplace charging programme. It adds to whatever public charging they have near home.">

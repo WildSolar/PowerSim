@@ -21,7 +21,7 @@ import { RenewalLogSection } from "./RenewalLogSection";
 import { useDwellingBillSummary } from "./useBillSummary";
 import { useHistorySeries } from "./useHistorySeries";
 import { useLivePowerPlants } from "./useLivePowerPlants";
-import { formatWatts } from "./format";
+import { formatCHF, formatWatts } from "./format";
 import "./panels.css";
 
 const colorOf = (key: (typeof DEVICE_CATEGORIES)[number]["key"]) => DEVICE_CATEGORIES.find((c) => c.key === key)!.color;
@@ -55,14 +55,21 @@ function ChargingNote({ charging }: { charging: SlotCharging }) {
   if (charging.kind === "public")
     return <div className="ev-session-note">Charges {charging.sources.map((s) => `${s.name.startsWith("at ") ? s.name : `at ${s.name}`} (${percentOf(s.share)})`).join(", ")}.</div>;
   const where = charging.sources.map((s) => (s.name === "at work" ? "at work" : `${s.name}, ${s.distanceM >= 1000 ? `${(s.distanceM / 1000).toFixed(1)} km` : `${Math.round(s.distanceM / 10) * 10} m`}`));
+  const home = charging.hasWallbox
+    ? "Has a wallbox."
+    : charging.wallboxRp !== null
+      ? `Could put in a wallbox for ${formatCHF(Math.round(charging.wallboxRp / 10_000) * 10_000)}.`
+      : "No wallbox possible.";
+  const choice =
+    charging.prefers === "home" ? "An electric car would charge at home." : charging.prefers === "public" ? "An electric car would charge in public." : "No way to charge an electric car.";
   return (
     <div
       className="ev-session-note"
-      title="Without a charger at home, an electric car relies on the public chargers around — the closer along the streets and the less busy, the better — and on charging at work, for those who can. Below 10% it isn't an option."
+      title="With an electric car, a household charges where it costs it less a year: at home (the electricity, and a wallbox if it has none yet, spread over its life) or at public chargers and at work (their price, and the hassle — the better the charging, the less). Public charging below 10% can't be relied on."
     >
-      No charger at home. Public charging here: {percentOf(charging.qos)}
-      {charging.usable ? "" : " — too little for an electric car"}
-      {where.length > 0 ? ` (${where.join("; ")})` : ""}.
+      {home} Public charging here: {percentOf(charging.qos)}
+      {charging.usable ? "" : " (too little to rely on)"}
+      {where.length > 0 ? ` — ${where.join("; ")}` : ""}. {choice}
     </div>
   );
 }

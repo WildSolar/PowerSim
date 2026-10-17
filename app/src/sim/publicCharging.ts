@@ -44,6 +44,8 @@ import {
   HASSLE_CHF,
   HOME_CHARGING_SHARE,
   HOME_CHARGING_SHARE_OTHER,
+  WALLBOX_COST_CHF,
+  WALLBOX_RIGHT_TO_CHARGE_EXTRA_CHF,
   OPERATOR_BUILD_MONTHS,
   OPERATOR_EXPAND_AT_USE,
   OPERATOR_EXPAND_POINTS,
@@ -174,7 +176,10 @@ export interface ChargingOption {
 
 export interface BuildingChargingAccess {
   households: number;
+  /** Households with a wallbox. */
   atHome: number;
+  /** Households without one that may put one in. */
+  mayInstall: number;
   /** The quality of public charging for its households without home charging (charging at work,
    * which is each person's own, aside). */
   qos: number;
@@ -367,6 +372,8 @@ class PublicCharging {
    * decision, and a site's full history keeps growing. */
   private live = new Map<string, Assignment[]>();
   private unmet: { atMs: number; x: number; y: number; kind: ChargingKind }[] = [];
+  /** Households' wallboxes ("egid:ewid"), by when they were put in. */
+  private wallboxes = new Map<string, number>();
   private lastOperatorYear: number | null = null;
   private projection = new LocalProjection(8.4, 47.4);
   private buildingLookup: (egid: string) => Building | undefined = () => undefined;
@@ -395,6 +402,7 @@ class PublicCharging {
     this.bySite = new Map();
     this.live = new Map();
     this.unmet = [];
+    this.wallboxes = new Map();
     this.lastOperatorYear = yearOf(startMs);
     this.selectedSiteId = null;
     this.placing = null;
@@ -450,14 +458,41 @@ class PublicCharging {
 
   // --- home charging ---
 
-  /** Whether a household can charge at home: a seeded draw per dwelling against its building
-   * type's share, raised by the right-to-charge rule for those who couldn't (`atStart`: as things
-   * stood before any rule). */
-  homeChargingAt(building: Building, dwelling: Dwelling, { atStart = false } = {}): boolean {
+  /** Whether a household may put in a wallbox: "own" (its own parking space, a wallbox allowed —
+   * a seeded draw per dwelling against its building type's share), "law" (only thanks to the right
+   * to charge), or null (it may not). */
+  wallboxRight(building: Building, dwelling: Dwelling): "own" | "law" | null {
     const group = buildingGroup(building);
     const base = (group && HOME_CHARGING_SHARE[group]) ?? HOME_CHARGING_SHARE_OTHER;
-    const share = atStart ? base : base + policyStore.get().homeChargingBoost * (1 - base);
-    return firstRandom(hashSeed(building.egid, dwelling.ewid, "home-charging")) < share;
+    const u = firstRandom(hashSeed(building.egid, dwelling.ewid, "home-charging"));
+    if (u < base) return "own";
+    return u < base + policyStore.get().homeChargingBoost * (1 - base) ? "law" : null;
+  }
+
+  /** Whether a household may charge at home (`atStart`: as things stood before any rule). */
+  homeChargingAt(building: Building, dwelling: Dwelling, { atStart = false } = {}): boolean {
+    const right = this.wallboxRight(building, dwelling);
+    return atStart ? right === "own" : right !== null;
+  }
+
+  /** Whether a household has a wallbox at `atMs`. */
+  hasWallboxAt(building: Building, dwelling: Dwelling, atMs: number): boolean {
+    const at = this.wallboxes.get(`${building.egid}:${dwelling.ewid}`);
+    return at !== undefined && at <= atMs;
+  }
+
+  /** A household puts in a wallbox (its first electric car charging at home). */
+  installWallbox(building: Building, dwelling: Dwelling, atMs: number): void {
+    const key = `${building.egid}:${dwelling.ewid}`;
+    if (!this.wallboxes.has(key)) this.wallboxes.set(key, atMs);
+  }
+
+  /** What putting in a wallbox would cost a household at `atMs` (Rp), or null if it may not. */
+  wallboxCostRp(building: Building, dwelling: Dwelling, atMs: number): number | null {
+    const right = this.wallboxRight(building, dwelling);
+    if (!right) return null;
+    const chf = (buildingGroup(building) === "houseSingle" ? WALLBOX_COST_CHF.house : WALLBOX_COST_CHF.flat) + (right === "law" ? WALLBOX_RIGHT_TO_CHARGE_EXTRA_CHF : 0);
+    return chf * 100 * priceFactor("chargerAc", atMs);
   }
 
   // --- usage ---
@@ -761,7 +796,11 @@ class PublicCharging {
     for (const b of buildings) {
       if (b.dwellings.length === 0) continue;
       let atHome = 0;
-      for (const d of b.dwellings) if (this.homeChargingAt(b, d)) atHome++;
+      let mayInstall = 0;
+      for (const d of b.dwellings) {
+        if (this.hasWallboxAt(b, d, atMs)) atHome++;
+        else if (this.wallboxRight(b, d)) mayInstall++;
+      }
       const candidates: { site: ChargingSite; distanceM: number; qos: number }[] = [];
       for (const { site, distanceM } of this.sitesNear(b)) {
         if (!CAR_NEED.kinds.includes(site.kind)) continue; // lorry parks: not for cars
@@ -773,7 +812,7 @@ class PublicCharging {
         const qos = this.siteQos(site, distanceM, atMs, 1, c);
         if (qos > 0) candidates.push({ site, distanceM, qos });
       }
-      result.set(b.egid, { households: b.dwellings.length, atHome, qos: shareOut(candidates).qos });
+      result.set(b.egid, { households: b.dwellings.length, atHome, mayInstall, qos: shareOut(candidates).qos });
     }
     return result;
   }
@@ -1151,6 +1190,7 @@ class PublicCharging {
       sites: this.sites,
       bySlot: [...this.bySlot].map(([key, list]) => [key, list.map((a) => ({ ...a, slot: slotRef(a.slot) }))] as const),
       unmet: this.unmet,
+      wallboxes: [...this.wallboxes],
       lastOperatorYear: this.lastOperatorYear,
       nextId: this.nextId,
     };
@@ -1171,6 +1211,7 @@ class PublicCharging {
       for (const a of assignments) this.bySite.get(a.siteId)?.push(a);
     }
     this.unmet = s.unmet;
+    this.wallboxes = new Map(s.wallboxes);
     this.lastOperatorYear = s.lastOperatorYear;
     this.nextId = s.nextId;
     this.selectedSiteId = null;
