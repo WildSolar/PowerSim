@@ -27,7 +27,7 @@ import {
 import type { PowerPlant } from "../data/types";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { policyStore } from "./policy";
-import { irradianceWm2, PEAK_IRRADIANCE_WM2, pvPowerWAt } from "./pv";
+import { irradianceWm2, profileShareAt, pvPowerWAt, roofProfileIndex } from "./pv";
 import { snowDepthCm } from "./snow";
 
 const HOUR_MS = 3_600_000;
@@ -53,12 +53,14 @@ interface DayCurve {
 
 const curves = new Map<string, DayCurve>();
 
-/** The day `dayIndex` (days since the epoch) for a battery with the given feed-in cap (0: none). */
-function dayCurve(dayIndex: number, cap: number, snowCm: number): DayCurve {
-  const key = `${dayIndex}:${cap}`;
+/** The day `dayIndex` (days since the epoch) for a battery with the given feed-in cap (0: none),
+ * with panels facing the sun as `profile` (pv.ts) — a roof facing east fills its battery earlier,
+ * one facing west later. */
+function dayCurve(dayIndex: number, cap: number, snowCm: number, profile: number): DayCurve {
+  const key = `${dayIndex}:${cap}:${profile}`;
   let curve = curves.get(key);
   if (curve) return curve;
-  if (curves.size > 256) curves.clear();
+  if (curves.size > 1024) curves.clear();
   const capacity = HOME_BATTERY_KWH_PER_KWP; // per kWp
   const power = capacity * HOME_BATTERY_KW_PER_KWH;
   const fill = new Float32Array(STEPS_PER_DAY + 1);
@@ -66,7 +68,8 @@ function dayCurve(dayIndex: number, cap: number, snowCm: number): DayCurve {
   let lastSunStep = -1; // the last quarter hour with a surplus to speak of
   for (let i = 0; i < STEPS_PER_DAY; i++) {
     const hour = (i + 0.5) * STEP_HOURS;
-    const sun = irradianceWm2(toSimTimeMs(dayIndex * DAY_MS + hour * HOUR_MS), snowCm) / PEAK_IRRADIANCE_WM2;
+    const t = toSimTimeMs(dayIndex * DAY_MS + hour * HOUR_MS);
+    const sun = profileShareAt(profile, t, irradianceWm2(t, snowCm));
     const threshold = cap > 0 && hour < GRID_FRIENDLY_PEAK_UNTIL_HOUR ? cap : 0;
     stored = Math.min(capacity, stored + Math.min(power, Math.max(0, sun - DAYTIME_OWN_USE_KW_PER_KWP - threshold)) * STEP_HOURS);
     fill[i + 1] = stored / capacity;
@@ -122,7 +125,8 @@ export function solarAndBatteryAt(egid: string, plants: PowerPlant[], simTimeMs:
   const dateMs = toDateMs(simTimeMs);
   const dayIndex = Math.floor(dateMs / DAY_MS);
   const hour = (dateMs - dayIndex * DAY_MS) / HOUR_MS;
-  const today = dayCurve(dayIndex, cap ?? 0, snow ?? 0);
+  const profile = roofProfileIndex(egid);
+  const today = dayCurve(dayIndex, cap ?? 0, snow ?? 0, profile);
   const surplusW = generationW - loadW;
   const maxW = kw * 1000;
 
@@ -132,7 +136,7 @@ export function solarAndBatteryAt(egid: string, plants: PowerPlant[], simTimeMs:
     const threshold = cap !== null && hour < GRID_FRIENDLY_PEAK_UNTIL_HOUR ? cap * ratedW : 0;
     if (!full) batteryW = Math.min(maxW, Math.max(0, surplusW - threshold));
   } else {
-    const yesterday = hour < 12 ? dayCurve(dayIndex - 1, cap ?? 0, snow ?? 0) : null;
+    const yesterday = hour < 12 ? dayCurve(dayIndex - 1, cap ?? 0, snow ?? 0, profile) : null;
     const discharging = (hour >= today.dischargeFromHour && hour < today.dischargeToHour) || (yesterday !== null && hour < yesterday.dischargeToHour - 24);
     if (discharging) batteryW = -Math.min(maxW, -surplusW);
   }

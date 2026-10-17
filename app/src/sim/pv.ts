@@ -236,6 +236,13 @@ export function roofOrientationLabel(egid: string): string {
   return PV_PROFILES[roofProfileIndex(egid)].label;
 }
 
+/** What 1 kW of panels of profile `profile` (roofProfileIndex, plantProfileIndex) makes at
+ * `simTimeMs` given the irradiance on the ground (W/m2, snow on the panels already taken off) — as a
+ * share of its rating. */
+export function profileShareAt(profile: number, simTimeMs: number, irradiance: number): number {
+  return irradiance > 0 ? (irradiance / PEAK_IRRADIANCE_WM2) * profileFactors(simTimeMs)[profile] : 0;
+}
+
 /** What 1 kW of panels on `egid`'s roof makes at `simTimeMs` given the irradiance on the ground
  * (W/m2, snow on the panels already taken off) — as a share of its rating. */
 export function roofPvShare(egid: string, simTimeMs: number, irradiance: number): number {
