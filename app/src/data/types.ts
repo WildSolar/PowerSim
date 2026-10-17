@@ -59,6 +59,9 @@ export interface PowerPlant {
   battery?: { kwh: number; kw: number; feedInCap: number | null };
   /** A wind turbine's site: its wind distribution at hub height (Weibull A, k) — sim/windPower.ts. */
   wind?: { a: number; k: number };
+  /** How the panels face the sun (config/pvProfiles.ts) — set for Agri-PV fields; a roof's is drawn
+   * per building (sim/pv.ts). */
+  pvProfile?: string;
 }
 
 /** Where a wind park could stand (pipeline/sources/wind.py): its turbines' positions and the wind at

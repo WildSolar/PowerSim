@@ -1,3 +1,4 @@
+import { AGRI_PV_SYSTEMS } from "../config/agriPv";
 import { useMemo, useSyncExternalStore } from "react";
 import { AGRI_PV_LEAD_MONTHS } from "../config/agriPv";
 import { agriPv, partnerName, type AgriPvDesignation } from "../sim/agriPv";
@@ -143,10 +144,11 @@ export function AgriPvSection({ part }: { part: "overview" | "build" }) {
           {[...summary.building, ...summary.inService].map((f) => (
             <div className="zn-change" key={f.id}>
               <span className="zn-change-title">
-                {agriPv.getPlot(f.plotId)?.name ?? "Field"} · {mw(f.capacityKw)}
+                {agriPv.getPlot(f.plotId)?.name ?? "Field"} · {AGRI_PV_SYSTEMS[f.system]?.label ?? "Agri-PV"} · {mw(f.capacityKw)}
               </span>
               <span className="zn-status">
                 {f.installedAtMs > now ? `Being built, ready ${monthYear(f.installedAtMs)}` : `Since ${monthYear(f.installedAtMs)}`} · power for {partnerName(f.partnerEgid, buildings)}
+                {f.ppaShare !== undefined && f.ppaShare < 1 ? ` (${Math.round(f.ppaShare * 100)}%, the rest to the utility)` : ""}
               </span>
             </div>
           ))}

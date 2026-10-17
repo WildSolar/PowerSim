@@ -1,3 +1,4 @@
+import { roofOrientationLabel } from "../sim/pv";
 import { useState } from "react";
 import { ENERGY_CLASS_CATALOG } from "../sim/energyClass";
 import { energyClassAt, retrofitLog } from "../sim/retrofit";
@@ -236,7 +237,11 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
       <div className={`device-row${hasSolar ? "" : " inactive"}`}>
         <span className="device-name">
           ☀️ Generation
-          {hasSolar && <span className="ev-badge responsive">{solarCapacityKw.toFixed(1)} kWp installed</span>}
+          {hasSolar && (
+            <span className="ev-badge responsive" title="How the panels face the sun: it sets when in the day they make the most">
+              {solarCapacityKw.toFixed(1)} kWp installed · facing {roofOrientationLabel(building.egid)}
+            </span>
+          )}
           {snowCoverCm > 0 && <span className="ev-badge">❄️ {snowCoverCm.toFixed(1)} cm snow</span>}
         </span>
         {hasSolar ? (

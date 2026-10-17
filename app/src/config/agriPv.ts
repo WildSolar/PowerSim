@@ -23,8 +23,21 @@ export const AGRI_PV_ACCEPTANCE_PER_YEAR_DIALOGUE = 0.15;
 export const AGRI_PV_ACCEPTANCE_PER_FIELD = 0.03;
 export const AGRI_PV_ACCEPTANCE_MAX = 0.8;
 
-// The installations: panels high above the crops or in vertical rows between them.
-export const AGRI_PV_KWP_PER_HA = 500;
+// The installations, in three kinds, each covering its whole field: vertical bifacial rows running
+// north–south between the crops (one face to the east, the other to the west; wide gaps for the
+// machines, so the least power per hectare); fixed rows high over orchards, vines and berries (the
+// panels shelter the crop, so the most); and rows over fields that turn to follow the sun from east
+// to west. Power per hectare and the build cost relative to vertical rows; informed placeholders.
+export type AgriPvSystem = "vertical" | "overhead" | "tracking";
+export const AGRI_PV_SYSTEMS: Record<AgriPvSystem, { label: string; kwpPerHa: number; capexFactor: number }> = {
+  vertical: { label: "Vertical rows", kwpPerHa: 300, capexFactor: 1 },
+  overhead: { label: "Fixed rows over orchards and vines", kwpPerHa: 800, capexFactor: 1.15 },
+  tracking: { label: "Tracking rows", kwpPerHa: 500, capexFactor: 1.2 },
+};
+// Which a field gets, drawn per field: cropland (its prime share) takes vertical or tracking rows,
+// which leave the machines room; other farmland — meadows, orchards, vines — any of the three.
+export const AGRI_PV_SYSTEM_WEIGHTS_CROPLAND: Record<AgriPvSystem, number> = { vertical: 0.5, overhead: 0, tracking: 0.5 };
+export const AGRI_PV_SYSTEM_WEIGHTS_OTHER: Record<AgriPvSystem, number> = { vertical: 0.35, overhead: 0.4, tracking: 0.25 };
 // Build cost per kWp: CHF 1,000 for a 0.5 MWp field, falling with size to CHF 600 for 10 MWp.
 export const AGRI_PV_CAPEX_CHF_PER_KWP_AT_500KWP = 1_000;
 export const AGRI_PV_CAPEX_SCALE_EXPONENT = 0.17;
@@ -42,7 +55,8 @@ export const AGRI_PV_MIN_KWP = 200;
 export const AGRI_PV_MIN_FOOTPRINT_M2 = 1_000;
 export const AGRI_PV_MIN_CONSUMER_MWH = 300;
 export const AGRI_PV_CONSIDER_PER_YEAR = 0.15;
-// A PPA is sized to cover at most this share of the business's yearly use.
+// The business takes the field's power up to this share of its yearly use, at its own price; the
+// rest is sold to the utility at the feed-in price.
 export const AGRI_PV_PPA_COVER_SHARE = 0.6;
 // How much the numbers are guessed at (a share of the yearly cost, as for every investment decision).
 export const AGRI_PV_UNCERTAINTY_FRACTION = 0.25;

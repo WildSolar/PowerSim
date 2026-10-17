@@ -24,6 +24,7 @@ import { mapNetworkBucketAt } from "../sim/districtHeatStats";
 import { streets } from "../sim/streets";
 import { pointsAt, publicCharging, qosKindOf, siteCapacityAt } from "../sim/publicCharging";
 import type { QosKind } from "../config/charging";
+import { AGRI_PV_SYSTEMS } from "../config/agriPv";
 import { zoning } from "../sim/zoning";
 import { mapFocus } from "./mapFocus";
 import { grid } from "../sim/grid";
@@ -1929,13 +1930,15 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       const now = simClock.getSimTimeMs();
       const field = agriPv.fieldOn(id);
       const state = agriPv.stateAt(id, now);
+      const suits = agriPv.installationFor(id);
+      const kind = `${AGRI_PV_SYSTEMS[suits.system].label.toLowerCase()}, ${(suits.capacityKw / 1000).toFixed(1)} MWp`;
       const status =
         field && state === "field"
-          ? `Agri-PV, ${(field.capacityKw / 1000).toFixed(1)} MWp`
+          ? `Agri-PV: ${kind}`
           : field
-            ? "Agri-PV being built"
+            ? `Agri-PV being built: ${kind}`
             : state === "zoned"
-              ? "zoned for Agri-PV"
+              ? `zoned for Agri-PV (suits ${kind})`
               : state === "planned"
                 ? "Agri-PV zone on the way"
                 : "farmland";

@@ -13,7 +13,14 @@
  * on a clear day, since there's nothing passing in front of the sun to begin with).
  * Snow cover (snow.ts) can additionally block generation outright, persisting after
  * a snowfall until a sustained thaw clears it — unlike cloud cover, this doesn't
- * clear the instant the sky does. Weather and snow are both shared by every plant in
+ * clear the instant the sky does.
+ *
+ * Arrays face the sun differently (config/pvProfiles.ts): every roof gets one of a basket of
+ * orientations, drawn per building, and Agri-PV fields their system's. What reaches a panel is the
+ * light straight from the sun on its plane, plus the sky's diffuse light and the ground's reflection;
+ * the share that comes diffuse rises with the cloud. Scaled so that the roofs together make as much
+ * over a year as before (as if every panel lay flat): the orientations spread the town's output
+ * over the day, softening its midday peak, without changing how much it makes. Weather and snow are both shared by every plant in
  * the municipality — it's entirely reasonable for panels a few km apart to see the
  * same sky at the same moment — so callers evaluating many plants at once (see
  * history.ts) should compute snow cover once and pass it in rather than let every
@@ -31,6 +38,8 @@ import { snowDepthCm, snowPvBlockingFactor } from "./snow";
 import { valueNoise } from "./valueNoise";
 import { weatherAt } from "./weather";
 import { policyStore } from "./policy";
+import { PV_ALBEDO, PV_BIFACIALITY, PV_DIFFUSE_SHARE_CLEAR, PV_PROFILES, type PvMount } from "../config/pvProfiles";
+import { firstRandom, hashSeed } from "./rng";
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
@@ -62,19 +71,175 @@ export function solarElevationDeg(dateMs: number): number {
  * than changing how much reaches the ground at all. Used for the live "insolation"
  * readout as well as being the input every PV plant's own generation derives from. */
 export function ghiWm2(simTimeMs: number): number {
+  return skyAt(simTimeMs).ghi;
+}
+
+/** The sky at an instant: global horizontal irradiance, the weather's transmittance (0-1), and the
+ * sun's direction (east, north, up; a unit vector), or null below the horizon. */
+function skyAt(simTimeMs: number): { ghi: number; transmittance: number; sun: [number, number, number] | null } {
   const dateMs = toDateMs(simTimeMs);
-  const elevationDeg = solarElevationDeg(dateMs);
-  if (elevationDeg <= 0) return 0;
-  const clearSky = PEAK_IRRADIANCE_WM2 * Math.sin((elevationDeg * Math.PI) / 180);
+  const sun = sunVector(dateMs);
+  if (sun[2] <= 0) return { ghi: 0, transmittance: 1, sun: null };
+  const clearSky = PEAK_IRRADIANCE_WM2 * sun[2];
 
   const cloudiness = weatherAt(simTimeMs).cloudiness;
   const smoothTransmittance = 1 - cloudiness * CLOUD_ATTENUATION;
   // Flicker amplitude scales with cloudiness: ~0 on a clear day (nothing to pass in
   // front of the sun), up to +/-PASSING_CLOUD_STRENGTH once fully overcast.
   const flicker = valueNoise("pv-passing-cloud", dateMs, PASSING_CLOUD_PERIOD_MS) * cloudiness * PASSING_CLOUD_STRENGTH;
-  const weatherTransmittance = Math.min(1, Math.max(0, smoothTransmittance + flicker));
+  const transmittance = Math.min(1, Math.max(0, smoothTransmittance + flicker));
 
-  return clearSky * weatherTransmittance;
+  return { ghi: clearSky * transmittance, transmittance, sun };
+}
+
+/** The sun's direction at `dateMs` as a unit vector (east, north, up). */
+function sunVector(dateMs: number): [number, number, number] {
+  const doy = dayOfYear(dateMs);
+  const hourOfDay = (dateMs % DAY_MS) / HOUR_MS;
+  const lat = (SCHLIEREN_LATITUDE_DEG * Math.PI) / 180;
+  const decl = (solarDeclinationDeg(doy) * Math.PI) / 180;
+  const hourAngle = (15 * (hourOfDay - 12) * Math.PI) / 180; // positive in the afternoon
+  return [
+    -Math.cos(decl) * Math.sin(hourAngle),
+    Math.sin(decl) * Math.cos(lat) - Math.cos(decl) * Math.sin(lat) * Math.cos(hourAngle),
+    Math.sin(decl) * Math.sin(lat) + Math.cos(decl) * Math.cos(lat) * Math.cos(hourAngle),
+  ];
+}
+
+// --- how arrays face the sun ---
+
+const DEG = Math.PI / 180;
+
+/** A panel's normal (east, north, up) at a tilt facing a compass direction. */
+function normal(tiltDeg: number, azimuthDeg: number): [number, number, number] {
+  return [Math.sin(tiltDeg * DEG) * Math.sin(azimuthDeg * DEG), Math.sin(tiltDeg * DEG) * Math.cos(azimuthDeg * DEG), Math.cos(tiltDeg * DEG)];
+}
+
+/** Light on a plane with normal `n` (W/m2): straight from the sun, the sky's diffuse light it sees,
+ * and the ground's reflection. */
+function onPlane(n: [number, number, number], sun: [number, number, number], dni: number, diffuse: number, ghi: number): number {
+  const cos = n[0] * sun[0] + n[1] * sun[1] + n[2] * sun[2];
+  return dni * Math.max(0, cos) + (diffuse * (1 + n[2])) / 2 + (ghi * PV_ALBEDO * (1 - n[2])) / 2;
+}
+
+/** Light on an array of `mount` relative to the horizontal (before scaling). */
+function mountLight(mount: PvMount, sun: [number, number, number], dni: number, diffuse: number, ghi: number): number {
+  switch (mount.kind) {
+    case "fixed":
+      return onPlane(normal(mount.tiltDeg, mount.azimuthDeg), sun, dni, diffuse, ghi);
+    case "eastWest":
+      return (onPlane(normal(mount.tiltDeg, 90), sun, dni, diffuse, ghi) + onPlane(normal(mount.tiltDeg, 270), sun, dni, diffuse, ghi)) / 2;
+    case "vertical": {
+      // Both faces work: rated on the front, the back adds what bifaciality makes of its light.
+      const east = onPlane(normal(90, 90), sun, dni, diffuse, ghi);
+      const west = onPlane(normal(90, 270), sun, dni, diffuse, ghi);
+      return ((east + west) * (1 + PV_BIFACIALITY)) / 2;
+    }
+    case "tracking": {
+      // Turned about a north–south axis to face the sun, within its range.
+      const angle = Math.max(-mount.maxAngleDeg * DEG, Math.min(mount.maxAngleDeg * DEG, Math.atan2(sun[0], sun[2])));
+      return onPlane([Math.sin(angle), 0, Math.cos(angle)], sun, dni, diffuse, ghi);
+    }
+  }
+}
+
+/** Each profile's output per kWp relative to a flat panel (light on its plane over the light on the
+ * ground, times the scaling), at one instant — worked out once per instant for all plants. */
+function profileFactors(simTimeMs: number): Float64Array {
+  if (simTimeMs === factorsAt) return factors;
+  factorsAt = simTimeMs;
+  const { ghi, transmittance, sun } = skyAt(simTimeMs);
+  if (!sun || ghi <= 0) {
+    factors.fill(0);
+    return factors;
+  }
+  const scale = profileScale();
+  const diffuseShare = PV_DIFFUSE_SHARE_CLEAR + (1 - PV_DIFFUSE_SHARE_CLEAR) * Math.min(1, Math.max(0, (1 - transmittance) / CLOUD_ATTENUATION));
+  const diffuse = ghi * diffuseShare;
+  const dni = Math.min(PEAK_IRRADIANCE_WM2, (ghi - diffuse) / Math.max(0.05, sun[2]));
+  for (let i = 0; i < PV_PROFILES.length; i++) factors[i] = Math.min(3, (scale * mountLight(PV_PROFILES[i].mount, sun, dni, diffuse, ghi)) / ghi);
+  return factors;
+}
+
+const factors = new Float64Array(PV_PROFILES.length);
+let factorsAt = Number.NaN;
+let scaleMemo: number | null = null;
+const yearFactors = new Map<string, number>();
+
+/** What a profile makes over a year relative to a flat panel (the roofs together: 1). */
+export function profileYearFactor(id: string): number {
+  profileScale();
+  return yearFactors.get(id) ?? 1;
+}
+
+/** The scaling: what a flat panel makes over a year over what the roof basket makes (each
+ * orientation as common as its weight), so the roofs together make what they did lying flat. */
+function profileScale(): number {
+  if (scaleMemo !== null) return scaleMemo;
+  let flat = 0;
+  let basket = 0;
+  const each = PV_PROFILES.map(() => 0);
+  const totalWeight = PV_PROFILES.reduce((s, p) => s + p.roofWeight, 0);
+  const startMs = Date.UTC(2026, 0, 1);
+  for (let h = 0; h < 365 * 24; h++) {
+    const dateMs = startMs + (h + 0.5) * HOUR_MS;
+    const sun = sunVector(dateMs);
+    if (sun[2] <= 0) continue;
+    // A typical sky: clear and overcast hours in about the Swiss proportion.
+    for (const transmittance of [1, 0.6, 0.25]) {
+      const ghi = PEAK_IRRADIANCE_WM2 * sun[2] * transmittance;
+      const diffuse = ghi * (PV_DIFFUSE_SHARE_CLEAR + (1 - PV_DIFFUSE_SHARE_CLEAR) * Math.min(1, (1 - transmittance) / CLOUD_ATTENUATION));
+      const dni = Math.min(PEAK_IRRADIANCE_WM2, (ghi - diffuse) / Math.max(0.05, sun[2]));
+      flat += ghi;
+      PV_PROFILES.forEach((p, i) => {
+        const light = mountLight(p.mount, sun, dni, diffuse, ghi);
+        each[i] += light;
+        basket += (p.roofWeight / totalWeight) * light;
+      });
+    }
+  }
+  scaleMemo = basket > 0 ? flat / basket : 1;
+  PV_PROFILES.forEach((p, i) => yearFactors.set(p.id, flat > 0 ? (scaleMemo! * each[i]) / flat : 1));
+  return scaleMemo;
+}
+
+const PROFILE_INDEX = new Map(PV_PROFILES.map((p, i) => [p.id, i]));
+const roofProfileByKey = new Map<string, number>();
+
+/** The profile a roof's arrays follow: a seeded draw per building from the basket. */
+export function roofProfileIndex(key: string): number {
+  let i = roofProfileByKey.get(key);
+  if (i === undefined) {
+    const total = PV_PROFILES.reduce((s, p) => s + p.roofWeight, 0);
+    let u = firstRandom(hashSeed(key, "pv-orientation")) * total;
+    i = 0;
+    for (let k = 0; k < PV_PROFILES.length; k++) {
+      u -= PV_PROFILES[k].roofWeight;
+      if (u < 0 && PV_PROFILES[k].roofWeight > 0) {
+        i = k;
+        break;
+      }
+    }
+    roofProfileByKey.set(key, i);
+  }
+  return i;
+}
+
+/** The profile a plant follows: its own (an Agri-PV field's system), else its roof's. */
+export function plantProfileIndex(plant: PowerPlant): number {
+  if (plant.pvProfile) return PROFILE_INDEX.get(plant.pvProfile) ?? 0;
+  return roofProfileIndex(plant.egid ?? plant.plantId);
+}
+
+/** How the arrays on a building face the sun, in words. */
+export function roofOrientationLabel(egid: string): string {
+  return PV_PROFILES[roofProfileIndex(egid)].label;
+}
+
+/** What 1 kW of panels on `egid`'s roof makes at `simTimeMs` given the irradiance on the ground
+ * (W/m2, snow on the panels already taken off) — as a share of its rating. */
+export function roofPvShare(egid: string, simTimeMs: number, irradiance: number): number {
+  return (irradiance / PEAK_IRRADIANCE_WM2) * profileFactors(simTimeMs)[roofProfileIndex(egid)];
 }
 
 /** Irradiance actually reaching a panel, in W/m2 — ghiWm2 further blocked by any
@@ -130,7 +295,9 @@ export function pvPowerWAt(plant: PowerPlant, simTimeMs: number, irradiance: num
   // with a battery generates in full: the battery takes what's over the limit, and homeBattery.ts
   // curtails the rest of the feed-in.
   const limit = plant.battery ? 1 : policyStore.get().feedInLimitPct / 100;
-  return -(plant.capacityKw * 1000 * Math.min(irradiance / PEAK_IRRADIANCE_WM2, limit));
+  if (irradiance <= 0) return 0;
+  const share = (irradiance / PEAK_IRRADIANCE_WM2) * profileFactors(simTimeMs)[plantProfileIndex(plant)];
+  return -(plant.capacityKw * 1000 * Math.min(share, limit));
 }
 
 /** Sum of every plant on a given building's roof (almost always 0 or 1 plant). */

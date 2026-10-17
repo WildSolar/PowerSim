@@ -51,7 +51,7 @@ import { monthElectricity, monthHeatingTechnology } from "./yearReport";
 import { dhFixedCostRpPerYear, dhProductionCostRp } from "./districtHeatDispatch";
 import { PUBLIC_SOLAR_SELF_USE_SHARE, UTILITY_PROFIT_RETAINED_SHARE } from "../config/treasury";
 import { publicCharging } from "./publicCharging";
-import { irradianceWm2, PEAK_IRRADIANCE_WM2, pvPowerWAt } from "./pv";
+import { irradianceWm2, pvPowerWAt, roofPvShare } from "./pv";
 import { roofContracts } from "./roofContracts";
 import { agriPv } from "./agriPv";
 import { wind } from "./wind";
@@ -248,8 +248,8 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
   const publicSolarKWh = energyKWh(
     times,
     times.map((t) => {
-      const sun = irradianceWm2(t) / PEAK_IRRADIANCE_WM2;
-      return publicArrays.reduce((sum, a) => sum + (a.installedAtMs <= t ? a.capacityKw * 1000 * sun : 0), 0);
+      const sun = irradianceWm2(t);
+      return publicArrays.reduce((sum, a) => sum + (a.installedAtMs <= t ? a.capacityKw * 1000 * roofPvShare(a.egid, t, sun) : 0), 0);
     }),
   );
   const retailRpKWh = (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2;
@@ -265,10 +265,12 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
   // Agri-PV fields too — and their partners take that energy instead of buying it (they still pay
   // for the grid).
   // What the fields made, as the town's generation counts it (snow on the panels, a feed-in limit).
+  // The partners take their share of each field's power; the utility buys the rest at the feed-in price.
   const fields = agriPv.plantsBefore(times[times.length - 1] + 1);
+  const ppaShares = new Map(agriPv.getFields().map((f) => [`agri-pv:${f.id}`, f.ppaShare ?? 1]));
   const fieldsW = times.map((t) => {
     const sun = irradianceWm2(t);
-    return fields.reduce((sum, p) => sum - pvPowerWAt(p, t, sun), 0);
+    return fields.reduce((sum, p) => sum - pvPowerWAt(p, t, sun) * (ppaShares.get(p.plantId) ?? 1), 0);
   });
   const ppaKWh = energyKWh(times, fieldsW);
   // And the utility's wind turbines: no feed-in for what they make.
@@ -276,8 +278,8 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
   const windKWh = energyKWh(times, times.map((t) => turbines.reduce((sum, p) => sum + windPowerW(p, t), 0)));
   const arrays = contractArrays();
   const contractW = times.map((t) => {
-    const sun = irradianceWm2(t) / PEAK_IRRADIANCE_WM2;
-    return arrays.reduce((sum, a) => sum + (a.installedAtMs <= t ? a.capacityKw * 1000 * sun : 0), 0);
+    const sun = irradianceWm2(t);
+    return arrays.reduce((sum, a) => sum + (a.installedAtMs <= t ? a.capacityKw * 1000 * roofPvShare(a.egid, t, sun) : 0), 0);
   });
   return {
     consumerRevenueRp:

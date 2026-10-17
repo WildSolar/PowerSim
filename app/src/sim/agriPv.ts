@@ -10,13 +10,16 @@
  *    Agri-PV dialogue (an information measure) builds acceptance over the years, which takes the edge
  *    off both; so does every field people get to see.
  *  - Businesses with a big electricity use build on the zoned fields. Now and then each looks into
- *    the zoned field nearest to it: a power purchase agreement (PPA) — it takes the field's power as
- *    it comes, instead of buying that energy from the utility. Worth it if the energy it saves beats
- *    the build cost, the upkeep and the farmer's rent, weighed like every investment in the game.
+ *    the zoned field nearest to it: an installation over the whole field, of the kind the field
+ *    suits (config/agriPv.ts — vertical rows, fixed rows over orchards and vines, or tracking rows;
+ *    drawn per field), with a power purchase agreement (PPA) — it takes the field's power as it
+ *    comes, up to a share of its own use, instead of buying that energy from the utility, and sells
+ *    the rest to the utility at the feed-in price. Worth it if that beats the build cost, the upkeep
+ *    and the farmer's rent, weighed like every investment in the game.
  *
  * The fields generate like any solar (registered with solarAdoption.ts as plants of their own, on
- * no building); the utility pays no feed-in for them, and sells their partners that much less
- * energy (finances.ts).
+ * no building), each kind facing the sun its own way (sim/pv.ts); the utility pays feed-in for the
+ * part sold to it, and sells the partners that much less energy for the rest (finances.ts).
  */
 
 import { GRID_UPKEEP_RP_PER_KWH } from "../config/market";
@@ -31,7 +34,10 @@ import {
   AGRI_PV_CAPEX_SCALE_EXPONENT,
   AGRI_PV_CONSIDER_PER_YEAR,
   AGRI_PV_FULL_SCALE_HA,
-  AGRI_PV_KWP_PER_HA,
+  AGRI_PV_SYSTEM_WEIGHTS_CROPLAND,
+  AGRI_PV_SYSTEM_WEIGHTS_OTHER,
+  AGRI_PV_SYSTEMS,
+  type AgriPvSystem,
   AGRI_PV_LASTING_SHARE,
   AGRI_PV_LEAD_MONTHS,
   AGRI_PV_LIFETIME_YEARS,
@@ -64,6 +70,7 @@ import { policyStore } from "./policy";
 import { hashSeed, mulberry32 } from "./rng";
 import { chooseNext, type RenewalCandidate } from "./renewal";
 import { setExtraPlants, specificYieldKWhPerKwp } from "./solarAdoption";
+import { profileYearFactor } from "./pv";
 import { tariffStore } from "./tariffStore";
 import { treasury } from "./treasury";
 
@@ -87,7 +94,10 @@ export interface AgriPvField {
   plotId: string;
   /** The business that built it and buys its power. */
   partnerEgid: string;
+  system: AgriPvSystem;
   capacityKw: number;
+  /** The share of its power its partner takes (the rest is sold to the utility). */
+  ppaShare: number;
   decidedAtMs: number;
   installedAtMs: number;
   costRp: number;
@@ -336,7 +346,7 @@ class AgriPv {
     for (const f of this.fields) {
       if (f.installedAtMs >= cutoffMs) continue;
       const plot = this.byId.get(f.plotId);
-      plants.push({ plantId: `agri-pv:${f.id}`, lon: plot?.lon ?? 0, lat: plot?.lat ?? 0, capacityKw: f.capacityKw, technology: "Photovoltaic", commissioningDate: null, egid: null });
+      plants.push({ plantId: `agri-pv:${f.id}`, lon: plot?.lon ?? 0, lat: plot?.lat ?? 0, capacityKw: f.capacityKw, technology: "Photovoltaic", commissioningDate: null, egid: null, pvProfile: f.system });
     }
     return plants;
   }
@@ -380,17 +390,38 @@ class AgriPv {
     return best?.plot ?? null;
   }
 
-  /** A business weighs a field: a PPA sized to the field and to its use, against doing nothing. */
+  /** The kind of installation a field suits — drawn per field, by how much of it is cropland. */
+  systemOf(plotId: string): AgriPvSystem {
+    const prime = this.byId.get(plotId)?.primeShare ?? 0;
+    const systems = Object.keys(AGRI_PV_SYSTEMS) as AgriPvSystem[];
+    const weights = systems.map((s) => prime * AGRI_PV_SYSTEM_WEIGHTS_CROPLAND[s] + (1 - prime) * AGRI_PV_SYSTEM_WEIGHTS_OTHER[s]);
+    let u = mulberry32(hashSeed(plotId, "agri-pv-system"))() * weights.reduce((a, w) => a + w, 0);
+    for (let i = 0; i < systems.length; i++) {
+      u -= weights[i];
+      if (u < 0) return systems[i];
+    }
+    return systems[0];
+  }
+
+  /** The installation a field would take: its kind and size (kWp). */
+  installationFor(plotId: string): { system: AgriPvSystem; capacityKw: number } {
+    const system = this.systemOf(plotId);
+    return { system, capacityKw: ((this.byId.get(plotId)?.areaM2 ?? 0) / 10_000) * AGRI_PV_SYSTEMS[system].kwpPerHa };
+  }
+
+  /** A business weighs a field: an installation over the whole field, its power taken up to a share
+   * of its own use and the rest sold to the utility, against doing nothing. */
   private consider(b: Building, plot: Plot, atMs: number): AgriPvField | null {
     const useKWh = this.yearlyUseKWh(b, atMs);
     if (useKWh < AGRI_PV_MIN_CONSUMER_MWH * 1000) return null;
-    const yieldPerKwp = specificYieldKWhPerKwp(atMs);
-    const kw = Math.min((plot.areaM2 / 10_000) * AGRI_PV_KWP_PER_HA, (useKWh * AGRI_PV_PPA_COVER_SHARE) / yieldPerKwp);
+    const { system, capacityKw: kw } = this.installationFor(plot.id);
     if (kw < AGRI_PV_MIN_KWP) return null;
-    const costRp = kw * capexRpPerKwp(kw, atMs);
-    const rentRp = (kw / AGRI_PV_KWP_PER_HA) * AGRI_PV_RENT_CHF_PER_HA_YEAR * 100;
+    const fieldKWh = kw * specificYieldKWhPerKwp(atMs) * profileYearFactor(system);
+    const ppaShare = Math.min(1, (useKWh * AGRI_PV_PPA_COVER_SHARE) / fieldKWh);
+    const costRp = kw * capexRpPerKwp(kw, atMs) * AGRI_PV_SYSTEMS[system].capexFactor;
+    const rentRp = (plot.areaM2 / 10_000) * AGRI_PV_RENT_CHF_PER_HA_YEAR * 100;
     const upkeepRp = kw * AGRI_PV_UPKEEP_CHF_PER_KWP_YEAR * 100;
-    const savedRp = kw * yieldPerKwp * this.ppaEnergyValueRpPerKWh(atMs);
+    const savedRp = fieldKWh * (ppaShare * this.ppaEnergyValueRpPerKWh(atMs) + (1 - ppaShare) * tariffStore.at(atMs).feedInPriceRpKWh);
     type Choice = "none" | "field";
     const candidates: RenewalCandidate<Choice>[] = [
       { id: "none", available: true, annualizedCostRp: 0, lifetimeMeanYears: AGRI_PV_LIFETIME_YEARS, greenness: 0 },
@@ -399,7 +430,7 @@ class AgriPv {
     const policy = policyStore.get();
     const { chosen } = chooseNext(candidates, "none", AGRI_PV_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier, policy.progressiveNudgeRp);
     if (chosen === "none") return null;
-    return { id: this.nextId++, plotId: plot.id, partnerEgid: b.egid, capacityKw: kw, decidedAtMs: atMs, installedAtMs: atMs + AGRI_PV_BUILD_MONTHS * MONTH_MS, costRp };
+    return { id: this.nextId++, plotId: plot.id, partnerEgid: b.egid, system, capacityKw: kw, ppaShare, decidedAtMs: atMs, installedAtMs: atMs + AGRI_PV_BUILD_MONTHS * MONTH_MS, costRp };
   }
 
   // --- time ---

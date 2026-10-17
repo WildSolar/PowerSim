@@ -741,6 +741,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Every solar installation at the start is real, from the federal register, at its registered size. From there, more appear as owners decide to put panels up. Panels follow the sun through the day and the seasons, produce less under cloud, and stop under snow until it melts.",
       ),
       p(
+        "Roofs face every way: south at 30° on one house, east and west at a shallow tilt on the flat roof next door, south-west on the one after. Each building's panels have their own orientation — its panel shows which — and that sets when in the day they make the most: east in the morning, west into the evening, south around noon. Over a year a south-facing roof makes a little more and an east- or west-facing one a little less, but together the town's roofs spread their output over the day, so its midday peak on the grid is lower than if every panel faced the same way.",
+      ),
+      p(
         "Every year, each building without panels has a chance that its owner seriously considers them. That chance grows for a few years after the heating is replaced (a natural moment to think about the roof), the more neighbours already have panels, with the municipality's solar campaign, and as panels get cheaper (see \"Technology prices over time\"). Buildings over 200 years old are treated as protected and don't get panels.",
       ),
       p(
@@ -780,13 +783,20 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Zoning: in the Zoning tool, the green fields outside the building zones are the town's farmland, one parcel's field each, with its local name. Pick fields and put them forward as an Agri-PV zone. It costs the planning work, always goes to a public vote, and comes into force two years on. People mind: the landscape and the food land weigh against it, prime cropland most of all (the canton's Fruchtfolgeflächen); the climate-minded and business are for. Part of the opposition stays for as long as the zone is there.",
         "Acceptance: at first, a zone is a hard sell — expect to lose early votes. The Agri-PV dialogue (an information measure: field visits, farmers who already harvest under panels, round tables) brings people round year by year, and every field they get to see helps a little. Acceptance softens the opposition to new zones and to those in force alike, though some will always mind.",
-        "Building: businesses with a big electricity use look into the zoned field nearest to them now and then. They build a field sized to cover part of their own use — at CHF 600–1,000 per kWp, the bigger the cheaper, plus a rent to the farmer — and take its power as it comes, under a power purchase agreement, instead of buying that energy from the utility. They still pay for the grid. Whether it pays depends on the price you set for electricity: the dearer it is, the better the deal.",
+        "Building: businesses with a big electricity use look into the zoned field nearest to them now and then. They build over the whole field — at CHF 600–1,000 per kWp, the bigger the cheaper, more for tracking and overhead rows, plus a rent to the farmer — and take its power as it comes, under a power purchase agreement, up to about 60% of their own use, instead of buying that energy from the utility (they still pay for the grid). The utility buys the rest at the feed-in price. Whether it pays depends on the prices you set: the dearer electricity, and the better the feed-in price, the better the deal.",
       ]),
+      p("Each field suits one of three kinds of installation, which sets how much it holds and when in the day it makes the most:"),
+      list([
+        "Vertical rows — bifacial panels standing between the crops in north–south rows, one face to the east, the other to the west, with wide gaps for the machines: about 0.3 MWp per hectare, making most in the morning and the late afternoon.",
+        "Fixed rows over orchards and vines — panels high above the trees, sheltering them, facing south: about 0.8 MWp per hectare.",
+        "Tracking rows — panels turning from east to west through the day over a field: about 0.5 MWp per hectare, making the most per kWp, over a long day.",
+      ]),
+      p("Cropland takes vertical or tracking rows, which leave the machines room; meadows, orchards and vines any of the three. A field's card on the map says which it suits, and how big it would be."),
       p(
-        "The fields feed into the town's grid like any solar and count against its emissions. The utility pays no feed-in for them, and sells their partners that much less energy — it keeps the grid fee.",
+        "The fields feed into the town's grid like any solar and count against its emissions. For what the partners take, the utility pays no feed-in and sells them that much less energy — it keeps the grid fee; for the rest, it pays the feed-in price like for any rooftop.",
       ),
       note(
-        "The fields are real (the canton's land cover and cadastral parcels, outside the federal building zones); which businesses invest, and when, is the game's. How fields connect to the grid isn't modelled yet: they feed into the town as a whole.",
+        "The fields are real (the canton's land cover and cadastral parcels, outside the federal building zones); which kind each suits, which businesses invest and when are the game's. How fields connect to the grid isn't modelled yet: they feed into the town as a whole.",
       ),
     ],
   },
