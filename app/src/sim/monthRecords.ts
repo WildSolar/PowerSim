@@ -33,6 +33,31 @@ export interface MonthRecord {
   storedKWh?: number;
   /** The utility's month as it was settled (finances.ts): every line of its accounts. */
   utility?: UtilityMonth;
+  /** What the town had at the month's end. */
+  assets?: MonthAssets;
+}
+
+export interface MonthAssets {
+  /** Generation (kW of rating): Agri-PV fields and wind turbines (rooftop solar is solarBuiltKw). */
+  agriPvKw: number;
+  windKw: number;
+  /** Batteries' storage (kWh): homes' and the neighbourhood batteries. */
+  homeBatteryKwh: number;
+  gridBatteryKwh: number;
+  /** District heating: pipe length (m, streets, trunk lines and direct lines), and what it reaches
+   * — connected, and connected or free to connect — by buildings, floor area and heat demand
+   * (shares of the heated buildings', 0-1). */
+  dhPipeM: number;
+  dhConnected: { buildings: number; floor: number; demand: number };
+  dhWithinReach: { buildings: number; floor: number; demand: number };
+  /** Public charging: charge points, their room and the room taken (cars' worth). */
+  chargerPoints: number;
+  chargerRoom: number;
+  chargerTaken: number;
+  /** Households without a wallbox: how good public charging is around them, on average (0-1);
+   * and the share of all households with a wallbox. */
+  chargingQos: number;
+  wallboxShare: number;
 }
 
 class MonthRecords {

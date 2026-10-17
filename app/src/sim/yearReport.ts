@@ -20,6 +20,10 @@
  * runs synchronously.
  */
 
+import { networkCoverage } from "./districtHeatStats";
+import { publicCharging } from "./publicCharging";
+import { wind } from "./wind";
+import { agriPv } from "./agriPv";
 import { timed } from "./devTiming";
 import { existsAt } from "./lifetime";
 import type { EnergyClassId } from "./energyClass";
@@ -273,6 +277,8 @@ export function monthElectricity(buildings: Building[], realPlants: PowerPlant[]
     const monthEndMs = toSimTimeMs(Date.UTC(year, month + 1, 1));
     const plants = effectivePowerPlantsAt(buildings, realPlants, monthEndMs - 1);
     timed("month electricity: record", () => recordMonthElectricity(buildings, year, month, times, series, plants, monthEndMs - 1));
+    await yieldToEventLoop();
+    timed("month assets: record", () => recordMonthAssets(buildings, year, month, plants, monthEndMs - 1));
     return { times, series, dynamicW: samples.map((s) => s.dynamicW) };
   }, "month electricity");
 }
@@ -500,6 +506,43 @@ function recordMonthElectricity(buildings: Building[], year: number, month: numb
     boughtKWh: flows.boughtKWh,
     soldKWh: flows.soldKWh,
     storedKWh: flows.storedKWh,
+  });
+}
+
+/** Keeps what the town had at a month's end in the record (the charts' equipment): generation,
+ * batteries, district heating's pipes and reach, public charging and how good it is. */
+function recordMonthAssets(buildings: Building[], year: number, month: number, plants: PowerPlant[], endMs: number): void {
+  const standing = buildings.filter((b) => existsAt(b, endMs));
+  let homeBatteryKwh = 0;
+  for (const p of plants) if (p.battery && (p.activeToMs === undefined || p.activeToMs > endMs)) homeBatteryKwh += p.battery.kwh;
+  const coverage = networkCoverage(standing, endMs);
+  const share = (c: { total: number; connected: number; withinReach: number }, which: "connected" | "withinReach") => (c.total > 0 ? c[which] / c.total : 0);
+  const usage = publicCharging.townUsage(endMs);
+  let households = 0;
+  let withWallbox = 0;
+  let without = 0;
+  let qosSum = 0;
+  for (const a of publicCharging.householdAccess(standing, endMs).values()) {
+    households += a.households;
+    withWallbox += a.atHome;
+    without += a.households - a.atHome;
+    qosSum += (a.households - a.atHome) * a.qos;
+  }
+  monthRecords.record(year * 12 + month, {
+    assets: {
+      agriPvKw: agriPv.capacityAtKw(endMs),
+      windKw: wind.turbinesAt(endMs).reduce((sum, p) => sum + (p.capacityKw ?? 0), 0),
+      homeBatteryKwh,
+      gridBatteryKwh: grid.batteriesInService(endMs).kwh,
+      dhPipeM: districtHeat.pipedLengthM(endMs) + districtHeat.trunkLengthM(endMs) + districtHeat.lineLengthM(endMs),
+      dhConnected: { buildings: share(coverage.buildings, "connected"), floor: share(coverage.floorAreaM2, "connected"), demand: share(coverage.heatDemandKWh, "connected") },
+      dhWithinReach: { buildings: share(coverage.buildings, "withinReach"), floor: share(coverage.floorAreaM2, "withinReach"), demand: share(coverage.heatDemandKWh, "withinReach") },
+      chargerPoints: usage.points,
+      chargerRoom: usage.capacity,
+      chargerTaken: usage.users,
+      chargingQos: without > 0 ? qosSum / without : 0,
+      wallboxShare: households > 0 ? withWallbox / households : 0,
+    },
   });
 }
 

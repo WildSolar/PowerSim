@@ -27,6 +27,7 @@ export const CHANGELOG: Release[] = [
     added: [
       "District heating: a network's card adds up its clean sources against its winter peak — the room left before the boilers start, or how much of the peak they make and their heat over a year (projected).",
       "Carbon removal contracts: the measure shows what they would cost at the share you set, and how far the town's emissions still are from the point where they apply.",
+      "New charts: solar and wind built (rooftop, Agri-PV, wind), batteries, district heating pipes and the share of buildings, floor area and heat demand they reach, public charging's room against what's taken, and the share of households with a wallbox and how good public charging is for the rest.",
     ],
     changed: [
       "Grid: about a quarter fewer transformer stations, each serving a bit more — bigger ones in large towns.",

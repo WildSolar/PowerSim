@@ -217,6 +217,90 @@ function rooftopSolarChart(nowMs: number): ChartData {
   };
 }
 
+// --- what the town has (monthRecords.ts's assets, at each month's end) ---
+
+function capacityChart(nowMs: number): ChartData {
+  const { records, ...m } = monthly(nowMs, (r) => !!r.assets && r.solarBuiltKw !== undefined);
+  return {
+    ...m,
+    unit: "MW",
+    total: "Together",
+    series: [
+      { key: "roof", label: "Rooftop solar (MWp)", color: color("solar"), kind: "stack", values: records.map((r) => r.solarBuiltKw! / 1000) },
+      { key: "agri", label: "Agri-PV (MWp)", color: "#c9a227", kind: "stack", values: records.map((r) => r.assets!.agriPvKw / 1000) },
+      { key: "wind", label: "Wind (MW)", color: "#5b6b7a", kind: "stack", values: records.map((r) => r.assets!.windKw / 1000) },
+    ],
+  };
+}
+
+function batteryChart(nowMs: number): ChartData {
+  const { records, ...m } = monthly(nowMs, (r) => !!r.assets);
+  return {
+    ...m,
+    unit: "MWh",
+    total: "Together",
+    series: [
+      { key: "home", label: "Home batteries", color: "#2a78d6", kind: "stack", values: records.map((r) => r.assets!.homeBatteryKwh / 1000) },
+      { key: "grid", label: "Neighbourhood batteries", color: "#4a3aa7", kind: "stack", values: records.map((r) => r.assets!.gridBatteryKwh / 1000) },
+    ],
+  };
+}
+
+function dhPipesChart(nowMs: number): ChartData {
+  const { records, ...m } = monthly(nowMs, (r) => !!r.assets);
+  return {
+    ...m,
+    unit: "km",
+    series: [{ key: "pipes", label: "District heating pipes", color: "#4a3aa7", kind: "line", values: records.map((r) => r.assets!.dhPipeM / 1000) }],
+  };
+}
+
+const DH_REACH_MEASURES = [
+  { value: "buildings", label: "Buildings" },
+  { value: "floor", label: "Floor area" },
+  { value: "demand", label: "Heat demand" },
+] as const;
+
+function dhReachChart(param: string | null, nowMs: number): ChartData {
+  const { records, ...m } = monthly(nowMs, (r) => !!r.assets);
+  const by = (DH_REACH_MEASURES.find((x) => x.value === param) ?? DH_REACH_MEASURES[0]).value;
+  return {
+    ...m,
+    unit: "%",
+    yMax: 100,
+    series: [
+      { key: "connected", label: "Connected", color: "#4a3aa7", kind: "line", values: records.map((r) => 100 * r.assets!.dhConnected[by]) },
+      { key: "reach", label: "Connected or free to connect", color: "#4a3aa7", kind: "line", dashed: true, values: records.map((r) => 100 * r.assets!.dhWithinReach[by]) },
+    ],
+  };
+}
+
+function chargingChart(nowMs: number): ChartData {
+  const { records, ...m } = monthly(nowMs, (r) => !!r.assets);
+  return {
+    ...m,
+    unit: "cars' worth",
+    series: [
+      { key: "room", label: "Room at public chargers", color: "#2a78d6", kind: "line", values: records.map((r) => r.assets!.chargerRoom) },
+      { key: "taken", label: "Room taken", color: "#eb6834", kind: "line", values: records.map((r) => r.assets!.chargerTaken) },
+      { key: "points", label: "Charge points", color: "#888", kind: "hidden", values: records.map((r) => r.assets!.chargerPoints) },
+    ],
+  };
+}
+
+function chargingQualityChart(nowMs: number): ChartData {
+  const { records, ...m } = monthly(nowMs, (r) => !!r.assets);
+  return {
+    ...m,
+    unit: "%",
+    yMax: 100,
+    series: [
+      { key: "qos", label: "Public charging, households without a wallbox (average)", color: "#2a78d6", kind: "line", values: records.map((r) => 100 * r.assets!.chargingQos) },
+      { key: "wallbox", label: "Households with a wallbox", color: "#1baf7a", kind: "line", values: records.map((r) => 100 * r.assets!.wallboxShare) },
+    ],
+  };
+}
+
 function modalSplitChart(nowMs: number): ChartData {
   const { records, ...m } = monthly(nowMs, (r) => !!r.mobility);
   const share = (pick: (x: NonNullable<MonthRecord["mobility"]>) => number) =>
@@ -468,6 +552,20 @@ export const CHARTS: ChartDef[] = [
     data: (_, now) => rooftopSolarChart(now),
   },
   {
+    id: "capacity",
+    group: "Energy",
+    title: "Solar and wind built",
+    description: "The rating of the town's rooftop solar, Agri-PV fields and wind turbines, at the end of each month.",
+    data: (_, now) => capacityChart(now),
+  },
+  {
+    id: "batteries",
+    group: "Energy",
+    title: "Batteries",
+    description: "How much the town's batteries can store, at the end of each month: those with home solar, and the neighbourhood batteries at the transformer stations.",
+    data: (_, now) => batteryChart(now),
+  },
+  {
     id: "transformer",
     group: "Grid",
     title: "A transformer",
@@ -481,6 +579,35 @@ export const CHARTS: ChartDef[] = [
     title: "Overloaded transformers",
     description: "How many transformer stations were over their capacity at each year's readings.",
     data: (_, now) => overloadedChart(now),
+  },
+  {
+    id: "dh-pipes",
+    group: "District heating",
+    title: "District heating pipes",
+    description: "How long the district heating networks are, at the end of each month — pipes under the streets, trunk lines to the plants and direct lines.",
+    data: (_, now) => dhPipesChart(now),
+  },
+  {
+    id: "dh-reach",
+    group: "District heating",
+    title: "District heating's reach",
+    description: "The share of the town's heated buildings on district heat, and the share it could serve (connected, or on a piped street) — by number of buildings, by floor area or by heat demand.",
+    param: { label: "Counted by", options: () => DH_REACH_MEASURES.map((x) => ({ value: x.value, label: x.label })) },
+    data: dhReachChart,
+  },
+  {
+    id: "public-charging",
+    group: "Mobility",
+    title: "Public charging",
+    description: "The room at the town's public chargers and how much of it is taken, in cars' worth (a van takes about two cars' room, a lorry about twenty), at the end of each month.",
+    data: (_, now) => chargingChart(now),
+  },
+  {
+    id: "charging-quality",
+    group: "Mobility",
+    title: "Charging an electric car",
+    description: "How many households have a wallbox, and how good public charging is on average for those who don't (near chargers, how busy, along the streets — charging at work aside), at the end of each month.",
+    data: (_, now) => chargingQualityChart(now),
   },
   {
     id: "modal-split",
