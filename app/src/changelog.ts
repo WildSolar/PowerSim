@@ -23,24 +23,27 @@ export interface Release {
 export const CHANGELOG: Release[] = [
   {
     version: "0.6.0",
-    date: null,
+    date: "2026-10-17",
+    title: "Car parks, district heat and the numbers",
+    summary:
+      "Solar canopies over the town's car parks: build them over your own, help private owners with a subsidy, or make them by law. District heating's heat pumps now run on the town's own electricity, river and lake ones struggling in the cold, and a network's card tells you when its boilers start. Wood heating is a system of its own. Thirteen new charts show what the town has built and how it lives with it, and the approval chart marks what you decided.",
     added: [
+      "Solar over car parks: a new Car parks tool shows every open-air car park of about 20 spaces and up. Cover the town's own with a solar canopy, directly or a few a year by measure; owners of private ones decide for themselves, helped by a new subsidy — or made to by a solar duty for large car parks. Canopies feed into their transformer area.",
       "District heating: a network's card adds up its clean sources against its winter peak — the room left before the boilers start, or how much of the peak they make and their heat over a year (projected).",
       "Carbon removal contracts: the measure shows what they would cost at the share you set, and how far the town's emissions still are from the point where they apply.",
-      "New charts: solar and wind built (rooftop, Agri-PV, wind), batteries, district heating pipes and the share of buildings, floor area and heat demand they reach, public charging's room against what's taken, and the share of households with a wallbox and how good public charging is for the rest.",
+      "New charts: solar and wind built (rooftop, car parks, Agri-PV, wind), batteries, district heating pipes and the share of buildings, floor area and heat demand they reach, each network's clean share, public charging's room against what's taken, the share of households with a wallbox and how good public charging is for the rest, buildings by heating system and by insulation, heat pumps' capacity, how full the transformers are, electric cars, vans and lorries, and the treasury's balance and debt.",
+      "The approval chart marks your measures — enacted, changed, repealed or struck down — so you can see what moved it.",
+    ],
+    changed: [
+      "District heating's heat pumps draw their power from the town's own electricity: the utility buys it hour by hour with the rest (midday solar can run them; a cold spell adds to the dearest hours), it shows in the electricity chart and the Year in Review's electricity by use, and it counts with the town's electricity in the emissions rather than district heating's. A river or lake heat pump does worse in winter, when the water is coldest.",
+      "Wood heating is now a heating system of its own: the buildings the register lists as heating with wood — logs, pellets or chips, in a boiler or a stove — burn wood pellets, wear out and are replaced like any other heating (by wood again, or by a heat pump, district heat or a boiler). It counts as clean. New wood heating isn't installed where there was none.",
       "Solar on public buildings fits the roofs that pay back best first, rather than in no particular order.",
       "Chargers at public buildings spread out: once a site is placed, the households around it count as served, and the next one never goes within about 300 m of a site still being built. Private operators, too, no longer count demand a site just ordered will meet.",
       "Churches are no longer counted among the municipality's buildings: no solar or chargers of the town's on them, and their roofs can be rented like any other.",
-      "District heating's heat pumps now draw their power from the town's own electricity: the utility buys it hour by hour with the rest (midday solar can run them; a cold spell adds to the dearest hours), it shows in the electricity chart and the Year in Review's electricity by use, and it counts with the town's electricity in the emissions rather than district heating's. A river or lake heat pump does worse in winter, when the water is coldest.",
-      "Solar over car parks: a new Car parks tool shows every open-air car park of about 20 spaces and up. Cover the town's own with a solar canopy, directly or a few a year by measure; owners of private ones decide for themselves, helped by a new subsidy — or made to by a solar duty for large car parks. Canopies feed into their transformer area.",
-      "More charts: buildings by heating system and by insulation, heat pumps' capacity, how full the transformers are, each district heating network's clean share, electric cars, vans and lorries, and the treasury's balance and debt. The approval chart marks your measures, so you can see what moved it.",
-    ],
-    changed: [
-      "Wood heating is now a heating system of its own: the buildings the register lists as heating with wood — logs, pellets or chips, in a boiler or a stove — burn wood pellets, wear out and are replaced like any other heating (by wood again, or by a heat pump, district heat or a boiler). It counts as clean. New wood heating isn't installed where there was none.",
-      "Grid: about a quarter fewer transformer stations, each serving a bit more — bigger ones in large towns.",
-      "Home and neighbourhood batteries get cheaper faster, to about half today's price in the long run.",
       "Private operators build out public charging faster: new sites where fewer would-be drivers gather, more of them a year, bigger expansions — and up to two shops' car parks a year.",
       "District heating: an incinerator or a treatment plant can be drawn on in stages — what you don't take stays on offer, though each stage pays its own fixed costs and trunk line.",
+      "Grid: about a quarter fewer transformer stations, each serving a bit more — bigger ones in large towns.",
+      "Home and neighbourhood batteries get cheaper faster, to about half today's price in the long run.",
     ],
     fixed: [
       "A new game starts with the treasury as it stands that day — the year so far counted while the game loads — instead of catching up month by month.",
