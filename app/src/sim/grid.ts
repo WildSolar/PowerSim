@@ -51,6 +51,8 @@ import { buildingCellZones, RoadAssignment } from "./gridAreas";
 import { LocalProjection, type XY } from "./localGeo";
 import { ghiWm2 } from "./pv";
 import { publicCharging } from "./publicCharging";
+import { carParks } from "./carParks";
+import { irradianceWm2, pvPowerWAt } from "./pv";
 import { hashSeed, mulberry32 } from "./rng";
 import { snowDepthCm } from "./snow";
 import { effectivePowerPlantsAt } from "./solarAdoption";
@@ -494,6 +496,12 @@ class Grid {
     // On-street chargers hang off the local station; a fast-charging hub or a lorry park has its own
     // transformer on the medium-voltage grid (it comes with the site, config/charging.ts).
     for (const site of publicCharging.getSites()) if (site.kind === "ac") sums[this.siteAreaId(site.lon, site.lat)] += publicCharging.siteLoadW(site, t);
+    // Solar canopies over car parks feed into the station of the area they stand in.
+    const canopies = carParks.plantsBefore(t + 1);
+    if (canopies.length > 0) {
+      const sun = irradianceWm2(t, snow);
+      for (const p of canopies) sums[this.siteAreaId(p.lon, p.lat)] += pvPowerWAt(p, t, sun);
+    }
     this.readingSamples.set(t, sums);
     return sums;
   }

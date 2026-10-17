@@ -20,6 +20,7 @@ import unicodedata
 from pathlib import Path
 
 import pandas as pd
+from shapely import make_valid
 from shapely.geometry import Polygon
 
 from . import coords
@@ -34,6 +35,7 @@ from .sources import farm as farm_source
 from .sources import wind as wind_source
 from .sources import streets as streets_source
 from .sources import exclusions as exclusions_source
+from .sources import car_parks as car_parks_source
 from .sources import gwr, powerplants, sites as sites_source, statent, stock_history
 
 DEFAULT_BFS_NUMBER = 247  # Schlieren
@@ -120,7 +122,7 @@ def _district_heat(bfs_number: int, buildings_df, segments, boundary_lv95, posit
     return network
 
 
-REFRESHABLE = ("streets", "district-heat", "farm", "wind")
+REFRESHABLE = ("streets", "district-heat", "farm", "wind", "car-parks")
 
 
 def refresh(bfs_number: int, parts: list[str]) -> Path:
@@ -130,7 +132,8 @@ def refresh(bfs_number: int, parts: list[str]) -> Path:
       them) district heating with it;
     - "district-heat": GWR for the district-heated buildings and entrances, the BFE's networks and
       heat sources, the land cover;
-    - "farm": the farmland plots."""
+    - "farm": the farmland plots;
+    - "car-parks": the open-air car parks (OpenStreetMap)."""
     path = next(
         (p for p in OUTPUT_DIR.glob("*.json") if p.name != INDEX_FILENAME and json.loads(p.read_text(encoding="utf-8")).get("bfsNumber") == bfs_number),
         None,
@@ -148,6 +151,11 @@ def refresh(bfs_number: int, parts: list[str]) -> Path:
         homes = [coords.lonlat_to_lv95(b["lon"], b["lat"]) for b in data["buildings"] if b.get("dwellings")]
         data["windSites"] = _to_camel(wind_source.fetch_sites(bfs_number, boundary_lv95, homes))
         print(f"  {len(data['windSites'])} site(s): " + ", ".join(f"{s['name']} ({len(s['turbines'])})" for s in data["windSites"]))
+    if "car-parks" in parts:
+        print(f"Refreshing car parks in {path.name}...")
+        footprints = {b["egid"]: make_valid(Polygon([coords.lonlat_to_lv95(lon, lat) for lon, lat in b["footprint"]])) for b in data["buildings"] if b.get("footprint") and len(b["footprint"]) >= 4}
+        data["carParks"] = _to_camel(car_parks_source.fetch_car_parks(boundary_lv95, footprints))
+        print(f"  {len(data['carParks'])} car parks, {sum(c['spaces'] for c in data['carParks'])} spaces")
     if "streets" in parts:
         _refresh_streets(bfs_number, data, boundary_lv95)
     if "district-heat" in parts or "streets" in parts:
@@ -313,6 +321,13 @@ def build(bfs_number: int) -> MunicipalityDataset:
     wind_sites = wind_source.fetch_sites(bfs_number, boundary_lv95, homes_xy)
     print(f"  {len(wind_sites)} site(s): " + ", ".join(f"{s['name']} ({len(s['turbines'])})" for s in wind_sites))
 
+    print("Fetching car parks (OpenStreetMap)...")
+    in_dataset = {int(e) for e in buildings_df[gwr.EGID_COL]}
+    car_parks = car_parks_source.fetch_car_parks(
+        boundary_lv95, {str(e): make_valid(Polygon(ring)) for e, ring in footprint_by_egid.items() if e in in_dataset and len(ring) >= 4}
+    )
+    print(f"  {len(car_parks)} car parks of {car_parks_source.MIN_SPACES} spaces or more, {sum(c['spaces'] for c in car_parks)} spaces")
+
     print("Fetching the heat-use atlas (canton ZH)...")
     heat_use = heat_use_source.fetch_heat_use(boundary_lv95)
     if heat_use:
@@ -413,6 +428,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
         vehicle_register=vehicle_register,
         zone_parcels=zone_parcels,
         heat_use=heat_use,
+        car_parks=car_parks,
     )
 
 

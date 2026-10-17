@@ -22,6 +22,7 @@ import { stock } from "../sim/stock";
 import { streets } from "../sim/streets";
 import { districtHeat } from "../sim/districtHeat";
 import { districtHeatSources } from "../sim/districtHeatSources";
+import { carParks } from "../sim/carParks";
 import { publicCharging } from "../sim/publicCharging";
 import { grid } from "../sim/grid";
 import { heatPumpSiting } from "../sim/heatPumpSiting";
@@ -188,6 +189,8 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   districtHeatSources.init(dataset, () => stock.getAll());
   zoning.init(dataset); // before the stock: new buildings ask their parcel what it allows
   heatPumpSiting.init(dataset, () => stock.getAll()); // before the stock: heating decisions ask it where a heat pump may go
+  // Car parks: their owners build canopies with no measure at all, so a do-nothing run has them too.
+  carParks.init(dataset, `carparks:${dataset.bfsNumber}`);
   publicCharging.init(dataset, 0);
   publicCharging.setBuildingLookup((egid) => stock.lookup(egid));
   publicCharging.setBuildingsProvider(() => stock.getAll());
@@ -240,6 +243,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     if (spec.withApproval) approval.advance(t);
     stock.advance(t);
     publicCharging.advance(t);
+    carParks.advance(t);
     grid.advance(t);
     if (spec.reinforceGrid) {
       for (const area of grid.getAreas()) {

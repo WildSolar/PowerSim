@@ -24,6 +24,7 @@ import { designLoadW, networkCoverage } from "./districtHeatStats";
 import { publicCharging } from "./publicCharging";
 import { wind } from "./wind";
 import { agriPv } from "./agriPv";
+import { carParks } from "./carParks";
 import { timed } from "./devTiming";
 import { existsAt } from "./lifetime";
 import type { EnergyClassId } from "./energyClass";
@@ -586,6 +587,7 @@ function recordMonthAssets(buildings: Building[], year: number, month: number, p
   monthRecords.record(year * 12 + month, {
     assets: {
       agriPvKw: agriPv.capacityAtKw(endMs),
+      carParkKw: carParks.capacityAtKw(endMs),
       windKw: wind.turbinesAt(endMs).reduce((sum, p) => sum + (p.capacityKw ?? 0), 0),
       homeBatteryKwh,
       gridBatteryKwh: grid.batteriesInService(endMs).kwh,

@@ -45,8 +45,10 @@ export interface MonthRecord {
 }
 
 export interface MonthAssets {
-  /** Generation (kW of rating): Agri-PV fields and wind turbines (rooftop solar is solarBuiltKw). */
+  /** Generation (kW of rating): Agri-PV fields, canopies over car parks and wind turbines (rooftop
+   * solar is solarBuiltKw). */
   agriPvKw: number;
+  carParkKw?: number;
   windKw: number;
   /** Batteries' storage (kWh): homes' and the neighbourhood batteries. */
   homeBatteryKwh: number;

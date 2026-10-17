@@ -27,6 +27,7 @@ import {
   POWER_RAMP,
   EXPORT_RAMP,
   SOLAR_RAMP,
+  CAR_PARK_LEGEND,
   type ColorMode,
 } from "../map/colorModes";
 import "./layerLegend.css";
@@ -46,6 +47,7 @@ export function LayerLegend({ mode }: { mode: ColorMode }) {
     evCharging: EV_CHARGING_LEGEND,
     zoning: ZONING_LEGEND,
     publicBuildings: PUBLIC_BUILDINGS_LEGEND,
+    carParks: CAR_PARK_LEGEND,
     roofSolar: ROOF_SOLAR_LEGEND,
     grid: GRID_LEGEND,
     age: AGE_LEGEND,

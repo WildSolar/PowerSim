@@ -5,6 +5,7 @@ import {
   CalendarClock,
   ChevronsLeft,
   ChevronsRight,
+  CircleParking,
   Drill,
   EvCharger,
   Factory,
@@ -47,6 +48,7 @@ const TOOLS: LayerDef[] = [
   { mode: "zoning", label: "Zoning", Icon: LandPlot },
   { mode: "publicBuildings", label: "Public buildings", Icon: School },
   { mode: "roofSolar", label: "Roof solar", Icon: PanelsTopLeft },
+  { mode: "carParks", label: "Car parks", Icon: CircleParking },
   { mode: "wind", label: "Wind", Icon: Wind },
 ];
 

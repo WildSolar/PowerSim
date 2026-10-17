@@ -27,6 +27,7 @@ import { EvChargingPanel } from "./ui/EvChargingPanel";
 import { ZoningPanel } from "./ui/ZoningPanel";
 import { GridPanel } from "./ui/GridPanel";
 import { PublicBuildingsPanel } from "./ui/PublicBuildingsPanel";
+import { CarParksPanel } from "./ui/CarParksPanel";
 import { ReportCardModal } from "./ui/ReportCardModal";
 import { EndScreen } from "./ui/EndScreen";
 import { loadPar } from "./sim/par";
@@ -51,6 +52,7 @@ import { districtHeat } from "./sim/districtHeat";
 import { districtHeatSources } from "./sim/districtHeatSources";
 import { roofContracts } from "./sim/roofContracts";
 import { agriPv } from "./sim/agriPv";
+import { carParks } from "./sim/carParks";
 import { wind } from "./sim/wind";
 import { districtHeatLines } from "./sim/districtHeatLines";
 import { monthRecords } from "./sim/monthRecords";
@@ -96,7 +98,7 @@ function returnToMenu() {
 // Dev-only handle for inspecting the simulation from the browser console.
 if (import.meta.env.DEV) import("./dev/scenario").then((m) => Object.assign(window, { __scenario: m.runScenario }));
 if (import.meta.env.DEV) import("./dev/perf").then((m) => Object.assign(window, { __perf: m.runPerf, __perfYearEnd: m.timeYearEndReport, __perfNewYear: m.timeNewYearPieces, __perfMapTick: m.timeMapPowerTick, __perfRolling: m.timeRollingChart, __perfMonth: m.timeMonthTurn }));
-if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore, tariffStore, market, inbox, dynamicTariff, grid, districtHeat, districtHeatSources, districtHeatLines, roofContracts, agriPv, wind, publicCharging, fleets, letters, newspaper, debt, studies, finances: financesModule } });
+if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore, tariffStore, market, inbox, dynamicTariff, grid, districtHeat, districtHeatSources, districtHeatLines, roofContracts, agriPv, carParks, wind, publicCharging, fleets, letters, newspaper, debt, studies, finances: financesModule } });
 if (import.meta.env.DEV) import("./sim/saveGame").then((m) => Object.assign(window, { __save: m }));
 if (import.meta.env.DEV) import("./sim/history").then((m) => Object.assign(window, { __history: m }));
 if (import.meta.env.DEV) import("./dev/par").then((m) => Object.assign(window, { __computePar: m.computePar }));
@@ -240,6 +242,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         districtHeatLines.init(loaded, () => stock.getAll());
         roofContracts.init(loaded, () => stock.getAll(), `roofs:${loaded.bfsNumber}`);
         agriPv.init(loaded, () => stock.getAll(), `agripv:${loaded.bfsNumber}`);
+        carParks.init(loaded, `carparks:${loaded.bfsNumber}`);
         wind.init(loaded, () => stock.getAll(), `wind:${loaded.bfsNumber}`);
         zoning.init(loaded); // before the stock: new buildings ask their parcel what it allows
         heatPumpSiting.init(loaded, () => stock.getAll()); // before the stock: heating decisions ask it where a heat pump may go
@@ -251,6 +254,13 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         // The public-building programmes have nothing left to do once every building they could reach has it.
         setMeasureAvailability("municipal-solar", (atMs) =>
           municipalSolarCandidates(stock.getAll(), loaded.powerPlants, atMs).length === 0 ? "Every public building with a roof for it already has solar." : null,
+        );
+        setMeasureAvailability("car-park-solar", () =>
+          carParks.municipalCandidates().length === 0
+            ? carParks.getLots().some((l) => l.owner === "municipal")
+              ? "Every one of the town's own car parks already has a canopy."
+              : "The town has no car park of its own big enough for a canopy."
+            : null,
         );
         setMeasureAvailability("fossil-heating-ban", (atMs) =>
           measures.externalOutlook(atMs).some((e) => e.id === "cantonal-fossil-heating-ban" && e.inEffect) ? "The canton's own ban is already in force." : null,
@@ -357,6 +367,8 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
       <GridPanel />
     ) : colorMode === "wind" ? (
       <WindPanel />
+    ) : colorMode === "carParks" ? (
+      <CarParksPanel />
     ) : colorMode === "roofSolar" ? (
       <RoofSolarPanel buildings={stockBuildings} onSelectBuilding={onSelectFromList} />
     ) : colorMode === "publicBuildings" ? (

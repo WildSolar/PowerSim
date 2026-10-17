@@ -125,6 +125,24 @@ export interface MunicipalityDataset {
   /** Where heat may be taken from the ground (canton ZH's heat-use atlas) — see
    * pipeline/sources/heat_use.py. Absent outside canton Zurich and in older datasets. */
   heatUse?: HeatUseData | null;
+  /** Open-air car parks of about 20 spaces and up, for solar canopies (OpenStreetMap) — see
+   * pipeline/sources/car_parks.py. Absent in older datasets. */
+  carParks?: CarParkData[];
+}
+
+/** An open-air car park (pipeline/sources/car_parks.py). */
+export interface CarParkData {
+  /** The OpenStreetMap element it comes from ("osm-w123"). */
+  id: string;
+  name: string | null;
+  /** Who may park (OpenStreetMap's access: "customers", "private", "yes"...). */
+  access: string | null;
+  spaces: number;
+  areaM2: number;
+  /** The building it most likely belongs to: a big one close by. */
+  hostEgid: string | null;
+  /** Outer ring: [lon, lat]. */
+  rings: [number, number][][];
 }
 
 export interface HeatUseData {

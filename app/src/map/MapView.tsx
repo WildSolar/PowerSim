@@ -33,6 +33,7 @@ import { heatPumpSiting } from "../sim/heatPumpSiting";
 import { publicBuildingBucket } from "../sim/publicBuildings";
 import { roofContracts } from "../sim/roofContracts";
 import { agriPv } from "../sim/agriPv";
+import { carParks } from "../sim/carParks";
 import { wind, WIND_PHASE_LABEL } from "../sim/wind";
 import { WIND_LOCAL_RADIUS_M } from "../config/wind";
 import {
@@ -55,6 +56,7 @@ import {
   GRID_LEGEND,
   ZONING_PENDING_COLOR,
   FARM_PLOT_COLORS,
+  CAR_PARK_LEGEND,
   WIND_SITE_COLORS,
   EV_CHARGING_LEGEND,
   evChargingBucket,
@@ -145,6 +147,9 @@ const WIND_REACH_LAYER_ID = "wind-reach";
 const WIND_TURBINE_LAYER_ID = "wind-turbines";
 
 // Farmland plots (Agri-PV), in the same layer.
+const CAR_PARK_SOURCE_ID = "car-parks";
+const CAR_PARK_FILL_LAYER_ID = "car-parks-fill";
+const CAR_PARK_LINE_LAYER_ID = "car-parks-line";
 const FARM_SOURCE_ID = "farm-plots";
 const FARM_FILL_LAYER_ID = "farm-plots-fill";
 const FARM_LINE_LAYER_ID = "farm-plots-line";
@@ -556,6 +561,22 @@ function windSitesGeoJSON(simTimeMs: number) {
   return { type: "FeatureCollection" as const, features };
 }
 
+/** The car parks, by whose they are and whether a canopy is coming or built, and which is picked. */
+function carParksGeoJSON(simTimeMs: number) {
+  const selected = carParks.getSelectedId();
+  return {
+    type: "FeatureCollection" as const,
+    features: carParks.getLots().map((lot) => {
+      const state = carParks.stateAt(lot.id, simTimeMs);
+      return {
+        type: "Feature" as const,
+        properties: { id: lot.id, bucket: state === "open" ? lot.owner : state, selected: lot.id === selected ? 1 : 0 },
+        geometry: { type: "Polygon" as const, coordinates: lot.rings },
+      };
+    }),
+  };
+}
+
 /** The farmland plots, by where each stands for Agri-PV, and which are picked. */
 function farmPlotsGeoJSON(simTimeMs: number) {
   const selection = agriPv.getSelection();
@@ -724,6 +745,7 @@ function colorExpression(mode: ColorMode, selectedEgid: string | null, scales: C
     publicBuildings: () => legendMatchExpression("publicStatus", PUBLIC_BUILDINGS_LEGEND),
     roofSolar: () => legendMatchExpression("roofStatus", ROOF_SOLAR_LEGEND),
     wind: () => ZONING_BUILDING_COLOR,
+    carParks: () => ZONING_BUILDING_COLOR,
     groundHeat: () => legendMatchExpression("groundStatus", GROUND_HEAT_LEGEND),
     // With an area selected, buildings elsewhere fade so its own stand out.
     grid: () => ["case", ["==", ["get", "gridStatus"], "dimmed"], GRID_DIMMED_COLOR, legendMatchExpression("gridStatus", GRID_LEGEND)],
@@ -1010,6 +1032,26 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
           ],
           "circle-stroke-color": "#fff",
           "circle-stroke-width": 2,
+        },
+      });
+      // Car parks: on the ground, under the buildings, shown only in that layer.
+      const carParkVisibility = colorModeRef.current === "carParks" ? "visible" : "none";
+      map.addSource(CAR_PARK_SOURCE_ID, { type: "geojson", data: carParksGeoJSON(simClock.getSimTimeMs()) });
+      map.addLayer({
+        id: CAR_PARK_FILL_LAYER_ID,
+        type: "fill",
+        source: CAR_PARK_SOURCE_ID,
+        layout: { visibility: carParkVisibility },
+        paint: { "fill-color": ml(legendMatchExpression("bucket", CAR_PARK_LEGEND)), "fill-opacity": ["match", ["get", "bucket"], "private", 0.35, 0.6] },
+      });
+      map.addLayer({
+        id: CAR_PARK_LINE_LAYER_ID,
+        type: "line",
+        source: CAR_PARK_SOURCE_ID,
+        layout: { visibility: carParkVisibility, "line-join": "round" },
+        paint: {
+          "line-color": ["case", ["==", ["get", "selected"], 1], SELECTED_COLOR, ml(legendMatchExpression("bucket", CAR_PARK_LEGEND))],
+          "line-width": ["case", ["==", ["get", "selected"], 1], 3.5, 1],
         },
       });
       map.addSource(FARM_SOURCE_ID, { type: "geojson", data: farmPlotsGeoJSON(simClock.getSimTimeMs()) });
@@ -1364,6 +1406,13 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
           )[0];
           if (turbine) {
             wind.select(String(turbine.properties?.site));
+            return;
+          }
+        }
+        if (colorModeRef.current === "carParks") {
+          const lot = map.queryRenderedFeatures(e.point, { layers: [CAR_PARK_FILL_LAYER_ID] })[0];
+          if (lot) {
+            carParks.select(String(lot.properties?.id));
             return;
           }
         }
@@ -1818,6 +1867,23 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     tick();
     const interval = setInterval(tick, SOLAR_TICK_MS);
     const unsubscribe = roofContracts.subscribe(tick);
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
+  }, [colorMode, dataset]);
+
+  // Car parks layer: the lots, kept current as canopies are ordered and built.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer(CAR_PARK_FILL_LAYER_ID)) return;
+    const visible = colorMode === "carParks";
+    for (const id of [CAR_PARK_FILL_LAYER_ID, CAR_PARK_LINE_LAYER_ID]) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+    if (!visible) return;
+    const tick = () => (map.getSource(CAR_PARK_SOURCE_ID) as GeoJSONSource | undefined)?.setData(carParksGeoJSON(simClock.getSimTimeMs()));
+    tick();
+    const interval = setInterval(tick, DISTRICT_HEAT_TICK_MS);
+    const unsubscribe = carParks.subscribe(tick);
     return () => {
       clearInterval(interval);
       unsubscribe();

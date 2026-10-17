@@ -96,3 +96,6 @@ class MunicipalityDataset:
     # Where heat may be taken from the ground (canton ZH's Wärmenutzungsatlas) — see
     # sources/heat_use.py: {zones: [{zone, no_boreholes, rings}], conditions, tunnels}, or None.
     heat_use: dict | None = None
+    # Open-air car parks of about 20 spaces and up, for solar canopies — see sources/car_parks.py:
+    # {id, name, access, spaces, area_m2, host_egid, rings}.
+    car_parks: list = field(default_factory=list)

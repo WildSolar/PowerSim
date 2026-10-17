@@ -32,6 +32,19 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     approval: () => ({ homeowners: 0.5, tenants: 0.1, business: 0.2, climate: 0.6 }),
   },
   {
+    id: "car-park-solar-subsidy",
+    category: "subsidy",
+    topic: "buildings",
+    subsidyCategory: "solar",
+    title: "Car park solar subsidy",
+    summary:
+      "A municipal subsidy per kWp for a solar canopy over a private car park — a shop's, a company's, a housing estate's. On top of the federal one-off payment; paid when an owner builds.",
+    params: [{ kind: "slider", key: "perKwp", label: "Per kWp", min: 0, max: 1000, step: 50, unit: "CHF/kWp", default: 300 }],
+    leadTimeMonths: 1,
+    effects: (p) => ({ carParkSolarSubsidyRpPerKwp: num(p, "perKwp") * CHF }),
+    approval: () => ({ business: 0.4, homeowners: 0.05, climate: 0.5 }),
+  },
+  {
     id: "home-battery-subsidy",
     category: "subsidy",
     topic: "buildings",
@@ -144,6 +157,18 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     leadTimeMonths: 6,
     effects: (p) => ({ municipalSolarBuildingsPerYear: num(p, "perYear") }),
     approval: () => ({ climate: 0.6, tenants: 0.1, homeowners: 0.1, business: -0.1 }),
+  },
+  {
+    id: "car-park-solar",
+    category: "infrastructure",
+    topic: "buildings",
+    title: "Solar over the town's car parks",
+    summary:
+      "The municipality puts solar canopies over its own car parks — by its schools, halls and sports grounds, and the public ones — a few each year, those that pay back best first. The treasury pays the price less the federal payment; what the panels save the building next door and earn feeding in is credited to you.",
+    params: [{ kind: "slider", key: "perYear", label: "Car parks per year", min: 0, max: 6, step: 1, unit: "per year", default: 2 }],
+    leadTimeMonths: 6,
+    effects: (p) => ({ carParkSolarMunicipalPerYear: num(p, "perYear") }),
+    approval: () => ({ climate: 0.5, drivers: 0.1, tenants: 0.05 }),
   },
 
   {
@@ -273,6 +298,37 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     approval: (p) => {
       const level = num(p, "level") / 100;
       return { homeowners: -0.1 - 0.3 * level, tenants: -0.05 - 0.15 * level, business: -0.1 - 0.2 * level, climate: 0.3 + 0.4 * level };
+    },
+    referendum: "optional",
+  },
+  {
+    id: "car-park-solar-duty",
+    category: "law",
+    topic: "buildings",
+    title: "Solar duty for large car parks",
+    summary:
+      "Every open-air car park over a size must get a solar canopy within so many years — each owner by its own date in that time, the town's own car parks included, paid by the treasury. The subsidy for private car parks still applies.",
+    params: [
+      {
+        kind: "choice",
+        key: "minSpaces",
+        label: "Car parks of",
+        options: [
+          { value: "20", label: "20 spaces and up" },
+          { value: "50", label: "50 spaces and up" },
+          { value: "100", label: "100 spaces and up" },
+        ],
+        default: "50",
+      },
+      { kind: "slider", key: "years", label: "Within", min: 2, max: 10, step: 1, unit: "years", default: 5 },
+    ],
+    leadTimeMonths: 12,
+    effects: (p) => ({ carParkSolarDutyMinSpaces: Number(p.minSpaces ?? 50), carParkSolarDutyYears: num(p, "years") }),
+    approval: (p) => {
+      // Smaller car parks and less time weigh heavier on their owners.
+      const reach = { "20": 1, "50": 0.7, "100": 0.45 }[String(p.minSpaces ?? "50")] ?? 0.7;
+      const haste = 1 + (5 - num(p, "years")) * 0.08;
+      return { business: -0.5 * reach * haste, homeowners: -0.15 * reach * haste, drivers: -0.05, climate: 0.4 + 0.2 * reach };
     },
     referendum: "optional",
   },

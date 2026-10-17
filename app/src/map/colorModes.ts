@@ -19,6 +19,7 @@ export type ColorMode =
   | "publicBuildings"
   | "roofSolar"
   | "wind"
+  | "carParks"
   | "grid";
 
 export interface LegendEntry {
@@ -269,6 +270,15 @@ export const HIGH_STANDARD_COLOR = "#0d7a52";
 export const ZONING_PENDING_COLOR = "#f2b01e";
 // Wind turbines (sim/wind.ts), by how far their site has come.
 export const WIND_SITE_COLORS = { planned: "#6f6d66", underWay: "#2a78d6", ready: "#1baf7a", turning: "#0d7a52", stopped: "#c2410c" } as const;
+
+// Car parks (sim/carParks.ts): the town's own, private ones, and canopies coming or built. The first
+// three are a validated set (all pairs); private car parks are the neutral bucket.
+export const CAR_PARK_LEGEND: LegendEntry[] = [
+  { bucket: "municipal", label: "The town's car park", color: "#2a78d6" },
+  { bucket: "building", label: "Canopy being built", color: "#4a3aa7" },
+  { bucket: "canopy", label: "Solar canopy", color: "#eda100" },
+  { bucket: "private", label: "Private car park", color: "#8f8b80" },
+];
 
 // Farmland in the zoning layer, by where it stands for Agri-PV (sim/agriPv.ts).
 export const FARM_PLOT_COLORS = { farmland: "#9cbf73", planned: "#e6c229", zoned: "#e6c229", fieldBuilding: "#3d5a80", field: "#3d5a80" } as const;

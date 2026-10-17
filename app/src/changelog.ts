@@ -31,6 +31,7 @@ export const CHANGELOG: Release[] = [
       "Solar on public buildings fits the roofs that pay back best first, rather than in no particular order.",
       "Chargers at public buildings spread out: once a site is placed, the households around it count as served, and the next one never goes within about 300 m of a site still being built. Private operators, too, no longer count demand a site just ordered will meet.",
       "Churches are no longer counted among the municipality's buildings: no solar or chargers of the town's on them, and their roofs can be rented like any other.",
+      "Solar over car parks: a new Car parks tool shows every open-air car park of about 20 spaces and up. Cover the town's own with a solar canopy, directly or a few a year by measure; owners of private ones decide for themselves, helped by a new subsidy — or made to by a solar duty for large car parks. Canopies feed into their transformer area.",
       "More charts: buildings by heating system and by insulation, heat pumps' capacity, how full the transformers are, each district heating network's clean share, electric cars, vans and lorries, and the treasury's balance and debt. The approval chart marks your measures, so you can see what moved it.",
     ],
     changed: [

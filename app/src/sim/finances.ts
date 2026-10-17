@@ -55,6 +55,7 @@ import { publicCharging } from "./publicCharging";
 import { irradianceWm2, pvPowerWAt, roofPvShare } from "./pv";
 import { roofContracts } from "./roofContracts";
 import { agriPv } from "./agriPv";
+import { carParks } from "./carParks";
 import { wind } from "./wind";
 import { windPowerW } from "./windPower";
 import { contractArrays, municipalArrays } from "./solarAdoption";
@@ -263,7 +264,19 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
     }),
   );
   const retailRpKWh = (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2;
-  const publicSolarSavingsRp = publicSolarKWh * (PUBLIC_SOLAR_SELF_USE_SHARE * retailRpKWh + (1 - PUBLIC_SOLAR_SELF_USE_SHARE) * tariff.feedInPriceRpKWh);
+  // And the canopies over its car parks: the part their building takes, saved; the rest fed in.
+  const canopies = carParks.municipalPlants(times[times.length - 1] + 1);
+  const canopyRp = canopies.reduce(
+    (sum, { plant, selfShare }) =>
+      sum +
+      energyKWh(
+        times,
+        times.map((t) => -pvPowerWAt(plant, t, irradianceWm2(t))),
+      ) *
+        (selfShare * retailRpKWh + (1 - selfShare) * tariff.feedInPriceRpKWh),
+    0,
+  );
+  const publicSolarSavingsRp = publicSolarKWh * (PUBLIC_SOLAR_SELF_USE_SHARE * retailRpKWh + (1 - PUBLIC_SOLAR_SELF_USE_SHARE) * tariff.feedInPriceRpKWh) + canopyRp;
 
   // The municipality's own public chargers sell at their own price. Their energy is part of the
   // town's metered consumption above, billed there at the household tariff — taken back out of

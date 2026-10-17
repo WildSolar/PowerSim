@@ -20,6 +20,10 @@ export interface Channels {
   homeBatterySubsidyRpPerKwh: number; // municipal subsidy per kWh of home battery
   homeBatterySubsidyGridFriendly: boolean; // ...paid only for batteries run grid-friendly
   municipalSolarBuildingsPerYear: number; // public buildings the municipality itself puts solar on each year
+  carParkSolarMunicipalPerYear: number; // canopies the municipality puts over its own car parks each year (carParks.ts)
+  carParkSolarSubsidyRpPerKwp: number; // municipal subsidy per kWp for a private car park canopy
+  carParkSolarDutyMinSpaces: number; // car parks of this many spaces and up must get a canopy (0: no duty)
+  carParkSolarDutyYears: number; // within this many years of the duty coming into force
 
   // Heating, mobility, retrofits
   heatPumpSubsidyRp: number; // flat municipal grant per heat pump installed
@@ -70,6 +74,10 @@ export const CHANNEL_DEFAULTS: Channels = {
   homeBatterySubsidyRpPerKwh: 0,
   homeBatterySubsidyGridFriendly: false,
   municipalSolarBuildingsPerYear: 0,
+  carParkSolarMunicipalPerYear: 0,
+  carParkSolarSubsidyRpPerKwp: 0,
+  carParkSolarDutyMinSpaces: 0,
+  carParkSolarDutyYears: 5,
   heatPumpSubsidyRp: 0,
   dhConnectionSubsidyRp: 0,
   heatPumpGrantEarlyOnly: false,
@@ -120,6 +128,10 @@ const COMBINERS: { [K in keyof Channels]: Combiner<Channels[K]> } = {
   homeBatterySubsidyRpPerKwh: sum,
   homeBatterySubsidyGridFriendly: any,
   municipalSolarBuildingsPerYear: sum,
+  carParkSolarMunicipalPerYear: sum,
+  carParkSolarSubsidyRpPerKwp: sum,
+  carParkSolarDutyMinSpaces: max,
+  carParkSolarDutyYears: max,
   heatPumpSubsidyRp: sum,
   dhConnectionSubsidyRp: sum,
   heatPumpGrantEarlyOnly: any,

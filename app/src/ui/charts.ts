@@ -233,8 +233,9 @@ function capacityChart(nowMs: number): ChartData {
     total: "Together",
     series: [
       { key: "roof", label: "Rooftop solar (MWp)", color: color("solar"), kind: "stack", values: records.map((r) => r.solarBuiltKw! / 1000) },
-      { key: "agri", label: "Agri-PV (MWp)", color: "#c9a227", kind: "stack", values: records.map((r) => r.assets!.agriPvKw / 1000) },
-      { key: "wind", label: "Wind (MW)", color: "#5b6b7a", kind: "stack", values: records.map((r) => r.assets!.windKw / 1000) },
+      { key: "carParks", label: "Car park canopies (MWp)", color: "#b5523b", kind: "stack", values: records.map((r) => (r.assets!.carParkKw ?? 0) / 1000) },
+      { key: "agri", label: "Agri-PV (MWp)", color: "#2f9e8f", kind: "stack", values: records.map((r) => r.assets!.agriPvKw / 1000) },
+      { key: "wind", label: "Wind (MW)", color: "#4a3aa7", kind: "stack", values: records.map((r) => r.assets!.windKw / 1000) },
     ],
   };
 }
@@ -728,7 +729,7 @@ export const CHARTS: ChartDef[] = [
     id: "capacity",
     group: "Energy",
     title: "Solar and wind built",
-    description: "The rating of the town's rooftop solar, Agri-PV fields and wind turbines, at the end of each month.",
+    description: "The rating of the town's rooftop solar, solar canopies over car parks, Agri-PV fields and wind turbines, at the end of each month.",
     data: (_, now) => capacityChart(now),
   },
   {

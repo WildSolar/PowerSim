@@ -142,6 +142,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Zoning — the zoning plan, parcel by parcel; change it here (see \"Zoning\").",
         "Public buildings — the municipality's own buildings and what they carry; order solar and chargers for them here (see \"Public buildings\").",
         "Roof solar — large roofs by where a roof contract stands; rent them and put the utility's solar on them here (see \"Roof contracts\").",
+        "Car parks — the open-air car parks big enough for a solar canopy, whose they are and what is built over them; cover the town's own here (see \"Solar over car parks\").",
         "Wind — where turbines could stand, once a study has looked, and each wind park's long road through zoning, permit and the courts (see \"Wind power\").",
       ]),
     ],
@@ -774,6 +775,26 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "car-parks",
+    title: "Solar over car parks",
+    blocks: [
+      p(
+        "A canopy of solar panels over a car park makes power where it is used, shades the cars, and needs no land that isn't paved already. The Car parks tool shows the town's open-air car parks of about 20 spaces and up — not multi-storey or underground ones, nor parking along the street — coloured by whose they are and what is built over them. Click one to see its card: its spaces, the building it goes with, what a canopy would make and what it would cost.",
+      ),
+      list([
+        "Size: a canopy covers the parking spaces, not the aisles — about 2.7 kWp a space, so a 100-space car park carries some 270 kWp. Its panels lie low, tilted south or in rows facing east and west. It costs more per kWp than a roof, for the steel: about CHF 2,300 per kWp for a small one, falling to CHF 1,500 for the biggest, less the federal one-off payment every installation gets.",
+        "The town's own: car parks by its schools, sports halls and the hospital, and those open to everyone that no shop or company goes with. Order a canopy on one from its card, or have a few built each year with the measure ‘Solar over the town's car parks’ — the ones that pay back best first. The treasury pays; what the panels save the building next door and earn feeding in is credited to you, as for \"Public buildings\".",
+        "Private ones: a shop's, a company's, a housing estate's. Now and then the owner looks into a canopy: its building takes part of the power by day — up to about half of what it uses — and the rest is sold at the feed-in price. A canopy lasts thirty years, but a business wants its money back within about twelve: worth it if what it saves and earns in that time beats the cost and the upkeep, weighed like every investment (see \"When things wear out\"). The dearer electricity and the better the feed-in price, the better the deal.",
+        "The car park solar subsidy: a municipal payment per kWp for a private canopy, on top of the federal one. Business welcomes it.",
+        "The solar duty for large car parks: a law that every car park over a size (20, 50 or 100 spaces) must have a canopy within so many years — each owner by its own date in that time, the town's own car parks included, at the treasury's cost. The subsidy still applies to private ones. Owners — business above all — dislike it, the more so the smaller the car parks it reaches and the less time it gives.",
+      ]),
+      p("Canopies feed into the station of the transformer area they stand in (see \"The electricity grid\"): a big one adds to its summer feed-in, like a big roof would."),
+      note(
+        "The car parks come from OpenStreetMap: those its mappers have drawn, so a few may be missing, and where a car park's number of spaces isn't recorded it is worked out from its area. Whose a car park is comes from what it is mapped as (for customers, private, open to all) and the building beside it — the game's best guess. A building takes its share of a canopy's power by a rule of thumb rather than hour by hour.",
+      ),
+    ],
+  },
+  {
     id: "agri-pv",
     title: "Agri-PV",
     blocks: [
@@ -1057,7 +1078,7 @@ export const WIKI_GROUPS: WikiGroup[] = [
     id: "electricity",
     title: "Electricity & solar",
     blurb: "The local grid, rooftop solar, and the batteries that smooth both.",
-    sections: ["grid", "solar", "roof-contracts", "agri-pv", "wind", "home-batteries"],
+    sections: ["grid", "solar", "roof-contracts", "car-parks", "agri-pv", "wind", "home-batteries"],
   },
   {
     id: "mobility",

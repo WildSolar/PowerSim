@@ -14,7 +14,7 @@ const DATA: { what: string; source: string }[] = [
   { what: "Cars and vans per municipality", source: "Road vehicle stock, Federal Statistical Office (BFS)" },
   { what: "Building zones", source: "Harmonised building zones of Switzerland, Federal Office for Spatial Development (ARE)" },
   { what: "Where heat may be taken from the ground", source: "Wärmenutzungsatlas, Canton of Zurich (AWEL)" },
-  { what: "Parks, sports grounds and cemeteries", source: "© OpenStreetMap contributors (ODbL)" },
+  { what: "Parks, sports grounds and cemeteries; car parks", source: "© OpenStreetMap contributors (ODbL)" },
 ];
 
 const SOFTWARE: { name: string; licence: string }[] = [
