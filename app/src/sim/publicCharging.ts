@@ -362,6 +362,12 @@ function yearOf(simTimeMs: number): number {
   return new Date(toDateMs(simTimeMs)).getUTCFullYear();
 }
 
+/** The month of an instant, as year * 12 + month. */
+function monthOf(simTimeMs: number): number {
+  const d = new Date(toDateMs(simTimeMs));
+  return d.getUTCFullYear() * 12 + d.getUTCMonth();
+}
+
 class PublicCharging {
   private sites: ChargingSite[] = [];
   private byId = new Map<string, ChargingSite>();
@@ -375,6 +381,9 @@ class PublicCharging {
   /** Households' wallboxes ("egid:ewid"), by when they were put in. */
   private wallboxes = new Map<string, number>();
   private lastOperatorYear: number | null = null;
+  /** The last month (year * 12 + month) whose start the vehicles' charging was reviewed at. */
+  private lastReviewMonth: number | null = null;
+  private reviewers: ((slotKey: string, slot: unknown, atMs: number, changed: ChargingSite[] | null) => void)[] = [];
   private projection = new LocalProjection(8.4, 47.4);
   private buildingLookup: (egid: string) => Building | undefined = () => undefined;
   private isDriving: (slot: unknown, atMs: number) => boolean = () => true;
@@ -404,6 +413,7 @@ class PublicCharging {
     this.unmet = [];
     this.wallboxes = new Map();
     this.lastOperatorYear = yearOf(startMs);
+    this.lastReviewMonth = monthOf(startMs);
     this.selectedSiteId = null;
     this.placing = null;
     this.fields = new Map();
@@ -579,16 +589,17 @@ class PublicCharging {
   /** How a vehicle at `building` without a charger of its own could charge at `atMs`: every open
    * site of a kind it can use in reach (shops' car parks: cars only), plus charging at work at
    * `workQos` — their quality together, the sources it would count on and their shares, and the
-   * price and hassle of it. */
-  chargingOption(building: Building, atMs: number, need: ChargingNeed = CAR_NEED, workQos = 0): ChargingOption {
+   * price and hassle of it. `only`: just these sites (and AT_WORK for work), for what staying with
+   * the chargers it has would be like. */
+  chargingOption(building: Building, atMs: number, need: ChargingNeed = CAR_NEED, workQos = 0, only?: ReadonlySet<string>): ChargingOption {
     const weight = need.kWhPerDay / CAR_DAILY_KWH;
     const candidates: { site: ChargingSite | null; distanceM: number; qos: number }[] = [];
     for (const { site, distanceM } of this.sitesNear(building)) {
-      if (!need.kinds.includes(site.kind) || (site.shop && need.vehicle !== "car")) continue;
+      if (!need.kinds.includes(site.kind) || (site.shop && need.vehicle !== "car") || (only && !only.has(site.id))) continue;
       const qos = this.siteQos(site, distanceM, atMs, weight);
       if (qos > 0) candidates.push({ site, distanceM, qos });
     }
-    if (workQos > 0) candidates.push({ site: null, distanceM: 0, qos: workQos });
+    if (workQos > 0 && (!only || only.has(AT_WORK))) candidates.push({ site: null, distanceM: 0, qos: workQos });
     const { qos, sources } = shareOut(candidates);
     const priceRpPerKWh = sources.reduce((sum, s) => sum + s.share * (s.site ? sitePriceRpPerKWh(s.site) : WORK_CHARGING_PRICE_RP_PER_KWH), 0);
     return { qos, sources, priceRpPerKWh, hassleRp: hassleRp(need.vehicle, qos) };
@@ -629,6 +640,39 @@ class PublicCharging {
   /** The household's car was replaced: whatever it relied on is freed. */
   endAssignment(slotKey: string, atMs: number): void {
     for (const a of this.bySlot.get(slotKey) ?? []) if (a.toMs === Number.POSITIVE_INFINITY && a.fromMs <= atMs) a.toMs = atMs;
+  }
+
+  /** Ends a vehicle's current bookings at `atMs`, to look at its charging afresh (with its room at
+   * its chargers free); returns them, for keep() to undo if it stays. */
+  release(slotKey: string, atMs: number): Assignment[] {
+    const held = (this.bySlot.get(slotKey) ?? []).filter((a) => a.fromMs <= atMs && atMs < a.toMs);
+    for (const a of held) a.toMs = atMs;
+    return held;
+  }
+
+  /** The vehicle stays with the bookings release() ended. */
+  keep(held: Assignment[]): void {
+    for (const a of held) a.toMs = Number.POSITIVE_INFINITY;
+  }
+
+  /** Who looks at their charging again (mobility.ts for households' cars, fleet.ts for businesses'
+   * vans and lorries): called for each vehicle with bookings, as `(slotKey, slot, atMs, changed)` —
+   * every New Year (`changed` null), and at the start of a month in which a site opened or grew
+   * (`changed`: those sites). */
+  addReviewer(review: (slotKey: string, slot: unknown, atMs: number, changed: ChargingSite[] | null) => void): void {
+    this.reviewers.push(review);
+  }
+
+  /** The vehicles' review at the start of month `month` (year * 12 + month), if it calls for one. */
+  private reviewRound(month: number): boolean {
+    const atMs = toSimTimeMs(Date.UTC(Math.floor(month / 12), month % 12, 1));
+    const fromMs = toSimTimeMs(Date.UTC(Math.floor((month - 1) / 12), (month + 11) % 12, 1));
+    const changed = month % 12 === 0 ? null : this.sites.filter((s) => (s.openedAtMs >= fromMs && s.openedAtMs < atMs) || s.expansions.some((e) => e.atMs >= fromMs && e.atMs < atMs));
+    if (changed && changed.length === 0) return false;
+    const due: [string, unknown][] = [];
+    for (const [key, list] of this.bySlot) if (list.some((a) => a.fromMs <= atMs && atMs < a.toMs)) due.push([key, list[list.length - 1].slot]);
+    for (const [key, slot] of due) for (const review of this.reviewers) review(key, slot, atMs, changed);
+    return true;
   }
 
   /** The public sites a vehicle's current bookings are at, `atMs` (charging at work aside). */
@@ -979,15 +1023,22 @@ class PublicCharging {
 
   // --- private operators ---
 
-  /** Runs the private operators' yearly round for every New Year reached — see module doc. */
+  /** Runs the private operators' yearly round for every New Year reached — see module doc — and
+   * the vehicles' review of their charging at the start of each month that calls for one. */
   advance(atMs: number): void {
     const year = yearOf(atMs);
     if (this.lastOperatorYear === null) this.lastOperatorYear = year;
+    if (this.lastReviewMonth === null) this.lastReviewMonth = monthOf(atMs);
     let changed = false;
     while (this.lastOperatorYear < year) {
       this.lastOperatorYear++;
       changed = this.operatorRound(this.lastOperatorYear) || changed;
       changed = this.publicBuildingRound(this.lastOperatorYear) || changed;
+    }
+    const month = monthOf(atMs);
+    while (this.lastReviewMonth < month) {
+      this.lastReviewMonth++;
+      changed = this.reviewRound(this.lastReviewMonth) || changed;
     }
     if (changed) this.notify();
   }
@@ -1192,6 +1243,7 @@ class PublicCharging {
       unmet: this.unmet,
       wallboxes: [...this.wallboxes],
       lastOperatorYear: this.lastOperatorYear,
+      lastReviewMonth: this.lastReviewMonth,
       nextId: this.nextId,
     };
   }
@@ -1213,6 +1265,7 @@ class PublicCharging {
     this.unmet = s.unmet;
     this.wallboxes = new Map(s.wallboxes);
     this.lastOperatorYear = s.lastOperatorYear;
+    this.lastReviewMonth = s.lastReviewMonth;
     this.nextId = s.nextId;
     this.selectedSiteId = null;
     this.placing = null;

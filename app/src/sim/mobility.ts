@@ -74,7 +74,7 @@ import { existsAt } from "./lifetime";
 import { priceFactor } from "./costTrends";
 import { gridDrawBlockedAt } from "./gridLimits";
 import { EARLY_SWITCH } from "../config/earlySwitch";
-import { WALLBOX_LIFETIME_YEARS } from "../config/charging";
+import { SWITCH_MIN_GAIN_CHF, WALLBOX_LIFETIME_YEARS } from "../config/charging";
 import { earlyCandidates, earlySwitchChance } from "./earlySwitch";
 
 // --- slot count --------------------------------------------------------------
@@ -428,6 +428,33 @@ export function bookInitialPublicCharging(buildings: Building[]): void {
 
 // A publicly charged car only draws power while its household actually drives it.
 publicCharging.setDrivingCheck((slot, atMs) => slot === null || handleMode(slot as SlotHandle, atMs) === "car");
+
+/** A household's electric car relying on public charging looks at its charging again
+ * (publicCharging.addReviewer): its bookings freed, it compares staying with the chargers it has
+ * against the best it could do now — other chargers, or a wallbox of its own — and moves if that
+ * saves at least SWITCH_MIN_GAIN_CHF a year. On a site opening or growing, only cars that have it
+ * in reach look. */
+publicCharging.addReviewer((key, slot, atMs, changed) => {
+  if (slot === null) return; // a business's vehicle (fleet.ts)
+  const h = slot as SlotHandle;
+  // Settles a replacement fallen due first: a car replaced since has given up its bookings.
+  if (handleVehicle(h, "car", atMs) !== "carEV") return;
+  const building = publicCharging.lookupBuilding(h.egid);
+  if (!building || (changed && !publicCharging.sitesNear(building).some((n) => changed.includes(n.site)))) return;
+  const held = publicCharging.release(key, atMs);
+  if (held.length === 0) return;
+  const access = chargingAccessAt(h.egid, h.ewid, h.slotIndex, atMs);
+  if (!access) {
+    publicCharging.keep(held);
+    return;
+  }
+  const annualKWh = (ANNUAL_CAR_KM / 100) * EV_CAR_KWH_PER_100KM;
+  const stay = publicCharging.chargingOption(building, atMs, CAR_NEED, workQosFor(h.egid, h.ewid, h.slotIndex, atMs), new Set(held.map((a) => a.siteId)));
+  const stayRp = annualKWh * stay.priceRpPerKWh + stay.hassleRp;
+  const best = evChargingChoice(access, tariffStore.at(atMs));
+  if (best.where === "none" || best.runningRp + SWITCH_MIN_GAIN_CHF * 100 > stayRp) publicCharging.keep(held);
+  else setUpCharging(key, h, access, best.where, atMs);
+});
 
 let slotHandleCache = new WeakMap<Dwelling, SlotHandle[]>();
 

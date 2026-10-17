@@ -47,12 +47,12 @@ import {
   type FleetVehicleClass,
   type FleetVehicleId,
 } from "../config/fleet";
-import type { ChargingKind } from "../config/charging";
+import { SWITCH_MIN_GAIN_CHF, type ChargingKind } from "../config/charging";
 import { toDateMs } from "./calendar";
 import { totalFloorAreaM2 } from "./commercial";
 import { existsAt } from "./lifetime";
 import { policyStore } from "./policy";
-import { publicCharging, usableOption, type ChargingNeed, type ChargingOption } from "./publicCharging";
+import { publicCharging, usableOption, type ChargingNeed, type ChargingOption, type ChargingSite } from "./publicCharging";
 import {
   chooseNext,
   peekRenewalChain,
@@ -246,12 +246,12 @@ class Fleets {
    * charger of its own (nothing more to install if its outgoing electric vehicle charged there)
    * against the public chargers around — a lorry charging park can beat a CHF 80,000 depot
    * charger; one without a yard has only the public ones. */
-  private accessAt(v: FleetVehicle, b: Building, atMs: number, incumbent: FleetVehicleId): FleetAccess {
+  private accessAt(v: FleetVehicle, b: Building, atMs: number, incumbent: FleetVehicleId, depotCharger?: boolean): FleetAccess {
     const found = publicCharging.chargingOption(b, atMs, publicNeed(v.vehicleClass));
     const option = usableOption(found) ? found : null;
     const publicAccess: FleetAccess | null = option ? { kind: "public", option } : null;
     if (!v.depot) return publicAccess ?? { kind: "none" };
-    const hasCharger = FLEET_CATALOG[incumbent].electric && !this.chargesPubliclyAt(v, atMs);
+    const hasCharger = depotCharger ?? (FLEET_CATALOG[incumbent].electric && !this.chargesPubliclyAt(v, atMs));
     // A new depot charger needs room on the grid.
     if (!hasCharger && gridDrawBlockedAt(b, atMs)) return publicAccess ?? { kind: "none" };
     const depot: FleetAccess = { kind: "depot", chargerRp: hasCharger ? 0 : DEPOT_CHARGER_COST_RP[v.vehicleClass] * priceFactor("depotCharger", atMs) };
@@ -260,6 +260,39 @@ class Fleets {
     const kWh = (spec.annualKm / 100) * spec.kWhPer100Km;
     const publicRp = kWh * option.priceRpPerKWh + option.hassleRp;
     return publicRp < depotRunningRp(kWh, depot.chargerRp, spec.lifetimeMeanYears, tariffStore.at(atMs)) ? (publicAccess as FleetAccess) : depot;
+  }
+
+  /** A vehicle relying on public charging looks at its charging again (publicCharging.addReviewer):
+   * its bookings freed, it compares staying with the chargers it has against the best it could do
+   * now — other chargers, or a charger in its own yard — and moves if that saves at least
+   * SWITCH_MIN_GAIN_CHF a year. On a site opening or growing, only vehicles that have it in reach
+   * look. */
+  review(key: string, atMs: number, changed: ChargingSite[] | null): void {
+    const cut = key.lastIndexOf(":fleet:");
+    if (cut < 0) return;
+    const b = this.lookupBuilding(key.slice(0, cut));
+    const v = b ? this.vehiclesOf(b)[Number(key.slice(cut + ":fleet:".length))] : undefined;
+    if (!b || !v) return;
+    const type = this.typeAt(v, atMs); // settles a replacement fallen due first
+    if (!FLEET_CATALOG[type].electric) return;
+    if (changed && !publicCharging.sitesNear(b).some((n) => changed.includes(n.site))) return;
+    const held = publicCharging.release(v.key, atMs);
+    if (held.length === 0) return;
+    const need = publicNeed(v.vehicleClass);
+    const spec = FLEET_CATALOG[type];
+    const kWh = (spec.annualKm / 100) * spec.kWhPer100Km;
+    const stay = publicCharging.chargingOption(b, atMs, need, 0, new Set(held.map((a) => a.siteId)));
+    const stayRp = kWh * stay.priceRpPerKWh + stay.hassleRp;
+    const access = this.accessAt(v, b, atMs, type, false); // charging in public, it has no charger in its yard
+    const bestRp =
+      access.kind === "depot"
+        ? depotRunningRp(kWh, access.chargerRp, spec.lifetimeMeanYears, tariffStore.at(atMs))
+        : access.kind === "public"
+          ? kWh * access.option.priceRpPerKWh + access.option.hassleRp
+          : Infinity;
+    if (bestRp + SWITCH_MIN_GAIN_CHF * 100 > stayRp) publicCharging.keep(held);
+    else if (access.kind === "public") publicCharging.assign(v.key, null, access.option, atMs, need);
+    // A depot: from now on it charges in its own yard.
   }
 
   /** Whether a vehicle without a depot that just went diesel would have gone electric with a
@@ -419,3 +452,7 @@ class Fleets {
 }
 
 export const fleets = new Fleets();
+
+publicCharging.addReviewer((key, slot, atMs, changed) => {
+  if (slot === null) fleets.review(key, atMs, changed); // households' cars: mobility.ts
+});
