@@ -157,3 +157,35 @@
   margin-top: 2px;
   font-weight: 600;
 }
+
+/* Marked moments (the player's decisions on the approval chart). */
+.time-chart g.event line {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  opacity: 0.6;
+}
+
+.time-chart g.event path {
+  fill: var(--ink-2);
+}
+
+.time-chart-legend i.event {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 7px solid var(--ink-2);
+}
+
+.time-chart-tip .event {
+  margin-top: 2px;
+  white-space: normal;
+  max-width: 280px;
+}
+
+.time-chart-tip .event::before {
+  content: "▾";
+  margin-right: 2px;
+}

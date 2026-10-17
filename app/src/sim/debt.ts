@@ -55,7 +55,7 @@ import type { Building } from "../data/types";
 import { allocationApprovalFactor, approval, setDebtPenalty, setUtilityShare } from "./approval";
 import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { simClock } from "./engine";
-import { departmentUtilityShareRp, latestBookedFinances, liveBalanceRp, operatingIncomeRp } from "./finances";
+import { departmentUtilityShareRp, latestBookedFinances, liveBalanceRp, operatingIncomeRp, setLoansOutstanding } from "./finances";
 import { setBalanceCheck, setSpendingFreeze } from "./fiscalRules";
 import { interestRates } from "./interestRates";
 import { existsAt } from "./lifetime";
@@ -134,6 +134,7 @@ class Debt {
     // Just after `atMs`: what was paid at that very moment (an order a moment ago) counts.
     setBalanceCheck((atMs) => this.balanceRp(atMs + 1));
     setDebtPenalty((atMs) => this.penaltyPoints(atMs));
+    setLoansOutstanding(() => this.loans.filter((l) => l.status === "active").reduce((sum, l) => sum + l.outstandingRp, 0));
     setUtilityShare(() => {
       const booked = latestBookedFinances();
       return booked ? departmentUtilityShareRp(booked) : 0;

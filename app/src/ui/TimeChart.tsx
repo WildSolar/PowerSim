@@ -38,6 +38,8 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
   const step = Math.max(data.integer ? 1 : 0, niceStep(range > 0 ? range : 1, 5));
   const yMin = Math.floor(minData / step) * step;
   const yMax = data.yMax ?? (maxData > 0 ? Math.ceil(maxData / step) * step : 5 * step);
+  // As many decimals as the step has (2.5 needs one), so no tick is rounded onto its neighbour's.
+  const stepDigits = (String(Number(step.toPrecision(6))).split(".")[1] ?? "").length;
   const yTicks: number[] = [];
   for (let t = yMin; t <= yMax + step / 2; t += step) yTicks.push(Number(t.toPrecision(10)));
 
@@ -71,6 +73,11 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
     return { left, width: Math.max(1, right - left) };
   });
   const hovered = hover !== null && hover < n ? hover : null;
+  // The marked moments within the hovered point's band.
+  const hoveredEvents =
+    hovered !== null
+      ? (data.events ?? []).filter((e) => (hovered === 0 || e.x >= (data.xs[hovered - 1] + data.xs[hovered]) / 2) && (hovered === n - 1 || e.x < (data.xs[hovered] + data.xs[hovered + 1]) / 2))
+      : [];
   const tipLeft = hovered !== null ? Math.min(85, Math.max(15, (x(data.xs[hovered]) / W) * 100)) : 0;
 
   return (
@@ -90,6 +97,12 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
             {data.reference.label}
           </span>
         )}
+        {data.events && data.events.length > 0 && (
+          <span>
+            <i className="event" />
+            {data.eventsLabel ?? "Events"}
+          </span>
+        )}
       </div>
       <div className="time-chart-plot">
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={data.series.map((s) => s.label).join(", ")}>
@@ -100,7 +113,7 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
             <g key={t}>
               <line className={t === 0 ? "zero" : "grid"} x1={PAD.left} x2={W - PAD.right} y1={y(t)} y2={y(t)} />
               <text className="tick" x={PAD.left - 8} y={y(t) + 3} textAnchor="end">
-                {t.toLocaleString("de-CH", { maximumFractionDigits: Math.max(0, -Math.floor(Math.log10(step))) })}
+                {t.toLocaleString("de-CH", { maximumFractionDigits: stepDigits })}
               </text>
             </g>
           ))}
@@ -126,6 +139,14 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
                 return bottom - top > 0.5 ? <rect key={`${s.key}-${i}`} className="bar" x={x(xv) - barWidth / 2} width={barWidth} y={top} height={bottom - top} style={{ fill: s.color }} /> : null;
               }),
             )}
+          {(data.events ?? [])
+            .filter((e) => e.x >= data.from && e.x <= data.to)
+            .map((e, i) => (
+              <g key={i} className="event">
+                <line x1={x(e.x)} x2={x(e.x)} y1={PAD.top} y2={H - PAD.bottom} />
+                <path d={`M${x(e.x) - 4},${PAD.top - 9} L${x(e.x) + 4},${PAD.top - 9} L${x(e.x)},${PAD.top - 2} Z`} />
+              </g>
+            ))}
           {data.reference && <line className="reference" x1={PAD.left} x2={W - PAD.right} y1={y(data.reference.value)} y2={y(data.reference.value)} />}
           {lines.map((s) => (
             <g key={s.key}>
@@ -157,6 +178,11 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
                 {data.total}: {formatValue(tops[tops.length - 1][hovered])} {data.unit}
               </span>
             )}
+            {hoveredEvents.map((e, i) => (
+              <span key={`e${i}`} className="event">
+                {e.label}
+              </span>
+            ))}
           </div>
         )}
       </div>

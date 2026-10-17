@@ -20,14 +20,15 @@
  * runs synchronously.
  */
 
-import { networkCoverage } from "./districtHeatStats";
+import { designLoadW, networkCoverage } from "./districtHeatStats";
 import { publicCharging } from "./publicCharging";
 import { wind } from "./wind";
 import { agriPv } from "./agriPv";
 import { timed } from "./devTiming";
 import { existsAt } from "./lifetime";
 import type { EnergyClassId } from "./energyClass";
-import { retrofitsInRange } from "./retrofit";
+import { gfaOf } from "./newBuild";
+import { energyClassAt, retrofitsInRange } from "./retrofit";
 import type { Building, PowerPlant } from "../data/types";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { categoryEnergyFromSeries, energyKWh, ZERO_CATEGORY_ENERGY_KWH, type CategoryEnergyKWh } from "./energy";
@@ -221,6 +222,7 @@ const TECHNOLOGY_SERIES_KEYS = [
 function joinTechnologySeries(parts: TechnologySeriesW[]): TechnologySeriesW {
   const out = Object.fromEntries(TECHNOLOGY_SERIES_KEYS.map((k) => [k, parts.map((p) => p[k][0])])) as unknown as TechnologySeriesW;
   out.dhSourceW = new Map();
+  out.dhNetworkW = new Map();
   parts.forEach((p, i) => {
     for (const [id, w] of p.dhSourceW) {
       let series = out.dhSourceW.get(id);
@@ -229,6 +231,15 @@ function joinTechnologySeries(parts: TechnologySeriesW[]): TechnologySeriesW {
         out.dhSourceW.set(id, series);
       }
       series[i] = w[0];
+    }
+    for (const [name, w] of p.dhNetworkW ?? []) {
+      let series = out.dhNetworkW!.get(name);
+      if (!series) {
+        series = { clean: new Array<number>(parts.length).fill(0), boiler: new Array<number>(parts.length).fill(0) };
+        out.dhNetworkW!.set(name, series);
+      }
+      series.clean[i] = w.clean[0];
+      series.boiler[i] = w.boiler[0];
     }
   });
   return out;
@@ -364,6 +375,8 @@ interface TechnologySeriesW {
   dhSourceW: Map<string, number[]>;
   dhOilW: number[];
   dhGasW: number[];
+  /** Each network's clean heat and boiler heat (by its name). */
+  dhNetworkW?: Map<string, { clean: number[]; boiler: number[] }>;
 }
 
 /** Space heating bucketed by which of the five systems is actually installed
@@ -384,6 +397,7 @@ function sampleTechnologySeries(buildings: Building[], times: number[]): Technol
     dhSourceW: new Map(),
     dhOilW: [],
     dhGasW: [],
+    dhNetworkW: new Map(),
   };
   for (const [i, t] of times.entries()) {
     const dailyMeanC = dailyMeanTempC(t);
@@ -444,6 +458,15 @@ function sampleTechnologySeries(buildings: Building[], times: number[]): Technol
     }
     out.dhOilW.push(production.oilW);
     out.dhGasW.push(production.gasW);
+    for (const [name, w] of production.byNetwork) {
+      let series = out.dhNetworkW!.get(name);
+      if (!series) {
+        series = { clean: new Array(times.length).fill(0), boiler: new Array(times.length).fill(0) };
+        out.dhNetworkW!.set(name, series);
+      }
+      series.clean[i] = w.cleanW;
+      series.boiler[i] = w.boilerW;
+    }
   }
   return out;
 }
@@ -540,6 +563,26 @@ function recordMonthAssets(buildings: Building[], year: number, month: number, p
     without += a.households - a.atHome;
     qosSum += (a.households - a.atHome) * a.qos;
   }
+  const fleet = fleets.census(standing, endMs);
+  // Heated buildings (not garages, sheds, or electric or unrecorded heating): by system, by insulation.
+  const heatingSystems: Record<string, { buildings: number; floor: number }> = {};
+  const insulation: Record<string, { buildings: number; floor: number }> = {};
+  const tally = (into: Record<string, { buildings: number; floor: number }>, key: string, floor: number) => {
+    const t = (into[key] ??= { buildings: 0, floor: 0 });
+    t.buildings++;
+    t.floor += floor;
+  };
+  let airHeatPumpKw = 0;
+  let groundHeatPumpKw = 0;
+  for (const b of standing) {
+    const system = currentHeatingSystemId(b, endMs);
+    if (!system) continue;
+    const floor = gfaOf(b);
+    tally(heatingSystems, system, floor);
+    tally(insulation, energyClassAt(b, endMs), floor);
+    if (system === "airHeatPump") airHeatPumpKw += designLoadW(b, endMs) / 1000;
+    else if (system === "groundHeatPump") groundHeatPumpKw += designLoadW(b, endMs) / 1000;
+  }
   monthRecords.record(year * 12 + month, {
     assets: {
       agriPvKw: agriPv.capacityAtKw(endMs),
@@ -554,6 +597,14 @@ function recordMonthAssets(buildings: Building[], year: number, month: number, p
       chargerTaken: usage.users,
       chargingQos: without > 0 ? qosSum / without : 0,
       wallboxShare: households > 0 ? withWallbox / households : 0,
+      vans: fleet.vans,
+      vansElectric: fleet.vansElectric,
+      trucks: fleet.trucks,
+      trucksElectric: fleet.trucksElectric,
+      heatingSystems,
+      insulation,
+      airHeatPumpKw,
+      groundHeatPumpKw,
     },
   });
 }
@@ -570,7 +621,10 @@ function recordMonthHeating(year: number, month: number, times: number[], series
   const gas = energyKWh(times, series.dhGasW);
   if (oil > 0) districtHeatKWh["Oil boilers"] = oil;
   if (gas > 0) districtHeatKWh["Gas boilers"] = gas;
+  const dhNetworkKWh: Record<string, { clean: number; boiler: number }> = {};
+  for (const [name, w] of series.dhNetworkW ?? []) dhNetworkKWh[name] = { clean: energyKWh(times, w.clean), boiler: energyKWh(times, w.boiler) };
   monthRecords.record(year * 12 + month, {
+    dhNetworkKWh,
     heatingKWh: {
       oil: energyKWh(times, series.oilBoilerSpaceW),
       gas: energyKWh(times, series.gasBoilerSpaceW),

@@ -203,6 +203,13 @@ const utilityMonths = new Map<number, UtilityMonth>();
 const utilityInFlight = new Map<number, Promise<UtilityMonth>>();
 
 /** A month of the utility's accounts (from the month's samples, yearReport.ts), settled once and kept. */
+let loansOutstandingRp: () => number = () => 0;
+
+/** debt.ts: what the loans still owe, for the month's record (finances.ts can't import debt.ts). */
+export function setLoansOutstanding(provider: () => number): void {
+  loansOutstandingRp = provider;
+}
+
 export function settleUtilityMonth(buildings: Building[], realPlants: PowerPlant[], year: number, month: number): Promise<UtilityMonth> {
   const key = year * 12 + month;
   const settled = utilityMonths.get(key);
@@ -212,7 +219,9 @@ export function settleUtilityMonth(buildings: Building[], realPlants: PowerPlant
     inFlight = timedAsync("utility month (span)", () => computeUtilityMonth(buildings, realPlants, year, month))
       .then((m) => {
         utilityMonths.set(key, m);
-        monthRecords.record(key, { utility: m }); // for the charts, line by line
+        // For the charts: the accounts line by line, and the treasury at the month's end.
+        const balanceRp = liveBalanceRp(buildings, toSimTimeMs(Date.UTC(year, month + 1, 1)) - 1, BASELINE_YEAR);
+        monthRecords.record(key, { utility: m, ...(balanceRp !== null ? { books: { balanceRp, loansRp: loansOutstandingRp() } } : {}) });
         treasury.notifyBooked(); // the live balance takes it in
         return m;
       })

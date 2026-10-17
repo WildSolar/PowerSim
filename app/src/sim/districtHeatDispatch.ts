@@ -51,15 +51,18 @@ export interface DhInstantW {
   bySource: Map<string, number>;
   oilW: number;
   gasW: number;
+  /** Each network's clean heat and its boilers' (by the network's name, for the charts). */
+  byNetwork: Map<string, { cleanW: number; boilerW: number }>;
 }
 
 /** Meets each network's delivered load (W) at one instant: its clean sources first, in merit
  * order, then its boilers. `orphanW`: district-heated buildings no network reaches any more
  * (their pipes' sources gone) — boilers alone. */
 export function dispatchInstant(loads: Map<DhNetworkInfo, number>, orphanW: number): DhInstantW {
-  const out: DhInstantW = { bySource: new Map(), oilW: 0, gasW: 0 };
+  const out: DhInstantW = { bySource: new Map(), oilW: 0, gasW: 0, byNetwork: new Map() };
   for (const [network, deliveredW] of loads) {
-    let remaining = deliveredW * (1 + DH_NETWORK_LOSS_SHARE);
+    const madeW = deliveredW * (1 + DH_NETWORK_LOSS_SHARE);
+    let remaining = madeW;
     for (const s of network.sources) {
       if (remaining <= 0) break;
       const capacity = Number.isFinite(s.cleanW) ? s.cleanW : 0;
@@ -72,6 +75,10 @@ export function dispatchInstant(loads: Map<DhNetworkInfo, number>, orphanW: numb
       if (network.fossil === "gas") out.gasW += remaining;
       else out.oilW += remaining;
     }
+    const n = out.byNetwork.get(network.name) ?? { cleanW: 0, boilerW: 0 };
+    n.cleanW += madeW - Math.max(0, remaining);
+    n.boilerW += Math.max(0, remaining);
+    out.byNetwork.set(network.name, n);
   }
   out.oilW += orphanW * (1 + DH_NETWORK_LOSS_SHARE);
   return out;

@@ -28,6 +28,7 @@ export const CHANGELOG: Release[] = [
       "District heating: a network's card adds up its clean sources against its winter peak — the room left before the boilers start, or how much of the peak they make and their heat over a year (projected).",
       "Carbon removal contracts: the measure shows what they would cost at the share you set, and how far the town's emissions still are from the point where they apply.",
       "New charts: solar and wind built (rooftop, Agri-PV, wind), batteries, district heating pipes and the share of buildings, floor area and heat demand they reach, public charging's room against what's taken, and the share of households with a wallbox and how good public charging is for the rest.",
+      "More charts: buildings by heating system and by insulation, heat pumps' capacity, how full the transformers are, each district heating network's clean share, electric cars, vans and lorries, and the treasury's balance and debt. The approval chart marks your measures, so you can see what moved it.",
     ],
     changed: [
       "Wood heating is now a heating system of its own: the buildings the register lists as heating with wood — logs, pellets or chips, in a boiler or a stove — burn wood pellets, wear out and are replaced like any other heating (by wood again, or by a heat pump, district heat or a boiler). It counts as clean. New wood heating isn't installed where there was none.",
@@ -38,6 +39,7 @@ export const CHANGELOG: Release[] = [
     ],
     fixed: [
       "A new game starts with the treasury as it stands that day — the year so far counted while the game loads — instead of catching up month by month.",
+      "Charts: an axis stepping in halves (2.5, 7.5…) shows them, instead of rounding two of its labels to the same number.",
     ],
   },
   {

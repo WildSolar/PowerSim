@@ -40,8 +40,9 @@ export function mapNetworkBucketAt(building: Building, atMs: number): NetworkSta
   return building.streetSegments?.some((id) => selection.has(id)) ? "planned" : status;
 }
 
-/** A building's heat load on a cold winter day — what the network has to be able to deliver. */
-function designLoadW(building: Building, atMs: number): number {
+/** A building's heat load on a cold winter day — what the network (or a heat pump) has to be able
+ * to deliver. */
+export function designLoadW(building: Building, atMs: number): number {
   return spaceHeatingThermalDemandW(building, DH_DESIGN_OUTDOOR_TEMP_C, DH_DESIGN_OUTDOOR_TEMP_C, atMs);
 }
 

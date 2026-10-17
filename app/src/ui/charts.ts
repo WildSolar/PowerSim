@@ -9,13 +9,15 @@
  */
 
 import { DH_SOURCE_SPECS } from "../config/districtHeat";
-import { HEATING_SYSTEM_CATALOG } from "../config/heating";
+import { HEATING_SYSTEM_CATALOG, type HeatingSystemId } from "../config/heating";
+import { ENERGY_CLASS_CATALOG, ENERGY_CLASS_ORDER } from "../config/retrofit";
 import { MOBILITY_MODE_CATALOG } from "../config/mobility";
 import { approval } from "../sim/approval";
 import { BASELINE_YEAR, MONTH_NAMES, toDateMs, toSimTimeMs } from "../sim/calendar";
 import { cachedEmissionsForYear, EMISSIONS_SOURCE_COLOR } from "../sim/emissions";
 import { bookedFinances, townTakeRp, utilityProfitRp, type UtilityMonth } from "../sim/finances";
 import { grid } from "../sim/grid";
+import { measures } from "../sim/measures";
 import { monthRecords, type MonthRecord } from "../sim/monthRecords";
 import { PAYOUT_CATEGORIES, PAYOUT_LABEL, treasury, type PayoutCategory } from "../sim/treasury";
 import { DEVICE_CATEGORIES } from "./deviceCategories";
@@ -50,6 +52,9 @@ export interface ChartData {
   /** The first and last year on the axis. */
   from: number;
   to: number;
+  /** Moments marked on the chart (the player's decisions), listed in the tooltip of their month. */
+  events?: { x: number; label: string }[];
+  eventsLabel?: string;
 }
 
 export interface ChartParam {
@@ -302,6 +307,117 @@ function chargingQualityChart(nowMs: number): ChartData {
   };
 }
 
+const COUNTED_BY = [
+  { value: "buildings", label: "Buildings" },
+  { value: "floor", label: "Floor area" },
+] as const;
+
+/** Heated buildings split some way (heating system, insulation), stacked: counted, or by floor area. */
+function buildingSplitChart(
+  nowMs: number,
+  param: string | null,
+  pick: (a: NonNullable<MonthRecord["assets"]>) => Record<string, { buildings: number; floor: number }> | undefined,
+  keys: { key: string; label: string; color: string }[],
+): ChartData {
+  const { records, ...m } = monthly(nowMs, (r) => !!r.assets && !!pick(r.assets));
+  const floor = param === "floor";
+  return {
+    ...m,
+    unit: floor ? "1,000 m²" : "buildings",
+    integer: !floor,
+    total: "All heated buildings",
+    series: keys.map((k) => ({
+      key: k.key,
+      label: k.label,
+      color: k.color,
+      kind: "stack" as const,
+      values: records.map((r) => {
+        const t = pick(r.assets!)![k.key];
+        return t ? (floor ? t.floor / 1000 : t.buildings) : 0;
+      }),
+    })),
+  };
+}
+
+const HEATING_ORDER: HeatingSystemId[] = ["airHeatPump", "groundHeatPump", "districtHeating", "woodPellet", "gasBoiler", "oilBoiler"];
+
+function heatingSystemsChart(param: string | null, nowMs: number): ChartData {
+  return buildingSplitChart(
+    nowMs,
+    param,
+    (a) => a.heatingSystems,
+    HEATING_ORDER.map((id) => ({ key: id, label: HEATING_SYSTEM_CATALOG[id].label, color: HEATING_SYSTEM_CATALOG[id].color })),
+  );
+}
+
+function insulationChart(param: string | null, nowMs: number): ChartData {
+  return buildingSplitChart(
+    nowMs,
+    param,
+    (a) => a.insulation,
+    // The best insulated at the bottom, so the stack grows from below as the town renovates.
+    [...ENERGY_CLASS_ORDER].reverse().map((id) => ({ key: id, label: ENERGY_CLASS_CATALOG[id].label, color: ENERGY_CLASS_CATALOG[id].color })),
+  );
+}
+
+function heatPumpChart(nowMs: number): ChartData {
+  const { records, ...m } = monthly(nowMs, (r) => r.assets?.airHeatPumpKw !== undefined);
+  return {
+    ...m,
+    unit: "MW of heat",
+    total: "All heat pumps",
+    series: [
+      { key: "air", label: HEATING_SYSTEM_CATALOG.airHeatPump.label, color: HEATING_SYSTEM_CATALOG.airHeatPump.color, kind: "stack", values: records.map((r) => r.assets!.airHeatPumpKw! / 1000) },
+      { key: "ground", label: HEATING_SYSTEM_CATALOG.groundHeatPump.label, color: HEATING_SYSTEM_CATALOG.groundHeatPump.color, kind: "stack", values: records.map((r) => r.assets!.groundHeatPumpKw! / 1000) },
+    ],
+  };
+}
+
+const NETWORK_COLORS = ["#4a3aa7", "#1baf7a", "#eb6834", "#2a78d6", "#c9a227", "#e87ba4"];
+
+function dhCleanShareChart(nowMs: number): ChartData {
+  const { records, ...m } = monthly(nowMs, (r) => !!r.dhNetworkKWh && Object.keys(r.dhNetworkKWh).length > 0);
+  // The networks that made the most heat over the whole record, biggest first.
+  const totals = new Map<string, number>();
+  for (const r of records) for (const [name, e] of Object.entries(r.dhNetworkKWh!)) totals.set(name, (totals.get(name) ?? 0) + e.clean + e.boiler);
+  const names = [...totals].sort((a, b) => b[1] - a[1]).slice(0, NETWORK_COLORS.length).map(([name]) => name);
+  const share = (e: { clean: number; boiler: number } | undefined) => (e && e.clean + e.boiler > 0 ? (100 * e.clean) / (e.clean + e.boiler) : null);
+  return {
+    ...m,
+    unit: "%",
+    yMax: 100,
+    series: [
+      ...names.map((name, i) => ({ key: name, label: name, color: NETWORK_COLORS[i], kind: "line" as const, values: records.map((r) => share(r.dhNetworkKWh![name])) })),
+      ...(names.length > 1
+        ? [
+            {
+              key: "all",
+              label: "All networks",
+              color: "var(--ink)",
+              kind: "line" as const,
+              dashed: true,
+              values: records.map((r) => share(Object.values(r.dhNetworkKWh!).reduce((s, e) => ({ clean: s.clean + e.clean, boiler: s.boiler + e.boiler }), { clean: 0, boiler: 0 }))),
+            },
+          ]
+        : []),
+    ],
+  };
+}
+
+function electricVehiclesChart(nowMs: number): ChartData {
+  const { records, ...m } = monthly(nowMs, (r) => !!r.mobility && r.assets?.vans !== undefined);
+  const pct = (part: number, all: number) => (all > 0 ? (100 * part) / all : null);
+  return {
+    ...m,
+    unit: "%",
+    series: [
+      { key: "cars", label: "Residents' cars", color: "#2a78d6", kind: "line", values: records.map((r) => pct(r.mobility!.carElectric, r.mobility!.car)) },
+      { key: "vans", label: "Business vans", color: "#eb6834", kind: "line", values: records.map((r) => pct(r.assets!.vansElectric!, r.assets!.vans!)) },
+      { key: "trucks", label: "Lorries", color: "#4a3aa7", kind: "line", values: records.map((r) => pct(r.assets!.trucksElectric!, r.assets!.trucks!)) },
+    ],
+  };
+}
+
 function modalSplitChart(nowMs: number): ChartData {
   const { records, ...m } = monthly(nowMs, (r) => !!r.mobility);
   const share = (pick: (x: NonNullable<MonthRecord["mobility"]>) => number) =>
@@ -364,6 +480,41 @@ function overloadedChart(nowMs: number): ChartData {
       { key: "winter", label: "Overloaded in winter (draw)", color: "#2a78d6", kind: "line", values: list.map(([, v]) => v.winter) },
       { key: "summer", label: "Overloaded in summer (feed-in)", color: color("solar"), kind: "line", values: list.map(([, v]) => v.summer) },
     ],
+  };
+}
+
+const LOAD_BANDS = [
+  { key: "low", label: "Under half full", color: "#b9d3ee", upTo: 0.5 },
+  { key: "mid", label: "Half to 80% full", color: "#6a9fd8", upTo: 0.8 },
+  { key: "high", label: "80% to full", color: "#2a5aa6", upTo: 1 },
+  { key: "over", label: "Over capacity", color: "#b23a2e", upTo: Infinity },
+] as const;
+
+const SEASONS = [
+  { value: "winter", label: "Winter peak draw" },
+  { value: "summer", label: "Summer solar feed-in" },
+] as const;
+
+function transformerLoadChart(param: string | null, nowMs: number): ChartData {
+  const season = param === "summer" ? "summer" : "winter";
+  const years = new Map<number, number[]>();
+  for (const a of grid.getAreas())
+    for (const r of a.readings ?? []) {
+      if (r.season !== season || r.capacityKw <= 0) continue;
+      const counts = years.get(r.year) ?? LOAD_BANDS.map(() => 0);
+      counts[LOAD_BANDS.findIndex((b) => r.kw / r.capacityKw <= b.upTo)]++;
+      years.set(r.year, counts);
+    }
+  const list = [...years].sort((a, b) => a[0] - b[0]);
+  return {
+    xs: list.map(([y]) => y + 0.5),
+    xLabels: list.map(([y]) => String(y)),
+    ...axis(nowMs),
+    unit: "transformers",
+    integer: true,
+    bars: true,
+    total: "All transformers",
+    series: LOAD_BANDS.map((b, i) => ({ key: b.key, label: b.label, color: b.color, kind: "stack" as const, values: list.map(([, c]) => c[i]) })),
   };
 }
 
@@ -435,6 +586,19 @@ function spendingChart(param: string | null, nowMs: number): ChartData {
   };
 }
 
+function treasuryChart(nowMs: number): ChartData {
+  const { records, ...m } = monthly(nowMs, (r) => !!r.books);
+  const mchf = (rp: number) => rp / 100 / 1_000_000;
+  return {
+    ...m,
+    unit: "M CHF",
+    series: [
+      { key: "balance", label: "Treasury balance", color: "#2a78d6", kind: "line", values: records.map((r) => mchf(r.books!.balanceRp)) },
+      { key: "debt", label: "Debt: loans and overdraft", color: "#b23a2e", kind: "line", values: records.map((r) => mchf(r.books!.loansRp + Math.max(0, -r.books!.balanceRp))) },
+    ],
+  };
+}
+
 /** The utility's accounts line by line (and the department's credit for public solar). */
 const UTILITY_LINES: { key: keyof UtilityMonth | "concessionFee"; label: string; cost: boolean }[] = [
   { key: "consumerRevenueRp", label: "Electricity sold to consumers", cost: false },
@@ -500,6 +664,9 @@ function utilityChart(param: string | null, nowMs: number): ChartData {
   };
 }
 
+/** The measure log's entries that were the player's decisions (or the voters' verdict on one). */
+const DECISION_PREFIXES = ["Enacted:", "Changed:", "Repealed:", "Struck down"];
+
 function approvalChart(nowMs: number): ChartData {
   const history = approval.getHistory();
   return {
@@ -513,6 +680,11 @@ function approvalChart(nowMs: number): ChartData {
     yMax: 100,
     reference: { value: 50, label: "50%: an election lost" },
     series: [{ key: "approval", label: "Approval", color: "#2a78d6", kind: "line", values: history.map((h) => h.approval) }],
+    events: measures
+      .getHistory()
+      .filter((e) => DECISION_PREFIXES.some((p) => e.text.startsWith(p)))
+      .map((e) => ({ x: nowYear(e.atMs), label: e.text.replace(/ In effect from .*$/, "") })),
+    eventsLabel: "Measures enacted, changed or repealed",
   };
 }
 
@@ -567,6 +739,29 @@ export const CHARTS: ChartDef[] = [
     data: (_, now) => batteryChart(now),
   },
   {
+    id: "heating-systems",
+    group: "Buildings",
+    title: "Heating systems",
+    description: "The town's heated buildings by what heats them, at the end of each month — counted, or by floor area. Garages, sheds and buildings with electric or unrecorded heating are left out.",
+    param: { label: "Counted by", options: () => COUNTED_BY.map((x) => ({ value: x.value, label: x.label })) },
+    data: heatingSystemsChart,
+  },
+  {
+    id: "insulation",
+    group: "Buildings",
+    title: "Insulation",
+    description: "The town's heated buildings by how well they are insulated, at the end of each month — counted, or by floor area.",
+    param: { label: "Counted by", options: () => COUNTED_BY.map((x) => ({ value: x.value, label: x.label })) },
+    data: insulationChart,
+  },
+  {
+    id: "heat-pumps",
+    group: "Buildings",
+    title: "Heat pumps",
+    description: "How much heat the town's heat pumps deliver on a cold winter day, at the end of each month — what they draw from the grid when it is coldest grows with it.",
+    data: (_, now) => heatPumpChart(now),
+  },
+  {
     id: "transformer",
     group: "Grid",
     title: "A transformer",
@@ -582,6 +777,14 @@ export const CHARTS: ChartDef[] = [
     data: (_, now) => overloadedChart(now),
   },
   {
+    id: "transformer-load",
+    group: "Grid",
+    title: "How full the transformers are",
+    description: "The transformer stations at each year's readings, by how full they were: at the winter peak draw, or at the summer's peak solar feed-in.",
+    param: { label: "Reading", options: () => SEASONS.map((x) => ({ value: x.value, label: x.label })) },
+    data: transformerLoadChart,
+  },
+  {
     id: "dh-pipes",
     group: "District heating",
     title: "District heating pipes",
@@ -595,6 +798,20 @@ export const CHARTS: ChartDef[] = [
     description: "The share of the town's heated buildings on district heat, and the share it could serve (connected, or on a piped street) — by number of buildings, by floor area or by heat demand.",
     param: { label: "Counted by", options: () => DH_REACH_MEASURES.map((x) => ({ value: x.value, label: x.label })) },
     data: dhReachChart,
+  },
+  {
+    id: "dh-clean-share",
+    group: "District heating",
+    title: "Clean district heat",
+    description: "The share of each network's heat made by its clean sources each month — the rest comes from its oil or gas boilers.",
+    data: (_, now) => dhCleanShareChart(now),
+  },
+  {
+    id: "electric-vehicles",
+    group: "Mobility",
+    title: "Electric vehicles",
+    description: "The share of residents' cars, business vans and lorries that are electric, at the end of each month.",
+    data: (_, now) => electricVehiclesChart(now),
   },
   {
     id: "public-charging",
@@ -621,7 +838,7 @@ export const CHARTS: ChartDef[] = [
     id: "approval",
     group: "Town",
     title: "Approval",
-    description: "Public approval of the municipality's energy policy, month by month.",
+    description: "Public approval of the municipality's energy policy, month by month, with your measures marked: hover a month to see what you decided.",
     data: (_, now) => approvalChart(now),
   },
   {
@@ -630,6 +847,13 @@ export const CHARTS: ChartDef[] = [
     title: "Emissions",
     description: "Each counted year's emissions by source, and what is left after carbon removals.",
     data: (_, now) => emissionsChart(now),
+  },
+  {
+    id: "treasury",
+    group: "Books",
+    title: "Treasury and debt",
+    description: "The treasury's balance at the end of each month, and what the town owes: its loans, and any overdraft.",
+    data: (_, now) => treasuryChart(now),
   },
   {
     id: "spending",

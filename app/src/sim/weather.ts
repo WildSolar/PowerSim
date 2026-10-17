@@ -46,6 +46,10 @@ function tempAnomalyC(dateMs: number): number {
   return systemNoise * 5 + dailyNoise * 2;
 }
 
+// The same days are asked about building after building (a year ahead, from the same moment):
+// remembered by date, which is all the weather depends on.
+const dailyMeanCache = new Map<number, number>();
+
 /** The day's characteristic temperature — seasonal baseline plus the slower-moving
  * "weather system" anomaly, deliberately excluding the diurnal day/night wobble
  * (which averages out over a full day). Used to decide whether a day is cold enough
@@ -54,7 +58,13 @@ function tempAnomalyC(dateMs: number): number {
  * diurnal swing included — see heatPump.ts). */
 export function dailyMeanTempC(simTimeMs: number): number {
   const dateMs = toDateMs(simTimeMs);
-  return seasonalTempC(dateMs) + tempAnomalyC(dateMs);
+  let c = dailyMeanCache.get(dateMs);
+  if (c === undefined) {
+    if (dailyMeanCache.size >= 50_000) dailyMeanCache.clear();
+    c = seasonalTempC(dateMs) + tempAnomalyC(dateMs);
+    dailyMeanCache.set(dateMs, c);
+  }
+  return c;
 }
 
 export type WeatherCondition = "clear" | "partly-cloudy" | "cloudy" | "overcast" | "rain" | "snow";

@@ -5,9 +5,11 @@
  *
  *  - electricity: what the town used, by category, and what its solar and wind made (kWh);
  *  - heating: heat delivered, by heating system (kWh);
- *  - district heat: what each kind of source made, and the boilers (kWh);
- *  - at the month's end: rooftop solar built and the roofs' potential (kWp), and how residents get
- *    around (the modal split, cars electric).
+ *  - district heat: what each kind of source made, and the boilers (kWh), and each network's
+ *    clean heat and boiler heat;
+ *  - at the month's end: rooftop solar built and the roofs' potential (kWp), how residents get
+ *    around (the modal split, cars electric), the town's equipment (assets), and the treasury's
+ *    balance and the loans still owed.
  *
  * A month is recorded once (its passes are cached forever); a record only grows.
  */
@@ -23,6 +25,8 @@ export interface MonthRecord {
   heatingKWh?: { oil: number; gas: number; airHeatPump: number; groundHeatPump: number; districtHeating: number; wood?: number };
   /** District heat made, by what made it ("Wood chips", "Oil boilers"…). */
   districtHeatKWh?: Record<string, number>;
+  /** Each network's heat (by its name): from its clean sources, and from its boilers (kWh). */
+  dhNetworkKWh?: Record<string, { clean: number; boiler: number }>;
   solarBuiltKw?: number;
   solarPotentialKw?: number;
   mobility?: { car: number; carElectric: number; bike: number; other: number };
@@ -35,6 +39,9 @@ export interface MonthRecord {
   utility?: UtilityMonth;
   /** What the town had at the month's end. */
   assets?: MonthAssets;
+  /** The treasury's balance at the month's end, once the utility's month was settled, and what
+   * the loans still owed (Rappen). */
+  books?: { balanceRp: number; loansRp: number };
 }
 
 export interface MonthAssets {
@@ -58,6 +65,17 @@ export interface MonthAssets {
    * and the share of all households with a wallbox. */
   chargingQos: number;
   wallboxShare: number;
+  /** Business vehicles, and how many of them are electric (residents' cars are in `mobility`). */
+  vans?: number;
+  vansElectric?: number;
+  trucks?: number;
+  trucksElectric?: number;
+  /** Heated buildings by heating system and by insulation class: buildings, and floor area (m2). */
+  heatingSystems?: Record<string, { buildings: number; floor: number }>;
+  insulation?: Record<string, { buildings: number; floor: number }>;
+  /** Heat pumps' rating: the heat they deliver on a cold winter day (kW), air and ground. */
+  airHeatPumpKw?: number;
+  groundHeatPumpKw?: number;
 }
 
 class MonthRecords {
