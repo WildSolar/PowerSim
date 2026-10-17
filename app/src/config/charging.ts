@@ -83,7 +83,7 @@ export const HASSLE_CHF: Record<ChargingVehicle, { base: number; span: number }>
 };
 
 // Where operators and letters look for demand gathering around a spot (straight line, m).
-export const DEMAND_RADIUS_M: Record<ChargingKind, number> = { ac: 300, dc: 1500, fleet: 3000 };
+export const DEMAND_RADIUS_M: Record<QosKind, number> = { ac: 300, shop: 1500, dc: 1500, fleet: 3000 };
 
 // --- Charging at work ---
 
@@ -178,3 +178,14 @@ export const OPERATOR_EXPAND_POINTS = 2;
 export const OPERATOR_MAX_POINTS = 12;
 export const OPERATOR_EXPAND_AT_USE = 0.8;
 export const OPERATOR_BUILD_MONTHS = 6;
+// The demand left over may also bring chargers to a shop's car park: a large shop (a retail
+// building of at least this footprint, its car park without chargers yet) with enough of that
+// demand within DEMAND_RADIUS_M.shop gets a few points, as a service to its customers.
+export const OPERATOR_SHOP_MIN_FOOTPRINT_M2 = 800;
+export const OPERATOR_NEW_SHOP_MIN_DEMAND = 6;
+export const OPERATOR_MAX_NEW_SHOPS_PER_YEAR = 1;
+export const OPERATOR_SHOP_POINTS = 4;
+export const OPERATOR_SHOP_POWER_KW = 22;
+// No new shop chargers this close to a shop's car park that has some: the same shopping area (and
+// of two chargers of a kind, only the better counts).
+export const SHOP_CAR_PARK_M = 300;

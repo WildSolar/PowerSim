@@ -27,6 +27,7 @@ export const CHANGELOG: Release[] = [
     added: [
       "Workplace charging: some drivers can charge where they work — more each year as employers equip their car parks, and more with the new workplace charging programme (Town hall → Measures).",
       "A home's panel shows where each driver's electric car charges, or how good the charging would be if they went electric.",
+      "Private operators equip large shops' car parks with chargers where people around would go electric with better charging.",
     ],
     changed: [
       "Charging an electric car without a charger at home is now a matter of degree: a quality from 0 to 100% made up of the chargers around — best close by and fading with the distance along the streets, not as the crow flies — and of how busy they are, plus charging at work for those who can. Different kinds add up; below 10% an electric car is ruled out. The better the charging, the smaller the hassle that weighs against an electric car.",

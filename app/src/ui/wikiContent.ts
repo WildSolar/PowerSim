@@ -863,7 +863,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "On-street chargers — up to 90%: the car charges overnight while you sleep, so it must be a walk away. Full within about 200 m on foot, gone by 500 m.",
         "Fast-charging hubs — up to 50%: a weekly stop with a wait. Full within about 1 km by road, fading out by 4 km.",
-        "Shops' car parks — up to 30%: a top-up while you shop. Within about 500 m by road, fading out by 3 km. They come with the town; you can't build them.",
+        "Shops' car parks — up to 30%: a top-up while you shop. Within about 500 m by road, fading out by 3 km. Some come with the town, and private operators equip more; you can't build them.",
         "Charging at work — 45%, for drivers whose employer has chargers in its car park: about one in eight today, more each year as employers equip theirs, and more with the workplace charging programme. It doesn't depend on where you live.",
       ]),
       p(
@@ -882,7 +882,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Room: an on-street point serves about 3 cars that rely on it fully, a fast-charging point about 30 — a car doing half its charging there takes half the room. A van takes about two cars' room, a lorry about twenty.",
       ]),
       p(
-        "The town starts with its real public chargers, run privately. Private operators react every New Year: where people would have gone electric with an empty on-street charger next door but didn't, they add points to busy sites or open new on-street ones. They charge 45 Rp/kWh on-street and 55 Rp/kWh at fast chargers, and leave hubs to you.",
+        "The town starts with its real public chargers, run privately. Private operators react every New Year: where people would have gone electric with an empty on-street charger next door but didn't, they add points to busy sites or open new on-street ones — and where enough such people are left around a large shop, they equip its car park (one a year at most). They charge 45 Rp/kWh on-street and 55 Rp/kWh at fast chargers, and leave hubs to you.",
       ),
       p(
         "To build your own, open the EV charging tool, pick a kind and size, and click where it should go; it lands at the nearest street, and blue lines show how far along the streets it would reach — the stronger, the better the charging there:",

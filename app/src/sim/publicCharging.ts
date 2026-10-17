@@ -23,8 +23,9 @@
  * the ones the player orders (municipal: built over a few months, their sales go to the treasury
  * at the tariff's public charging prices), and private operators: every New Year they look at the
  * unmet demand of the year before — households that would have bought an electric car with an
- * on-street charger next door but didn't — expand busy sites where that demand gathers, and open
- * new on-street sites where enough of it has none close by.
+ * on-street charger next door but didn't — expand busy sites where that demand gathers, open
+ * new on-street sites where enough of it has none close by, and put chargers in the car park of
+ * a large shop where enough of what is left gathers around it.
  *
  * A publicly charged car draws its power at its sites, not at home: on-street chargers mostly in
  * the evening, fast chargers and shops' car parks during the day; what it charges at work is drawn
@@ -50,6 +51,12 @@ import {
   OPERATOR_MAX_POINTS,
   OPERATOR_NEW_SITE_MIN_DEMAND,
   OPERATOR_NEW_SITE_POINTS,
+  OPERATOR_MAX_NEW_SHOPS_PER_YEAR,
+  OPERATOR_NEW_SHOP_MIN_DEMAND,
+  OPERATOR_SHOP_MIN_FOOTPRINT_M2,
+  OPERATOR_SHOP_POINTS,
+  OPERATOR_SHOP_POWER_KW,
+  SHOP_CAR_PARK_M,
   MAX_FILL,
   PRIVATE_PRICE_RP_PER_KWH,
   QOS_CURVE,
@@ -74,6 +81,7 @@ import { simClock } from "./engine";
 import { LocalProjection } from "./localGeo";
 import { policyStore } from "./policy";
 import { buildingGroup } from "./buildingGroup";
+import { commercialCategory } from "./commercial";
 import { existsAt } from "./lifetime";
 import { firstRandom, hashSeed, hashSeedFrom } from "./rng";
 import { streets } from "./streets";
@@ -1032,18 +1040,22 @@ class PublicCharging {
     let demand = this.unmet.filter((d) => d.kind === "ac" && d.atMs >= yearStartMs(year - 1) && d.atMs < now);
     let changed = false;
 
-    // Full sites with demand around them grow.
-    for (const site of this.sites) {
-      if (site.owner !== "private") continue;
-      const capacity = siteCapacityAt(site, now);
-      const points = pointsAt(site, now);
-      if (capacity === 0 || points >= OPERATOR_MAX_POINTS || this.usersAt(site.id, now) / capacity < OPERATOR_EXPAND_AT_USE) continue;
-      const near = demand.filter((d) => Math.hypot(d.x - site.x, d.y - site.y) <= DEMAND_RADIUS_M[site.kind]);
-      if (near.length < 2) continue;
-      site.expansions.push({ atMs: opensAt, points: Math.min(OPERATOR_EXPAND_POINTS, OPERATOR_MAX_POINTS - points) });
-      demand = demand.filter((d) => !near.includes(d));
-      changed = true;
-    }
+    // Busy sites with demand around them grow — shops' car parks only from what is left at the end:
+    // they gather demand from far around, which would leave none for the streets.
+    const expandBusy = (shops: boolean) => {
+      for (const site of this.sites) {
+        if (site.owner !== "private" || !!site.shop !== shops) continue;
+        const capacity = siteCapacityAt(site, now);
+        const points = pointsAt(site, now);
+        if (capacity === 0 || points >= OPERATOR_MAX_POINTS || this.usersAt(site.id, now) / capacity < OPERATOR_EXPAND_AT_USE) continue;
+        const near = demand.filter((d) => Math.hypot(d.x - site.x, d.y - site.y) <= DEMAND_RADIUS_M[qosKindOf(site)]);
+        if (near.length < 2) continue;
+        site.expansions.push({ atMs: opensAt, points: Math.min(OPERATOR_EXPAND_POINTS, OPERATOR_MAX_POINTS - points) });
+        demand = demand.filter((d) => !near.includes(d));
+        changed = true;
+      }
+    };
+    expandBusy(false);
 
     // Where enough demand gathers with no charger around, a new on-street site opens.
     for (let n = 0; n < OPERATOR_MAX_NEW_SITES_PER_YEAR && demand.length >= OPERATOR_NEW_SITE_MIN_DEMAND; n++) {
@@ -1073,7 +1085,46 @@ class PublicCharging {
       demand = demand.filter((d) => !bestGroup.includes(d));
       changed = true;
     }
+
+    // What's left may bring chargers to a large shop's car park, where most of it gathers.
+    expandBusy(true);
+    for (let n = 0; n < OPERATOR_MAX_NEW_SHOPS_PER_YEAR && demand.length >= OPERATOR_NEW_SHOP_MIN_DEMAND; n++) {
+      let best: { b: Building; near: typeof demand } | null = null;
+      for (const b of this.shopCandidates(now)) {
+        const [x, y] = this.projection.toXY(b.lon, b.lat);
+        const near = demand.filter((d) => Math.hypot(d.x - x, d.y - y) <= DEMAND_RADIUS_M.shop);
+        if (near.length < OPERATOR_NEW_SHOP_MIN_DEMAND) continue;
+        if (!best || near.length > best.near.length || (near.length === best.near.length && (b.footprintAreaM2 ?? 0) > (best.b.footprintAreaM2 ?? 0))) best = { b, near };
+      }
+      if (!best) break;
+      const { b, near } = best;
+      this.addSite({
+        id: `operator-${this.nextId++}`,
+        name: `Shop car park ${campusAddress(b.address) ?? "(unnamed)"}`,
+        street: streets.snapToStreet(b.lon, b.lat)?.street ?? "",
+        lon: b.lon,
+        lat: b.lat,
+        kind: "ac",
+        shop: true,
+        owner: "private",
+        powerKw: OPERATOR_SHOP_POWER_KW,
+        points: OPERATOR_SHOP_POINTS,
+        openedAtMs: opensAt,
+      });
+      demand = demand.filter((d) => !near.includes(d));
+      changed = true;
+    }
     return changed;
+  }
+
+  /** The large shops standing at `atMs` whose car park has no chargers yet. */
+  private shopCandidates(atMs: number): Building[] {
+    const shopSites = this.sites.filter((s) => s.shop);
+    return this.buildingsProvider().filter((b) => {
+      if (commercialCategory(b) !== "retail" || (b.footprintAreaM2 ?? 0) < OPERATOR_SHOP_MIN_FOOTPRINT_M2 || !existsAt(b, atMs)) return false;
+      const [x, y] = this.projection.toXY(b.lon, b.lat);
+      return !shopSites.some((s) => Math.hypot(s.x - x, s.y - y) < SHOP_CAR_PARK_M);
+    });
   }
 
   // --- subscription ---
