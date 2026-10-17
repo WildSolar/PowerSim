@@ -92,7 +92,7 @@ import {
   PANEL_LIFETIME_MEAN_YEARS,
   usableRoofFractionFromDraw,
 } from "./solarSystems";
-import { irradianceWm2, PEAK_IRRADIANCE_WM2 } from "./pv";
+import { irradianceWm2, PEAK_IRRADIANCE_WM2, profileShareAt, roofProfileIndex } from "./pv";
 import { isOffPeakHour, type Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 import { treasury } from "./treasury";
@@ -273,10 +273,24 @@ function solarBiasStrengthRp(egid: string): number {
 
 /** The sample instants of a year's savings estimate and the sunlight a panel would get at each —
  * the same for every roof in town, so worked out once per year's batch rather than once per
- * candidate (each instant's snow cover alone is a month of weather lookback). */
+ * candidate (each instant's snow cover alone is a month of weather lookback) — and, per roof
+ * orientation (pv.ts), what 1 kW of panels facing that way makes of it, as asked for. */
 interface YearSunlight {
   times: number[];
   irradianceWm2: number[];
+  shares: Map<number, Float64Array>;
+}
+
+/** What 1 kW of panels on `egid`'s roof makes at each of a year's sample instants, as a share of
+ * its rating — by the roof's own orientation. */
+function roofShares(sunlight: YearSunlight, egid: string): Float64Array {
+  const profile = roofProfileIndex(egid);
+  let shares = sunlight.shares.get(profile);
+  if (!shares) {
+    shares = Float64Array.from(sunlight.times, (t, i) => profileShareAt(profile, t, sunlight.irradianceWm2[i]));
+    sunlight.shares.set(profile, shares);
+  }
+  return shares;
 }
 
 const sunlightByYear = new Map<number, YearSunlight>();
@@ -286,7 +300,7 @@ function yearSunlight(year: number): YearSunlight {
   if (!sunlight) {
     const yearStartMs = toSimTimeMs(Date.UTC(year, 0, 1));
     const times = historyTimeSteps(yearStartMs + YEAR_MS, YEAR_MS, ANNUAL_SAMPLES);
-    sunlight = { times, irradianceWm2: times.map((t) => irradianceWm2(t)) };
+    sunlight = { times, irradianceWm2: times.map((t) => irradianceWm2(t)), shares: new Map() };
     sunlightByYear.set(year, sunlight);
   }
   return sunlight;
@@ -311,11 +325,13 @@ function dayInMonth(seed: number, monthStartMs: number): number {
  * self-consumption/export split is an approximation, not a precise
  * simulation, a known limitation worth being upfront about (see the wiki). */
 function candidateEconomics(building: Building, candidateCapacityKw: number, sunlight: YearSunlight, tariff: Tariff): SolarEconomics {
-  const { times, irradianceWm2: irradiance } = sunlight;
+  const { times } = sunlight;
   const consumptionW = consumptionSeriesW(sampleBuildingCategorySeries(building, times, tariff, []));
-  // What pv.ts's pvPowerW would give for a panel of this size, as a positive production figure.
+  // What pv.ts's pvPowerW would give for a panel of this size on this roof (facing the way it
+  // does), as a positive production figure.
   const ratedW = candidateCapacityKw * 1000;
-  const productionW = (i: number) => ratedW * (irradiance[i] / PEAK_IRRADIANCE_WM2);
+  const shares = roofShares(sunlight, building.egid);
+  const productionW = (i: number) => ratedW * shares[i];
   const law = policyStore.get().feedInLimitPct / 100;
   const gridCap = Math.min(law, GRID_FRIENDLY_FEED_IN_CAP);
 

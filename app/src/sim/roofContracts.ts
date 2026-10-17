@@ -17,6 +17,7 @@
  * is paid for them), against the rent and their upkeep (finances.ts).
  */
 
+import { roofYearFactor } from "./pv";
 import {
   OWNER_ASK_LOG_SPREAD,
   OWNER_ASK_MEDIAN_CHF_PER_M2,
@@ -192,11 +193,12 @@ class RoofContracts {
   quote(b: Building, atMs: number, rent = this.rent): RoofQuote | null {
     const array = roofArray(b, atMs);
     if (!array) return null;
-    // Planned on a typical year's sun and the market's underlying price (not this month's spike or
-    // this year's weather): it moves only as panels and prices change over the years, the rent you
-    // offer, and whether the grid here needs a battery with the array.
+    // Planned on a typical year's sun on this roof, facing the way it does, and the market's
+    // underlying price (not this month's spike or this year's weather): it moves only as panels and
+    // prices change over the years, the rent you offer, and whether the grid here needs a battery
+    // with the array.
     const year = new Date(toDateMs(atMs)).getUTCFullYear();
-    const yieldKWh = array.capacityKw * typicalYieldKWhPerKwp();
+    const yieldKWh = array.capacityKw * typicalYieldKWhPerKwp() * roofYearFactor(b.egid);
     const valueRp = yieldKWh * market.basePrice("wholesale", year);
     const rentRp = rent * array.areaM2 * 100;
     const upkeepRp = array.capacityKw * ROOF_UPKEEP_CHF_PER_KWP_YEAR * 100;

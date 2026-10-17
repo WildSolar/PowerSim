@@ -231,6 +231,12 @@ export function plantProfileIndex(plant: PowerPlant): number {
   return roofProfileIndex(plant.egid ?? plant.plantId);
 }
 
+/** What the arrays on a building's roof make over a year relative to a flat panel (its orientation:
+ * a south roof a little more, an east or west one less). */
+export function roofYearFactor(egid: string): number {
+  return profileYearFactor(PV_PROFILES[roofProfileIndex(egid)].id);
+}
+
 /** How the arrays on a building face the sun, in words. */
 export function roofOrientationLabel(egid: string): string {
   return PV_PROFILES[roofProfileIndex(egid)].label;
