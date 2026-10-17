@@ -83,7 +83,7 @@ import { toDateMs, toSimTimeMs } from "./calendar";
 import { simClock } from "./engine";
 import { LocalProjection } from "./localGeo";
 import { policyStore } from "./policy";
-import { buildingGroup } from "./buildingGroup";
+import { buildingGroup, isMunicipalBuilding } from "./buildingGroup";
 import { commercialCategory } from "./commercial";
 import { existsAt } from "./lifetime";
 import { firstRandom, hashSeed, hashSeedFrom } from "./rng";
@@ -1086,7 +1086,8 @@ class PublicCharging {
   /** The "Chargers at public buildings" measure's yearly round: this year's number of sites (a
    * fractional rate rounds by chance), each at the public building without chargers that has the
    * most unmet demand around it last year (households that wanted an electric car but found no
-   * charger), then the biggest. */
+   * charger), then the biggest. Not next to a site still being built or placed earlier in the
+   * round: what it will serve is no longer counted, and the buildings around it wait their turn. */
   private publicBuildingRound(year: number): boolean {
     const channels = policyStore.get();
     const perYear = channels.publicBuildingChargerSitesPerYear;
@@ -1094,18 +1095,26 @@ class PublicCharging {
     const now = yearStartMs(year);
     const whole = Math.floor(perYear);
     const count = whole + (firstRandom(hashSeed("public-building-chargers", String(year))) < perYear - whole ? 1 : 0);
-    const demand = this.unmet.filter((d) => d.kind === "ac" && d.atMs >= yearStartMs(year - 1) && d.atMs < now);
-    const candidates = this.publicBuildingChargerCandidates(now)
-      .map((b) => {
-        const [x, y] = this.projection.toXY(b.lon, b.lat);
-        return { b, demand: demand.filter((d) => Math.hypot(d.x - x, d.y - y) <= DEMAND_RADIUS_M.ac).length };
-      })
-      .sort((a, c) => c.demand - a.demand || (c.b.footprintAreaM2 ?? 0) - (a.b.footprintAreaM2 ?? 0));
+    let demand = this.unmetDemand(yearStartMs(year - 1), now);
+    // Sites not open yet: each keeps the buildings around it out of this round.
+    const coming = this.sites.filter((s) => s.openedAtMs > now).map((s) => ({ x: s.x, y: s.y }));
+    const nearComing = (x: number, y: number) => coming.some((c) => Math.hypot(c.x - x, c.y - y) <= DEMAND_RADIUS_M.ac);
+    const candidates = this.publicBuildingChargerCandidates(now).map((b) => {
+      const [x, y] = this.projection.toXY(b.lon, b.lat);
+      return { b, x, y };
+    });
     let placed = 0;
-    for (const { b } of candidates) {
-      if (placed >= count) break;
-      if (this.onChargedCampus(b)) continue; // one placed earlier in this round covers its campus now
-      this.buildAtBuilding(b, channels.publicBuildingChargerPoints, now, { select: false });
+    while (placed < count) {
+      let best: { b: Building; x: number; y: number; near: number } | null = null;
+      for (const c of candidates) {
+        if (nearComing(c.x, c.y) || this.onChargedCampus(c.b)) continue;
+        const near = demand.filter((d) => Math.hypot(d.x - c.x, d.y - c.y) <= DEMAND_RADIUS_M.ac).length;
+        if (!best || near > best.near || (near === best.near && (c.b.footprintAreaM2 ?? 0) > (best.b.footprintAreaM2 ?? 0))) best = { ...c, near };
+      }
+      if (!best) break;
+      this.buildAtBuilding(best.b, channels.publicBuildingChargerPoints, now, { select: false });
+      coming.push({ x: best.x, y: best.y });
+      demand = demand.filter((d) => Math.hypot(d.x - best.x, d.y - best.y) > DEMAND_RADIUS_M.ac);
       placed++;
     }
     return placed > 0;
@@ -1127,14 +1136,28 @@ class PublicCharging {
   /** The public buildings the "Chargers at public buildings" measure can still put a site at on
    * `atMs`: standing, and on a campus without one yet. */
   publicBuildingChargerCandidates(atMs: number): Building[] {
-    return this.buildingsProvider().filter((b) => buildingGroup(b) === "public" && existsAt(b, atMs) && !this.onChargedCampus(b));
+    return this.buildingsProvider().filter((b) => isMunicipalBuilding(b) && existsAt(b, atMs) && !this.onChargedCampus(b));
+  }
+
+  /** Cars' public charging demand left unmet between the two moments, less what a site opened or
+   * ordered since will serve: a household that found no charger last spring has one around the
+   * corner now, or soon. */
+  private unmetDemand(fromMs: number, toMs: number): { atMs: number; x: number; y: number; kind: ChargingKind }[] {
+    const later = this.sites.filter((s) => s.openedAtMs > fromMs);
+    return this.unmet.filter(
+      (d) =>
+        d.kind === "ac" &&
+        d.atMs >= fromMs &&
+        d.atMs < toMs &&
+        !later.some((s) => s.openedAtMs > d.atMs && CAR_NEED.kinds.includes(s.kind) && Math.hypot(d.x - s.x, d.y - s.y) <= DEMAND_RADIUS_M[qosKindOf(s)]),
+    );
   }
 
   private operatorRound(year: number): boolean {
     const now = yearStartMs(year);
     const opensAt = now + OPERATOR_BUILD_MONTHS * MONTH_MS;
     // Operators build on-street chargers; demand only a fast-charging hub would meet (lorries) is left to the municipality.
-    let demand = this.unmet.filter((d) => d.kind === "ac" && d.atMs >= yearStartMs(year - 1) && d.atMs < now);
+    let demand = this.unmetDemand(yearStartMs(year - 1), now);
     let changed = false;
 
     // Busy sites with demand around them grow — shops' car parks only from what is left at the end:

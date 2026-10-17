@@ -76,7 +76,7 @@ import { consumptionSeriesW, hourOfDayAt } from "./billing";
 import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { logCandidateDecision } from "./decisionLog";
 import { LocalProjection, PointGrid } from "./localGeo";
-import { buildingGroup } from "./buildingGroup";
+import { isMunicipalBuilding } from "./buildingGroup";
 import { existsAt } from "./lifetime";
 import type { ConstructionRules } from "./constructionRules";
 import { heatingRenewalsInRange } from "./heatingRenewal";
@@ -610,7 +610,7 @@ export function municipalSolarCandidates(buildings: Building[], realPlants: Powe
   const realEgids = realPvEgids(realPlants);
   return buildings.filter(
     (b) =>
-      buildingGroup(b) === "public" &&
+      isMunicipalBuilding(b) &&
       (b.footprintAreaM2 ?? 0) >= MUNICIPAL_SOLAR_MIN_FOOTPRINT_M2 &&
       existsAt(b, atMs) &&
       !adoptionByEgid.has(b.egid) &&
@@ -625,17 +625,37 @@ function municipalBatteryFor(building: Building, capacityKw: number, atMs: numbe
   return capacityKw > SMALL_SOLAR_KWP && gridFeedInBlockedAt(building, atMs) ? batteryFor(capacityKw, GRID_FRIENDLY_FEED_IN_CAP) : null;
 }
 
+const municipalReturnCache = new Map<string, number>();
+
+/** What each franc the treasury puts into solar on `building` brings back a year: what the panels
+ * would save the building and earn feeding in (as for an owner, candidateEconomics), over their
+ * price less the federal payment. Worked out once per building and year (and feed-in limit). */
+function municipalSolarReturn(building: Building, year: number, tariff: Tariff): number {
+  const key = `${building.egid}:${year}:${policyStore.get().feedInLimitPct}`;
+  let r = municipalReturnCache.get(key);
+  if (r === undefined) {
+    const capacityKw = (building.footprintAreaM2 ?? 0) * usableRoofFraction(building) * kwpPerM2At(year);
+    const netCostRp = capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year)) - federalSubsidyRp(capacityKw);
+    r = capacityKw > 0 && netCostRp > 0 ? annualValueRp(candidateEconomics(building, capacityKw, yearSunlight(year), tariff), "solar", 0) / netCostRp : 0;
+    if (municipalReturnCache.size > 5000) municipalReturnCache.clear();
+    municipalReturnCache.set(key, r);
+  }
+  return r;
+}
+
 /** The municipality puts solar on some of its own (public) buildings this year — a measure, not an
  * owner's decision: full usable roof, paid for by the treasury (less the federal payment every
- * installation gets), generating from the install date. */
-function installMunicipalSolar(buildings: Building[], realPlants: PowerPlant[], year: number, yearStartMs: number): void {
+ * installation gets), generating from the install date. The roofs that pay back best go first. */
+function installMunicipalSolar(buildings: Building[], realPlants: PowerPlant[], year: number, yearStartMs: number, tariff: Tariff): void {
   const perMonth = policyStore.get().municipalSolarBuildingsPerYear / 12;
   if (perMonth <= 0) return;
   const whole = Math.floor(perMonth);
   const count = whole + (mulberry32(hashSeed("municipal-solar-count", String(yearStartMs)))() < perMonth - whole ? 1 : 0);
   if (count === 0) return;
   const candidates = municipalSolarCandidates(buildings, realPlants, yearStartMs).sort(
-    (a, b) => hashSeed(a.egid, "municipal-solar", String(yearStartMs)) - hashSeed(b.egid, "municipal-solar", String(yearStartMs)),
+    (a, b) =>
+      municipalSolarReturn(b, year, tariff) - municipalSolarReturn(a, year, tariff) ||
+      hashSeed(a.egid, "municipal-solar", String(yearStartMs)) - hashSeed(b.egid, "municipal-solar", String(yearStartMs)),
   );
   for (const building of candidates.slice(0, count)) {
     const usable = usableRoofFraction(building);
@@ -843,7 +863,7 @@ function processMonth(buildings: Building[], realPlants: PowerPlant[], year: num
   const policy = policyStore.get();
   const yearStartMs = toSimTimeMs(Date.UTC(year, month, 1)); // the start of this month
   const tariff = tariffStore.at(yearStartMs);
-  installMunicipalSolar(buildings, realPlants, year, yearStartMs);
+  installMunicipalSolar(buildings, realPlants, year, yearStartMs, tariff);
 
   let sunlight: YearSunlight | undefined;
   const priceMultiplier = Math.pow(1 / priceFactorInYear("solar", year), SOLAR_PRICE_HAZARD_ELASTICITY);

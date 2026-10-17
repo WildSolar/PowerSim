@@ -28,6 +28,9 @@ export const CHANGELOG: Release[] = [
       "District heating: a network's card adds up its clean sources against its winter peak — the room left before the boilers start, or how much of the peak they make and their heat over a year (projected).",
       "Carbon removal contracts: the measure shows what they would cost at the share you set, and how far the town's emissions still are from the point where they apply.",
       "New charts: solar and wind built (rooftop, Agri-PV, wind), batteries, district heating pipes and the share of buildings, floor area and heat demand they reach, public charging's room against what's taken, and the share of households with a wallbox and how good public charging is for the rest.",
+      "Solar on public buildings fits the roofs that pay back best first, rather than in no particular order.",
+      "Chargers at public buildings spread out: once a site is placed, the households around it count as served, and the next one never goes within about 300 m of a site still being built. Private operators, too, no longer count demand a site just ordered will meet.",
+      "Churches are no longer counted among the municipality's buildings: no solar or chargers of the town's on them, and their roofs can be rented like any other.",
       "More charts: buildings by heating system and by insulation, heat pumps' capacity, how full the transformers are, each district heating network's clean share, electric cars, vans and lorries, and the treasury's balance and debt. The approval chart marks your measures, so you can see what moved it.",
     ],
     changed: [

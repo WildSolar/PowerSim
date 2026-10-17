@@ -13,3 +13,10 @@ export function buildingGroup(building: Building): BuildingGroup | null {
   if (/Schul|Sport|Kult|Kranken|Museen/.test(c)) return "public";
   return null;
 }
+
+/** Whether the game counts a building as the municipality's own (the Public buildings tool, and
+ * the programmes putting solar and chargers on them): public use, but not a church — the parishes
+ * own those. */
+export function isMunicipalBuilding(building: Building): boolean {
+  return buildingGroup(building) === "public" && !/Kirchen/.test(building.buildingClass ?? "");
+}

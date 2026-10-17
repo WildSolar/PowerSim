@@ -139,7 +139,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "buildings",
     title: "Solar on public buildings",
     summary:
-      "The municipality puts solar on its own schools, halls and other public buildings, a few each year. The panels cost the treasury their price (less the federal payment) and generate from then on.",
+      "The municipality puts solar on its own schools, halls and other public buildings, a few each year — the roofs that pay back best first. The panels cost the treasury their price (less the federal payment) and generate from then on.",
     params: [{ kind: "slider", key: "perYear", label: "Buildings per year", min: 0, max: 20, step: 1, unit: "per year", default: 3 }],
     leadTimeMonths: 6,
     effects: (p) => ({ municipalSolarBuildingsPerYear: num(p, "perYear") }),
@@ -152,7 +152,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "mobility",
     title: "Chargers at public buildings",
     summary:
-      "The municipality puts public chargers in the car parks of its schools, halls and other public buildings, a few sites each year — first where most households nearby want an electric car but have no charger. They're municipal chargers like any other: bought by the treasury, selling at your public charging price.",
+      "The municipality puts public chargers in the car parks of its schools, halls and other public buildings, a few sites each year — first where most households nearby want an electric car but have no charger, never right next to a site still being built. They're municipal chargers like any other: bought by the treasury, selling at your public charging price.",
     params: [
       { kind: "slider", key: "perYear", label: "Sites per year", min: 0, max: 10, step: 1, unit: "per year", default: 2 },
       { kind: "choice", key: "points", label: "Charge points per site", options: [{ value: "4", label: "4" }, { value: "8", label: "8" }, { value: "12", label: "12" }], default: "4" },

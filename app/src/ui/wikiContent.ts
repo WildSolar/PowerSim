@@ -550,11 +550,11 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "The municipality owns buildings of its own — schools, sports halls and the like — and can lead by example on them. The Public buildings tool shows them all, coloured by what they carry: solar, chargers, both or neither. Its drawer lists them; click one, there or on the map, to see it and order for it. A public building's own panel has the same orders.",
       ),
       list([
-        "Solar: the full usable roof, ordered directly, paid by the treasury (less the federal payment every installation gets) and generating a few months later. Or automatically, a few buildings a year, with the ‘Solar on public buildings’ measure.",
-        "Chargers: a public charging site in the building's car park, with 4, 8 or 12 points, ordered directly. Or automatically with the ‘Chargers at public buildings’ measure, which starts where most households nearby are missing a charger. Either way they are municipal chargers like any other (see \"Public charging\").",
+        "Solar: the full usable roof, ordered directly, paid by the treasury (less the federal payment every installation gets) and generating a few months later. Or automatically, a few buildings a year, with the ‘Solar on public buildings’ measure — the roofs that pay back best first: those where the panels would save and earn the most a year for what they cost, much as an owner would weigh it.",
+        "Chargers: a public charging site in the building's car park, with 4, 8 or 12 points, ordered directly. Or automatically with the ‘Chargers at public buildings’ measure, which starts where most households nearby are missing a charger. Once it has placed a site, the households around it count as served, so the next one goes where the need is next greatest — never within about 300 m of a site still being built. Either way they are municipal chargers like any other (see \"Public charging\").",
         "Once every public building has what a programme provides, the measure has nothing left to do: it is greyed out, and one already in force winds up by itself — without the approval cost of a repeal, and any vote on it is called off.",
       ]),
-      note("The register doesn't say who owns a building, so every public-use building counts as the municipality's — churches and the hospital included."),
+      note("The register doesn't say who owns a building, so every public-use building counts as the municipality's — the hospital included — except churches, which belong to their parishes."),
     ],
   },
   {
