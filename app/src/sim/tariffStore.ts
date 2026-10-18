@@ -18,7 +18,21 @@ import { GRID_UPKEEP_RP_PER_KWH } from "../config/market";
 import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { simClock } from "./engine";
 import { market } from "./market";
+import { networkTariff } from "./networkTariff";
 import { DEFAULT_SHEET, type Tariff, type TariffSheet } from "./tariff";
+
+/** What a kWh costs a consumer in basic supply under a sheet in a year: its energy price and the
+ * regulated network fee (networkTariff.ts) — and the base fee per meter and month. */
+export function sheetPrices(sheet: TariffSheet, year: number): { peakRpKWh: number; offPeakRpKWh: number; networkPeakRpKWh: number; networkOffPeakRpKWh: number; baseFeeRpPerMonth: number } {
+  const fees = networkTariff.fees(year, sheet);
+  return {
+    peakRpKWh: sheet.energyPeakRpKWh + fees.peakRpKWh,
+    offPeakRpKWh: sheet.energyOffPeakRpKWh + fees.offPeakRpKWh,
+    networkPeakRpKWh: fees.peakRpKWh,
+    networkOffPeakRpKWh: fees.offPeakRpKWh,
+    baseFeeRpPerMonth: fees.baseFeeRpPerMonth,
+  };
+}
 
 export interface TariffPublication {
   atMs: number;
@@ -133,8 +147,15 @@ class TariffStore {
   }
 
   private compose(atMs: number): Tariff {
+    const sheet = this.sheetFor(yearOf(atMs));
+    const prices = sheetPrices(sheet, yearOf(atMs));
     return {
-      ...this.sheetFor(yearOf(atMs)),
+      ...sheet,
+      networkPeakRpKWh: prices.networkPeakRpKWh,
+      networkOffPeakRpKWh: prices.networkOffPeakRpKWh,
+      peakPriceRpKWh: prices.peakRpKWh,
+      offPeakPriceRpKWh: prices.offPeakRpKWh,
+      baseFeeRpPerMonth: prices.baseFeeRpPerMonth,
       oilPriceRpPerLiter: market.price("oil", atMs),
       gasPriceRpKWh: market.price("gas", atMs),
       woodPelletPriceRpKWh: interpolateCurve(WOOD_PELLET_PRICE_RP_PER_KWH, yearOf(atMs)),

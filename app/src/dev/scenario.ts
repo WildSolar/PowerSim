@@ -24,6 +24,7 @@ import { districtHeat } from "../sim/districtHeat";
 import { districtHeatSources } from "../sim/districtHeatSources";
 import { carParks } from "../sim/carParks";
 import { removals } from "../sim/removals";
+import { networkTariff } from "../sim/networkTariff";
 import { publicCharging } from "../sim/publicCharging";
 import { grid } from "../sim/grid";
 import { heatPumpSiting } from "../sim/heatPumpSiting";
@@ -193,6 +194,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   // Car parks: their owners build canopies with no measure at all, so a do-nothing run has them too.
   carParks.init(dataset, `carparks:${dataset.bfsNumber}`);
   removals.init(cachedEmissionsForYear);
+  networkTariff.init(() => stock.getAll());
   publicCharging.init(dataset, 0);
   publicCharging.setBuildingLookup((egid) => stock.lookup(egid));
   publicCharging.setBuildingsProvider(() => stock.getAll());
@@ -247,6 +249,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     publicCharging.advance(t);
     carParks.advance(t);
     removals.advance(t);
+    networkTariff.advance(t);
     grid.advance(t);
     if (spec.reinforceGrid) {
       for (const area of grid.getAreas()) {

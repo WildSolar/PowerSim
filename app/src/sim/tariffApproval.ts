@@ -19,7 +19,7 @@ import { approval, setPriceStances, type Stances } from "./approval";
 import { toDateMs } from "./calendar";
 import { market } from "./market";
 import type { TariffSheet } from "./tariff";
-import { tariffStore, type TariffPublication } from "./tariffStore";
+import { sheetPrices, tariffStore, type TariffPublication } from "./tariffStore";
 
 // A tariff 10% dearer than elsewhere is a stance of -0.25 among households; the most a cheap
 // tariff can win is a stance of +0.25 (loss aversion).
@@ -31,14 +31,22 @@ const BILL_WEIGHT = { tenants: 0.8, homeowners: 0.8, business: 0.6, drivers: 0.2
 const DISTRICT_HEAT_WEIGHT = 0.15;
 const FEED_IN_WEIGHT = 0.3;
 
-/** What the typical household pays per kWh on a sheet: its time-of-use rates, weighted by when it uses power. */
-export function householdRpKWh(sheet: TariffSheet): number {
-  return HOUSEHOLD_OFF_PEAK_SHARE * sheet.offPeakPriceRpKWh + (1 - HOUSEHOLD_OFF_PEAK_SHARE) * sheet.peakPriceRpKWh;
+/** What the typical household pays per kWh on a sheet in a year: its time-of-use rates, energy and
+ * network fee together, weighted by when it uses power — and its base fee, spread over its use. */
+export function householdRpKWh(sheet: TariffSheet, year: number): number {
+  const p = sheetPrices(sheet, year);
+  return HOUSEHOLD_OFF_PEAK_SHARE * p.offPeakRpKWh + (1 - HOUSEHOLD_OFF_PEAK_SHARE) * p.peakRpKWh + (p.baseFeeRpPerMonth * 12) / REFERENCE_HOUSEHOLD_KWH;
 }
 
-/** The typical household's yearly electricity bill (CHF). */
-export function householdBillChf(sheet: TariffSheet): number {
-  return (householdRpKWh(sheet) * REFERENCE_HOUSEHOLD_KWH) / 100;
+/** The typical household's energy price alone (Rp/kWh), weighted the same way — what the price
+ * ceiling holds (tariffCap.ts). */
+export function householdEnergyRpKWh(sheet: TariffSheet): number {
+  return HOUSEHOLD_OFF_PEAK_SHARE * sheet.energyOffPeakRpKWh + (1 - HOUSEHOLD_OFF_PEAK_SHARE) * sheet.energyPeakRpKWh;
+}
+
+/** The typical household's yearly electricity bill (CHF), base fee included. */
+export function householdBillChf(sheet: TariffSheet, year: number): number {
+  return (householdRpKWh(sheet, year) * REFERENCE_HOUSEHOLD_KWH) / 100;
 }
 
 /** What households pay elsewhere in Switzerland in a year (Rp/kWh). */
@@ -57,7 +65,7 @@ function feeling(ratio: number): number {
 
 /** How each group feels about a sheet in a year. */
 export function stancesFor(sheet: TariffSheet, year: number): Stances {
-  const bill = feeling(householdRpKWh(sheet) / benchmarkRpKWh(year));
+  const bill = feeling(householdRpKWh(sheet, year) / benchmarkRpKWh(year));
   const heat = feeling(sheet.districtHeatingPriceRpKWh / BENCHMARK_DISTRICT_HEAT_RP_KWH) * DISTRICT_HEAT_WEIGHT;
   const feedIn = Math.max(-FEED_IN_WEIGHT, Math.min(FEED_IN_WEIGHT, (sheet.feedInPriceRpKWh / BENCHMARK_FEED_IN_RP_KWH - 1) * FEED_IN_WEIGHT));
   return {
@@ -84,8 +92,8 @@ function yearOf(atMs: number): number {
 function onPublish(p: TariffPublication): void {
   const change = changeStances(p.previous, p.sheet, p.year);
   approval.decide({ key: `tariff:${p.year}:${Math.round(p.atMs)}`, title: `The ${p.year} tariff`, stances: change, leadTimeMonths: 4, atMs: p.atMs });
-  const before = householdBillChf(p.previous);
-  const after = householdBillChf(p.sheet);
+  const before = householdBillChf(p.previous, p.year);
+  const after = householdBillChf(p.sheet, p.year);
   const pct = before > 0 ? Math.round((after / before - 1) * 100) : 0;
   approval.note(
     p.atMs,
@@ -107,8 +115,8 @@ export function initTariffApproval(): void {
 export function previewReaction(sheet: TariffSheet, year: number): { billChf: number; previousBillChf: number; benchmarkChf: number; change: Stances; lasting: Stances } {
   const previous = tariffStore.sheetFor(year);
   return {
-    billChf: householdBillChf(sheet),
-    previousBillChf: householdBillChf(previous),
+    billChf: householdBillChf(sheet, year),
+    previousBillChf: householdBillChf(previous, year),
     benchmarkChf: benchmarkBillChf(year),
     change: changeStances(previous, sheet, year),
     lasting: stancesFor(sheet, year),

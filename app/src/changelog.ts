@@ -30,6 +30,7 @@ export const CHANGELOG: Release[] = [
       "Wiki: “All topics” at the top of the contents, and in each article's heading, takes you back to the overview of every topic.",
     ],
     changed: [
+      "The electricity price is now in two parts, as on a real Swiss bill: the energy price, which you set, and the network fee, which the regulator sets cost-plus — the grid's running costs, a small return and the capital cost of what you've built, with what it over- or under-collects handed back over three years. You choose the network fee's shape: a monthly base fee per meter, and how much cheaper the night rate is. The energy price ceiling now holds the energy price alone. Bills show the base fee, and the utility's accounts the energy and network revenue apart.",
       "Wholesale power moves every year: the utility buys most of a year's power ahead, a third in each of the three years before, and the rest month by month — so the market's ups and downs reach it smoothed, not flattened. The Prices tab shows what next year's power, mostly bought already, will cost.",
       "Carbon removal contracts are bought and paid month by month, rather than in one bill each January: from the year after a counted year gets the town down to the line, each month buys a twelfth of what that year left, up to the share set.",
     ],

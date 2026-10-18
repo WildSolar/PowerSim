@@ -47,6 +47,12 @@ export function BillSection({ summary }: BillSectionProps) {
         <span className="device-name">⚡ Electricity</span>
         <span className="device-watts">{formatCHF(bill.electricityRp)}</span>
       </div>
+      {bill.baseFeeRp > 0 && (
+        <div className="device-row">
+          <span className="device-name">🔌 Base fee (network)</span>
+          <span className="device-watts">{formatCHF(bill.baseFeeRp)}</span>
+        </div>
+      )}
       {bill.solarCreditRp > 0 && (
         <div className="device-row">
           <span className="device-name">☀️ Solar credit (feed-in)</span>

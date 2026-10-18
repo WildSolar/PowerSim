@@ -340,7 +340,7 @@ class Advisors {
     // What the part still bought month by month could add or take away, roughly (a crisis aside).
     const marginRp = WHOLESALE_SPOT_MONTHLY_SIGMA * nextRp * (1 - WHOLESALE_HEDGED_SHARE) * boughtKWh;
     const neededRpKWh = deliveredKWh > 0 ? (deltaRp * WHOLESALE_HEDGED_SHARE * boughtKWh) / deliveredKWh : 0;
-    const householdNow = householdRpKWh(tariffStore.sheetFor(year));
+    const householdNow = householdRpKWh(tariffStore.sheetFor(year), year);
     const benchNow = benchmarkRpKWh(year);
     const benchNext = benchNow + (nextRp - thisRp);
     const vsAverage = (householdNow / benchNext - 1) * 100;

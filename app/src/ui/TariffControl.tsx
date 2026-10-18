@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { MAX_SPREAD_RP_KWH, SUGGESTED_SPREAD_RP_KWH } from "../config/dynamicTariff";
 import { WHOLESALE_HEDGED_SHARE, type Commodity } from "../config/market";
 import { approval } from "../sim/approval";
@@ -8,25 +8,35 @@ import { market } from "../sim/market";
 import { stock } from "../sim/stock";
 import { useSimDay, useTariff } from "../sim/store";
 import type { TariffSheet } from "../sim/tariff";
-import { householdBillChf, householdRpKWh, previewReaction } from "../sim/tariffApproval";
-import { householdPriceCap } from "../sim/tariffCap";
-import { TARIFF_CAP_MARGIN } from "../config/tariff";
-import { tariffStore } from "../sim/tariffStore";
+import { householdBillChf, householdEnergyRpKWh, previewReaction } from "../sim/tariffApproval";
+import { energyPriceCap } from "../sim/tariffCap";
+import { BASE_FEE_MAX_CHF_PER_MONTH, TARIFF_CAP_MARGIN } from "../config/tariff";
+import { sheetPrices, tariffStore } from "../sim/tariffStore";
 import { DynamicPriceChart } from "./DynamicPriceChart";
 import "./tariffControl.css";
 
 const YEAR_MS = 365.25 * 24 * 3_600_000;
 
-type SheetField = Exclude<keyof TariffSheet, "offPeakStartHour" | "offPeakEndHour">;
+type SheetField = Exclude<keyof TariffSheet, "offPeakStartHour" | "offPeakEndHour" | "dynamicSpreadRpKWh">;
+type FieldGroup = "energy" | "network" | "solar" | "other";
 
-const FIELDS: { key: SheetField; label: string; max: number; title?: string; group: "electricity" | "other" }[] = [
-  { key: "offPeakPriceRpKWh", label: "Off-peak", max: 60, group: "electricity" },
-  { key: "peakPriceRpKWh", label: "Peak", max: 80, group: "electricity" },
-  { key: "feedInPriceRpKWh", label: "Solar feed-in", max: 40, group: "electricity", title: "What the utility pays for solar power fed into the grid" },
-  { key: "districtHeatingPriceRpKWh", label: "District heating", max: 40, group: "other" },
-  { key: "publicChargingAcRpKWh", label: "Public charging", max: 120, group: "other", title: "At the municipality's own on-street chargers" },
-  { key: "publicChargingDcRpKWh", label: "Fast charging", max: 150, group: "other", title: "At the municipality's own fast-charging hubs" },
-  { key: "publicChargingFleetRpKWh", label: "Lorry charging", max: 150, group: "other", title: "At the municipality's own lorry charging parks" },
+const GROUP_LABEL: Record<FieldGroup, string> = {
+  energy: "Energy price",
+  network: "Network fee (regulated)",
+  solar: "Solar",
+  other: "Heat and charging",
+};
+
+const FIELDS: { key: SheetField; label: string; max: number; step: number; unit: string; scale?: number; title?: string; group: FieldGroup }[] = [
+  { key: "energyOffPeakRpKWh", label: "Off-peak", max: 60, step: 0.5, unit: "Rp/kWh", group: "energy", title: "What households and small businesses in basic supply pay for the power itself" },
+  { key: "energyPeakRpKWh", label: "Peak", max: 80, step: 0.5, unit: "Rp/kWh", group: "energy" },
+  { key: "baseFeeChfPerMonth", label: "Base fee", max: BASE_FEE_MAX_CHF_PER_MONTH, step: 1, unit: "CHF/month", group: "network", title: "Per meter and month: the more of the grid's allowance it raises, the less each kWh carries" },
+  { key: "networkOffPeakShare", label: "Off-peak rate", max: 100, step: 5, unit: "% of peak", scale: 100, group: "network", title: "How much cheaper the network fee is at night" },
+  { key: "feedInPriceRpKWh", label: "Feed-in", max: 40, step: 0.5, unit: "Rp/kWh", group: "solar", title: "What the utility pays for solar power fed into the grid" },
+  { key: "districtHeatingPriceRpKWh", label: "District heating", max: 40, step: 0.5, unit: "Rp/kWh", group: "other" },
+  { key: "publicChargingAcRpKWh", label: "Public charging", max: 120, step: 0.5, unit: "Rp/kWh", group: "other", title: "At the municipality's own on-street chargers" },
+  { key: "publicChargingDcRpKWh", label: "Fast charging", max: 150, step: 0.5, unit: "Rp/kWh", group: "other", title: "At the municipality's own fast-charging hubs" },
+  { key: "publicChargingFleetRpKWh", label: "Lorry charging", max: 150, step: 0.5, unit: "Rp/kWh", group: "other", title: "At the municipality's own lorry charging parks" },
 ];
 
 const MARKETS: { id: Commodity; label: string; unit: string; digits: number }[] = [
@@ -72,12 +82,14 @@ export function TariffControl() {
 
   const preview = previewReaction(draft, targetYear);
   const reaction = approval.reactionTo(preview.change);
-  const vsNow = (preview.billChf / householdBillChf(inForce) - 1) * 100;
+  const vsNow = (preview.billChf / householdBillChf(inForce, nowYear) - 1) * 100;
   const vsAverage = (preview.billChf / preview.benchmarkChf - 1) * 100;
   const unchanged = published && sameSheet(draft, tariffStore.sheetFor(targetYear));
-  const cap = householdPriceCap(simDay);
-  const average = householdRpKWh(draft);
+  const cap = energyPriceCap(targetYear);
+  const average = householdEnergyRpKWh(draft);
   const overCap = average > cap.capRpKWh + 0.005;
+  const pricesNow = sheetPrices(inForce, nowYear);
+  const pricesNext = sheetPrices(draft, targetYear);
 
   return (
     <div className="tariff-control">
@@ -98,14 +110,24 @@ export function TariffControl() {
           </span>
         </span>
         {FIELDS.map((f, i) => (
-          <TariffRow
-            key={f.key}
-            field={f}
-            now={inForce[f.key]}
-            value={draft[f.key]}
-            onChange={(v) => setDraft((d) => ({ ...d, [f.key]: v }))}
-            groupStart={i > 0 && FIELDS[i - 1].group !== f.group}
-          />
+          <Fragment key={f.key}>
+            <TariffRow
+              field={f}
+              now={inForce[f.key]}
+              value={draft[f.key]}
+              onChange={(v) => setDraft((d) => ({ ...d, [f.key]: v }))}
+              groupLabel={i === 0 || FIELDS[i - 1].group !== f.group ? GROUP_LABEL[f.group] : null}
+            />
+            {f.key === "networkOffPeakShare" && (
+              <>
+                <ComputedRow label="Off-peak" now={pricesNow.networkOffPeakRpKWh} next={pricesNext.networkOffPeakRpKWh} title="Set by the regulator from what the grid costs: you choose only how it is raised" />
+                <ComputedRow label="Peak" now={pricesNow.networkPeakRpKWh} next={pricesNext.networkPeakRpKWh} />
+                <span className="tech-prices-group">All in, per kWh</span>
+                <ComputedRow label="Off-peak" now={pricesNow.offPeakRpKWh} next={pricesNext.offPeakRpKWh} title="Energy and network fee together, without the base fee" />
+                <ComputedRow label="Peak" now={pricesNow.peakRpKWh} next={pricesNext.peakRpKWh} />
+              </>
+            )}
+          </Fragment>
         ))}
       </div>
 
@@ -132,9 +154,9 @@ export function TariffControl() {
         </div>
         <div
           className="tariff-preview-line"
-          title={`What the regulator allows: the power (${cap.wholesaleRpKWh.toFixed(1)} Rp), the grid (${cap.gridRpKWh.toFixed(1)} Rp) and the concession fee (${cap.concessionRpKWh.toFixed(1)} Rp) per kWh, plus ${Math.round(TARIFF_CAP_MARGIN * 100)}% return`}
+          title={`What the regulator allows for the energy: the power bought for ${targetYear} (${cap.wholesaleRpKWh.toFixed(1)} Rp) and the concession fee (${cap.concessionRpKWh.toFixed(1)} Rp) per kWh, plus ${Math.round(TARIFF_CAP_MARGIN * 100)}% return and ${cap.salesRpKWh.toFixed(1)} Rp of sales costs`}
         >
-          <span>Average price, against the regulator&apos;s ceiling</span>
+          <span>Average energy price, against the regulator&apos;s ceiling</span>
           <span className={overCap ? "up" : ""}>
             {average.toFixed(1)} of {cap.capRpKWh.toFixed(1)} Rp/kWh
           </span>
@@ -148,8 +170,8 @@ export function TariffControl() {
       <div className="tariff-publish">
         {overCap && (
           <p className="tariff-over-cap">
-            Over the ceiling: ElCom, the federal regulator, holds a monopoly utility&apos;s household price to its costs plus a reasonable return —{" "}
-            {cap.capRpKWh.toFixed(1)} Rp/kWh on average for a typical household. Lower the electricity prices to publish.
+            Over the ceiling: ElCom, the federal regulator, holds a monopoly utility&apos;s energy price to its costs plus a reasonable return —{" "}
+            {cap.capRpKWh.toFixed(1)} Rp/kWh on average for a typical household. Lower the energy prices to publish.
           </p>
         )}
         <button className="tariff-publish-btn" disabled={unchanged || overCap} onClick={() => tariffStore.publish(draft, simDay)}>
@@ -175,31 +197,47 @@ function TariffRow({
   now,
   value,
   onChange,
-  groupStart,
+  groupLabel,
 }: {
   field: (typeof FIELDS)[number];
   now: number;
   value: number;
   onChange: (v: number) => void;
-  groupStart: boolean;
+  groupLabel: string | null;
 }) {
+  const scale = field.scale ?? 1;
   return (
     <>
-      {groupStart && <span className="tech-prices-group">Heat and charging</span>}
+      {groupLabel && <span className="tech-prices-group">{groupLabel}</span>}
       <span className="tariff-label" title={field.title}>
         {field.label}
       </span>
-      <span className="tech-prices-value">{now}</span>
+      <span className="tech-prices-value">{Math.round(now * scale * 10) / 10}</span>
       <input
         type="number"
         min={0}
         max={field.max}
-        step={0.5}
-        value={value}
+        step={field.step}
+        value={Math.round(value * scale * 10) / 10}
         className={value !== now ? "changed" : ""}
         aria-label={`${field.label}, next year`}
-        onChange={(e) => onChange(Math.max(0, Math.min(field.max, Number(e.target.value) || 0)))}
+        onChange={(e) => onChange(Math.max(0, Math.min(field.max, Number(e.target.value) || 0)) / scale)}
       />
+      <span className="tariff-unit">{field.unit}</span>
+    </>
+  );
+}
+
+/** A price that follows from others (the regulated network fee, the price all in): this year's and
+ * next year's, not to be set. */
+function ComputedRow({ label, now, next, title }: { label: string; now: number; next: number; title?: string }) {
+  return (
+    <>
+      <span className="tariff-label tariff-computed" title={title}>
+        {label}
+      </span>
+      <span className="tech-prices-value">{now.toFixed(1)}</span>
+      <span className={`tech-prices-value tariff-computed-next${Math.abs(next - now) >= 0.05 ? " changed" : ""}`}>{next.toFixed(1)}</span>
       <span className="tariff-unit">Rp/kWh</span>
     </>
   );
@@ -224,7 +262,7 @@ function DynamicTariffDraft({
   // Who would sign up, with the town as it is today (it pauses while the town hall is open).
   const uptake = useMemo(
     () => (offered ? estimateUptake(stock.getAll(), draft, year, atMs) : null),
-    [offered, draft.dynamicSpreadRpKWh, draft.offPeakPriceRpKWh, draft.peakPriceRpKWh, year, Math.floor(atMs / 86_400_000)],
+    [offered, draft.dynamicSpreadRpKWh, draft.energyOffPeakRpKWh, draft.energyPeakRpKWh, draft.baseFeeChfPerMonth, draft.networkOffPeakShare, year, Math.floor(atMs / 86_400_000)],
   );
   return (
     <div className="dyn-draft">

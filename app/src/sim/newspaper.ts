@@ -309,8 +309,8 @@ class Newspaper {
     const latest = new Map<number, TariffPublication>();
     for (const e of this.tariffEvents.filter((x) => inMonth(x.atMs))) latest.set(e.year, { ...e, previous: latest.get(e.year)?.previous ?? e.previous });
     for (const e of latest.values()) {
-      const before = householdBillChf(e.previous);
-      const after = householdBillChf(e.sheet);
+      const before = householdBillChf(e.previous, e.year);
+      const after = householdBillChf(e.sheet, e.year);
       const pct = before > 0 ? Math.round((after / before - 1) * 100) : 0;
       const average = Math.round(benchmarkBillChf(e.year));
       const body = `From 1 January ${e.year}, a typical household pays CHF ${Math.round(after).toLocaleString("en-GB")} a year for its electricity; the Swiss average is about CHF ${average.toLocaleString("en-GB")}.`;

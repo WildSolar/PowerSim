@@ -611,7 +611,8 @@ function treasuryChart(nowMs: number): ChartData {
 
 /** The utility's accounts line by line (and the department's credit for public solar). */
 const UTILITY_LINES: { key: keyof UtilityMonth | "concessionFee"; label: string; cost: boolean }[] = [
-  { key: "consumerRevenueRp", label: "Electricity sold to consumers", cost: false },
+  { key: "energyRevenueRp", label: "Electricity sold (energy price)", cost: false },
+  { key: "networkRevenueRp", label: "Network fees and base fees", cost: false },
   { key: "surplusSoldRp", label: "Surplus sold on the spot market", cost: false },
   { key: "districtHeatRevenueRp", label: "District heat sold", cost: false },
   { key: "publicChargingRevenueRp", label: "Public charging sold", cost: false },
@@ -649,7 +650,7 @@ function utilityChart(param: string | null, nowMs: number): ChartData {
   }
   const list = bookedFinances();
   const k = (rp: number) => rp / 100 / 1000;
-  const sales = list.map((f) => f.consumerRevenueRp + f.districtHeatRevenueRp + f.publicChargingRevenueRp + f.surplusSoldRp);
+  const sales = list.map((f) => f.energyRevenueRp + f.networkRevenueRp + f.districtHeatRevenueRp + f.publicChargingRevenueRp + f.surplusSoldRp);
   const costs = list.map(
     (f) =>
       f.feedInPaidRp +

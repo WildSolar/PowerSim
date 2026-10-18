@@ -15,7 +15,7 @@ export function useTariffDeadline(): number | null {
 /** The deadline has come without next year's tariff: keep this year's prices, or go and set new ones. */
 export function TariffDeadlineDialog({ year, onOpenPrices }: { year: number; onOpenPrices: () => void }) {
   const sheet = tariffStore.sheetFor(year);
-  const bill = Math.round(householdBillChf(sheet)).toLocaleString("en-GB");
+  const bill = Math.round(householdBillChf(sheet, year)).toLocaleString("en-GB");
   return (
     <div className="td-layer">
       <div className="td-scrim" />

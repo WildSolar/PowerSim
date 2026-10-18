@@ -39,7 +39,7 @@ import { existsAt } from "./lifetime";
 import { currentMobilityMode, currentVehicleType, mobilitySlotCount } from "./mobility";
 import { hashSeed, mulberry32 } from "./rng";
 import type { TariffSheet } from "./tariff";
-import { tariffStore } from "./tariffStore";
+import { sheetPrices, tariffStore } from "./tariffStore";
 
 const DAY_MS = 24 * 3_600_000;
 const HOUR_MS = 3_600_000;
@@ -76,15 +76,22 @@ export function loadSignal(simMs: number): number {
   return za + (zb - za) * f;
 }
 
+/** A sheet's time-of-use prices in the year of `simMs`, energy and network fee together. */
+function touPrices(sheet: TariffSheet, simMs: number): { peak: number; offPeak: number } {
+  const p = sheetPrices(sheet, new Date(toDateMs(simMs)).getUTCFullYear());
+  return { peak: p.peakRpKWh, offPeak: p.offPeakRpKWh };
+}
+
 /** The time-of-use tariff's average over a day, which the dynamic price moves around. */
-export function dynamicLevelRpKWh(sheet: TariffSheet): number {
+export function dynamicLevelRpKWh(sheet: TariffSheet, simMs: number): number {
   const offPeakHours = (sheet.offPeakEndHour - sheet.offPeakStartHour + 24) % 24;
-  return (offPeakHours * sheet.offPeakPriceRpKWh + (24 - offPeakHours) * sheet.peakPriceRpKWh) / 24;
+  const { peak, offPeak } = touPrices(sheet, simMs);
+  return (offPeakHours * offPeak + (24 - offPeakHours) * peak) / 24;
 }
 
 /** The dynamic price at `simMs` under a sheet (Rp/kWh). */
 export function dynamicPriceRpKWh(sheet: TariffSheet, simMs: number): number {
-  return Math.max(0, dynamicLevelRpKWh(sheet) + sheet.dynamicSpreadRpKWh * loadSignal(simMs));
+  return Math.max(0, dynamicLevelRpKWh(sheet, simMs) + sheet.dynamicSpreadRpKWh * loadSignal(simMs));
 }
 
 /** Whether a sheet offers the dynamic tariff at all. */
@@ -165,7 +172,8 @@ interface YearRates {
 function touRate(sheet: TariffSheet, simMs: number): number {
   const hour = ((simMs % DAY_MS) + DAY_MS) % DAY_MS / HOUR_MS;
   const offPeak = hour >= sheet.offPeakStartHour || hour < sheet.offPeakEndHour;
-  return offPeak ? sheet.offPeakPriceRpKWh : sheet.peakPriceRpKWh;
+  const prices = touPrices(sheet, simMs);
+  return offPeak ? prices.offPeak : prices.peak;
 }
 
 function yearRates(sheet: TariffSheet, year: number): YearRates {
@@ -198,7 +206,7 @@ function yearRates(sheet: TariffSheet, year: number): YearRates {
     touBase: base[0] / base[2],
     dynBase: base[1] / base[2],
     touEvPlugIn: ev[0] / days,
-    touEvOffPeak: sheet.offPeakPriceRpKWh,
+    touEvOffPeak: touPrices(sheet, toSimTimeMs(Date.UTC(year, 6, 1))).offPeak,
     dynEv: ev[1] / days,
     touHeatPump: hp[0] / hp[2],
     dynHeatPump: hp[1] / hp[2],

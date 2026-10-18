@@ -55,6 +55,7 @@ import { agriPv } from "./sim/agriPv";
 import { carParks } from "./sim/carParks";
 import { removals } from "./sim/removals";
 import { advisors } from "./sim/advisors";
+import { networkTariff } from "./sim/networkTariff";
 import { cachedEmissionsForYear } from "./sim/emissions";
 import { wind } from "./sim/wind";
 import { districtHeatLines } from "./sim/districtHeatLines";
@@ -247,6 +248,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         agriPv.init(loaded, () => stock.getAll(), `agripv:${loaded.bfsNumber}`);
         carParks.init(loaded, `carparks:${loaded.bfsNumber}`);
         removals.init(cachedEmissionsForYear);
+        networkTariff.init(() => stock.getAll());
         advisors.init(() => stock.getAll(), `advisors:${loaded.bfsNumber}`);
         wind.init(loaded, () => stock.getAll(), `wind:${loaded.bfsNumber}`);
         zoning.init(loaded); // before the stock: new buildings ask their parcel what it allows

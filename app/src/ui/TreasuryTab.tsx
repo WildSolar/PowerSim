@@ -173,7 +173,8 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
           </h3>
           <table className="borrow-table treasury-table">
             <tbody>
-              <Line label="Electricity sold to consumers" value={last.consumerRevenueRp} />
+              <Line label="Electricity sold to consumers (energy)" value={last.energyRevenueRp} />
+              <Line label="Network fees and base fees" value={last.networkRevenueRp} />
               <Line label="Solar feed-in paid to owners" value={-last.feedInPaidRp} />
               <Line label="Electricity bought over contracts" value={-last.wholesaleCostRp} />
               <Line label="Surplus sold on the spot market" value={last.surplusSoldRp} />

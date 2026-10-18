@@ -22,7 +22,6 @@
  * part sold to it, and sells the partners that much less energy for the rest (finances.ts).
  */
 
-import { GRID_UPKEEP_RP_PER_KWH } from "../config/market";
 import { BLOC_ORDER } from "../config/approval";
 import {
   AGRI_PV_ACCEPTANCE_MAX,
@@ -360,7 +359,7 @@ class AgriPv {
    * tariff: what they would have paid for it, less the grid fee they still pay (Rp per kWh). */
   ppaEnergyValueRpPerKWh(atMs: number): number {
     const t = tariffStore.at(atMs);
-    return Math.max(0, (t.peakPriceRpKWh + t.offPeakPriceRpKWh) / 2 - GRID_UPKEEP_RP_PER_KWH);
+    return (t.energyPeakRpKWh + t.energyOffPeakRpKWh) / 2;
   }
 
   /** A business's electricity use over the year before `atMs` (kWh). */

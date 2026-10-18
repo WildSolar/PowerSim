@@ -39,6 +39,7 @@
  * TOU rate lookup this module already does for a real bill.
  */
 
+import { commercialCategory } from "./commercial";
 import { dynamicPriceRpKWh, dynamicTariff } from "./dynamicTariff";
 import type { Building, Dwelling } from "../data/types";
 import { toDateMs } from "./calendar";
@@ -124,6 +125,33 @@ export function electricityCostRp(times: number[], powerW: number[], tariff: Tar
   return costRp;
 }
 
+/** electricityCostRp, split into what goes to the energy price and what to the network fee: the
+ * time-of-use energy and network rates, and on the dynamic tariff its price less the network fee. */
+export function electricityCostSplitRp(times: number[], powerW: number[], tariff: Tariff, dynamicW?: number[]): { energyRp: number; networkRp: number; offPeakKWh: number } {
+  let energyRp = 0;
+  let networkRp = 0;
+  let offPeakKWh = 0;
+  for (let i = 1; i < times.length; i++) {
+    const dtHours = (times[i] - times[i - 1]) / HOUR_MS;
+    const kWh = (((powerW[i] + powerW[i - 1]) / 2) * dtHours) / 1000;
+    const dynamicKWh = dynamicW ? (((dynamicW[i] + dynamicW[i - 1]) / 2) * dtHours) / 1000 : 0;
+    const midMs = (times[i] + times[i - 1]) / 2;
+    const offPeak = isOffPeakHour(tariff, hourOfDayAt(midMs));
+    const network = offPeak ? tariff.networkOffPeakRpKWh : tariff.networkPeakRpKWh;
+    const energy = offPeak ? tariff.energyOffPeakRpKWh : tariff.energyPeakRpKWh;
+    networkRp += kWh * network;
+    if (offPeak) offPeakKWh += kWh;
+    energyRp += (kWh - dynamicKWh) * energy + (dynamicKWh > 0 ? dynamicKWh * (dynamicPriceRpKWh(tariff, midMs) - network) : 0);
+  }
+  return { energyRp, networkRp, offPeakKWh };
+}
+
+/** The base fee for `meters` meters over the period the sample times span. */
+function baseFeeFor(meters: number, times: number[], tariff: Tariff): number {
+  const months = times.length > 1 ? (times[times.length - 1] - times[0]) / MONTH_MS : 0;
+  return meters * tariff.baseFeeRpPerMonth * months;
+}
+
 /** A flat (non-time-of-use) rate over a power series — solar feed-in and
  * heating fuel both use this, just with different series and prices. */
 export function flatCostRp(times: number[], powerW: number[], priceRpKWh: number): number {
@@ -132,6 +160,7 @@ export function flatCostRp(times: number[], powerW: number[], priceRpKWh: number
 
 export interface BillBreakdown {
   electricityRp: number;
+  baseFeeRp: number; // the network's base fee per meter, for the period billed
   solarCreditRp: number; // positive — a credit, subtracted in netRp
   heatingFuel: HeatingFuel;
   heatingFuelRp: number;
@@ -139,8 +168,11 @@ export interface BillBreakdown {
   netRp: number;
 }
 
+const MONTH_MS = (365.25 * 24 * 3_600_000) / 12;
+
 const ZERO_BILL: BillBreakdown = {
   electricityRp: 0,
+  baseFeeRp: 0,
   solarCreditRp: 0,
   heatingFuel: null,
   heatingFuelRp: 0,
@@ -174,6 +206,7 @@ export function ownBillFromSeries(series: CategorySeries, times: number[], tarif
   const solarCreditRp = flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh);
   return {
     electricityRp,
+    baseFeeRp: 0,
     solarCreditRp,
     heatingFuel: null,
     heatingFuelRp: 0,
@@ -202,7 +235,9 @@ export function buildingBillRp(building: Building, series: CategorySeries, times
   const own = ownBillFromSeries(series, times, tariff, dynamicW);
   const fuel = heatingFuelType(building, times[times.length - 1]);
   const { costRp: heatingFuelRp, quantity: heatingFuelQuantity } = heatingFuelCostAndQuantity(building, fuel, times, tariff);
-  return { ...own, heatingFuel: fuel, heatingFuelRp, heatingFuelQuantity, netRp: own.netRp + heatingFuelRp };
+  // A meter for each household, and one for the business if there is one.
+  const baseFeeRp = baseFeeFor(building.dwellings.length + (commercialCategory(building) ? 1 : 0), times, tariff);
+  return { ...own, baseFeeRp, heatingFuel: fuel, heatingFuelRp, heatingFuelQuantity, netRp: own.netRp + heatingFuelRp + baseFeeRp };
 }
 
 /** The portion of the building's *shared* systems (heat pump/AC electricity,
@@ -217,6 +252,7 @@ function sharedBuildingBillRp(building: Building, buildingSeries: CategorySeries
   const { costRp: heatingFuelRp, quantity: heatingFuelQuantity } = heatingFuelCostAndQuantity(building, fuel, times, tariff);
   return {
     electricityRp,
+    baseFeeRp: 0,
     solarCreditRp,
     heatingFuel: fuel,
     heatingFuelRp,
@@ -228,6 +264,7 @@ function sharedBuildingBillRp(building: Building, buildingSeries: CategorySeries
 export function addBills(a: BillBreakdown, b: BillBreakdown): BillBreakdown {
   return {
     electricityRp: a.electricityRp + b.electricityRp,
+    baseFeeRp: a.baseFeeRp + b.baseFeeRp,
     solarCreditRp: a.solarCreditRp + b.solarCreditRp,
     heatingFuel: a.heatingFuel ?? b.heatingFuel,
     heatingFuelRp: a.heatingFuelRp + b.heatingFuelRp,
@@ -239,6 +276,7 @@ export function addBills(a: BillBreakdown, b: BillBreakdown): BillBreakdown {
 function scaleBill(bill: BillBreakdown, fraction: number): BillBreakdown {
   return {
     electricityRp: bill.electricityRp * fraction,
+    baseFeeRp: bill.baseFeeRp * fraction,
     solarCreditRp: bill.solarCreditRp * fraction,
     heatingFuel: bill.heatingFuel,
     heatingFuelRp: bill.heatingFuelRp * fraction,
@@ -274,7 +312,8 @@ export function dwellingBillRp(
   const own = ownBillFromSeries(ownSeries, times, tariff, onDynamic ? consumptionSeriesW(ownSeries) : undefined);
   const shareFraction = dwellingAreaShareFraction(building, dwelling);
   const share = scaleBill(sharedBuildingBillRp(building, buildingSeries, times, tariff), shareFraction);
-  return addBills(own, share);
+  const baseFeeRp = baseFeeFor(1, times, tariff);
+  return addBills({ ...own, baseFeeRp, netRp: own.netRp + baseFeeRp }, share);
 }
 
 export { ZERO_BILL };

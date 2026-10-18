@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toSimTimeMs } from "../sim/calendar";
 import { dynamicPriceRpKWh } from "../sim/dynamicTariff";
 import type { TariffSheet } from "../sim/tariff";
+import { sheetPrices } from "../sim/tariffStore";
 
 const W = 320;
 const H = 132;
@@ -9,8 +10,9 @@ const PAD = { left: 28, right: 16, top: 8, bottom: 20 };
 const STEPS = 96; // every 15 minutes
 const HOUR_MS = 3_600_000;
 
-function touPrice(sheet: TariffSheet, hour: number): number {
-  return hour >= sheet.offPeakStartHour || hour < sheet.offPeakEndHour ? sheet.offPeakPriceRpKWh : sheet.peakPriceRpKWh;
+function touPrice(sheet: TariffSheet, year: number, hour: number): number {
+  const p = sheetPrices(sheet, year);
+  return hour >= sheet.offPeakStartHour || hour < sheet.offPeakEndHour ? p.offPeakRpKWh : p.peakRpKWh;
 }
 
 /** A day of dynamic prices under a sheet: a winter and a summer day of `year`, against the
@@ -21,7 +23,7 @@ export function DynamicPriceChart({ sheet, year }: { sheet: TariffSheet; year: n
   const hours = Array.from({ length: STEPS + 1 }, (_, i) => (i * 24) / STEPS);
   const winter = hours.map((h) => dynamicPriceRpKWh(sheet, dayStart(0) + h * HOUR_MS));
   const summer = hours.map((h) => dynamicPriceRpKWh(sheet, dayStart(6) + h * HOUR_MS));
-  const tou = hours.map((h) => touPrice(sheet, h % 24));
+  const tou = hours.map((h) => touPrice(sheet, year, h % 24));
 
   const all = [...winter, ...summer, ...tou];
   const lo = Math.max(0, Math.floor((Math.min(...all) - 2) / 5) * 5);

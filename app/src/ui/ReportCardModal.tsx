@@ -172,7 +172,8 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
 
   const income: LedgerRow[] = finances
     ? [
-        { label: "Electricity sold to customers", rp: finances.current.consumerRevenueRp },
+        { label: "Electricity sold to customers (energy)", rp: finances.current.energyRevenueRp },
+        { label: "Network fees and base fees", rp: finances.current.networkRevenueRp },
         { label: "Government allocation", rp: finances.current.governmentAllocationRp },
         { label: "District heat sold", rp: finances.current.districtHeatRevenueRp },
         ...(finances.current.publicSolarSavingsRp > 0 ? [{ label: "Solar on public buildings: bills saved, power fed in", rp: finances.current.publicSolarSavingsRp }] : []),

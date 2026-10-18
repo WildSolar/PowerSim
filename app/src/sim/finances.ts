@@ -38,7 +38,8 @@
 
 import { timedAsync } from "./devTiming";
 import type { Building, PowerPlant } from "../data/types";
-import { consumptionSeriesW, electricityCostRp, flatCostRp } from "./billing";
+import { consumptionSeriesW, electricityCostSplitRp, flatCostRp } from "./billing";
+import { networkTariff } from "./networkTariff";
 import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { energyKWh } from "./energy";
 import { allocationApprovalFactor, approval } from "./approval";
@@ -65,7 +66,10 @@ import { powerFlows } from "./spotMarket";
 
 export interface MunicipalFinances {
   year: number;
-  consumerRevenueRp: number; // what consumers paid for grid electricity, time-of-use priced — the same rates billing.ts bills them at
+  energyRevenueRp: number; // the energy price paid by consumers in basic supply, time-of-use priced — the same rates billing.ts bills them at
+  networkRevenueRp: number; // the network fee on every kWh the grid carried, and the meters' base fees (networkTariff.ts)
+  networkKWh: number; // electricity the grid carried to consumers — what the network fee is reckoned on
+  networkOffPeakKWh: number; // ...of it in off-peak hours
   feedInPaidRp: number; // paid out to solar owners (real or adopted) for exported generation — never for the utility's own arrays on rented roofs
   wholesaleCostRp: number; // paid upstream, over the contracts, for what the town drew beyond its own generation in each hour (spotMarket.ts)
   surplusSoldRp: number; // what the town's surplus fetched on the spot market — below zero when sunny middays drive the price under it
@@ -112,7 +116,12 @@ export function computeMunicipalFinancesForYear(buildings: Building[], realPlant
 
 /** One month of the municipal utility: what it sold and bought, and its networks' upkeep. */
 export interface UtilityMonth {
-  consumerRevenueRp: number;
+  energyRevenueRp: number;
+  networkRevenueRp: number;
+  /** Not money: electricity the grid carried to consumers (kWh), what the network fee is reckoned on,
+   * and the part of it in off-peak hours (how the regulator splits the fee). */
+  networkKWh: number;
+  networkOffPeakKWh: number;
   feedInPaidRp: number;
   wholesaleCostRp: number;
   surplusSoldRp: number;
@@ -133,7 +142,10 @@ export interface UtilityMonth {
 const UTILITY_KEYS: (keyof UtilityMonth)[] = [
   "deliveredKWh",
   "publicSolarSavingsRp",
-  "consumerRevenueRp",
+  "energyRevenueRp",
+  "networkRevenueRp",
+  "networkKWh",
+  "networkOffPeakKWh",
   "feedInPaidRp",
   "wholesaleCostRp",
   "surplusSoldRp",
@@ -150,7 +162,8 @@ const UTILITY_KEYS: (keyof UtilityMonth)[] = [
 /** The utility's profit (or loss) in a month. */
 export function utilityProfitRp(m: UtilityMonth): number {
   return (
-    m.consumerRevenueRp +
+    m.energyRevenueRp +
+    m.networkRevenueRp +
     m.districtHeatRevenueRp +
     m.publicChargingRevenueRp +
     m.surplusSoldRp -
@@ -306,9 +319,17 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
     const sun = irradianceWm2(t);
     return arrays.reduce((sum, a) => sum + (a.installedAtMs <= t ? a.capacityKw * 1000 * roofPvShare(a.egid, t, sun) : 0), 0);
   });
+  const split = electricityCostSplitRp(times, consumptionW, tariff, dynamicW);
+  const energyAvgRpKWh = (tariff.energyPeakRpKWh + tariff.energyOffPeakRpKWh) / 2;
+  const networkAvgRpKWh = (tariff.networkPeakRpKWh + tariff.networkOffPeakRpKWh) / 2;
   return {
-    consumerRevenueRp:
-      electricityCostRp(times, consumptionW, tariff, dynamicW) - charging.kWh * ((tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2) - ppaKWh * agriPv.ppaEnergyValueRpPerKWh(midMonthMs),
+    // The energy price from consumers in basic supply, the network fee from everyone on the grid and
+    // the meters' base fees — less the municipality's own chargers' power (the utility's own use,
+    // sold at their own price), and the Agri-PV partners' energy (they take the field's instead).
+    energyRevenueRp: split.energyRp - charging.kWh * energyAvgRpKWh - ppaKWh * agriPv.ppaEnergyValueRpPerKWh(midMonthMs),
+    networkRevenueRp: split.networkRp - charging.kWh * networkAvgRpKWh + networkTariff.meters(midMonthMs) * tariff.baseFeeRpPerMonth,
+    networkKWh: grossKWh,
+    networkOffPeakKWh: split.offPeakKWh,
     feedInPaidRp: Math.max(0, flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh) - flatCostRp(times, contractW, tariff.feedInPriceRpKWh) - ppaKWh * tariff.feedInPriceRpKWh - windKWh * tariff.feedInPriceRpKWh),
     wholesaleCostRp: flows.boughtKWh * (tariff.wholesalePriceRpKWh + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare),
     surplusSoldRp: flows.soldRp,
@@ -359,7 +380,10 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     for (const k of UTILITY_KEYS) utility[k] += m[k];
   }
   const {
-    consumerRevenueRp,
+    energyRevenueRp,
+    networkRevenueRp,
+    networkKWh,
+    networkOffPeakKWh,
     feedInPaidRp,
     wholesaleCostRp,
     surplusSoldRp,
@@ -390,7 +414,8 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
   const profitRp = utilityProfitRp(utility);
   const profitTransferRp = townTakeRp(year, profitRp, deliveredKWh);
   const netIncomeRp =
-    consumerRevenueRp +
+    energyRevenueRp +
+    networkRevenueRp +
     districtHeatRevenueRp +
     publicChargingRevenueRp +
     surplusSoldRp +
@@ -411,7 +436,10 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
 
   const result: MunicipalFinances = {
     year,
-    consumerRevenueRp,
+    energyRevenueRp,
+    networkRevenueRp,
+    networkKWh,
+    networkOffPeakKWh,
     feedInPaidRp,
     wholesaleCostRp,
     surplusSoldRp,
@@ -477,7 +505,8 @@ export function cachedCumulativeBalanceRp(throughYear: number, baselineYear: num
  * what debt is measured against (debt.ts). */
 export function operatingIncomeRp(f: MunicipalFinances): number {
   return (
-    f.consumerRevenueRp +
+    f.energyRevenueRp +
+    f.networkRevenueRp +
     f.districtHeatRevenueRp +
     f.publicChargingRevenueRp +
     f.surplusSoldRp +

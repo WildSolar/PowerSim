@@ -397,3 +397,17 @@
   font-size: 12px;
   color: var(--bad);
 }
+
+/* Prices that follow from others: the regulated network fee, the price all in. */
+.tariff-computed {
+  color: var(--ink-2);
+}
+
+.tariff-computed-next {
+  text-align: right;
+  padding-right: 8px;
+}
+
+.tariff-computed-next.changed {
+  font-weight: 600;
+}
