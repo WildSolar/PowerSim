@@ -68,7 +68,7 @@ import {
   requestText,
   resolvedByOthersText,
   voteResultText,
-  heatOfferText,
+  datacenterHeatOfferText, heatOfferText,
   welcomeText,
   type LetterText,
   type Mood,
@@ -294,13 +294,25 @@ class Letters {
     const from = monthStartMs(month);
     const to = monthStartMs(month + 1);
     for (const c of districtHeat.getCandidates()) {
-      if (c.kind !== "industry") continue;
+      if (c.kind !== "industry" && c.kind !== "datacenter") continue;
       const atMs = districtHeatSources.offerAtMs(c);
       if (atMs < from || atMs >= to) continue;
       const b = c.egid ? this.buildingsProvider().find((x) => x.egid === c.egid) : undefined;
       const quote = districtHeatSources.candidateQuote(c, atMs);
       const where = b?.address ?? "our site";
       const name = candidateName(c);
+      if (c.kind === "datacenter") {
+        this.post({
+          atMs,
+          kind: "offer",
+          bloc: "business",
+          from: `The data centre, ${where}`,
+          role: "",
+          focus: { lon: c.lon, lat: c.lat, egid: c.egid },
+          ...datacenterHeatOfferText(quote.sizeMw, quote.yearlyRp, quote.capexRp, districtHeat.servesAt(b?.streetSegments, atMs)),
+        });
+        continue;
+      }
       this.post({
         atMs,
         kind: "offer",

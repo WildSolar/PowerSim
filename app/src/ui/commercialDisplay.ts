@@ -9,6 +9,7 @@ export const COMMERCIAL_CATEGORY_LABEL: Record<CommercialCategory, string> = {
   sports: "Sports hall",
   hospital: "Hospital/healthcare",
   other: "Commercial (other)",
+  datacenter: "Data centre",
 };
 
 export const COMMERCIAL_CATEGORY_ICON: Record<CommercialCategory, string> = {
@@ -20,4 +21,5 @@ export const COMMERCIAL_CATEGORY_ICON: Record<CommercialCategory, string> = {
   sports: "🏟️",
   hospital: "🏥",
   other: "🏛️",
+  datacenter: "🖥️",
 };

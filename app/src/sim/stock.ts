@@ -95,6 +95,7 @@ import { applyNewBuildAttributes, buildingGroup, gfaOf } from "./newBuild";
 import { policyStore } from "./policy";
 import { commitVehicleDecisions } from "./mobility";
 import { zoning } from "./zoning";
+import { DATACENTER_SITE_PER_FOOTPRINT } from "../config/datacenter";
 import { fleets } from "./fleet";
 import { energyClassAt } from "./retrofit";
 import { measures } from "./measures";
@@ -862,6 +863,62 @@ class StockStore {
       return true;
     }
     return false;
+  }
+
+  /** A data centre (datacenter.ts): one hall on the open work-zone site with the most room left,
+   * built from `atMs` to `builtAtMs`. Null if no work-zone site can take it. */
+  placeDatacenter(atMs: number, itKw: number, footprintM2: number, floors: number, builtAtMs: number): Building | null {
+    const rng = this.rng("datacenter", String(Math.floor(atMs)));
+    const room = (s: SiteState) => s.site.areaM2 - s.usedAreaM2;
+    const sites = this.sites.filter((s) => zoning.zoneForSite(s.site) === "work" && room(s) >= footprintM2 * DATACENTER_SITE_PER_FOOTPRINT).sort((a, b) => room(b) - room(a));
+    const like = this.all.find((b) => b.buildingClass === "Industriegebäude");
+    for (const state of sites) {
+      for (let sample = 0; sample < SITE_POINT_SAMPLES * 4; sample++) {
+        const point = this.samplePoint(state, rng);
+        if (!point) continue;
+        const rect = this.fitRectAt(state, point, footprintM2, 1.6, state.angleRad) ?? this.fitRectAt(state, point, footprintM2, 2.5, state.angleRad + Math.PI / 2);
+        if (!rect) continue;
+        state.used.push(rect);
+        const footprintArea = 4 * rect.halfLong * rect.halfShort;
+        state.usedAreaM2 += footprintArea;
+        const [lon, lat] = this.projection.toLonLat(rect.cx, rect.cy);
+        const corners = rectCorners(rect).map(([x, y]) => this.projection.toLonLat(x, y) as [number, number]);
+        const ring = [...corners, corners[0]];
+        const address = this.newAddress(rect.cx, rect.cy);
+        const building: Building = {
+          egid: this.newEgid(),
+          lon,
+          lat,
+          footprint: ring,
+          address,
+          constructionYear: yearOf(builtAtMs),
+          category: like?.category ?? null,
+          buildingClass: "Industriegebäude",
+          floorCount: floors,
+          energyReferenceAreaM2: null,
+          footprintAreaM2: footprintArea,
+          heatingGenerator: null,
+          heatingEnergySource: null,
+          hotWaterGenerator: null,
+          hotWaterEnergySource: null,
+          dwellings: [],
+          streetSegments: streets.segmentsFor(lon, lat, address, ring),
+          origin: "new",
+          constructionStartMs: atMs,
+          builtAtMs,
+          datacenterItKw: itKw,
+        };
+        this.finishBuilding(building, atMs, builtAtMs, constructionRules(policyStore.get(), yearOf(atMs)), rng);
+        this.ringXY.set(building.egid, rectCorners(rect));
+        this.register(building, atMs);
+        this.gfaTotal += footprintArea * floors;
+        this.projects.push({ kind: "new", decidedAtMs: atMs, oldEgids: [], newEgids: [building.egid], constructionStartMs: atMs, completedAtMs: builtAtMs, siteId: state.site.id });
+        this.heap.push(atMs, { type: "transition" });
+        this.heap.push(builtAtMs, { type: "transition" });
+        return building;
+      }
+    }
+    return null;
   }
 
   private pickGroup(state: SiteState, zone: SiteZone, rng: () => number): BuildingGroup | null {

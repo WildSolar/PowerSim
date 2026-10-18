@@ -583,8 +583,11 @@ export const WIKI_SECTIONS: WikiSection[] = [
       p(
         "Shops, offices, schools, churches, sports halls, hospitals and factories use energy on their own rhythm — office hours, long shop hours, a church quiet except on Sunday morning, a hospital around the clock — in proportion to their floor area. Business use is usually the biggest share of the town's electricity.",
       ),
+      p(
+        "Now and then a data centre comes to a town with open land in a work zone — in some towns never, in others once, years into your term. The local paper announces it; it takes two years to build and a few more to fill. It is big: several megawatts of servers and the cooling on top, day and night, as much power as thousands of homes. It buys its energy on the open market, certified renewable, so its power adds nothing to the town's emissions, and it has its own substation, so it loads no neighbourhood's transformer. It pays the network fee like any business, and its concession fee straight to the town. What it means for you is its heat: a year after it opens, it offers its waste heat to the utility for next to nothing (see \"Heat for district heating\").",
+      ),
       note(
-        "Factories are the least predictable: their real shifts aren't public, so they run long hours with some days busier than others. Garages, storage, farm buildings and buildings the register doesn't describe use no business energy at all.",
+        "Factories are the least predictable: their real shifts aren't public, so they run long hours with some days busier than others. Garages, storage, farm buildings and buildings the register doesn't describe use no business energy at all. Whether and when a data centre comes, and how big, is the game's draw for each municipality.",
       ),
     ],
   },
@@ -696,6 +699,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Incinerator waste heat. A waste incineration plant within reach can sell the town some of its heat — what it doesn't already deliver or turn into electricity. A heat exchanger station, and a trunk line if the plant stands outside the town; the heat is bought per kWh, cheaply.",
         "Industrial waste heat. Now and then a factory writes to offer the heat its processes throw away — cooling water, exhaust. Its size is what the factory has; the utility pays for the connection, then a fixed sum a year. The offers stay open, and show on the map.",
+        "Data centre waste heat. If a data centre has come to town (see \"Businesses & industry\"), it offers the heat of its cooling water — 25–35 °C all year — for a token payment. A heat pump lifts it to the network's temperature, an easy lift, so it runs on little power: a large, cheap, steady source. Its size is what the data centre gives; the utility pays for the heat pump and the connection.",
         "Waste water. A treatment plant's cleaned water stays at 10–20 °C all year: a heat pump on it gives cheap, steady heat. The plant is public, so there is nothing to pay for the heat itself — only the heat pump, its power, and a trunk line if the plant is outside the town. How much it can give depends on the plant.",
         "Groundwater. A heat pump on wells into the aquifer, anywhere the canton allows groundwater use (shaded on the map while you place it) — but not in the protection zones around drinking-water wells. A few MW at most per plant, and a yearly water-rights fee.",
         "Rivers and lakes. A heat pump on a river or lake, standing no more than 100 m from the water. The water never runs out, so the size is yours — but it is coldest in winter, about 4 °C against 20 °C in late summer, and the heat pump works hardest for its heat just when the network needs the most: it needs about half as much power again for a kWh of heat in February as in August.",

@@ -17,7 +17,7 @@ import { useMapKeyboard } from "./useMapKeyboard";
 import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { snowDepthCm } from "../sim/snow";
 import { districtHeat } from "../sim/districtHeat";
-import { candidateName, districtHeatSources } from "../sim/districtHeatSources";
+import { candidateName, onContract, districtHeatSources } from "../sim/districtHeatSources";
 import { districtHeatLines } from "../sim/districtHeatLines";
 import { DH_WOOD_NUISANCE_RADIUS_M } from "../config/districtHeat";
 import { groundRule } from "../config/heatPumpSiting";
@@ -1664,7 +1664,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
           .map((s) => ({ key: s.id, lon: s.lon, lat: s.lat, text: `${s.fromMs <= now ? "🏭" : "🚧"} ${s.name}`, candidate: false })),
         ...districtHeatSources
           .availableCandidates(now)
-          .map((c) => ({ key: c.id, lon: c.lon, lat: c.lat, text: c.kind === "industry" ? `${candidateName(c)} · waste heat on offer` : c.name, candidate: true })),
+          .map((c) => ({ key: c.id, lon: c.lon, lat: c.lat, text: onContract(c) ? `${candidateName(c)} · waste heat on offer` : c.name, candidate: true })),
       ];
       // Several sources at one plant (a network's own and an addition) share a label.
       const byPlace = new Map<string, (typeof items)[number]>();

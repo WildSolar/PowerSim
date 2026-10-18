@@ -60,7 +60,7 @@ export const DH_UNKNOWN_CAPACITY_HEADROOM = 1.5;
 
 // --- Heat sources ---
 
-export type DhSourceKind = "incinerator" | "industry" | "wastewater" | "groundwater" | "surfaceWater" | "wood" | "other";
+export type DhSourceKind = "incinerator" | "industry" | "datacenter" | "wastewater" | "groundwater" | "surfaceWater" | "wood" | "other";
 
 export interface DhSourceSpec {
   label: string;
@@ -88,6 +88,9 @@ export const DH_SOURCE_SPECS: Record<DhSourceKind, DhSourceSpec> = {
   incinerator: { label: "Incinerator waste heat", merit: 0, cop: null, capexChfAt1Mw: 250_000, capexFixedChf: 400_000, upkeepChfPerKwYear: 4, buildMonths: 12, minMw: 1, maxMw: 60 },
   // A factory's cooling water and exhaust, through a heat exchanger (and a booster where it runs cool).
   industry: { label: "Industrial waste heat", merit: 1, cop: null, capexChfAt1Mw: 250_000, capexFixedChf: 80_000, upkeepChfPerKwYear: 6, buildMonths: 9, minMw: 0.05, maxMw: 20 },
+  // A data centre's cooling water (25-35 °C all year), lifted to the network's temperature by a heat
+  // pump — an easy lift, so an efficient one.
+  datacenter: { label: "Data centre waste heat", merit: 1.5, cop: 4.5, capexChfAt1Mw: 900_000, capexFixedChf: 300_000, upkeepChfPerKwYear: 20, buildMonths: 12, minMw: 0.5, maxMw: 15 },
   // A heat pump on a treatment plant's cleaned effluent (10-20 °C all year).
   wastewater: { label: "Waste water heat pump", merit: 2, cop: 2.9, capexChfAt1Mw: 1_500_000, capexFixedChf: 500_000, upkeepChfPerKwYear: 25, buildMonths: 18, minMw: 0.2, maxMw: 40 },
   // A heat pump on wells into the aquifer, with a return well.
@@ -117,6 +120,8 @@ export const DH_INCINERATOR_TOWN_SHARE = 0.2;
 export const DH_INCINERATOR_HEAT_RP_PER_KWH = 4;
 // Industrial waste heat: the factory offers it for a yearly payment, per kWh of its yearly potential.
 export const DH_INDUSTRY_PAYMENT_RP_PER_KWH = 1.5;
+// A data centre all but gives its waste heat away (it saves on cooling): a token payment, likewise.
+export const DH_DATACENTER_PAYMENT_RP_PER_KWH = 0.3;
 // What a factory is called, by its branch (NOGA division) — in the offer it writes, and on the map.
 export const DH_INDUSTRY_SITE_NAMES: Record<number, string> = {
   10: "Food factory",
@@ -154,7 +159,7 @@ export const DH_INDUSTRY_SITE_NAMES: Record<number, string> = {
 export const DH_INDUSTRY_OFFER_YEARS: [number, number] = [2027, 2040];
 // A potential (MWh a year) as a plant size: incinerators and factories give heat most of the year,
 // a treatment plant's effluent is drawn on hardest in winter.
-export const DH_FULL_LOAD_HOURS = { incinerator: 5_000, industry: 6_000, wastewater: 4_000, wood: 3_500 } as const;
+export const DH_FULL_LOAD_HOURS = { incinerator: 5_000, industry: 6_000, datacenter: 6_000, wastewater: 4_000, wood: 3_500 } as const;
 // Groundwater: the water-rights concession, per kW of heat a year (as for a building's own wells).
 export const DH_GROUNDWATER_FEE_CHF_PER_KW_YEAR = 10;
 // Rivers and lakes: the plant has to stand this close to the water.

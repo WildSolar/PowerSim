@@ -56,6 +56,7 @@ import { publicCharging } from "./publicCharging";
 import { irradianceWm2, pvPowerWAt, roofPvShare } from "./pv";
 import { roofContracts } from "./roofContracts";
 import { agriPv } from "./agriPv";
+import { datacenter } from "./datacenter";
 import { carParks } from "./carParks";
 import { wind } from "./wind";
 import { windPowerW } from "./windPower";
@@ -68,7 +69,9 @@ export interface MunicipalFinances {
   year: number;
   energyRevenueRp: number; // the energy price paid by consumers in basic supply, time-of-use priced — the same rates billing.ts bills them at
   networkRevenueRp: number; // the network fee on every kWh the grid carried, and the meters' base fees (networkTariff.ts)
-  networkKWh: number; // electricity the grid carried to consumers — what the network fee is reckoned on
+  networkKWh: number; // electricity the grid carried to consumers — what the concession fee is reckoned on
+  /** What a data centre drew (kWh): carried by the grid, its concession paid to the town directly. */
+  datacenterKWh: number;
   networkOffPeakKWh: number; // ...of it in off-peak hours
   feedInPaidRp: number; // paid out to solar owners (real or adopted) for exported generation — never for the utility's own arrays on rented roofs
   wholesaleCostRp: number; // paid upstream, over the contracts, for what the town drew beyond its own generation in each hour (spotMarket.ts)
@@ -118,10 +121,12 @@ export function computeMunicipalFinancesForYear(buildings: Building[], realPlant
 export interface UtilityMonth {
   energyRevenueRp: number;
   networkRevenueRp: number;
-  /** Not money: electricity the grid carried to consumers (kWh), what the network fee is reckoned on,
-   * and the part of it in off-peak hours (how the regulator splits the fee). */
+  /** Not money: electricity the grid carried to consumers (kWh), what the concession fee is reckoned
+   * on, and the part of it in off-peak hours (how the regulator splits the fee). */
   networkKWh: number;
   networkOffPeakKWh: number;
+  /** What a data centre drew (kWh): carried by the grid too, its concession paid to the town directly. */
+  datacenterKWh: number;
   feedInPaidRp: number;
   wholesaleCostRp: number;
   surplusSoldRp: number;
@@ -147,6 +152,7 @@ const UTILITY_KEYS: (keyof UtilityMonth)[] = [
   "networkRevenueRp",
   "networkKWh",
   "networkOffPeakKWh",
+  "datacenterKWh",
   "feedInPaidRp",
   "wholesaleCostRp",
   "surplusSoldRp",
@@ -260,6 +266,9 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
   const { times, series, dynamicW, dhHeatPumpW, marketW } = await monthElectricity(buildings, realPlants, year, month);
   const consumptionW = consumptionSeriesW(series);
   const grossKWh = energyKWh(times, consumptionW);
+  // A data centre pays its concession fee straight to the town (datacenter.ts): what the utility's
+  // fee is reckoned on leaves it out.
+  const datacenterKWh = energyKWh(times, times.map((t) => datacenter.powerW(t)));
   // The businesses on the open market: the grid carries their power, their supplier sells it.
   const basicW = consumptionW.map((w, i) => Math.max(0, w - marketW[i]));
   const basicKWh = energyKWh(times, basicW);
@@ -346,7 +355,8 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
     // sold at their own price), and the Agri-PV partners' energy (they take the field's instead).
     energyRevenueRp: basicSplit.energyRp - charging.kWh * energyAvgRpKWh - ppaKWh * agriPv.ppaEnergyValueRpPerKWh(midMonthMs),
     networkRevenueRp: split.networkRp - charging.kWh * networkAvgRpKWh + networkTariff.meters(midMonthMs) * tariff.baseFeeRpPerMonth,
-    networkKWh: grossKWh,
+    networkKWh: grossKWh - datacenterKWh,
+    datacenterKWh,
     networkOffPeakKWh: split.offPeakKWh,
     feedInPaidRp: Math.max(0, flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh) - flatCostRp(times, contractW, tariff.feedInPriceRpKWh) - (ppaKWh + ownFieldsKWh + windKWh) * tariff.feedInPriceRpKWh),
     wholesaleCostRp: flows.boughtKWh * (tariff.wholesalePriceRpKWh + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare),
@@ -403,6 +413,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     networkRevenueRp,
     networkKWh,
     networkOffPeakKWh,
+    datacenterKWh,
     feedInPaidRp,
     wholesaleCostRp,
     surplusSoldRp,
@@ -459,6 +470,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     networkRevenueRp,
     networkKWh,
     networkOffPeakKWh,
+    datacenterKWh,
     feedInPaidRp,
     wholesaleCostRp,
     surplusSoldRp,

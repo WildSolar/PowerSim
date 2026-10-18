@@ -186,6 +186,7 @@ class DistrictHeatNetwork {
   private orders: NetworkOrder[] = [];
   private selection = new Set<number>();
   private candidates: DhCandidateData[] = [];
+  private extraCandidates: () => DhCandidateData[] = () => [];
   private water: [number, number][][][] = [];
   private forestHa = 0;
   private readonly listeners = new Set<() => void>();
@@ -262,7 +263,13 @@ class DistrictHeatNetwork {
   }
 
   getCandidates(): DhCandidateData[] {
-    return this.candidates;
+    const extra = this.extraCandidates();
+    return extra.length > 0 ? [...this.candidates, ...extra] : this.candidates;
+  }
+
+  /** Candidates that appear during a game (a data centre's waste heat, datacenter.ts). */
+  setExtraCandidates(provider: () => DhCandidateData[]): void {
+    this.extraCandidates = provider;
   }
 
   getWater(): [number, number][][][] {

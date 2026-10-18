@@ -23,6 +23,7 @@ import { streets } from "../sim/streets";
 import { districtHeat } from "../sim/districtHeat";
 import { districtHeatSources } from "../sim/districtHeatSources";
 import { carParks } from "../sim/carParks";
+import { datacenter } from "../sim/datacenter";
 import { removals } from "../sim/removals";
 import { networkTariff } from "../sim/networkTariff";
 import { marketAccess } from "../sim/marketAccess";
@@ -189,6 +190,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   heatPumpSiting.init(dataset, () => stock.getAll()); // before the stock: heating decisions ask it where a heat pump may go
   // Car parks: their owners build canopies with no measure at all, so a do-nothing run has them too.
   carParks.init(dataset, `carparks:${dataset.bfsNumber}`);
+  datacenter.init(`datacenter:${dataset.bfsNumber}`);
   removals.init(cachedEmissionsForYear);
   networkTariff.init(() => stock.getAll());
   publicCharging.init(dataset, 0);
@@ -235,6 +237,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     stock.advance(t);
     publicCharging.advance(t);
     carParks.advance(t);
+    datacenter.advance(t);
     removals.advance(t);
     networkTariff.advance(t);
     marketAccess.advance(t);

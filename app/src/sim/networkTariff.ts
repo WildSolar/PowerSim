@@ -58,6 +58,11 @@ function dueMs(year: number): number {
   return year - 1 === BASELINE_YEAR ? toSimTimeMs(Date.UTC(year, 0, 1)) - 1 : toSimTimeMs(Date.UTC(year - 1, 8, 1)) - 1;
 }
 
+/** What the grid carried in a month (kWh): everyone's, a data centre's too. */
+function carriedKWh(u: { networkKWh?: number; deliveredKWh: number; datacenterKWh?: number }): number {
+  return (u.networkKWh ?? u.deliveredKWh) + (u.datacenterKWh ?? 0);
+}
+
 class NetworkTariff {
   private allowances = new Map<number, NetworkAllowance>();
   private buildingsProvider: () => Building[] = () => [];
@@ -141,7 +146,7 @@ class NetworkTariff {
     // The electricity carried over the last twelve months settled.
     const month = monthIndex(atMs);
     const recent = monthRecords.all().filter((r) => r.utility && r.month < month && r.month >= month - 12);
-    const carried = recent.reduce((sum, r) => sum + (r.utility!.networkKWh ?? r.utility!.deliveredKWh), 0);
+    const carried = recent.reduce((sum, r) => sum + carriedKWh(r.utility!), 0);
     const expectedKWh = recent.length > 0 ? (carried * 12) / recent.length : meters * NETWORK_KWH_PER_METER_FALLBACK;
     const offPeakKWh = recent.reduce((sum, r) => sum + (r.utility!.networkOffPeakKWh ?? 0), 0);
     const offPeakShare = carried > 0 && offPeakKWh > 0 ? offPeakKWh / carried : NETWORK_OFF_PEAK_KWH_SHARE;
@@ -156,7 +161,7 @@ class NetworkTariff {
       const months = monthRecords.all().filter((r) => r.utility && Math.floor(r.month / 12) === b);
       if (months.length < 12) continue;
       const collected = months.reduce((sum, r) => sum + (r.utility!.networkRevenueRp ?? 0), 0);
-      const kWh = months.reduce((sum, r) => sum + (r.utility!.networkKWh ?? r.utility!.deliveredKWh), 0);
+      const kWh = months.reduce((sum, r) => sum + carriedKWh(r.utility!), 0);
       const allowed = this.costPerKWh() * kWh + (this.allowances.get(b)?.capitalRp ?? 0);
       correctionRp += (collected - allowed) / NETWORK_COVERAGE_YEARS;
     }

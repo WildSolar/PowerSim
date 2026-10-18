@@ -31,6 +31,7 @@ import {
 } from "./emissionFactors";
 import { gridCarbonIntensityGPerKWh } from "./gridCarbon";
 import { dhEmissionsKgCO2 } from "./districtHeatDispatch";
+import { datacenter } from "./datacenter";
 import { GAS_BOILER_EFFICIENCY, OIL_BOILER_EFFICIENCY, OIL_ENERGY_KWH_PER_LITER } from "./heatingSystems";
 import { computeHeatingTechnologyBreakdown, computeMobilityFuelLiters, computeNetElectricityKWh } from "./yearReport";
 
@@ -101,7 +102,9 @@ async function countYear(buildings: Building[], plants: PowerPlant[], year: numb
   ]);
 
   const greenShare = policyStore.get().greenPowerShare / 100;
-  const electricityKgCO2 = (netElectricityKWh * gridCarbonIntensityGPerKWh(year) * (1 - GREEN_POWER_MAX_EMISSION_REDUCTION * greenShare)) / 1000;
+  // A data centre buys certified renewable power (datacenter.ts): its electricity carries nothing.
+  const datacenterKWh = datacenter.kWhBetween(toSimTimeMs(Date.UTC(year, 0, 1)), toSimTimeMs(Date.UTC(year + 1, 0, 1)));
+  const electricityKgCO2 = (Math.max(0, netElectricityKWh - datacenterKWh) * gridCarbonIntensityGPerKWh(year) * (1 - GREEN_POWER_MAX_EMISSION_REDUCTION * greenShare)) / 1000;
 
   const gasFuelKWh = heatingTechnology.gasBoilerSpaceKWh / GAS_BOILER_EFFICIENCY;
   const gasKgCO2 = gasFuelKWh * NATURAL_GAS_KG_CO2_PER_KWH;

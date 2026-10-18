@@ -121,6 +121,13 @@ class MarketAccess {
     this.businessCache = null;
   }
 
+  /** A site that buys on the open market from the day it opens (a data centre, datacenter.ts). */
+  joinMarket(egid: string, fromMs: number): void {
+    if (this.onMarket.has(egid)) return;
+    this.onMarket.set(egid, fromMs);
+    this.businessCache = null;
+  }
+
   /** Whether a site buys on the open market at `atMs`. */
   isOnMarket(egid: string, atMs: number): boolean {
     const since = this.onMarket.get(egid);

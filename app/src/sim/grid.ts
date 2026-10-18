@@ -490,7 +490,8 @@ class Grid {
     // Heat pumps under load control: at a winter peak, part of them are switched off in turns.
     const controlled = season === "winter" ? policyStore.get().heatPumpLoadControlShare * LOAD_CONTROL_OFF_SHARE_AT_PEAK : 0;
     for (const b of all) {
-      if (!existsAt(b, t)) continue;
+      // A data centre has its own substation on the medium-voltage grid (datacenter.ts).
+      if (!existsAt(b, t) || b.datacenterItKw !== undefined) continue;
       sums[this.areaIdOf(b)] += buildingPowerW(b, t, plants, snow) - (controlled > 0 ? controlled * heatPumpPowerW(b, t) : 0);
     }
     // On-street chargers hang off the local station; a fast-charging hub or a lorry park has its own

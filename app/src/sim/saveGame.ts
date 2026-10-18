@@ -37,6 +37,7 @@ import { restoreScore, snapshotScore } from "./score";
 import { roofContracts } from "./roofContracts";
 import { agriPv } from "./agriPv";
 import { carParks } from "./carParks";
+import { datacenter } from "./datacenter";
 import { removals } from "./removals";
 import { advisors } from "./advisors";
 import { networkTariff } from "./networkTariff";
@@ -113,6 +114,7 @@ interface SaveState {
   roofContracts: ReturnType<typeof roofContracts.snapshot>;
   agriPv: ReturnType<typeof agriPv.snapshot>;
   carParks: ReturnType<typeof carParks.snapshot>;
+  datacenter: ReturnType<typeof datacenter.snapshot>;
   removals: ReturnType<typeof removals.snapshot>;
   advisors: ReturnType<typeof advisors.snapshot>;
   networkTariff: ReturnType<typeof networkTariff.snapshot>;
@@ -192,6 +194,7 @@ export function captureState(transparency: boolean): Omit<SaveState, "yearReport
     roofContracts: roofContracts.snapshot(),
     agriPv: agriPv.snapshot(),
     carParks: carParks.snapshot(),
+    datacenter: datacenter.snapshot(),
     removals: removals.snapshot(),
     advisors: advisors.snapshot(),
     networkTariff: networkTariff.snapshot(),
@@ -294,6 +297,7 @@ export function applySave(file: SaveFile): void {
   roofContracts.restore(s.roofContracts);
   agriPv.restore(s.agriPv);
   carParks.restore(s.carParks);
+  datacenter.restore(s.datacenter);
   removals.restore(s.removals);
   advisors.restore(s.advisors);
   networkTariff.restore(s.networkTariff);

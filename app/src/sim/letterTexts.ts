@@ -130,6 +130,21 @@ export function heatOfferText(site: string, potentialMwh: number, mw: number, ye
   };
 }
 
+/** The data centre offering its waste heat to the utility. */
+export function datacenterHeatOfferText(mw: number, yearlyRp: number, connectionRp: number, onPipes: boolean): LetterText {
+  const chf = (rp: number) => `CHF ${Math.round(rp / 100).toLocaleString("de-CH")}`;
+  return {
+    subject: "Our waste heat, for next to nothing",
+    paragraphs: [
+      "Every kilowatt-hour our servers draw ends up as heat. Today our coolers blow it into the air, day and night, summer and winter, and it costs us to do so.",
+      `We offer it to the municipal utility: warm water at 25 to 35 °C, enough for about ${mw.toFixed(1)} MW of district heat once a heat pump has lifted it, for a token ${chf(yearlyRp)} a year. The utility would build the heat pump and the connection, about ${chf(connectionRp)}.`,
+      onPipes
+        ? "The district heating network already runs past our site. Our offer stands — you will find it in the District heating layer."
+        : "The district heating network doesn't reach us yet: the pipes would have to come our way. Our offer stands — you will find it in the District heating layer.",
+    ],
+  };
+}
+
 export function voteResultText(title: string, accepted: boolean, yesShare: number, againFrom: string | null): LetterText {
   const yes = votePct(yesShare);
   const no = votePct(100 - yesShare);

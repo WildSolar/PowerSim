@@ -37,6 +37,8 @@ export interface Building {
   constructionStartMs?: number;
   /** Completion: the building only exists (draws power, houses anyone) from here on. */
   builtAtMs?: number;
+  /** A data centre's IT load at full use (kW) — sim/datacenter.ts; absent for every other building. */
+  datacenterItKw?: number;
   demolishedAtMs?: number;
   replacesEgids?: string[];
   replacedByEgid?: string;
@@ -239,7 +241,7 @@ export interface DhNetworkData extends DhSiteData {
  * or a factory with waste heat to sell. */
 export interface DhCandidateData extends DhSiteData {
   id: string;
-  kind: "incinerator" | "wastewater" | "industry";
+  kind: "incinerator" | "wastewater" | "industry" | "datacenter";
   name: string;
   /** Incinerators: the heat and electricity delivered in the latest year reported (MWh). */
   heatMwh?: number;

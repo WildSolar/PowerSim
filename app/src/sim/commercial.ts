@@ -25,13 +25,14 @@
  * trying to guess which floors are which.
  */
 
+import { DATACENTER_OPENING_SHARE, DATACENTER_PUE_SUMMER, DATACENTER_PUE_WINTER, DATACENTER_RAMP_YEARS } from "../config/datacenter";
 import type { Building } from "../data/types";
-import { dayOfWeek, toDateMs } from "./calendar";
+import { dayOfWeek, dayOfYear, toDateMs } from "./calendar";
 import { hashSeed, mulberry32 } from "./rng";
 import { businessHoursShape, isWeekday } from "./schedule";
 import { noiseChannelSeed, valueNoiseFrom } from "./valueNoise";
 
-export type CommercialCategory = "office" | "retail" | "industrial" | "school" | "church" | "sports" | "hospital" | "other";
+export type CommercialCategory = "office" | "retail" | "industrial" | "school" | "church" | "sports" | "hospital" | "other" | "datacenter";
 
 const CATEGORY_BY_BUILDING_CLASS: Record<string, CommercialCategory> = {
   "Bürogebäude": "office",
@@ -47,6 +48,7 @@ const CATEGORY_BY_BUILDING_CLASS: Record<string, CommercialCategory> = {
 };
 
 export function commercialCategory(building: Building): CommercialCategory | null {
+  if (building.datacenterItKw !== undefined) return "datacenter";
   if (!building.buildingClass) return null;
   return CATEGORY_BY_BUILDING_CLASS[building.buildingClass] ?? null;
 }
@@ -120,7 +122,22 @@ const PROFILES: Record<CommercialCategory, CategoryProfile> = {
     baselineFraction: 0.15,
     shape: (h, dow) => (isWeekday(dow) ? businessHoursShape(h, 9, 18) : 0),
   },
+  // A data centre's load is its own (datacenterPowerW below), not per m².
+  datacenter: { peakWPerM2: 0, baselineFraction: 1, shape: () => 0 },
 };
+
+/** A data centre's draw (W): its IT load — filling up over its first years — and the cooling on
+ * top, which costs least in winter and most in high summer, a little more in the afternoon. */
+function datacenterPowerW(itKw: number, openedAtMs: number, simTimeMs: number): number {
+  const years = Math.max(0, simTimeMs - openedAtMs) / (365.25 * DAY_MS);
+  const use = Math.min(1, DATACENTER_OPENING_SHARE + ((1 - DATACENTER_OPENING_SHARE) * years) / DATACENTER_RAMP_YEARS);
+  const dateMs = toDateMs(simTimeMs);
+  const summer = 0.5 - 0.5 * Math.cos((2 * Math.PI * (dayOfYear(dateMs) - 15)) / 365.25); // 0 mid-January, 1 mid-July
+  const hour = (dateMs % DAY_MS) / HOUR_MS;
+  const afternoon = 0.5 + 0.5 * Math.cos((2 * Math.PI * (hour - 15)) / 24);
+  const pue = DATACENTER_PUE_WINTER + (DATACENTER_PUE_SUMMER - DATACENTER_PUE_WINTER) * summer * (0.85 + 0.3 * afternoon);
+  return itKw * 1000 * use * pue;
+}
 
 export interface CommercialProfile {
   egid: string;
@@ -128,6 +145,9 @@ export interface CommercialProfile {
   areaM2: number;
   intensityMultiplier: number;
   shiftNoiseSeed: number; // valueNoise.ts's hashed channel for an industrial building's shift pattern
+  /** A data centre's IT load (kW) and when it opened. */
+  itKw?: number;
+  openedAtMs?: number;
 }
 
 /** +/-30% per-building variation within a category, seeded — two same-category
@@ -141,6 +161,8 @@ function intensityMultiplier(egid: string): number {
 export function makeCommercialProfile(building: Building): CommercialProfile | null {
   const category = commercialCategory(building);
   if (!category) return null;
+  if (category === "datacenter")
+    return { egid: building.egid, category, areaM2: totalFloorAreaM2(building) ?? 0, intensityMultiplier: 1, shiftNoiseSeed: 0, itKw: building.datacenterItKw, openedAtMs: building.builtAtMs ?? 0 };
   const areaM2 = totalFloorAreaM2(building);
   if (areaM2 === null) return null;
   return {
@@ -153,6 +175,7 @@ export function makeCommercialProfile(building: Building): CommercialProfile | n
 }
 
 export function commercialPowerWFromProfile(profile: CommercialProfile, simTimeMs: number): number {
+  if (profile.category === "datacenter") return datacenterPowerW(profile.itKw ?? 0, profile.openedAtMs ?? 0, simTimeMs);
   const p = PROFILES[profile.category];
   const dateMs = toDateMs(simTimeMs);
   const hourOfDay = (dateMs % DAY_MS) / HOUR_MS;

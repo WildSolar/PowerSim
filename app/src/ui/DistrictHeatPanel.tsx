@@ -4,7 +4,7 @@ import type { DhCandidateData } from "../data/types";
 import { BASELINE_YEAR, formatDate, toDateMs } from "../sim/calendar";
 import { districtHeat, type DhNetworkInfo } from "../sim/districtHeat";
 import { zeroDhEnergy, type DhEnergyKWh } from "../sim/districtHeatDispatch";
-import { candidateName, districtHeatSources, type PlacedKind } from "../sim/districtHeatSources";
+import { candidateName, onContract, districtHeatSources, type PlacedKind } from "../sim/districtHeatSources";
 import { districtHeatLines } from "../sim/districtHeatLines";
 import { simClock } from "../sim/engine";
 import { networkCoverage, networkPeaksW, networkStatusAt, networkYearProjection, streetDemand, type CoverageShare } from "../sim/districtHeatStats";
@@ -250,7 +250,7 @@ function DraftCard({ simDay }: { simDay: number }) {
 function candidateLine(c: DhCandidateData, maxMw: number): string {
   const size = `up to ${maxMw.toFixed(maxMw < 10 ? 1 : 0)} MW`;
   const where = c.outside ? ` · ${(c.trunkM / 1000).toFixed(1)} km trunk line` : "";
-  return c.kind === "industry" ? `${maxMw.toFixed(1)} MW of waste heat on offer${where}` : `${size}${where}`;
+  return onContract(c) ? `${maxMw.toFixed(1)} MW of waste heat on offer${where}` : `${size}${where}`;
 }
 
 const TERRAIN_LABEL: Record<DhLineTerrain, string> = {
@@ -518,7 +518,7 @@ export function DistrictHeatPanel() {
               <p className="dh-note">Heat within reach — pick one here or on the map:</p>
               {candidates.map((c) => (
                 <button key={c.id} className="dh-choice" onClick={() => districtHeatSources.startDraft(c.kind, c.id)}>
-                  <span className="dh-choice-title">{c.kind === "industry" ? `${candidateName(c)} (waste heat)` : c.name}</span>
+                  <span className="dh-choice-title">{onContract(c) ? `${candidateName(c)} (waste heat)` : c.name}</span>
                   <span className="dh-dim">{candidateLine(c, districtHeatSources.candidateMaxMw(c))}</span>
                 </button>
               ))}

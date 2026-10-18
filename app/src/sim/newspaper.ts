@@ -15,6 +15,7 @@ import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { debt, type DebtEvent } from "./debt";
 import { districtHeat } from "./districtHeat";
 import { agriPv } from "./agriPv";
+import { datacenter } from "./datacenter";
 import { simClock } from "./engine";
 import { grid } from "./grid";
 import { currentHeatingSystemId, heatingRenewalsInRange } from "./heatingRenewal";
@@ -282,6 +283,21 @@ class Newspaper {
     for (const order of districtHeat.getOrders()) {
       if (inMonth(order.completesAtMs)) items.push({ priority: 42, headline: "District heating reaches new streets", body: `${(order.lengthM / 1000).toFixed(1)} km of new pipes are ready; buildings along them can connect.` });
       else if (inMonth(order.orderedAtMs)) items.push({ priority: 38, headline: "District heating to be extended", body: `Work on ${(order.lengthM / 1000).toFixed(1)} km of new pipes is under way.` });
+    }
+
+    // A data centre.
+    const dc = datacenter.building();
+    if (dc?.datacenterItKw !== undefined) {
+      const mw = Math.round(dc.datacenterItKw / 100) / 10;
+      const where = dc.address ? ` on ${dc.address.replace(/ \d.*$/, "")}` : " in the industrial zone";
+      if (dc.constructionStartMs !== undefined && inMonth(dc.constructionStartMs))
+        items.push({
+          priority: 55,
+          headline: "A data centre is coming to town",
+          body: `Work starts on a data centre${where}: ${mw} MW of servers once it's full, drawing as much power as thousands of homes, day and night. Its operator promises renewable power, and has heat to spare.`,
+        });
+      else if (dc.builtAtMs !== undefined && inMonth(dc.builtAtMs))
+        items.push({ priority: 45, headline: "The data centre is open", body: `The first servers are running${where}. It will take a few years to fill.` });
     }
 
     // Agri-PV.

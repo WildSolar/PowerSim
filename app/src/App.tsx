@@ -53,6 +53,7 @@ import { districtHeatSources } from "./sim/districtHeatSources";
 import { roofContracts } from "./sim/roofContracts";
 import { agriPv } from "./sim/agriPv";
 import { carParks } from "./sim/carParks";
+import { datacenter } from "./sim/datacenter";
 import { removals } from "./sim/removals";
 import { advisors } from "./sim/advisors";
 import { networkTariff } from "./sim/networkTariff";
@@ -104,7 +105,7 @@ function returnToMenu() {
 // Dev-only handle for inspecting the simulation from the browser console.
 if (import.meta.env.DEV) import("./dev/scenario").then((m) => Object.assign(window, { __scenario: m.runScenario }));
 if (import.meta.env.DEV) import("./dev/perf").then((m) => Object.assign(window, { __perf: m.runPerf, __perfYearEnd: m.timeYearEndReport, __perfNewYear: m.timeNewYearPieces, __perfMapTick: m.timeMapPowerTick, __perfRolling: m.timeRollingChart, __perfMonth: m.timeMonthTurn }));
-if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore, tariffStore, market, inbox, dynamicTariff, grid, districtHeat, districtHeatSources, districtHeatLines, roofContracts, agriPv, carParks, advisors, networkTariff, marketAccess, wind, publicCharging, fleets, letters, newspaper, debt, studies, finances: financesModule } });
+if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore, tariffStore, market, inbox, dynamicTariff, grid, districtHeat, districtHeatSources, districtHeatLines, roofContracts, agriPv, carParks, datacenter, advisors, networkTariff, marketAccess, wind, publicCharging, fleets, letters, newspaper, debt, studies, finances: financesModule } });
 if (import.meta.env.DEV) import("./sim/saveGame").then((m) => Object.assign(window, { __save: m }));
 if (import.meta.env.DEV) import("./sim/history").then((m) => Object.assign(window, { __history: m }));
 if (import.meta.env.DEV) import("./dev/par").then((m) => Object.assign(window, { __computePar: m.computePar }));
@@ -249,6 +250,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         roofContracts.init(loaded, () => stock.getAll(), `roofs:${loaded.bfsNumber}`);
         agriPv.init(loaded, () => stock.getAll(), `agripv:${loaded.bfsNumber}`);
         carParks.init(loaded, `carparks:${loaded.bfsNumber}`);
+        datacenter.init(`datacenter:${loaded.bfsNumber}`);
         removals.init(cachedEmissionsForYear);
         networkTariff.init(() => stock.getAll());
         advisors.init(() => stock.getAll(), `advisors:${loaded.bfsNumber}`);

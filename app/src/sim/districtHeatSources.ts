@@ -3,7 +3,8 @@
  * ordering it (districtHeat.ts keeps the sources).
  *
  *  - Waste heat bought from a plant within reach: an incinerator (per kWh), a factory that offers its
- *    waste heat (a fixed yearly payment; the offers arrive one by one over the years), and a waste
+ *    waste heat (a fixed yearly payment; the offers arrive one by one over the years) — or a data
+ *    centre's, if one comes to town (datacenter.ts) — and a waste
  *    water treatment plant, which is public — the town pays only for the heat pump on its effluent.
  *    Their size is set by what the plant can give; a plant outside the town needs a trunk line.
  *  - A heat pump drawing on groundwater, anywhere in the heat-use atlas's zones that allow
@@ -21,6 +22,7 @@
 
 import {
   DH_CAPEX_SCALE_EXPONENT,
+  DH_DATACENTER_PAYMENT_RP_PER_KWH,
   DH_FULL_LOAD_HOURS,
   DH_GROUNDWATER_FEE_CHF_PER_KW_YEAR,
   DH_INCINERATOR_HEAT_RP_PER_KWH,
@@ -54,6 +56,7 @@ import { existsAt } from "./lifetime";
 import { LocalProjection, pointInPolygon, type XY } from "./localGeo";
 import { areaWithin } from "./zoneShape";
 import { districtHeatLines } from "./districtHeatLines";
+import { datacenter } from "./datacenter";
 import { market } from "./market";
 import { hashSeed, mulberry32 } from "./rng";
 import { streets } from "./streets";
@@ -95,6 +98,12 @@ export interface DraftQuote {
   nuisanceHomes: number | null;
   /** Where it feeds in. */
   feed: { node: number; lon: number; lat: number } | null;
+}
+
+/** Waste heat sold on one contract, all of it at once, for a fixed yearly payment: a factory's or a
+ * data centre's. */
+export function onContract(c: DhCandidateData | null | undefined): boolean {
+  return c?.kind === "industry" || c?.kind === "datacenter";
 }
 
 /** What a candidate is called: a factory by its branch, the rest by their plant's name. */
@@ -169,6 +178,7 @@ class DistrictHeatSources {
   /** When a candidate becomes available: incinerators and treatment plants from the start, a
    * factory once its offer arrives. */
   offerAtMs(c: DhCandidateData): number {
+    if (c.kind === "datacenter") return datacenter.offerAtMs();
     if (c.kind !== "industry") return Number.NEGATIVE_INFINITY;
     const rng = mulberry32(hashSeed(this.seed, c.id));
     const [from, to] = DH_INDUSTRY_OFFER_YEARS;
@@ -182,7 +192,7 @@ class DistrictHeatSources {
   availableCandidates(atMs: number): DhCandidateData[] {
     return districtHeat.getCandidates().filter((c) => {
       if (this.offerAtMs(c) > atMs) return false;
-      if (c.kind === "industry") return this.stagesOn(c) === 0;
+      if (onContract(c)) return this.stagesOn(c) === 0;
       return this.candidateMaxMw(c) >= DH_SOURCE_SPECS[c.kind].minMw - 1e-9;
     });
   }
@@ -211,6 +221,8 @@ class DistrictHeatSources {
         return (((c.heatMwh ?? 0) + DH_INCINERATOR_POWER_TO_HEAT * (c.electricityMwh ?? 0)) * DH_INCINERATOR_TOWN_SHARE) / DH_FULL_LOAD_HOURS.incinerator;
       case "industry":
         return (c.potentialMwh ?? 0) / DH_FULL_LOAD_HOURS.industry;
+      case "datacenter":
+        return (c.potentialMwh ?? 0) / DH_FULL_LOAD_HOURS.datacenter;
       case "wastewater": {
         const site = this.projection.toXY(c.lon, c.lat);
         const used = districtHeat
@@ -244,7 +256,7 @@ class DistrictHeatSources {
     const c = candidateId ? districtHeat.getCandidates().find((x) => x.id === candidateId) : null;
     this.draft = { kind, candidateId, lon: c?.lon ?? null, lat: c?.lat ?? null, sizeMw: 0 };
     const sizes = this.quote(0).sizes;
-    this.draft.sizeMw = c?.kind === "industry" ? (sizes[sizes.length - 1] ?? 0) : (sizes[Math.min(sizes.length - 1, Math.floor(sizes.length / 3))] ?? 0);
+    this.draft.sizeMw = onContract(c) ? (sizes[sizes.length - 1] ?? 0) : (sizes[Math.min(sizes.length - 1, Math.floor(sizes.length / 3))] ?? 0);
     districtHeatLines.cancel();
     this.notify();
   }
@@ -290,7 +302,7 @@ class DistrictHeatSources {
     let name = spec.label;
     let feed: DraftQuote["feed"] = null;
     if (candidate) {
-      name = candidate.kind === "industry" ? `${candidateName(candidate)} waste heat` : candidate.name;
+      name = onContract(candidate) ? `${candidateName(candidate)} waste heat` : candidate.name;
       const stages = this.stagesOn(candidate);
       if (stages > 0) name = `${name}, stage ${stages + 1}`;
       maxMw = Math.min(maxMw, this.candidateMaxMw(candidate));
@@ -315,12 +327,16 @@ class DistrictHeatSources {
           ? "The town's forest can't feed another wood plant: its sustainable yield is spoken for."
           : "There is no heat left to take here.";
     }
-    const sizes = candidate?.kind === "industry" ? [Math.round(maxMw * 100) / 100] : sizeSteps(spec.minMw, maxMw);
+    const sizes = onContract(candidate) ? [Math.round(maxMw * 100) / 100] : sizeSteps(spec.minMw, maxMw);
     const sizeMw = sizes.length > 0 ? sizes.reduce((best, s) => (Math.abs(s - d.sizeMw) < Math.abs(best - d.sizeMw) ? s : best), sizes[0]) : 0;
     const trunkRp = Math.round(trunkM * DH_TRUNK_COST_CHF_PER_M * priceFactor("districtHeatPipes", atMs) * 100);
     const kw = sizeMw * 1000;
     const yearlyRp =
-      candidate?.kind === "industry" ? (candidate.potentialMwh ?? 0) * 1000 * DH_INDUSTRY_PAYMENT_RP_PER_KWH : d.kind === "groundwater" ? kw * DH_GROUNDWATER_FEE_CHF_PER_KW_YEAR * 100 : 0;
+      candidate?.kind === "industry"
+        ? (candidate.potentialMwh ?? 0) * 1000 * DH_INDUSTRY_PAYMENT_RP_PER_KWH
+        : candidate?.kind === "datacenter"
+          ? (candidate.potentialMwh ?? 0) * 1000 * DH_DATACENTER_PAYMENT_RP_PER_KWH
+          : d.kind === "groundwater" ? kw * DH_GROUNDWATER_FEE_CHF_PER_KW_YEAR * 100 : 0;
     return {
       kind: d.kind,
       name,
