@@ -387,7 +387,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Solar feed-in: what panels earn for power fed back into the grid. The price itself is federal: each quarter's reference market price — the spot price weighted by when solar produces — but never less than a federal minimum for small plants. As the region's panels crowd into the same sunny hours, that market price sinks, summer most, and by the mid-2030s the minimum is what most quarters pay; in a market crisis it can rise well above it. On top, you may pay a bonus of your own, as most Swiss utilities do for the power's certificate of origin: a higher bonus makes solar pay for more owners — and costs the utility. Owners weighing panels look at the year's price; their bills and the utility's accounts pay each quarter's.",
         "District heating: what the network’s heat costs its customers, and earns the utility.",
         "Public charging: what the municipality’s own chargers charge — on-street, fast and at lorry charging parks. Private operators set their own (see \"Public charging\").",
-        "Dynamic tariff: whether households may choose a price that follows the grid’s load through the day, and how far it swings (see \"The dynamic tariff\").",
+        "Dynamic tariff: whether households may choose the next day's market prices instead, and your margin on them (see \"The dynamic tariff\").",
       ]),
       p(
         "Before you publish, the page shows the network fee that follows, the price per kWh all in, and what a typical household would pay for its electricity in a year, base fee included — against this year and against the Swiss average — and how people are likely to take it.",
@@ -422,22 +422,22 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "The dynamic tariff",
     blocks: [
       p(
-        "Next to the time-of-use tariff you can offer a dynamic one (Town hall → Prices). Its price changes through the day by a rule fixed in advance: dearest when the town’s grid is expected to be busiest — the evening peak — and cheapest when it’s quiet: at night and, in summer, at midday when the panels are producing. Over a day it averages out to the time-of-use tariff; you choose how far it swings either side. The page shows a winter and a summer day of it before you publish.",
+        "Next to the time-of-use tariff you can offer a dynamic one (Town hall → Prices). Those on it pay the next day's market prices, published the day before: each hour's day-ahead price on the electricity market and your margin on it, plus the network fee — the same average, flat through the day. The market price sinks when the region's panels are producing, deepest on a clear spring or summer midday (and below zero on the sunniest from the 2030s), and rises in the morning and evening peaks; nights sit in between. Every day is its own: a grey day has no midday trough, a crisis lifts every hour. You choose your margin; the page shows a winter and a summer day of it before you publish.",
       ),
       p(
         "Nobody has to take it. On 1 January each household weighs what it would save against the bother of switching, and each building’s owner does the same for its heat pump, which has its own meter. The page estimates how many would sign up.",
       ),
       list([
-        "Electric cars: the car charges itself in the cheapest hours of the night, full by morning. A household whose car charges as soon as it’s plugged in saves the most — this is who signs up first.",
-        "Heat pumps: they run harder while power is cheap and ease off when it’s dear; the house holds the warmth. It pays most for large buildings.",
-        "Washing machines: some loads are started by timer in the cheapest hour of the day.",
+        "Electric cars: the car charges itself in the cheapest hours of the night, by that night's prices, full by morning. A household whose car charges as soon as it’s plugged in saves the most — this is who signs up first.",
+        "Heat pumps: they run harder while power is cheap and ease off when it’s dear, day by day — on a sunny day, at midday; the house holds the warmth. It pays most for large buildings.",
+        "Washing machines: some loads are started by timer in the day's cheapest hour.",
         "Everyone else: a household with nothing to shift pays about the same either way, so few bother.",
       ]),
       p(
-        "What it does: load moves out of the evening peak into the night, which eases the grid where it’s tightest (see \"The electricity grid\"). What it costs: the utility earns less from the households who shift, since they buy when power is cheap. A wider swing moves more load and wins more households — and widens that gap. Each home’s panel says whether it is on the dynamic tariff.",
+        "What it does: load moves out of the evening peak into the night, which eases the grid where it’s tightest (see \"The electricity grid\"). What it costs: the utility earns its margin rather than the time-of-use price on what they use — though what they shift into cheap hours also costs it less to buy. A smaller margin wins more households. Each home’s panel says whether it is on the dynamic tariff.",
       ),
       note(
-        "The price follows the expected load, not what the town actually draws. If very many cars charge in the same cheap hours, those hours get busy — the price won’t notice. Businesses stay on the time-of-use tariff.",
+        "The price follows the market, not what the town itself draws. If very many cars charge in the same cheap hours, those hours get busy on the town's grid — the price won't notice. Businesses stay on the time-of-use tariff. Real day-ahead prices come in 15-minute steps; here, hours.",
       ),
     ],
   },

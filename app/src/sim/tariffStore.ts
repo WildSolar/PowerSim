@@ -24,9 +24,15 @@ import { DEFAULT_SHEET, type Tariff, type TariffSheet } from "./tariff";
 
 /** What a kWh costs a consumer in basic supply under a sheet in a year: its energy price and the
  * regulated network fee (networkTariff.ts) — and the base fee per meter and month. */
-export function sheetPrices(sheet: TariffSheet, year: number): { peakRpKWh: number; offPeakRpKWh: number; networkPeakRpKWh: number; networkOffPeakRpKWh: number; baseFeeRpPerMonth: number } {
+export function sheetPrices(
+  sheet: TariffSheet,
+  year: number,
+): { peakRpKWh: number; offPeakRpKWh: number; networkPeakRpKWh: number; networkOffPeakRpKWh: number; networkAvgRpKWh: number; baseFeeRpPerMonth: number } {
   const fees = networkTariff.fees(year, sheet);
+  const q = networkTariff.allowance(year).offPeakShare;
   return {
+    // The dynamic tariff's network fee: the same, flat through the day.
+    networkAvgRpKWh: (1 - q) * fees.peakRpKWh + q * fees.offPeakRpKWh,
     peakRpKWh: sheet.energyPeakRpKWh + fees.peakRpKWh,
     offPeakRpKWh: sheet.energyOffPeakRpKWh + fees.offPeakRpKWh,
     networkPeakRpKWh: fees.peakRpKWh,
@@ -155,6 +161,7 @@ class TariffStore {
       ...sheet,
       networkPeakRpKWh: prices.networkPeakRpKWh,
       networkOffPeakRpKWh: prices.networkOffPeakRpKWh,
+      networkAvgRpKWh: prices.networkAvgRpKWh,
       peakPriceRpKWh: prices.peakRpKWh,
       offPeakPriceRpKWh: prices.offPeakRpKWh,
       baseFeeRpPerMonth: prices.baseFeeRpPerMonth,

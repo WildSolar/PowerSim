@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { MAX_SPREAD_RP_KWH, SUGGESTED_SPREAD_RP_KWH } from "../config/dynamicTariff";
+import { MAX_MARGIN_RP_KWH, SUGGESTED_MARGIN_RP_KWH } from "../config/dynamicTariff";
 import { WHOLESALE_HEDGED_SHARE, type Commodity } from "../config/market";
 import { approval } from "../sim/approval";
 import { toDateMs } from "../sim/calendar";
@@ -21,7 +21,7 @@ import "./tariffControl.css";
 
 const YEAR_MS = 365.25 * 24 * 3_600_000;
 
-type SheetField = Exclude<keyof TariffSheet, "offPeakStartHour" | "offPeakEndHour" | "dynamicSpreadRpKWh">;
+type SheetField = Exclude<keyof TariffSheet, "offPeakStartHour" | "offPeakEndHour" | "dynamicMarginRpKWh">;
 type FieldGroup = "energy" | "network" | "solar" | "other";
 
 const GROUP_LABEL: Record<FieldGroup, string> = {
@@ -68,7 +68,7 @@ function signedPct(pct: number): string {
 }
 
 function sameSheet(a: TariffSheet, b: TariffSheet): boolean {
-  return FIELDS.every(({ key }) => a[key] === b[key]) && a.dynamicSpreadRpKWh === b.dynamicSpreadRpKWh;
+  return FIELDS.every(({ key }) => a[key] === b[key]) && a.dynamicMarginRpKWh === b.dynamicMarginRpKWh;
 }
 
 /** The utility's prices: the tariff in force, next year's to publish, and the market prices it
@@ -149,7 +149,7 @@ export function TariffControl() {
         inForce={inForce}
         year={targetYear}
         atMs={simDay}
-        onSpread={(v) => setDraft((d) => ({ ...d, dynamicSpreadRpKWh: v }))}
+        onSpread={(v) => setDraft((d) => ({ ...d, dynamicMarginRpKWh: v }))}
       />
 
       <div className="tariff-preview">
@@ -282,37 +282,37 @@ function DynamicTariffDraft({
   atMs: number;
   onSpread: (v: number) => void;
 }) {
-  const offered = draft.dynamicSpreadRpKWh > 0;
+  const offered = draft.dynamicMarginRpKWh > 0;
   // Who would sign up, with the town as it is today (it pauses while the town hall is open).
   const uptake = useMemo(
     () => (offered ? estimateUptake(stock.getAll(), draft, year, atMs) : null),
-    [offered, draft.dynamicSpreadRpKWh, draft.energyOffPeakRpKWh, draft.energyPeakRpKWh, draft.baseFeeChfPerMonth, draft.networkOffPeakShare, year, Math.floor(atMs / 86_400_000)],
+    [offered, draft.dynamicMarginRpKWh, draft.energyOffPeakRpKWh, draft.energyPeakRpKWh, draft.baseFeeChfPerMonth, draft.networkOffPeakShare, year, Math.floor(atMs / 86_400_000)],
   );
   return (
     <div className="dyn-draft">
       <div className="dyn-draft-head">
         <label className="dyn-draft-toggle">
-          <input type="checkbox" checked={offered} onChange={(e) => onSpread(e.target.checked ? SUGGESTED_SPREAD_RP_KWH : 0)} />
+          <input type="checkbox" checked={offered} onChange={(e) => onSpread(e.target.checked ? SUGGESTED_MARGIN_RP_KWH : 0)} />
           <span>Offer a dynamic tariff</span>
         </label>
-        <span className="tariff-unit">{inForce.dynamicSpreadRpKWh > 0 ? `Now: ±${inForce.dynamicSpreadRpKWh} Rp/kWh` : "Not offered now"}</span>
+        <span className="tariff-unit">{inForce.dynamicMarginRpKWh > 0 ? `Now: margin ${inForce.dynamicMarginRpKWh} Rp/kWh` : "Not offered now"}</span>
       </div>
       <p className="tech-prices-note">
-        Households may choose it instead of the time-of-use tariff. Its price follows the expected load on the grid hour by hour, around the same daily average: dearer in the evening peak, cheapest at night and, in summer, at midday.
+        Households may choose it instead of the time-of-use tariff. They pay the next day&apos;s market prices, published the day before — each hour&apos;s day-ahead price and your margin, plus the network fee. Sunny days are cheapest at midday, still winter evenings dearest; those on it plan their charging, heating and washing day by day.
       </p>
       {offered && (
         <>
           <div className="dyn-draft-spread">
-            <span className="tariff-label">Price swing, either side</span>
+            <span className="tariff-label">Your margin on the day-ahead price</span>
             <input
               type="number"
-              min={1}
-              max={MAX_SPREAD_RP_KWH}
-              step={1}
-              value={draft.dynamicSpreadRpKWh}
-              className={draft.dynamicSpreadRpKWh !== inForce.dynamicSpreadRpKWh ? "changed" : ""}
-              aria-label="Dynamic tariff price swing"
-              onChange={(e) => onSpread(Math.max(1, Math.min(MAX_SPREAD_RP_KWH, Math.round(Number(e.target.value) || 1))))}
+              min={0.5}
+              max={MAX_MARGIN_RP_KWH}
+              step={0.5}
+              value={draft.dynamicMarginRpKWh}
+              className={draft.dynamicMarginRpKWh !== inForce.dynamicMarginRpKWh ? "changed" : ""}
+              aria-label="Dynamic tariff margin"
+              onChange={(e) => onSpread(Math.max(0.5, Math.min(MAX_MARGIN_RP_KWH, Math.round((Number(e.target.value) || 0.5) * 2) / 2)))}
             />
             <span className="tariff-unit">Rp/kWh</span>
           </div>

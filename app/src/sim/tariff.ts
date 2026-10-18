@@ -27,7 +27,7 @@ export interface TariffSheet {
   publicChargingAcRpKWh: number; // at the municipality's own on-street chargers — see publicCharging.ts
   publicChargingDcRpKWh: number; // at the municipality's own fast-charging hubs
   publicChargingFleetRpKWh: number; // at the municipality's own lorry charging parks
-  dynamicSpreadRpKWh: number; // the dynamic tariff's swing either side of the daily average; 0: not offered — see dynamicTariff.ts
+  dynamicMarginRpKWh: number; // the dynamic tariff's margin on the day-ahead price; 0: not offered — see dynamicTariff.ts
 }
 
 /** Every price at one moment: the year's sheet plus the month's market prices and the grid upkeep —
@@ -35,6 +35,7 @@ export interface TariffSheet {
 export interface Tariff extends TariffSheet {
   networkPeakRpKWh: number; // the regulated network fee per kWh, peak (networkTariff.ts)
   networkOffPeakRpKWh: number; // ...and off-peak
+  networkAvgRpKWh: number; // ...flat through the day, as on the dynamic tariff
   peakPriceRpKWh: number; // energy and network together, peak — what a kWh costs a consumer in basic supply
   offPeakPriceRpKWh: number; // ...off-peak
   baseFeeRpPerMonth: number; // the base fee, per meter and month
@@ -59,5 +60,5 @@ export function isOffPeakHour(tariff: Tariff, hourOfDay: number): boolean {
  * is fixed), so this deliberately ignores offPeakStartHour/offPeakEndHour rather
  * than invalidating a cache over a value that never actually changes. */
 export function tariffKey(tariff: Tariff): string {
-  return `${tariff.offPeakPriceRpKWh}:${tariff.peakPriceRpKWh}:${tariff.dynamicSpreadRpKWh}`;
+  return `${tariff.offPeakPriceRpKWh}:${tariff.peakPriceRpKWh}:${tariff.dynamicMarginRpKWh}`;
 }

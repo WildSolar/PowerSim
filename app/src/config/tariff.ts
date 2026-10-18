@@ -26,7 +26,7 @@ export const DEFAULT_SHEET: TariffSheet = {
   publicChargingDcRpKWh: 55,
   publicChargingFleetRpKWh: 40,
   // No dynamic tariff at the start (config/dynamicTariff.ts).
-  dynamicSpreadRpKWh: 0,
+  dynamicMarginRpKWh: 0,
 };
 
 // The network fee, regulated cost-plus (sim/networkTariff.ts): what the grid costs to run (config/

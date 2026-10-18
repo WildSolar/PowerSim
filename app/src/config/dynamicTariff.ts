@@ -1,16 +1,15 @@
-// The dynamic electricity tariff (sim/dynamicTariff.ts): a price that changes through the day by a
-// fixed rule — dear when the town's grid is expected to be busiest, cheap when it's quiet — that
-// households may sign up for instead of the time-of-use tariff. Informed placeholders.
+// The dynamic electricity tariff (sim/dynamicTariff.ts): the next day's market prices, published the
+// day before, that households may sign up for instead of the time-of-use tariff — the day-ahead
+// price of each hour and the utility's margin, plus the network fee. Informed placeholders.
 
-/** How busy the grid is expected to be, hour by hour (00:00-01:00 first), on a winter and a summer
- * day: the evening peak, the night trough, and in summer the midday solar dip. Only the shape
- * matters: each is shifted to average zero and scaled so its extreme is 1. */
-export const DYNAMIC_SHAPE_WINTER = [
+/** How much the market's demand moves the day-ahead price through the day (00:00-01:00 first):
+ * the morning and evening peaks, the night trough. Only the shape matters: it is shifted to average
+ * zero and scaled so its extreme is 1; the sun's effect is the spot model's (config/spotMarket.ts). */
+export const DAY_AHEAD_DEMAND_SHAPE = [
   -0.8, -0.9, -1.0, -1.0, -0.9, -0.6, 0.0, 0.5, 0.6, 0.4, 0.3, 0.3, 0.3, 0.2, 0.1, 0.2, 0.5, 0.9, 1.0, 0.8, 0.4, 0.0, -0.3, -0.6,
 ];
-export const DYNAMIC_SHAPE_SUMMER = [
-  -0.5, -0.6, -0.6, -0.6, -0.5, -0.3, 0.1, 0.4, 0.3, 0.0, -0.4, -0.8, -1.0, -1.0, -0.8, -0.4, 0.1, 0.6, 0.9, 1.0, 0.8, 0.5, 0.1, -0.2,
-];
+/** How far demand lifts or lowers the day-ahead price at its extremes (a share of the wholesale price). */
+export const DAY_AHEAD_DEMAND_SHARE = 0.3;
 
 /** When an ordinary household uses its electricity through the day (relative), for judging what
  * the dynamic tariff would cost it. */
@@ -18,9 +17,9 @@ export const HOUSEHOLD_LOAD_SHAPE = [
   0.5, 0.4, 0.35, 0.35, 0.35, 0.4, 0.6, 0.9, 0.9, 0.8, 0.8, 0.9, 1.0, 0.9, 0.8, 0.8, 0.9, 1.1, 1.3, 1.4, 1.3, 1.1, 0.9, 0.7,
 ];
 
-/** The spread the price page suggests, and the most it allows (Rp/kWh either side of the average). */
-export const SUGGESTED_SPREAD_RP_KWH = 10;
-export const MAX_SPREAD_RP_KWH = 25;
+/** The margin on the day-ahead price the price page suggests, and the most it allows (Rp/kWh). */
+export const SUGGESTED_MARGIN_RP_KWH = 5;
+export const MAX_MARGIN_RP_KWH = 20;
 
 // How households on the dynamic tariff respond. Electric cars charge automatically in the
 // cheapest hours before they're needed (spread a little, below). A heat pump runs this much harder when power is at its

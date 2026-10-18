@@ -139,9 +139,10 @@ export function electricityCostSplitRp(times: number[], powerW: number[], tariff
     const offPeak = isOffPeakHour(tariff, hourOfDayAt(midMs));
     const network = offPeak ? tariff.networkOffPeakRpKWh : tariff.networkPeakRpKWh;
     const energy = offPeak ? tariff.energyOffPeakRpKWh : tariff.energyPeakRpKWh;
-    networkRp += kWh * network;
+    // On the dynamic tariff the network fee is flat through the day (its average).
+    networkRp += (kWh - dynamicKWh) * network + dynamicKWh * tariff.networkAvgRpKWh;
     if (offPeak) offPeakKWh += kWh;
-    energyRp += (kWh - dynamicKWh) * energy + (dynamicKWh > 0 ? dynamicKWh * (dynamicPriceRpKWh(tariff, midMs) - network) : 0);
+    energyRp += (kWh - dynamicKWh) * energy + (dynamicKWh > 0 ? dynamicKWh * (dynamicPriceRpKWh(tariff, midMs) - tariff.networkAvgRpKWh) : 0);
   }
   return { energyRp, networkRp, offPeakKWh };
 }

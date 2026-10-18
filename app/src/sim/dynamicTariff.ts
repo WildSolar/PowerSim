@@ -1,10 +1,11 @@
 /**
  * The dynamic electricity tariff (config/dynamicTariff.ts). When the year's tariff sheet offers it
- * (a spread above zero, tariffStore.ts), the price moves through the day around the time-of-use
- * tariff's daily average: up to the spread dearer when the grid is expected to be busiest, as much
- * cheaper when it's quiet. The rule is fixed in advance from the hour and the season — like a
- * utility pricing on forecast load — and does not react to what the town actually draws, so if
- * everyone shifts into the same cheap hours, those hours get busy.
+ * (a margin above zero, tariffStore.ts), households on it pay the next day's market prices, published
+ * the day before: each hour's day-ahead price — the spot price, sinking with the region's sun and
+ * rising in the morning and evening peaks — and the utility's margin, plus the network fee as on the
+ * time-of-use tariff. Every day is its own: a sunny spring day has a deep midday trough, a still
+ * grey winter evening a spike. The price follows the market, not what the town itself draws, so if
+ * everyone shifts into the same cheap hours, those hours get busy on the town's grid.
  *
  * Who signs up is decided once a year, on 1 January, under that year's sheet: each household
  * weighs what it would save — mostly from charging its car in the cheapest hours — against its own
@@ -12,15 +13,15 @@
  * meter. Nobody signs up who would only pay more. The decision is a pure function of the year's
  * sheet and the town as it stood on 1 January, so it needs no saving.
  *
- * Households on it respond (ev.ts, heatPump.ts, devices.ts): cars charge in the cheapest window
- * before they're needed, heat pumps run harder when power is cheap and softer when it's dear, and
- * a share of washing machines wait for the cheapest hour.
+ * Households on it respond (ev.ts, heatPump.ts, devices.ts), planning each day by its prices: cars
+ * charge in the night's cheapest window before they're needed, heat pumps run harder when power is
+ * cheap and softer when it's dear, and a share of washing machines wait for the cheapest hour.
  */
 
 import {
   DWELLING_BASE_KWH,
-  DYNAMIC_SHAPE_SUMMER,
-  DYNAMIC_SHAPE_WINTER,
+  DAY_AHEAD_DEMAND_SHAPE,
+  DAY_AHEAD_DEMAND_SHARE,
   EV_KWH,
   HEAT_PUMP_SHIFT,
   HOUSEHOLD_LOAD_SHAPE,
@@ -40,6 +41,8 @@ import { currentMobilityMode, currentVehicleType, mobilitySlotCount } from "./mo
 import { hashSeed, mulberry32 } from "./rng";
 import type { TariffSheet } from "./tariff";
 import { sheetPrices, tariffStore } from "./tariffStore";
+import { market } from "./market";
+import { spotShare } from "./spotMarket";
 
 const DAY_MS = 24 * 3_600_000;
 const HOUR_MS = 3_600_000;
@@ -52,29 +55,7 @@ function normalize(shape: number[]): number[] {
   return shifted.map((v) => v / max);
 }
 
-const WINTER = normalize(DYNAMIC_SHAPE_WINTER);
-const SUMMER = normalize(DYNAMIC_SHAPE_SUMMER);
-
-/** 1 in mid-January, 0 in mid-July. */
-function winterWeight(simDay: number): number {
-  const day = Math.floor(EPOCH_MS / DAY_MS) + simDay;
-  return 0.5 + 0.5 * Math.cos((2 * Math.PI * (day - 14)) / 365.2425);
-}
-
-/** How busy the grid is expected to be at `simMs`, from -1 (quietest) to 1 (busiest). */
-export function loadSignal(simMs: number): number {
-  const day = Math.floor(simMs / DAY_MS);
-  const w = winterWeight(day);
-  // Hourly values sit at the middle of their hour; in between, the signal runs straight.
-  const x = (simMs - day * DAY_MS) / HOUR_MS - 0.5;
-  const h = Math.floor(x);
-  const f = x - h;
-  const a = (h + 24) % 24;
-  const b = (h + 25) % 24;
-  const za = w * WINTER[a] + (1 - w) * SUMMER[a];
-  const zb = w * WINTER[b] + (1 - w) * SUMMER[b];
-  return za + (zb - za) * f;
-}
+const DEMAND = normalize(DAY_AHEAD_DEMAND_SHAPE);
 
 /** A sheet's time-of-use prices in the year of `simMs`, energy and network fee together. */
 function touPrices(sheet: TariffSheet, simMs: number): { peak: number; offPeak: number } {
@@ -82,21 +63,60 @@ function touPrices(sheet: TariffSheet, simMs: number): { peak: number; offPeak: 
   return { peak: p.peakRpKWh, offPeak: p.offPeakRpKWh };
 }
 
-/** The time-of-use tariff's average over a day, which the dynamic price moves around. */
-export function dynamicLevelRpKWh(sheet: TariffSheet, simMs: number): number {
-  const offPeakHours = (sheet.offPeakEndHour - sheet.offPeakStartHour + 24) % 24;
-  const { peak, offPeak } = touPrices(sheet, simMs);
-  return (offPeakHours * offPeak + (24 - offPeakHours) * peak) / 24;
+/** 1 in mid-January, 0 in mid-July. */
+function winterWeight(simDay: number): number {
+  const day = Math.floor(EPOCH_MS / DAY_MS) + simDay;
+  return 0.5 + 0.5 * Math.cos((2 * Math.PI * (day - 14)) / 365.2425);
 }
 
-/** The dynamic price at `simMs` under a sheet (Rp/kWh). */
+/** How the market's demand stands at `simMs`, from -1 (the night trough) to 1 (the evening peak). */
+function demandSignal(simMs: number): number {
+  const day = Math.floor(simMs / DAY_MS);
+  // Hourly values sit at the middle of their hour; in between, the signal runs straight.
+  const x = (simMs - day * DAY_MS) / HOUR_MS - 0.5;
+  const h = Math.floor(x);
+  const f = x - h;
+  const a = DEMAND[(h + 24) % 24];
+  const b = DEMAND[(h + 25) % 24];
+  return a + (b - a) * f;
+}
+
+/** The day-ahead market price at `simMs` (Rp/kWh), published the day before: the spot price, which
+ * sinks with the region's sun (spotMarket.ts), lifted by demand in the morning and evening peaks. */
+export function dayAheadPriceRpKWh(simMs: number): number {
+  return market.price("wholesale", simMs) * (spotShare(simMs) + DAY_AHEAD_DEMAND_SHARE * demandSignal(simMs));
+}
+
+/** The dynamic price at `simMs` under a sheet (Rp/kWh): the day-ahead price and the utility's
+ * margin, and the network fee flat through the day (its average), so the market's shape comes
+ * through — never below nothing. */
 export function dynamicPriceRpKWh(sheet: TariffSheet, simMs: number): number {
-  return Math.max(0, dynamicLevelRpKWh(sheet, simMs) + sheet.dynamicSpreadRpKWh * loadSignal(simMs));
+  const p = sheetPrices(sheet, new Date(toDateMs(simMs)).getUTCFullYear());
+  return Math.max(0, dayAheadPriceRpKWh(simMs) + sheet.dynamicMarginRpKWh + p.networkAvgRpKWh);
 }
 
 /** Whether a sheet offers the dynamic tariff at all. */
 export function offersDynamic(sheet: TariffSheet): boolean {
-  return sheet.dynamicSpreadRpKWh > 0;
+  return sheet.dynamicMarginRpKWh > 0;
+}
+
+const signalCache = new Map<number, { mean: number; dev: number }>();
+
+/** Where the day-ahead price at `simMs` stands in its day, from -1 (the day's cheapest) to 1 (its
+ * dearest): what the households on the dynamic tariff plan their day by. */
+export function priceSignal(simMs: number): number {
+  const day = Math.floor(simMs / DAY_MS);
+  let s = signalCache.get(day);
+  if (!s) {
+    const prices: number[] = [];
+    for (let q = 0; q < 96; q++) prices.push(dayAheadPriceRpKWh(day * DAY_MS + (q + 0.5) * (DAY_MS / 96)));
+    const mean = prices.reduce((a, b) => a + b, 0) / prices.length;
+    const dev = Math.max(1e-6, ...prices.map((p) => Math.abs(p - mean)));
+    s = { mean, dev };
+    if (signalCache.size > 800) signalCache.clear();
+    signalCache.set(day, s);
+  }
+  return Math.max(-1, Math.min(1, (dayAheadPriceRpKWh(simMs) - s.mean) / s.dev));
 }
 
 // --- responses ---
@@ -111,7 +131,7 @@ function nightTroughMs(simDay: number): number {
     let best = Infinity;
     trough = from;
     for (let t = from; t <= from + 14 * HOUR_MS; t += HOUR_MS / 4) {
-      const z = loadSignal(t);
+      const z = priceSignal(t);
       if (z < best) {
         best = z;
         trough = t;
@@ -134,7 +154,7 @@ export function smartChargeStartMs(simDay: number, plugInMs: number, latestStart
 
 /** How much harder (above 1) or softer a heat pump on the dynamic tariff runs at `simMs`. */
 export function heatPumpShiftFactor(simMs: number): number {
-  return 1 - HEAT_PUMP_SHIFT * loadSignal(simMs);
+  return 1 - HEAT_PUMP_SHIFT * priceSignal(simMs);
 }
 
 /** Where a timer-started laundry load moves: the cheapest start within the delay, finishing by midnight. */
@@ -143,9 +163,9 @@ export function smartLaundryStartMs(startMs: number, durationMs: number, draw: n
   const dayEnd = Math.floor(startMs / DAY_MS) * DAY_MS + DAY_MS;
   const latest = Math.min(startMs + LAUNDRY_MAX_DELAY_HOURS * HOUR_MS, dayEnd - durationMs);
   let best = startMs;
-  let bestZ = loadSignal(startMs + durationMs / 2);
+  let bestZ = priceSignal(startMs + durationMs / 2);
   for (let t = startMs + HOUR_MS / 2; t <= latest; t += HOUR_MS / 2) {
-    const z = loadSignal(t + durationMs / 2);
+    const z = priceSignal(t + durationMs / 2);
     if (z < bestZ) {
       bestZ = z;
       best = t;
@@ -286,6 +306,7 @@ class DynamicTariff {
     this.unsubscribe?.();
     this.unsubscribe = tariffStore.onPublish((p) => this.uptake.delete(p.year));
     troughCache.clear();
+    signalCache.clear();
     this.yearStartMs = Infinity;
     this.yearEndMs = -Infinity;
   }
