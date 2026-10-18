@@ -285,11 +285,18 @@ class Newspaper {
     }
 
     // Agri-PV.
-    for (const f of agriPv.getFields()) {
+    for (const f of agriPv.getProjects()) {
       const field = agriPv.getPlot(f.plotId)?.name ?? "a field outside town";
       const mw = (f.capacityKw / 1000).toFixed(1);
-      if (inMonth(f.decidedAtMs)) items.push({ priority: 46, headline: `Solar over the crops at ${field}`, body: `A local business is to build ${mw} MWp of Agri-PV there, and take the power as it comes. The farmer keeps farming underneath.` });
-      else if (inMonth(f.installedAtMs)) items.push({ priority: 40, headline: `Agri-PV at ${field} in service`, body: `${mw} MWp of panels over the field are feeding in.` });
+      const who =
+        f.developer === "business"
+          ? "A local business has applied to build"
+          : f.developer === "cooperative"
+            ? "An energy cooperative, its members from town, has applied to build"
+            : "The municipality has applied to build";
+      const after = f.developer === "business" ? ", and take the power as it comes" : f.developer === "cooperative" ? ", and sell the power to the utility" : "";
+      if (inMonth(f.startedAtMs)) items.push({ priority: 46, headline: `Solar over the crops at ${field}?`, body: `${who} ${mw} MWp of Agri-PV there${after}. The farmer would keep farming underneath.` });
+      else if (f.installedAtMs !== undefined && inMonth(f.installedAtMs)) items.push({ priority: 40, headline: `Agri-PV at ${field} in service`, body: `${mw} MWp of panels over the field are feeding in.` });
     }
 
     for (const s of districtHeat.getSources()) {

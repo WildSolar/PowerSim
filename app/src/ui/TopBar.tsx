@@ -115,7 +115,7 @@ function Clock() {
 }
 
 function TreasuryKpi({ dataset, onOpen }: { dataset: MunicipalityDataset; onOpen: () => void }) {
-  const { balanceRp, budgetRp, allocationSoFarRp, utilityRp, utilityMonths, paidOutRp, receivedRp, borrowedRp } = useLiveTreasury(dataset);
+  const { balanceRp, budgetRp, allocationSoFarRp, utilityRp, utilityMonths, paidOutRp, borrowedRp } = useLiveTreasury(dataset);
   useSyncExternalStore(
     (l) => debt.subscribe(l),
     () => debt.getVersion(),
@@ -127,7 +127,6 @@ function TreasuryKpi({ dataset, onOpen }: { dataset: MunicipalityDataset; onOpen
     ...(utilityMonths > 0 ? [`Utility, ${utilityMonths} month${utilityMonths === 1 ? "" : "s"} settled: ${utilityRp >= 0 ? "+" : "−"}${formatCHF(Math.abs(utilityRp))}`] : []),
     `Paid out so far: −${formatCHF(paidOutRp)}`,
     ...(borrowedRp > 0 ? [`Borrowed this year: +${formatCHF(borrowedRp)}`] : []),
-    ...(receivedRp > 0 ? [`Zoning levy so far: +${formatCHF(receivedRp)}`] : []),
     ...(owedRp > 0 ? [`Debt (${debt.rating().label}): ${formatCHF(owedRp)}`] : []),
     "Click for the accounts and borrowing",
   ];

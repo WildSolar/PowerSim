@@ -32,7 +32,7 @@ import { grid } from "../sim/grid";
 import { heatPumpSiting } from "../sim/heatPumpSiting";
 import { publicBuildingBucket } from "../sim/publicBuildings";
 import { roofContracts } from "../sim/roofContracts";
-import { agriPv } from "../sim/agriPv";
+import { AGRI_PV_PHASE_LABEL, agriPv } from "../sim/agriPv";
 import { carParks } from "../sim/carParks";
 import { wind, WIND_PHASE_LABEL } from "../sim/wind";
 import { WIND_LOCAL_RADIUS_M } from "../config/wind";
@@ -47,8 +47,6 @@ import {
   DISTRICT_HEAT_LEGEND,
   CHARGER_USE_RAMP,
   COVERAGE_COLOR,
-  DH_PRIORITY_COLOR,
-  HIGH_STANDARD_COLOR,
   ZONING_BUILDING_COLOR,
   ZONING_LEGEND,
   PUBLIC_BUILDINGS_LEGEND,
@@ -134,26 +132,21 @@ const COVERAGE_KINDS: QosKind[] = ["ac", "shop", "dc", "fleet"];
 const coverageId = (kind: QosKind) => `charging-coverage-${kind}`;
 const ZONE_SOURCE_ID = "zone-parcels";
 const ZONE_FILL_LAYER_ID = "zone-parcels-fill";
-const ZONE_DH_LAYER_ID = "zone-parcels-dh-priority";
-const ZONE_STANDARD_LAYER_ID = "zone-parcels-high-standard";
 const ZONE_LINE_LAYER_ID = "zone-parcels-line";
-const ZONE_MARK_LAYER_ID = "zone-parcels-mark"; // picked or with a change on the way
-// The same parcels in the district heating layer: only the district-heat priority zones, under the streets.
-const DH_PRIORITY_FILL_LAYER_ID = "dh-priority-zones-fill";
-const DH_PRIORITY_LINE_LAYER_ID = "dh-priority-zones-line";
 // Wind sites and their turbines (the Wind layer).
 const WIND_SOURCE_ID = "wind-sites";
 const WIND_REACH_LAYER_ID = "wind-reach";
 const WIND_TURBINE_LAYER_ID = "wind-turbines";
 
-// Farmland plots (Agri-PV), in the same layer.
 const CAR_PARK_SOURCE_ID = "car-parks";
 const CAR_PARK_FILL_LAYER_ID = "car-parks-fill";
 const CAR_PARK_LINE_LAYER_ID = "car-parks-line";
+// Farmland plots (the Agri-PV layer).
 const FARM_SOURCE_ID = "farm-plots";
 const FARM_FILL_LAYER_ID = "farm-plots-fill";
 const FARM_LINE_LAYER_ID = "farm-plots-line";
-const ZONE_LAYER_IDS = [FARM_FILL_LAYER_ID, FARM_LINE_LAYER_ID, ZONE_FILL_LAYER_ID, ZONE_DH_LAYER_ID, ZONE_STANDARD_LAYER_ID, ZONE_LINE_LAYER_ID, ZONE_MARK_LAYER_ID];
+const FARM_LAYER_IDS = [FARM_FILL_LAYER_ID, FARM_LINE_LAYER_ID];
+const ZONE_LAYER_IDS = [ZONE_FILL_LAYER_ID, ZONE_LINE_LAYER_ID];
 const ZONING_TICK_MS = 3000;
 const STATION_SOURCE_ID = "grid-stations";
 const STATION_LAYER_ID = "grid-stations-circle";
@@ -166,8 +159,6 @@ const GRID_ZONE_FILL_LAYER_ID = "grid-zones-fill";
 const GRID_ZONE_LINE_LAYER_ID = "grid-zones-line";
 const GRID_ZONE_SELECTED_LAYER_ID = "grid-zones-selected";
 const GRID_DIMMED_COLOR = "#e0ded8"; // buildings outside the selected area
-const STRIPE_DH = "zone-stripe-dh";
-const STRIPE_STANDARD = "zone-stripe-standard";
 
 const LORRY_PARK_RING = "#7a4fd1";
 const HUB_RING_COLOR = "#1a1a1a";
@@ -503,23 +494,12 @@ function addChargerIcons(map: MlMap): void {
   }
 }
 
-/** Every zone parcel as the plan stands at `simTimeMs`, with whether it's picked or has a change
- * on the way — for the zoning layer. */
-function zoneParcelsGeoJSON(simTimeMs: number) {
-  const selection = zoning.getSelection();
+/** Every zone parcel of the plan, for the zoning layer. */
+function zoneParcelsGeoJSON() {
   return {
     type: "FeatureCollection" as const,
     features: zoning.getParcels().flatMap((parcel) => {
-      const state = zoning.stateAt(parcel.id, simTimeMs);
-      if (!state) return [];
-      const properties = {
-        id: parcel.id,
-        zone: state.zone,
-        extraFloors: state.extraFloors,
-        dhPriority: state.dhPriority ? 1 : 0,
-        highStandard: state.highStandard ? 1 : 0,
-        mark: selection.has(parcel.id) ? "selected" : zoning.hasPendingChange(parcel.id, simTimeMs) ? "pending" : "none",
-      };
+      const properties = { id: parcel.id, zone: parcel.zone };
       return parcel.rings.map((rings) => ({ type: "Feature" as const, properties, geometry: { type: "Polygon" as const, coordinates: rings } }));
     }),
   };
@@ -577,39 +557,21 @@ function carParksGeoJSON(simTimeMs: number) {
   };
 }
 
-/** The farmland plots, by where each stands for Agri-PV, and which are picked. */
+/** The farmland plots, by where each stands for Agri-PV, and which are picked (for a zone, or its card). */
 function farmPlotsGeoJSON(simTimeMs: number) {
   const selection = agriPv.getSelection();
+  const card = agriPv.getSelectedId();
   return {
     type: "FeatureCollection" as const,
     features: agriPv.getPlots().map((plot) => {
       const state = agriPv.stateAt(plot.id, simTimeMs);
       return {
         type: "Feature" as const,
-        properties: { id: plot.id, state, mark: selection.has(plot.id) ? "selected" : state === "planned" ? "pending" : "none" },
+        properties: { id: plot.id, state, mark: selection.has(plot.id) || plot.id === card ? "selected" : state === "planned" ? "pending" : "none" },
         geometry: { type: "Polygon" as const, coordinates: plot.rings },
       };
     }),
   };
-}
-
-/** A small tile of diagonal stripes, for the energy-zone overlays (fill-pattern). */
-function stripeImage(color: string, forward: boolean): { width: number; height: number; data: Uint8Array } {
-  const size = 12;
-  const data = new Uint8Array(size * size * 4);
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const d = ((forward ? x + y : x - y + size) % size + size) % size;
-      const on = d < 3;
-      const o = (y * size + x) * 4;
-      data[o] = r;
-      data[o + 1] = g;
-      data[o + 2] = b;
-      data[o + 3] = on ? 170 : 0;
-    }
-  }
-  return { width: size, height: size, data };
 }
 
 /** Every transformer station, by how loaded it was at the last reading — for the grid layer. */
@@ -742,6 +704,7 @@ function colorExpression(mode: ColorMode, selectedEgid: string | null, scales: C
     districtHeat: () => legendMatchExpression("network", DISTRICT_HEAT_LEGEND),
     evCharging: () => legendMatchExpression("charging", EV_CHARGING_LEGEND),
     zoning: () => ZONING_BUILDING_COLOR,
+    agriPv: () => ZONING_BUILDING_COLOR,
     publicBuildings: () => legendMatchExpression("publicStatus", PUBLIC_BUILDINGS_LEGEND),
     roofSolar: () => legendMatchExpression("roofStatus", ROOF_SOLAR_LEGEND),
     wind: () => ZONING_BUILDING_COLOR,
@@ -994,10 +957,10 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         },
       });
 
-      // Zoning: the parcels on the ground, under the buildings, shown only in that layer.
+      // Zoning: the parcels on the ground, under the buildings, shown only in that layer; farmland
+      // likewise in the Agri-PV layer.
       const zoneVisibility = colorModeRef.current === "zoning" ? "visible" : "none";
-      if (!map.hasImage(STRIPE_DH)) map.addImage(STRIPE_DH, stripeImage(DH_PRIORITY_COLOR, true));
-      if (!map.hasImage(STRIPE_STANDARD)) map.addImage(STRIPE_STANDARD, stripeImage(HIGH_STANDARD_COLOR, false));
+      const farmVisibility = colorModeRef.current === "agriPv" ? "visible" : "none";
       // Wind: the sites' turbines and the kilometre around them, shown only in that layer.
       const windVisibility = colorModeRef.current === "wind" ? "visible" : "none";
       map.addSource(WIND_SOURCE_ID, { type: "geojson", data: windSitesGeoJSON(simClock.getSimTimeMs()) as never });
@@ -1059,23 +1022,35 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         id: FARM_FILL_LAYER_ID,
         type: "fill",
         source: FARM_SOURCE_ID,
-        layout: { visibility: zoneVisibility },
+        layout: { visibility: farmVisibility },
         paint: {
-          "fill-color": ["match", ["get", "state"], "farmland", FARM_PLOT_COLORS.farmland, "planned", FARM_PLOT_COLORS.planned, "zoned", FARM_PLOT_COLORS.zoned, FARM_PLOT_COLORS.field],
-          "fill-opacity": ["match", ["get", "state"], "farmland", 0.22, "planned", 0.25, "zoned", 0.45, "fieldBuilding", 0.35, 0.65],
+          "fill-color": [
+            "match",
+            ["get", "state"],
+            "farmland",
+            FARM_PLOT_COLORS.farmland,
+            "planned",
+            FARM_PLOT_COLORS.planned,
+            "zoned",
+            FARM_PLOT_COLORS.zoned,
+            "underWay",
+            FARM_PLOT_COLORS.underWay,
+            FARM_PLOT_COLORS.field,
+          ],
+          "fill-opacity": ["match", ["get", "state"], "farmland", 0.22, "planned", 0.25, "zoned", 0.45, "underWay", 0.5, "fieldBuilding", 0.35, 0.65],
         },
       });
       map.addLayer({
         id: FARM_LINE_LAYER_ID,
         type: "line",
         source: FARM_SOURCE_ID,
-        layout: { visibility: zoneVisibility, "line-join": "round" },
+        layout: { visibility: farmVisibility, "line-join": "round" },
         paint: {
           "line-color": ["match", ["get", "mark"], "selected", SELECTED_COLOR, "pending", ZONING_PENDING_COLOR, FARM_PLOT_COLORS.farmland],
           "line-width": ["match", ["get", "mark"], "none", 1, 3.5],
         },
       });
-      map.addSource(ZONE_SOURCE_ID, { type: "geojson", data: zoneParcelsGeoJSON(simClock.getSimTimeMs()) });
+      map.addSource(ZONE_SOURCE_ID, { type: "geojson", data: zoneParcelsGeoJSON() });
       map.addLayer({
         id: ZONE_FILL_LAYER_ID,
         type: "fill",
@@ -1083,25 +1058,8 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         layout: { visibility: zoneVisibility },
         paint: {
           "fill-color": ml(legendMatchExpression("zone", ZONING_LEGEND)),
-          // Denser where more floors are allowed.
-          "fill-opacity": ["+", 0.3, ["*", 0.18, ["get", "extraFloors"]]],
+          "fill-opacity": 0.3,
         },
-      });
-      map.addLayer({
-        id: ZONE_DH_LAYER_ID,
-        type: "fill",
-        source: ZONE_SOURCE_ID,
-        filter: ["==", ["get", "dhPriority"], 1],
-        layout: { visibility: zoneVisibility },
-        paint: { "fill-pattern": STRIPE_DH },
-      });
-      map.addLayer({
-        id: ZONE_STANDARD_LAYER_ID,
-        type: "fill",
-        source: ZONE_SOURCE_ID,
-        filter: ["==", ["get", "highStandard"], 1],
-        layout: { visibility: zoneVisibility },
-        paint: { "fill-pattern": STRIPE_STANDARD },
       });
       map.addLayer({
         id: ZONE_LINE_LAYER_ID,
@@ -1110,38 +1068,6 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         layout: { visibility: zoneVisibility, "line-join": "round" },
         paint: { "line-color": ml(legendMatchExpression("zone", ZONING_LEGEND)), "line-width": 1.5 },
       });
-      map.addLayer({
-        id: ZONE_MARK_LAYER_ID,
-        type: "line",
-        source: ZONE_SOURCE_ID,
-        filter: ["!=", ["get", "mark"], "none"],
-        layout: { visibility: zoneVisibility, "line-join": "round" },
-        paint: { "line-color": ["match", ["get", "mark"], "selected", SELECTED_COLOR, ZONING_PENDING_COLOR], "line-width": 3.5 },
-      });
-
-      // District-heat priority zones, for the district heating layer: under its streets.
-      map.addLayer(
-        {
-          id: DH_PRIORITY_FILL_LAYER_ID,
-          type: "fill",
-          source: ZONE_SOURCE_ID,
-          filter: ["==", ["get", "dhPriority"], 1],
-          layout: { visibility: dhVisibility },
-          paint: { "fill-pattern": STRIPE_DH, "fill-opacity": 0.7 },
-        },
-        STREET_UNPIPED_LAYER_ID,
-      );
-      map.addLayer(
-        {
-          id: DH_PRIORITY_LINE_LAYER_ID,
-          type: "line",
-          source: ZONE_SOURCE_ID,
-          filter: ["==", ["get", "dhPriority"], 1],
-          layout: { visibility: dhVisibility, "line-join": "round" },
-          paint: { "line-color": DH_PRIORITY_COLOR, "line-width": 2 },
-        },
-        STREET_UNPIPED_LAYER_ID,
-      );
 
       // Grid: each station's zone, on the ground under the buildings, shown only in that layer.
       const gridVisibility = colorModeRef.current === "grid" ? "visible" : "none";
@@ -1416,15 +1342,15 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
             return;
           }
         }
-        if (colorModeRef.current === "zoning") {
-          const parcel = map.queryRenderedFeatures(e.point, { layers: [ZONE_FILL_LAYER_ID] })[0];
-          if (parcel) {
-            zoning.toggle(String(parcel.properties?.id));
+        if (colorModeRef.current === "agriPv") {
+          // Farmland is picked for a zone; a field zoned or further along opens its card.
+          const plot = map.queryRenderedFeatures(e.point, { layers: [FARM_FILL_LAYER_ID] })[0];
+          if (plot) {
+            const id = String(plot.properties?.id);
+            if (agriPv.stateAt(id, simClock.getSimTimeMs()) === "farmland") agriPv.toggle(id);
+            else agriPv.select(id);
             return;
           }
-          const plot = map.queryRenderedFeatures(e.point, { layers: [FARM_FILL_LAYER_ID] })[0];
-          if (plot) agriPv.toggle(String(plot.properties?.id));
-          return;
         }
         if (colorModeRef.current === "evCharging") {
           const placing = publicCharging.getPlacing();
@@ -1715,8 +1641,6 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       DH_OVERLAY_LINE_LAYER_ID,
       DH_LINE_LAYER_ID,
       DH_LINE_END_LAYER_ID,
-      DH_PRIORITY_FILL_LAYER_ID,
-      DH_PRIORITY_LINE_LAYER_ID,
     ];
     const visible = colorMode === "districtHeat";
     for (const id of layers) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
@@ -1766,7 +1690,6 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       (map.getSource(DH_LINE_SOURCE_ID) as GeoJSONSource | undefined)?.setData(districtHeatLinesGeoJSON(simClock.getSimTimeMs()) as never);
       drawLabels();
       (map.getSource(STREET_SOURCE_ID) as GeoJSONSource | undefined)?.setData(streetsToGeoJSON(simClock.getSimTimeMs()));
-      (map.getSource(ZONE_SOURCE_ID) as GeoJSONSource | undefined)?.setData(zoneParcelsGeoJSON(simClock.getSimTimeMs())); // priority zones come into force over time
       const polySource = map.getSource(POLY_SOURCE_ID) as GeoJSONSource | undefined;
       const pointSource = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
       const polyData = polygonsRef.current;
@@ -1981,8 +1904,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     };
   }, [colorMode, dataset]);
 
-  // Zoning layer: the parcels as the plan stands (changes come into force over time), which are
-  // picked, and a hover card per parcel.
+  // Zoning layer: the parcels of the plan, and a hover card per parcel.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.getLayer(ZONE_FILL_LAYER_ID)) return;
@@ -1990,50 +1912,65 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     for (const id of ZONE_LAYER_IDS) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
     if (!visible) return;
 
-    const tick = () => {
-      (map.getSource(ZONE_SOURCE_ID) as GeoJSONSource | undefined)?.setData(zoneParcelsGeoJSON(simClock.getSimTimeMs()));
-      (map.getSource(FARM_SOURCE_ID) as GeoJSONSource | undefined)?.setData(farmPlotsGeoJSON(simClock.getSimTimeMs()));
+    const popup = new Popup({ closeButton: false, closeOnClick: false, offset: 10, className: "charger-popup" });
+    const onHover = (e: MapMouseEvent & { features?: { properties: Record<string, unknown> }[] }) => {
+      const parcel = zoning.getParcel(String(e.features?.[0]?.properties.id));
+      if (!parcel) return;
+      const label = ZONING_LEGEND.find((l) => l.bucket === parcel.zone)?.label ?? parcel.zone;
+      popup
+        .setLngLat(e.lngLat)
+        .setText(`${label} · ${(parcel.areaM2 / 10_000).toFixed(1)} ha`)
+        .addTo(map);
     };
-    const onFarmHover = (e: MapMouseEvent & { features?: { properties: Record<string, unknown> }[] }) => {
+    const onLeave = () => popup.remove();
+    map.on("mousemove", ZONE_FILL_LAYER_ID, onHover as never);
+    map.on("mouseleave", ZONE_FILL_LAYER_ID, onLeave);
+    return () => {
+      map.off("mousemove", ZONE_FILL_LAYER_ID, onHover as never);
+      map.off("mouseleave", ZONE_FILL_LAYER_ID, onLeave);
+      popup.remove();
+    };
+  }, [colorMode, dataset]);
+
+  // Agri-PV layer: the farmland by where each field stands (zones and projects move on over time),
+  // which are picked, and a hover card per field.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer(FARM_FILL_LAYER_ID)) return;
+    const visible = colorMode === "agriPv";
+    for (const id of FARM_LAYER_IDS) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+    if (!visible) {
+      agriPv.clearSelection();
+      return;
+    }
+
+    const tick = () => (map.getSource(FARM_SOURCE_ID) as GeoJSONSource | undefined)?.setData(farmPlotsGeoJSON(simClock.getSimTimeMs()));
+    const popup = new Popup({ closeButton: false, closeOnClick: false, offset: 10, className: "charger-popup" });
+    const onHover = (e: MapMouseEvent & { features?: { properties: Record<string, unknown> }[] }) => {
       const id = String(e.features?.[0]?.properties.id);
       const plot = agriPv.getPlot(id);
       if (!plot) return;
       const now = simClock.getSimTimeMs();
-      const field = agriPv.fieldOn(id);
+      const project = agriPv.projectOn(id);
       const state = agriPv.stateAt(id, now);
       const suits = agriPv.installationFor(id);
       const kind = `${AGRI_PV_SYSTEMS[suits.system].label.toLowerCase()}, ${(suits.capacityKw / 1000).toFixed(1)} MWp`;
       const status =
-        field && state === "field"
+        project && state === "field"
           ? `Agri-PV: ${kind}`
-          : field
+          : project && state === "fieldBuilding"
             ? `Agri-PV being built: ${kind}`
-            : state === "zoned"
-              ? `zoned for Agri-PV (suits ${kind})`
-              : state === "planned"
-                ? "Agri-PV zone on the way"
-                : "farmland";
+            : project && state === "underWay"
+              ? `Agri-PV: ${AGRI_PV_PHASE_LABEL[project.phase].toLowerCase()}`
+              : state === "zoned"
+                ? `zoned for Agri-PV (suits ${kind})`
+                : state === "planned"
+                  ? "Agri-PV zone on the way"
+                  : "farmland";
       const prime = plot.primeShare >= 0.5 ? " · prime cropland" : "";
       popup
         .setLngLat(e.lngLat)
         .setText(`${plot.name ?? "Field"} · ${(plot.areaM2 / 10_000).toFixed(1)} ha · ${status}${prime}`)
-        .addTo(map);
-    };
-    const popup = new Popup({ closeButton: false, closeOnClick: false, offset: 10, className: "charger-popup" });
-    const onHover = (e: MapMouseEvent & { features?: { properties: Record<string, unknown> }[] }) => {
-      const id = String(e.features?.[0]?.properties.id);
-      const state = zoning.stateAt(id, simClock.getSimTimeMs());
-      const parcel = zoning.getParcel(id);
-      if (!state || !parcel) return;
-      const label = ZONING_LEGEND.find((l) => l.bucket === state.zone)?.label ?? state.zone;
-      const extras = [
-        state.extraFloors > 0 ? `+${state.extraFloors} floor${state.extraFloors === 1 ? "" : "s"}` : null,
-        state.dhPriority ? "district-heat priority" : null,
-        state.highStandard ? "high standard" : null,
-      ].filter(Boolean);
-      popup
-        .setLngLat(e.lngLat)
-        .setText(`${label} · ${(parcel.areaM2 / 10_000).toFixed(1)} ha${extras.length > 0 ? ` · ${extras.join(", ")}` : ""}`)
         .addTo(map);
     };
     const onLeave = () => popup.remove();
@@ -2042,28 +1979,18 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
 
     tick();
     const interval = setInterval(tick, ZONING_TICK_MS);
-    const unsubscribe = zoning.subscribe(tick);
-    const unsubscribeFarm = agriPv.subscribe(tick);
-    map.on("mousemove", FARM_FILL_LAYER_ID, onFarmHover as never);
+    const unsubscribe = agriPv.subscribe(tick);
+    map.on("mousemove", FARM_FILL_LAYER_ID, onHover as never);
     map.on("mouseleave", FARM_FILL_LAYER_ID, onLeave);
     map.on("mouseenter", FARM_FILL_LAYER_ID, onEnter);
     map.on("mouseleave", FARM_FILL_LAYER_ID, onExit);
-    map.on("mousemove", ZONE_FILL_LAYER_ID, onHover as never);
-    map.on("mouseleave", ZONE_FILL_LAYER_ID, onLeave);
-    map.on("mouseenter", ZONE_FILL_LAYER_ID, onEnter);
-    map.on("mouseleave", ZONE_FILL_LAYER_ID, onExit);
     return () => {
       clearInterval(interval);
       unsubscribe();
-      unsubscribeFarm();
-      map.off("mousemove", FARM_FILL_LAYER_ID, onFarmHover as never);
+      map.off("mousemove", FARM_FILL_LAYER_ID, onHover as never);
       map.off("mouseleave", FARM_FILL_LAYER_ID, onLeave);
       map.off("mouseenter", FARM_FILL_LAYER_ID, onEnter);
       map.off("mouseleave", FARM_FILL_LAYER_ID, onExit);
-      map.off("mousemove", ZONE_FILL_LAYER_ID, onHover as never);
-      map.off("mouseleave", ZONE_FILL_LAYER_ID, onLeave);
-      map.off("mouseenter", ZONE_FILL_LAYER_ID, onEnter);
-      map.off("mouseleave", ZONE_FILL_LAYER_ID, onExit);
       popup.remove();
       map.getCanvas().style.cursor = "";
     };

@@ -179,7 +179,7 @@ class HeatPumpSiting {
     if (noise) return noise;
     if (this.noiseCache.size > 20_000) this.noiseCache.clear();
 
-    const zone = zoning.stateForBuilding(b, atMs)?.zone;
+    const zone = zoning.zoneForBuilding(b);
     const sensitivity: "II" | "III" = zone === "mixed" || zone === "centre" || zone === "work" ? "III" : "II";
     const distanceM = this.unitDistanceM(b, atMs);
     const years = Math.max(0, (atMs - 0) / YEAR_MS);

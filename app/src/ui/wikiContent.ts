@@ -133,16 +133,17 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Ground heat — where a ground-source heat pump could go, over the canton's map of what the ground allows (see \"Where a heat pump may go\").",
         "Power draw — what each building draws from the grid right now, or feeds into it from its solar panels.",
         "Solar — how much solar each building carries, updated as panels go up.",
+        "Zoning — the zoning plan, parcel by parcel (see \"Zoning\").",
       ]),
       p("Planning tools:"),
       list([
         "District heating — who is connected, who could be, the pipes and the heat sources; extend the network and add heat sources here (see \"District heating network\" and \"Heat for district heating\").",
         "EV charging — where households could charge an electric car, and every public charger by how full it is; build chargers here (see \"Public charging\").",
         "Grid — the transformer areas and how loaded they are; reinforce them or add batteries here (see \"The electricity grid\").",
-        "Zoning — the zoning plan, parcel by parcel; change it here (see \"Zoning\").",
         "Public buildings — the municipality's own buildings and what they carry; order solar and chargers for them here (see \"Public buildings\").",
         "Roof solar — large roofs by where a roof contract stands; rent them and put the utility's solar on them here (see \"Roof contracts\").",
         "Car parks — the open-air car parks big enough for a solar canopy, whose they are and what is built over them; cover the town's own here (see \"Solar over car parks\").",
+        "Agri-PV — the farmland outside the building zones, the fields zoned for solar and those taken up; zone fields, or develop one yourself, here (see \"Agri-PV\").",
         "Wind — where turbines could stand, once a study has looked, and each wind park's long road through zoning, permit and the courts (see \"Wind power\").",
       ]),
     ],
@@ -530,7 +531,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Replacement: a building is safe for its first 30 years; after that, its chance of being replaced rises every year. Neighbours built in the same year often go with it — a housing estate is usually one project. A replacement keeps the address and the footprint but holds 20–30% more homes, with extra floors where needed (never towering over its surroundings).",
       ),
       p(
-        "Growth: new buildings go up on vacant building land — zoned for building and still open; parks, sports fields, playgrounds, allotments and cemeteries stay free, as do clearances along roads, rail, forest and water. Each is sized and turned like the buildings around it. When the vacant land runs out, growth has to come from replacing old buildings with denser ones, and slows down. The zoning plan steers where and how much (see \"Zoning\").",
+        "Growth: new buildings go up on vacant building land — zoned for building and still open; parks, sports fields, playgrounds, allotments and cemeteries stay free, as do clearances along roads, rail, forest and water. Each is sized and turned like the buildings around it. When the vacant land runs out, growth has to come from replacing old buildings with denser ones, and slows down. The zoning plan says what goes where (see \"Zoning\").",
       ),
       list([
         "New buildings mostly get heat pumps — fossil heating isn't allowed in new buildings — and district heating where a pipe runs in the street.",
@@ -548,23 +549,15 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Zoning",
     blocks: [
       p(
-        "The zoning plan decides what may be built where, and how much — one of the municipality's strongest levers. The game starts with the town's real plan, parcel by parcel: residential, mixed, centre, work and public-use zones. Open the Zoning tool to see it, and click parcels to pick them, or pick every parcel of a zone at once.",
+        "The zoning plan decides what may be built where. The Zoning view shows the town's real plan, parcel by parcel: residential, mixed, centre, work and public-use zones. Hover over a parcel for its zone and size. It matters to the energy of the town in a few places:",
       ),
       list([
-        "Rezoning a parcel to another use changes what gets built on its open land, and what its old buildings become when they are replaced: a factory in what is now a residential zone becomes flats — and comes up for replacement sooner, because it no longer fits. Public-use land stays as it is.",
-        "Densifying (one or two floors more than the plan allows today) lets new and replacement buildings go higher and hold more homes, and makes replacing old buildings there pay sooner. You can take the extra floors back, too.",
-        "A district heating priority zone allows no new oil or gas heating at all. A building on a street with a district heating pipe must connect — a new one when it's built, an existing one when its heating is next replaced; district heat is then its only choice. The District heating tool shows these zones too, so extensions can follow them.",
-        "A high-standard zone requires new and replacement buildings to reach Minergie-P, with a full roof of solar panels.",
-        "Outside the building zones, farmland can be zoned for Agri-PV (see \"Agri-PV\").",
+        "Growth: new buildings on open building land are of the kind their zone allows — homes in a residential zone, homes with shops and offices in mixed and centre zones, workshops and halls in a work zone (see \"Town growth & renewal\").",
+        "Noise: an air heat pump's outdoor unit has to stay quieter at night in a residential zone than in a mixed, centre or work zone (see \"Where a heat pump may go\").",
+        "Outside the building zones lies the farmland, where you can zone fields for solar (see \"Agri-PV\").",
       ]),
-      p(
-        "Before you submit a change, the drawer shows what it would touch — the area, the buildings and homes, the open building land — what the planning costs, and how people are likely to take it. The change is paid when submitted and comes into force about eighteen months later, after the planning procedure. It is political: each group reacts at once (tenants welcome more homes, neighbours and homeowners dislike densification, businesses resent losing work zones, the climate-minded like energy zones and compact building), and a contested change — or any change covering 15% or more of the town's zoned land — goes to a public vote first, which can strike it down. On the map, a parcel with a change on the way is outlined in yellow, densified parcels are shaded stronger, and energy zones are striped.",
-      ),
-      p(
-        "Zoning creates land value, and the municipality takes a share: a levy of 25% of the gain when a project's permit is granted — on the extra floor space densification allows, and on the rise in land value when a plot is rezoned to a more valuable use (work to residential, say). The rezoning gain belongs to the land, so it is levied once, with the plot's first project. It shows in the treasury as the zoning levy.",
-      ),
       note(
-        "Land values, planning costs and how strongly each group reacts are rough estimates. New building land outside today's zones isn't possible (federal law makes it rare), and new homes don't yet bring costs of their own — schools, roads — beyond their energy use.",
+        "The plan stays as it is through the game. Rezoning and densifying take years of town planning in a real municipality, and their pull on the town's energy is slow and indirect, so the game leaves them out; the energy department steers buildings with the laws, grants and programmes in the Town hall instead.",
       ),
     ],
   },
@@ -649,10 +642,10 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Noise. An air heat pump's outdoor unit must stay under the night limit at the neighbours' windows — 45 dB in residential zones, 50 dB in mixed, centre and work zones. What counts is how loud the unit is (bigger buildings need bigger, louder ones), how close the neighbours are and how sensitive the zone is. Anything over the limit has to come off: a quieter model and a careful spot (up to 5 dB, about CHF 2,500 on a house), a sound hood (up to 10 dB, about CHF 7,000), or the unit indoors with air ducts (up to 20 dB, about CHF 20,000 in an existing building, little in a new one). Beyond that, an air heat pump isn't permitted. Units get a little quieter over the years.",
       ]),
       p(
-        "Both shape every heating decision: an option the site rules out isn't on offer, and noise measures and borehole conditions add to the price. A building replacing a heat pump with its like keeps its boreholes or wells and its permitted spot. Rezoning a residential parcel to a mixed or work zone allows 5 dB more; densifying brings neighbours closer. The Ground heat view shows the canton's map, and what it means for each building.",
+        "Both shape every heating decision: an option the site rules out isn't on offer, and noise measures and borehole conditions add to the price. A building replacing a heat pump with its like keeps its boreholes or wells and its permitted spot. The Ground heat view shows the canton's map, and what it means for each building.",
       ),
       p(
-        "If a fossil heating ban is in force — the canton's, or a district heating priority zone — and nothing else is possible (no heat pump fits, because of the ground, the noise or a full grid, and no district heating reaches the building), the owner may install a new gas or oil heating as an exception, as cantonal energy law allows. The building's heating history says so. Bringing district heating to such streets, or room on the grid, is the way out.",
+        "If a fossil heating ban is in force and nothing else is possible (no heat pump fits, because of the ground, the noise or a full grid, and no district heating reaches the building), the owner may install a new gas or oil heating as an exception, as cantonal energy law allows. The building's heating history says so. Bringing district heating to such streets, or room on the grid, is the way out.",
       ),
       note(
         "The distance to the neighbours is judged from the nearest buildings with homes or workplaces, not from a real site plan. The ground map comes from canton Zurich's heat-use atlas; where there is no such map, the ground restricts nothing.",
@@ -824,25 +817,31 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Agri-PV",
     blocks: [
       p(
-        "Solar parks on open land are all but impossible in Switzerland: outside the building zones, the land is for farming. Agri-PV is the opening — panels high above the crops, or in rows between them, on fields that stay farmed. Two steps, two actors.",
+        "Solar parks on open land are all but impossible in Switzerland: outside the building zones, the land is for farming. Agri-PV is the opening — panels high above the crops, or in rows between them, on fields that stay farmed. As with wind, a field goes a long road: a zone, a permit, the build. The Agri-PV tool shows the town's farmland — the green fields outside the building zones, one parcel's field each, with its local name — and where each one stands.",
       ),
       list([
-        "Zoning: in the Zoning tool, the green fields outside the building zones are the town's farmland, one parcel's field each, with its local name. Pick fields and put them forward as an Agri-PV zone. It costs the planning work, always goes to a public vote, and comes into force two years on. People mind: the landscape and the food land weigh against it, prime cropland most of all (the canton's Fruchtfolgeflächen); the climate-minded and business are for. Part of the opposition stays for as long as the zone is there.",
-        "Acceptance: at first, a zone is a hard sell — expect to lose early votes. The Agri-PV dialogue (an information measure: field visits, farmers who already harvest under panels, round tables) brings people round year by year, and every field they get to see helps a little. Acceptance softens the opposition to new zones and to those in force alike, though some will always mind.",
-        "Building: businesses with a big electricity use look into the zoned field nearest to them now and then. They build over the whole field — at CHF 600–1,000 per kWp, the bigger the cheaper, more for tracking and overhead rows, plus a rent to the farmer — and take its power as it comes, under a power purchase agreement, up to about 60% of their own use, instead of buying that energy from the utility (they still pay for the grid). The utility buys the rest at the feed-in price. Whether it pays depends on the prices you set: the dearer electricity, and the better the feed-in price, the better the deal.",
+        "Zoning: click farmland to pick it, and put the picked fields forward as an Agri-PV zone. It costs the planning work, always goes to a public vote, and comes into force two years on. People mind: the landscape and the food land weigh against it, prime cropland most of all (the canton's Fruchtfolgeflächen); the climate-minded and business are for. Part of the opposition stays for as long as the zone is there.",
+        "Acceptance: at first, a zone is a hard sell — expect to lose early votes. The Agri-PV dialogue (an information measure: field visits, farmers who already harvest under panels, round tables) brings people round year by year, and every field they get to see in service helps a little. Acceptance softens the opposition to new zones and to those in force alike, though some will always mind.",
+        "The permit: someone has to take a zoned field up and apply — for the canton's permit to build outside the building zones, which asks that the farming goes on, and the building permit. It takes a year. About one in three is appealed, by landscape protection or neighbours; the courts then take one to three years, and now and then strike the permit down. The field rests three years before anyone may take it up again.",
+        "The build: a year, over the whole field, at CHF 600–1,000 per kWp — the bigger the cheaper, more for tracking and overhead rows — and then a yearly rent to the farmer, and the upkeep.",
       ]),
+      p("Three kinds of developer take fields up:"),
+      list([
+        "Businesses with a big electricity use look into the zoned field nearest to them now and then. They take its power as it comes, under a power purchase agreement, up to about 60% of their own use, instead of buying that energy from the utility (they still pay the network fee); the utility buys the rest at the feed-in price. Whether it pays depends on your prices: the dearer your energy price and the better the feed-in, the better the deal.",
+        "Energy cooperatives — residents pooling their savings — look into each free zoned field now and then. They sell all its power to the utility at the feed-in price, and take a field up if that pays for it with a little to spare. They can raise up to about CHF 3 million, so the largest fields are beyond them. Your feed-in bonus is what moves them (see \"Tariffs & energy prices\").",
+        "The municipality: pick a zoned field no one has taken up — on the map, or in the tool's Build tab — and apply for the permit from its card; once the permit stands, order the panels. Both are paid from the treasury. The field is the utility's own: it pays no feed-in for the power and buys that much less at the wholesale price, while the upkeep and the farmer's rent show in its accounts.",
+      ]),
+      p("A business or a cooperative builds as soon as its permit stands; you decide when to build yours. The local paper reports each field taken up and each that goes into service, and for your own fields the town clerk writes how the permit fares."),
       p("Each field suits one of three kinds of installation, which sets how much it holds and when in the day it makes the most:"),
       list([
         "Vertical rows — bifacial panels standing between the crops in north–south rows, one face to the east, the other to the west, with wide gaps for the machines: about 0.3 MWp per hectare, making most in the morning and the late afternoon.",
         "Fixed rows over orchards and vines — panels high above the trees, sheltering them, facing south: about 0.8 MWp per hectare.",
         "Tracking rows — panels turning from east to west through the day over a field: about 0.5 MWp per hectare, making the most per kWp, over a long day.",
       ]),
-      p("Cropland takes vertical or tracking rows, which leave the machines room; meadows, orchards and vines any of the three. A field's card on the map says which it suits, and how big it would be."),
-      p(
-        "The fields feed into the town's grid like any solar and count against its emissions. For what the partners take, the utility pays no feed-in and sells them that much less energy — it keeps the grid fee; for the rest, it pays the feed-in price like for any rooftop.",
-      ),
+      p("Cropland takes vertical or tracking rows, which leave the machines room; meadows, orchards and vines any of the three. Hover over a field on the map to see which it suits, and how big it would be."),
+      p("The fields feed into the town's grid like any solar and count against its emissions."),
       note(
-        "The fields are real (the canton's land cover and cadastral parcels, outside the federal building zones); which kind each suits, which businesses invest and when are the game's. How fields connect to the grid isn't modelled yet: they feed into the town as a whole.",
+        "The fields are real (the canton's land cover and cadastral parcels, outside the federal building zones); which kind each suits, which businesses and cooperatives invest and when are the game's. Every zoned field can be taken up — whether its farmer wants panels on the land isn't asked yet. How fields connect to the grid isn't modelled yet: they feed into the town as a whole.",
       ),
     ],
   },

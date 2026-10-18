@@ -1,25 +1,36 @@
 /**
  * Agri-PV: solar over farmland that stays farmed. Free-standing solar is all but impossible outside
  * the building zones in Switzerland; Agri-PV — panels high above the crops or in rows between them —
- * is the opening. Two steps, two actors:
+ * is the opening. Like wind (wind.ts), a field goes a long road, step by step:
  *
- *  - The municipality zones fields for it (the plots are real: farmland outside the building zones,
- *    cut along the cadastral parcels — pipeline/sources/farm.py). Like any zoning change it costs the
- *    planning work, takes a procedure, and goes to the voters — and people mind: landscape and food
- *    against, the climate-minded for. Part of that stays for as long as the zones are there. The
- *    Agri-PV dialogue (an information measure) builds acceptance over the years, which takes the edge
- *    off both; so does every field people get to see.
- *  - Businesses with a big electricity use build on the zoned fields. Now and then each looks into
- *    the zoned field nearest to it: an installation over the whole field, of the kind the field
- *    suits (config/agriPv.ts — vertical rows, fixed rows over orchards and vines, or tracking rows;
- *    drawn per field), with a power purchase agreement (PPA) — it takes the field's power as it
- *    comes, up to a share of its own use, instead of buying that energy from the utility, and sells
- *    the rest to the utility at the feed-in price. Worth it if that beats the build cost, the upkeep
- *    and the farmer's rent, weighed like every investment in the game.
+ *  1. The municipality zones fields for it (the plots are real: farmland outside the building zones,
+ *     cut along the cadastral parcels — pipeline/sources/farm.py). Like any change to the zoning plan
+ *     it costs the planning work, takes a procedure, and goes to the voters — and people mind:
+ *     landscape and food against, the climate-minded for. Part of that stays for as long as the
+ *     zones are there. The Agri-PV dialogue (an information measure) builds acceptance over the
+ *     years, which takes the edge off both; so does every field people get to see.
+ *  2. A developer takes up a zoned field and applies for the permit (a year) — sometimes appealed,
+ *     and now and then struck down in court; then the field rests a few years.
+ *  3. The build (a year), over the whole field, of the kind the field suits (config/agriPv.ts —
+ *     vertical rows, fixed rows over orchards and vines, or tracking rows; drawn per field).
+ *
+ * Three kinds of developer:
+ *  - Businesses with a big electricity use, each now and then looking into the zoned field nearest to
+ *    it, with a power purchase agreement (PPA): it takes the field's power as it comes, up to a share
+ *    of its own use, instead of buying that energy from the utility, and sells the rest to the
+ *    utility at the feed-in price. Worth it if that beats the build, the upkeep and the farmer's
+ *    rent, weighed like every investment in the game.
+ *  - Energy cooperatives: residents pooling their savings, selling all the power at the feed-in price
+ *    — content with their money back and a little more, but only as big as they can raise.
+ *  - The municipality, when the player takes a field up: permit and build paid from the treasury,
+ *    the power the utility's own (no feed-in paid for it; it saves buying power), the upkeep and the
+ *    rent in the utility's accounts.
+ * A business or a cooperative builds as soon as its permit stands; the municipality when the player
+ * orders it.
  *
  * The fields generate like any solar (registered with solarAdoption.ts as plants of their own, on
- * no building), each kind facing the sun its own way (sim/pv.ts); the utility pays feed-in for the
- * part sold to it, and sells the partners that much less energy for the rest (finances.ts).
+ * no building), each kind facing the sun its own way (sim/pv.ts); finances.ts settles who is paid
+ * for what.
  */
 
 import { BLOC_ORDER } from "../config/approval";
@@ -27,11 +38,17 @@ import {
   AGRI_PV_ACCEPTANCE_MAX,
   AGRI_PV_ACCEPTANCE_PER_FIELD,
   AGRI_PV_ACCEPTANCE_PER_YEAR_DIALOGUE,
+  AGRI_PV_APPEAL_CHANCE,
+  AGRI_PV_APPEAL_UPHELD_CHANCE,
+  AGRI_PV_APPEAL_YEARS,
   AGRI_PV_BUILD_MONTHS,
   AGRI_PV_CAPEX_CHF_PER_KWP_AT_500KWP,
   AGRI_PV_CAPEX_FLOOR_CHF_PER_KWP,
   AGRI_PV_CAPEX_SCALE_EXPONENT,
   AGRI_PV_CONSIDER_PER_YEAR,
+  AGRI_PV_COOP_CONSIDER_PER_YEAR,
+  AGRI_PV_COOP_MAX_CHF,
+  AGRI_PV_COOP_MIN_RETURN,
   AGRI_PV_FULL_SCALE_HA,
   AGRI_PV_SYSTEM_WEIGHTS_CROPLAND,
   AGRI_PV_SYSTEM_WEIGHTS_OTHER,
@@ -44,11 +61,15 @@ import {
   AGRI_PV_MIN_FOOTPRINT_M2,
   AGRI_PV_MIN_KWP,
   AGRI_PV_MIN_SCALE,
+  AGRI_PV_PERMIT_COST_CHF,
+  AGRI_PV_PERMIT_COST_CHF_PER_HA,
+  AGRI_PV_PERMIT_MONTHS,
   AGRI_PV_PLANNING_COST_CHF,
   AGRI_PV_PLANNING_COST_CHF_PER_HA,
   AGRI_PV_PPA_COVER_SHARE,
   AGRI_PV_PRIME_FACTOR,
   AGRI_PV_RENT_CHF_PER_HA_YEAR,
+  AGRI_PV_RETRY_YEARS,
   AGRI_PV_STANCES,
   AGRI_PV_UNCERTAINTY_FRACTION,
   AGRI_PV_UPKEEP_CHF_PER_KWP_YEAR,
@@ -61,8 +82,9 @@ import { toDateMs, toSimTimeMs } from "./calendar";
 import { priceFactor } from "./costTrends";
 import { energyKWh } from "./energy";
 import { simClock } from "./engine";
-import { cannotPay } from "./fiscalRules";
+import { cannotPay, spendingFrozen } from "./fiscalRules";
 import { historyTimeSteps, sampleBuildingCategorySeries } from "./history";
+import { inbox } from "./inbox";
 import { existsAt } from "./lifetime";
 import { LocalProjection, pointInPolygon, type XY } from "./localGeo";
 import { policyStore } from "./policy";
@@ -88,18 +110,37 @@ export interface AgriPvDesignation {
   costRp: number;
 }
 
-export interface AgriPvField {
+export type AgriPvDeveloper = "business" | "cooperative" | "municipality";
+
+export type AgriPvPhase =
+  | "permitting" // the permit procedure
+  | "appeal" // the permit is appealed, in the courts
+  | "permitted" // permitted, waiting on the municipality to build
+  | "building"
+  | "operating"
+  | "struckDown"; // the appeal was upheld — the field rests
+
+export interface AgriPvProject {
   id: number;
   plotId: string;
-  /** The business that built it and buys its power. */
-  partnerEgid: string;
+  developer: AgriPvDeveloper;
+  /** A business's: the building whose power the field supplies. */
+  partnerEgid?: string;
   system: AgriPvSystem;
   capacityKw: number;
-  /** The share of its power its partner takes (the rest is sold to the utility). */
+  /** The share of its power its partner takes (the rest is sold to the utility); 0 unless a business's. */
   ppaShare: number;
-  decidedAtMs: number;
-  installedAtMs: number;
+  phase: AgriPvPhase;
+  /** When the current phase began and when it ends (null: waits on the player, or for good). */
+  phaseFromMs: number;
+  phaseUntilMs: number | null;
+  /** The appeal's outcome, drawn when the permit is granted. */
+  appealUpheld?: boolean;
+  startedAtMs: number;
+  installedAtMs?: number;
+  /** What the developer has paid: the permit (the municipality's only) and the build. */
   costRp: number;
+  log: { atMs: number; text: string }[];
 }
 
 export interface AgriPvQuote {
@@ -112,7 +153,17 @@ export interface AgriPvQuote {
   title: string;
 }
 
-export type PlotState = "farmland" | "planned" | "zoned" | "field" | "fieldBuilding";
+/** What a field would be: its kind and size, a year's output, and what it costs. */
+export interface AgriPvEconomics {
+  system: AgriPvSystem;
+  capacityKw: number;
+  yearlyKWh: number;
+  buildCostRp: number;
+  rentRpPerYear: number;
+  upkeepRpPerYear: number;
+}
+
+export type PlotState = "farmland" | "planned" | "zoned" | "underWay" | "fieldBuilding" | "field";
 
 interface Plot extends FarmPlotData {
   ringXY: XY[];
@@ -136,22 +187,27 @@ function capexRpPerKwp(kw: number, atMs: number): number {
   return chf * 100 * priceFactor("solar", atMs);
 }
 
+const DEVELOPER_LABEL: Record<AgriPvDeveloper, string> = { business: "a business", cooperative: "an energy cooperative", municipality: "the municipality" };
+
 class AgriPv {
   private plots: Plot[] = [];
   private byId = new Map<string, Plot>();
   private projection = new LocalProjection(8.4, 47.4);
   private designations: AgriPvDesignation[] = [];
-  private fields: AgriPvField[] = [];
+  private projects: AgriPvProject[] = [];
   private acceptance = 0;
   private selection = new Set<string>();
   private buildingsProvider: () => Building[] = () => [];
   private seed = "";
+  private town = "";
   private lastMonth = 0;
   private nextId = 1;
   private unsubscribeClock: (() => void) | null = null;
   private readonly listeners = new Set<() => void>();
   private version = 0;
   private stanceCache: { key: string; stances: Stances } | null = null;
+  /** The field picked on the map or in a list (UI state, not saved). */
+  private selectedId: string | null = null;
 
   init(dataset: MunicipalityDataset, buildingsProvider: () => Building[], seed: string): void {
     this.unsubscribeClock?.();
@@ -166,11 +222,13 @@ class AgriPv {
     });
     this.byId = new Map(this.plots.map((p) => [p.id, p]));
     this.designations = [];
-    this.fields = [];
+    this.projects = [];
     this.acceptance = 0;
     this.selection = new Set();
+    this.selectedId = null;
     this.buildingsProvider = buildingsProvider;
     this.seed = seed;
+    this.town = dataset.name;
     this.nextId = 1;
     this.lastMonth = monthIndex(simClock.getSimTimeMs());
     this.stanceCache = null;
@@ -205,13 +263,32 @@ class AgriPv {
     return this.designations.some((d) => !d.rejected && d.plotIds.includes(plotId));
   }
 
-  fieldOn(plotId: string): AgriPvField | undefined {
-    return this.fields.find((f) => f.plotId === plotId);
+  /** The latest project on a plot, if any (an earlier one struck down stays in the record). */
+  projectOn(plotId: string): AgriPvProject | undefined {
+    for (let i = this.projects.length - 1; i >= 0; i--) if (this.projects[i].plotId === plotId) return this.projects[i];
+    return undefined;
+  }
+
+  /** When a field struck down in court may be taken up again. */
+  restingUntil(p: AgriPvProject): number | null {
+    return p.phase === "struckDown" ? p.phaseFromMs + AGRI_PV_RETRY_YEARS * YEAR_MS : null;
+  }
+
+  /** Whether a zoned plot is free for a developer to take up at `atMs`. */
+  isFree(plotId: string, atMs: number): boolean {
+    if (!this.zonedAt(plotId, atMs)) return false;
+    const p = this.projectOn(plotId);
+    if (!p) return true;
+    const until = this.restingUntil(p);
+    return until !== null && atMs >= until;
   }
 
   stateAt(plotId: string, atMs: number): PlotState {
-    const field = this.fieldOn(plotId);
-    if (field) return field.installedAtMs <= atMs ? "field" : "fieldBuilding";
+    const p = this.projectOn(plotId);
+    if (p && p.phase !== "struckDown") {
+      if (p.installedAtMs !== undefined) return p.installedAtMs <= atMs ? "field" : "fieldBuilding";
+      return "underWay";
+    }
     if (this.zonedAt(plotId, atMs)) return "zoned";
     if (this.zonedOrPlanned(plotId)) return "planned";
     return "farmland";
@@ -221,8 +298,8 @@ class AgriPv {
     return this.designations;
   }
 
-  getFields(): AgriPvField[] {
-    return this.fields;
+  getProjects(): AgriPvProject[] {
+    return this.projects;
   }
 
   getAcceptance(): number {
@@ -269,7 +346,7 @@ class AgriPv {
 
   /** What putting the picked plots forward would do. */
   quote(): AgriPvQuote {
-    const plotIds = [...this.selection].filter((id) => !this.zonedOrPlanned(id) && !this.fieldOn(id));
+    const plotIds = [...this.selection].filter((id) => !this.zonedOrPlanned(id));
     const plots = plotIds.map((id) => this.byId.get(id) as Plot);
     const areaM2 = plots.reduce((sum, p) => sum + p.areaM2, 0);
     const primeShare = areaM2 > 0 ? plots.reduce((sum, p) => sum + p.areaM2 * p.primeShare, 0) / areaM2 : 0;
@@ -336,58 +413,7 @@ class AgriPv {
     return stances;
   }
 
-  // --- the fields ---
-
-  /** The fields generating before `cutoffMs`, as plants on no building (solarAdoption.ts, and the
-   * utility's accounts, finances.ts). */
-  plantsBefore(cutoffMs: number): PowerPlant[] {
-    const plants: PowerPlant[] = [];
-    for (const f of this.fields) {
-      if (f.installedAtMs >= cutoffMs) continue;
-      const plot = this.byId.get(f.plotId);
-      plants.push({ plantId: `agri-pv:${f.id}`, lon: plot?.lon ?? 0, lat: plot?.lat ?? 0, capacityKw: f.capacityKw, technology: "Photovoltaic", commissioningDate: null, egid: null, pvProfile: f.system });
-    }
-    return plants;
-  }
-
-  /** The fields in service at `atMs`, and their combined size (kW). */
-  capacityAtKw(atMs: number): number {
-    return this.fields.reduce((sum, f) => sum + (f.installedAtMs <= atMs ? f.capacityKw : 0), 0);
-  }
-
-  /** The energy the fields' partners take instead of buying it from the utility, at `atMs`'s
-   * tariff: what they would have paid for it, less the grid fee they still pay (Rp per kWh). */
-  ppaEnergyValueRpPerKWh(atMs: number): number {
-    const t = tariffStore.at(atMs);
-    return (t.energyPeakRpKWh + t.energyOffPeakRpKWh) / 2;
-  }
-
-  /** A business's electricity use over the year before `atMs` (kWh). */
-  private yearlyUseKWh(b: Building, atMs: number): number {
-    const times = historyTimeSteps(atMs, YEAR_MS, 96);
-    return energyKWh(times, consumptionSeriesW(sampleBuildingCategorySeries(b, times, tariffStore.at(atMs), [])));
-  }
-
-  /** The businesses big enough to look into a field. */
-  private consumers(atMs: number): Building[] {
-    return this.buildingsProvider().filter((b) => {
-      if ((b.footprintAreaM2 ?? 0) < AGRI_PV_MIN_FOOTPRINT_M2 || !existsAt(b, atMs)) return false;
-      const g = buildingGroup(b);
-      return g === "commercial" || g === "industrial";
-    });
-  }
-
-  /** The zoned field nearest to a business, free to build on. */
-  private nearestFreeField(b: Building, atMs: number): Plot | null {
-    const p = this.projection.toXY(b.lon, b.lat);
-    let best: { plot: Plot; d: number } | null = null;
-    for (const plot of this.plots) {
-      if (!this.zonedAt(plot.id, atMs) || this.fieldOn(plot.id)) continue;
-      const d = Math.hypot(plot.centre[0] - p[0], plot.centre[1] - p[1]);
-      if (!best || d < best.d) best = { plot, d };
-    }
-    return best?.plot ?? null;
-  }
+  // --- a field's numbers ---
 
   /** The kind of installation a field suits — drawn per field, by how much of it is cropland. */
   systemOf(plotId: string): AgriPvSystem {
@@ -408,68 +434,307 @@ class AgriPv {
     return { system, capacityKw: ((this.byId.get(plotId)?.areaM2 ?? 0) / 10_000) * AGRI_PV_SYSTEMS[system].kwpPerHa };
   }
 
+  /** A field's installation, output and costs, were it built at `atMs`. */
+  economics(plotId: string, atMs: number): AgriPvEconomics {
+    const { system, capacityKw: kw } = this.installationFor(plotId);
+    const ha = (this.byId.get(plotId)?.areaM2 ?? 0) / 10_000;
+    return {
+      system,
+      capacityKw: kw,
+      yearlyKWh: kw * specificYieldKWhPerKwp(atMs) * profileYearFactor(system),
+      buildCostRp: kw * capexRpPerKwp(kw, atMs) * AGRI_PV_SYSTEMS[system].capexFactor,
+      rentRpPerYear: ha * AGRI_PV_RENT_CHF_PER_HA_YEAR * 100,
+      upkeepRpPerYear: kw * AGRI_PV_UPKEEP_CHF_PER_KWP_YEAR * 100,
+    };
+  }
+
+  /** The permit for a field: the canton's exceptional permit and the building permit (Rp). */
+  permitCostRp(plotId: string): number {
+    return Math.round((AGRI_PV_PERMIT_COST_CHF + (AGRI_PV_PERMIT_COST_CHF_PER_HA * (this.byId.get(plotId)?.areaM2 ?? 0)) / 10_000) * 100);
+  }
+
+  /** What the municipality's fields in service at `atMs` cost the utility a year: their upkeep and
+   * the farmers' rent (Rp). */
+  upkeepRpPerYear(atMs: number): number {
+    let rp = 0;
+    for (const p of this.projects) {
+      if (p.developer !== "municipality" || p.installedAtMs === undefined || p.installedAtMs > atMs) continue;
+      const ha = (this.byId.get(p.plotId)?.areaM2 ?? 0) / 10_000;
+      rp += p.capacityKw * AGRI_PV_UPKEEP_CHF_PER_KWP_YEAR * 100 + ha * AGRI_PV_RENT_CHF_PER_HA_YEAR * 100;
+    }
+    return rp;
+  }
+
+  // --- the fields ---
+
+  /** The fields generating before `cutoffMs`, as plants on no building (solarAdoption.ts, and the
+   * utility's accounts, finances.ts). */
+  plantsBefore(cutoffMs: number): PowerPlant[] {
+    const plants: PowerPlant[] = [];
+    for (const f of this.projects) {
+      if (f.installedAtMs === undefined || f.installedAtMs >= cutoffMs) continue;
+      const plot = this.byId.get(f.plotId);
+      plants.push({ plantId: `agri-pv:${f.id}`, lon: plot?.lon ?? 0, lat: plot?.lat ?? 0, capacityKw: f.capacityKw, technology: "Photovoltaic", commissioningDate: null, egid: null, pvProfile: f.system });
+    }
+    return plants;
+  }
+
+  /** The fields in service at `atMs`: their combined size (kW). */
+  capacityAtKw(atMs: number): number {
+    return this.projects.reduce((sum, f) => sum + (f.installedAtMs !== undefined && f.installedAtMs <= atMs ? f.capacityKw : 0), 0);
+  }
+
+  /** The energy the fields' partners take instead of buying it from the utility, at `atMs`'s
+   * tariff: what they would have paid for it, less the grid fee they still pay (Rp per kWh). */
+  ppaEnergyValueRpPerKWh(atMs: number): number {
+    const t = tariffStore.at(atMs);
+    return (t.energyPeakRpKWh + t.energyOffPeakRpKWh) / 2;
+  }
+
+  // --- developers ---
+
+  /** A business's electricity use over the year before `atMs` (kWh). */
+  private yearlyUseKWh(b: Building, atMs: number): number {
+    const times = historyTimeSteps(atMs, YEAR_MS, 96);
+    return energyKWh(times, consumptionSeriesW(sampleBuildingCategorySeries(b, times, tariffStore.at(atMs), [])));
+  }
+
+  /** The businesses big enough to look into a field. */
+  private consumers(atMs: number): Building[] {
+    return this.buildingsProvider().filter((b) => {
+      if ((b.footprintAreaM2 ?? 0) < AGRI_PV_MIN_FOOTPRINT_M2 || !existsAt(b, atMs)) return false;
+      const g = buildingGroup(b);
+      return g === "commercial" || g === "industrial";
+    });
+  }
+
+  /** The free zoned field nearest to a business. */
+  private nearestFreeField(b: Building, atMs: number): Plot | null {
+    const p = this.projection.toXY(b.lon, b.lat);
+    let best: { plot: Plot; d: number } | null = null;
+    for (const plot of this.plots) {
+      if (!this.isFree(plot.id, atMs)) continue;
+      const d = Math.hypot(plot.centre[0] - p[0], plot.centre[1] - p[1]);
+      if (!best || d < best.d) best = { plot, d };
+    }
+    return best?.plot ?? null;
+  }
+
   /** A business weighs a field: an installation over the whole field, its power taken up to a share
    * of its own use and the rest sold to the utility, against doing nothing. */
-  private consider(b: Building, plot: Plot, atMs: number): AgriPvField | null {
+  private businessConsiders(b: Building, plot: Plot, atMs: number): boolean {
     const useKWh = this.yearlyUseKWh(b, atMs);
-    if (useKWh < AGRI_PV_MIN_CONSUMER_MWH * 1000) return null;
-    const { system, capacityKw: kw } = this.installationFor(plot.id);
-    if (kw < AGRI_PV_MIN_KWP) return null;
-    const fieldKWh = kw * specificYieldKWhPerKwp(atMs) * profileYearFactor(system);
-    const ppaShare = Math.min(1, (useKWh * AGRI_PV_PPA_COVER_SHARE) / fieldKWh);
-    const costRp = kw * capexRpPerKwp(kw, atMs) * AGRI_PV_SYSTEMS[system].capexFactor;
-    const rentRp = (plot.areaM2 / 10_000) * AGRI_PV_RENT_CHF_PER_HA_YEAR * 100;
-    const upkeepRp = kw * AGRI_PV_UPKEEP_CHF_PER_KWP_YEAR * 100;
-    const savedRp = fieldKWh * (ppaShare * this.ppaEnergyValueRpPerKWh(atMs) + (1 - ppaShare) * tariffStore.at(atMs).feedInExpectedRpKWh);
+    if (useKWh < AGRI_PV_MIN_CONSUMER_MWH * 1000) return false;
+    const e = this.economics(plot.id, atMs);
+    if (e.capacityKw < AGRI_PV_MIN_KWP) return false;
+    const ppaShare = Math.min(1, (useKWh * AGRI_PV_PPA_COVER_SHARE) / e.yearlyKWh);
+    const savedRp = e.yearlyKWh * (ppaShare * this.ppaEnergyValueRpPerKWh(atMs) + (1 - ppaShare) * tariffStore.at(atMs).feedInExpectedRpKWh);
     type Choice = "none" | "field";
     const candidates: RenewalCandidate<Choice>[] = [
       { id: "none", available: true, annualizedCostRp: 0, lifetimeMeanYears: AGRI_PV_LIFETIME_YEARS, greenness: 0 },
-      { id: "field", available: true, annualizedCostRp: costRp / AGRI_PV_LIFETIME_YEARS + rentRp + upkeepRp - savedRp, lifetimeMeanYears: AGRI_PV_LIFETIME_YEARS, greenness: 1 },
+      {
+        id: "field",
+        available: true,
+        annualizedCostRp: e.buildCostRp / AGRI_PV_LIFETIME_YEARS + e.rentRpPerYear + e.upkeepRpPerYear - savedRp,
+        lifetimeMeanYears: AGRI_PV_LIFETIME_YEARS,
+        greenness: 1,
+      },
     ];
     const policy = policyStore.get();
     const { chosen } = chooseNext(candidates, "none", AGRI_PV_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier, policy.progressiveNudgeRp);
-    if (chosen === "none") return null;
-    return { id: this.nextId++, plotId: plot.id, partnerEgid: b.egid, system, capacityKw: kw, ppaShare, decidedAtMs: atMs, installedAtMs: atMs + AGRI_PV_BUILD_MONTHS * MONTH_MS, costRp };
+    if (chosen === "none") return false;
+    this.start(plot.id, "business", atMs, { partnerEgid: b.egid, ppaShare });
+    return true;
+  }
+
+  /** An energy cooperative weighs a field: all its power sold at the feed-in price, enough to pay
+   * the build, the rent and the upkeep with a little to spare — if it can raise the money. */
+  private cooperativeConsiders(plot: Plot, atMs: number): boolean {
+    const e = this.economics(plot.id, atMs);
+    if (e.capacityKw < AGRI_PV_MIN_KWP || e.buildCostRp > AGRI_PV_COOP_MAX_CHF * 100) return false;
+    const costRp = e.buildCostRp / AGRI_PV_LIFETIME_YEARS + e.rentRpPerYear + e.upkeepRpPerYear;
+    const earnsRp = e.yearlyKWh * tariffStore.at(atMs).feedInExpectedRpKWh;
+    if (earnsRp < costRp * (1 + AGRI_PV_COOP_MIN_RETURN)) return false;
+    this.start(plot.id, "cooperative", atMs, {});
+    return true;
+  }
+
+  /** A developer takes up a field: its permit procedure begins. */
+  private start(plotId: string, developer: AgriPvDeveloper, atMs: number, extra: { partnerEgid?: string; ppaShare?: number }, costRp = 0): AgriPvProject {
+    const { system, capacityKw } = this.installationFor(plotId);
+    const p: AgriPvProject = {
+      id: this.nextId++,
+      plotId,
+      developer,
+      partnerEgid: extra.partnerEgid,
+      system,
+      capacityKw,
+      ppaShare: extra.ppaShare ?? 0,
+      phase: "permitting",
+      phaseFromMs: atMs,
+      phaseUntilMs: atMs + AGRI_PV_PERMIT_MONTHS * MONTH_MS,
+      startedAtMs: atMs,
+      costRp,
+      log: [{ atMs, text: `Taken up by ${DEVELOPER_LABEL[developer]}: applied for the permit.` }],
+    };
+    this.projects.push(p);
+    return p;
+  }
+
+  /** The municipality takes up a free zoned field: the permit is paid now, from the treasury. */
+  applyForPermit(plotId: string, atMs: number): boolean {
+    if (!this.isFree(plotId, atMs) || spendingFrozen(atMs)) return false;
+    const costRp = this.permitCostRp(plotId);
+    if (cannotPay(costRp, atMs)) return false;
+    const p = this.start(plotId, "municipality", atMs, {}, costRp);
+    treasury.recordPayout("infrastructure", atMs, costRp, `agri-pv-permit:${p.id}`);
+    this.notify();
+    return true;
+  }
+
+  /** The municipality builds its permitted field: paid now, in service a year on. */
+  build(plotId: string, atMs: number): boolean {
+    const p = this.projectOn(plotId);
+    if (!p || p.developer !== "municipality" || p.phase !== "permitted") return false;
+    const costRp = this.economics(plotId, atMs).buildCostRp;
+    if (cannotPay(costRp, atMs)) return false;
+    p.costRp += costRp;
+    this.startBuilding(p, atMs);
+    treasury.recordPayout("infrastructure", atMs, costRp, `agri-pv-build:${p.id}`);
+    this.notify();
+    return true;
+  }
+
+  private startBuilding(p: AgriPvProject, atMs: number): void {
+    if (p.developer !== "municipality") p.costRp = this.economics(p.plotId, atMs).buildCostRp;
+    p.phase = "building";
+    p.phaseFromMs = atMs;
+    p.phaseUntilMs = atMs + AGRI_PV_BUILD_MONTHS * MONTH_MS;
+    p.installedAtMs = p.phaseUntilMs;
+    p.log.push({ atMs, text: `Construction began: ${(p.capacityKw / 1000).toFixed(1)} MWp.` });
+  }
+
+  /** The permit stands: a business or a cooperative builds at once, the municipality when ordered. */
+  private permitted(p: AgriPvProject, atMs: number, text: string): void {
+    p.phaseFromMs = atMs;
+    p.phaseUntilMs = null;
+    p.log.push({ atMs, text });
+    if (p.developer === "municipality") {
+      p.phase = "permitted";
+      this.letter(atMs, `Agri-PV at ${this.fieldName(p)}: permit granted`, ["The permit for the municipality's Agri-PV field stands. The panels can be ordered (Agri-PV tool)."]);
+    } else this.startBuilding(p, atMs);
+  }
+
+  private endPhase(p: AgriPvProject, atMs: number): void {
+    const rng = mulberry32(hashSeed(this.seed, "project", String(p.id), p.phase));
+    switch (p.phase) {
+      case "permitting": {
+        if (rng() >= AGRI_PV_APPEAL_CHANCE) {
+          this.permitted(p, atMs, "The permit was granted, and no one appealed.");
+          break;
+        }
+        const [from, to] = AGRI_PV_APPEAL_YEARS;
+        p.phase = "appeal";
+        p.phaseFromMs = atMs;
+        p.phaseUntilMs = atMs + (from + rng() * (to - from)) * YEAR_MS;
+        p.appealUpheld = rng() < AGRI_PV_APPEAL_UPHELD_CHANCE;
+        p.log.push({ atMs, text: "The permit was granted — and appealed. The courts will take a while." });
+        if (p.developer === "municipality")
+          this.letter(atMs, `Agri-PV at ${this.fieldName(p)}: we are appealing`, [
+            `Panels over the fields at ${this.fieldName(p)} would spoil an open landscape that belongs to everyone. We have lodged an appeal against the permit with the cantonal court.`,
+          ], "Landscape protection association");
+        break;
+      }
+      case "appeal":
+        if (p.appealUpheld) {
+          p.phase = "struckDown";
+          p.phaseFromMs = atMs;
+          p.phaseUntilMs = null;
+          p.log.push({ atMs, text: `The court upheld the appeal: the permit is void. The field can be taken up again in ${AGRI_PV_RETRY_YEARS} years.` });
+          if (p.developer === "municipality") this.letter(atMs, `Agri-PV at ${this.fieldName(p)}: the court has ruled`, ["The court has upheld the appeal against the Agri-PV field's permit. The permit is void."]);
+        } else this.permitted(p, atMs, "The court dismissed the appeal: the permit stands.");
+        break;
+      case "building":
+        p.phase = "operating";
+        p.phaseFromMs = atMs;
+        p.phaseUntilMs = null;
+        p.log.push({ atMs, text: "The field is in service." });
+        // People see one more field.
+        this.acceptance = Math.min(AGRI_PV_ACCEPTANCE_MAX, this.acceptance + AGRI_PV_ACCEPTANCE_PER_FIELD);
+        this.stanceCache = null;
+        break;
+      default:
+        p.phaseUntilMs = null;
+    }
+  }
+
+  fieldName(p: AgriPvProject): string {
+    return this.byId.get(p.plotId)?.name ?? "the field";
+  }
+
+  private letter(atMs: number, subject: string, paragraphs: string[], from = `The Town Clerk of ${this.town}`): void {
+    inbox.addLetter({ id: `agri-pv-${Math.floor(atMs)}-${subject.length}`, atMs, kind: "report", bloc: null, from, role: "", subject, paragraphs });
   }
 
   // --- time ---
 
   private advance(nowMs: number): void {
-    const month = monthIndex(nowMs);
-    if (month <= this.lastMonth) return;
-    // A long jump takes at most two years of months.
-    for (let m = Math.max(this.lastMonth + 1, month - 24); m <= month; m++) this.monthly(m);
-    this.lastMonth = month;
-  }
-
-  private monthly(month: number): void {
-    const atMs = toSimTimeMs(Date.UTC(Math.floor(month / 12), month % 12, 1));
-    // Acceptance: the dialogue, while it runs.
-    if (policyStore.get().agriPvDialogue > 0) this.acceptance = Math.min(AGRI_PV_ACCEPTANCE_MAX, this.acceptance + AGRI_PV_ACCEPTANCE_PER_YEAR_DIALOGUE / 12);
-    // Businesses look into the zoned fields.
-    if (!this.plots.some((p) => this.zonedAt(p.id, atMs) && !this.fieldOn(p.id))) return;
-    const withField = new Set(this.fields.map((f) => f.partnerEgid));
-    const chance = monthlyChance(AGRI_PV_CONSIDER_PER_YEAR);
-    let built = false;
-    for (const b of this.consumers(atMs)) {
-      if (withField.has(b.egid)) continue;
-      if (mulberry32(hashSeed(this.seed, "consider", b.egid, String(month)))() >= chance) continue;
-      const plot = this.nearestFreeField(b, atMs);
-      if (!plot) break;
-      const field = this.consider(b, plot, atMs);
-      if (!field) continue;
-      this.fields.push(field);
-      withField.add(b.egid);
-      this.acceptance = Math.min(AGRI_PV_ACCEPTANCE_MAX, this.acceptance + AGRI_PV_ACCEPTANCE_PER_FIELD);
-      built = true;
+    let changed = false;
+    for (const p of this.projects) {
+      while (p.phaseUntilMs !== null && p.phaseUntilMs <= nowMs) {
+        this.endPhase(p, p.phaseUntilMs);
+        changed = true;
+      }
     }
-    if (built) {
+    const month = monthIndex(nowMs);
+    if (month > this.lastMonth) {
+      // A long jump takes at most two years of months.
+      for (let m = Math.max(this.lastMonth + 1, month - 24); m <= month; m++) if (this.monthly(m)) changed = true;
+      this.lastMonth = month;
+    }
+    if (changed) {
       this.stanceCache = null;
       this.notify();
     }
   }
 
+  /** A month: acceptance grows while the dialogue runs, and developers look into the free zoned
+   * fields — the businesses first (a PPA pays best), then the cooperatives. */
+  private monthly(month: number): boolean {
+    const atMs = toSimTimeMs(Date.UTC(Math.floor(month / 12), month % 12, 1));
+    if (policyStore.get().agriPvDialogue > 0) this.acceptance = Math.min(AGRI_PV_ACCEPTANCE_MAX, this.acceptance + AGRI_PV_ACCEPTANCE_PER_YEAR_DIALOGUE / 12);
+    if (!this.plots.some((p) => this.isFree(p.id, atMs))) return false;
+    let started = false;
+    const withField = new Set(this.projects.filter((p) => p.partnerEgid && p.phase !== "struckDown").map((p) => p.partnerEgid));
+    const chance = monthlyChance(AGRI_PV_CONSIDER_PER_YEAR);
+    for (const b of this.consumers(atMs)) {
+      if (withField.has(b.egid)) continue;
+      if (mulberry32(hashSeed(this.seed, "consider", b.egid, String(month)))() >= chance) continue;
+      const plot = this.nearestFreeField(b, atMs);
+      if (!plot) break;
+      if (!this.businessConsiders(b, plot, atMs)) continue;
+      withField.add(b.egid);
+      started = true;
+    }
+    const coopChance = monthlyChance(AGRI_PV_COOP_CONSIDER_PER_YEAR);
+    for (const plot of this.plots) {
+      if (!this.isFree(plot.id, atMs)) continue;
+      if (mulberry32(hashSeed(this.seed, "cooperative", plot.id, String(month)))() >= coopChance) continue;
+      if (this.cooperativeConsiders(plot, atMs)) started = true;
+    }
+    return started;
+  }
+
   // --- subscription ---
+
+  getSelectedId(): string | null {
+    return this.selectedId;
+  }
+
+  select(id: string | null): void {
+    this.selectedId = id;
+    this.notify();
+  }
 
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
@@ -488,22 +753,34 @@ class AgriPv {
   // --- saving (saveGame.ts) ---
 
   snapshot() {
-    return { designations: this.designations, fields: this.fields, acceptance: this.acceptance, lastMonth: this.lastMonth, nextId: this.nextId };
+    return { designations: this.designations, projects: this.projects, acceptance: this.acceptance, lastMonth: this.lastMonth, nextId: this.nextId };
   }
 
   restore(s: ReturnType<AgriPv["snapshot"]>): void {
     this.designations = s.designations;
-    this.fields = s.fields;
+    this.projects = s.projects;
     this.acceptance = s.acceptance;
     this.lastMonth = s.lastMonth;
     this.nextId = s.nextId;
     this.selection = new Set();
+    this.selectedId = null;
     this.stanceCache = null;
     this.notify();
   }
 }
 
 export const agriPv = new AgriPv();
+
+export const AGRI_PV_PHASE_LABEL: Record<AgriPvPhase, string> = {
+  permitting: "Permit procedure",
+  appeal: "Appealed, in the courts",
+  permitted: "Permitted — ready to build",
+  building: "Being built",
+  operating: "In service",
+  struckDown: "Struck down in court",
+};
+
+export const AGRI_PV_DEVELOPER_LABEL: Record<AgriPvDeveloper, string> = { business: "Business (PPA)", cooperative: "Energy cooperative", municipality: "Municipality" };
 
 /** The partner a field's PPA is with: its building's address. */
 export function partnerName(egid: string, buildings: Building[]): string {

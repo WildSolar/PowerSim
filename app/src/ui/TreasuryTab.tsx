@@ -33,7 +33,7 @@ function sum(spending: PayoutsByCategory, categories: PayoutCategory[]): number 
 
 /** What the department kept of the utility's year: its profit, less what went to the town. */
 function utilityMarginRp(f: MunicipalFinances): number {
-  return operatingIncomeRp(f) - f.governmentAllocationRp - f.zoningLevyRp;
+  return operatingIncomeRp(f) - f.governmentAllocationRp;
 }
 
 /** The Treasury tab: the accounts (this year so far, the last booked year in detail, and every year
@@ -131,12 +131,6 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
               </td>
             </tr>
           )}
-          {live.receivedRp > 0 && (
-            <tr>
-              <td>Value-capture levy (zoning)</td>
-              <td className="pos">+{formatCHF(live.receivedRp)}</td>
-            </tr>
-          )}
           {live.borrowedRp > 0 && (
             <tr>
               <td>Borrowed</td>
@@ -186,6 +180,7 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
               {last.publicChargingUpkeepRp > 0 && <Line label="Public charger upkeep" value={-last.publicChargingUpkeepRp} />}
               {last.roofContractCostRp > 0 && <Line label="Roof rent and upkeep (utility's solar)" value={-last.roofContractCostRp} />}
               {last.windUpkeepRp > 0 && <Line label="Wind turbine upkeep" value={-last.windUpkeepRp} />}
+              {last.agriPvUpkeepRp > 0 && <Line label="Agri-PV upkeep and rent (utility's fields)" value={-last.agriPvUpkeepRp} />}
               <tr className="treasury-total">
                 <td>The utility's profit</td>
                 <td className={utilityProfit >= 0 ? "pos" : "neg"}>
@@ -229,7 +224,6 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
                 <th>Year</th>
                 <th title="The department's share of the utility's profit">Utility</th>
                 <th title="From the overall government">Allocation</th>
-                <th title="Zoning levy">Levies</th>
                 <th>Borrowed</th>
                 <th title="Subsidies, programmes, zoning plans, interest">Running</th>
                 <th>Invested</th>
@@ -246,7 +240,6 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
                     <td>{f.year}</td>
                     <td>{chfM(utilityMarginRp(f))}</td>
                     <td>{chfM(f.governmentAllocationRp)}</td>
-                    <td>{chfM(f.zoningLevyRp)}</td>
                     <td>{chfM(f.borrowedRp)}</td>
                     <td>{chfM(-running)}</td>
                     <td>{chfM(-invested)}</td>

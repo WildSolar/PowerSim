@@ -11,8 +11,6 @@ import {
   PUBLIC_BUILDINGS_LEGEND,
   ROOF_SOLAR_LEGEND,
   GRID_LEGEND,
-  DH_PRIORITY_COLOR,
-  HIGH_STANDARD_COLOR,
   ZONING_PENDING_COLOR,
   FARM_PLOT_COLORS,
   WIND_SITE_COLORS,
@@ -92,10 +90,6 @@ export function LayerLegend({ mode }: { mode: ColorMode }) {
               <span>{dot.label}</span>
             </div>
           ))}
-          <div className="legend-row">
-            <span className="swatch" style={{ background: `repeating-linear-gradient(135deg, ${DH_PRIORITY_COLOR} 0 3px, transparent 3px 7px)`, border: `1px solid ${DH_PRIORITY_COLOR}` }} />
-            <span>District-heat priority zone</span>
-          </div>
         </div>
       )}
       {mode === "wind" && (
@@ -118,35 +112,22 @@ export function LayerLegend({ mode }: { mode: ColorMode }) {
           </div>
         </div>
       )}
-      {mode === "zoning" && (
+      {mode === "agriPv" && (
         <div className="legend">
-          <div className="legend-row">
-            <span className="swatch" style={{ background: "#f2c14e", opacity: 0.95 }} />
-            <span>Stronger colour: extra floors allowed</span>
-          </div>
-          <div className="legend-row">
-            <span className="swatch" style={{ background: `repeating-linear-gradient(135deg, ${DH_PRIORITY_COLOR} 0 3px, transparent 3px 7px)` }} />
-            <span>District-heat priority zone</span>
-          </div>
-          <div className="legend-row">
-            <span className="swatch" style={{ background: `repeating-linear-gradient(45deg, ${HIGH_STANDARD_COLOR} 0 3px, transparent 3px 7px)` }} />
-            <span>High-standard zone</span>
-          </div>
+          {[
+            { label: "Farmland — click to pick for a zone", color: FARM_PLOT_COLORS.farmland, opacity: 0.6 },
+            { label: "Zoned for Agri-PV", color: FARM_PLOT_COLORS.zoned, opacity: 1 },
+            { label: "Permit under way, or ready to build", color: FARM_PLOT_COLORS.underWay, opacity: 1 },
+            { label: "Agri-PV field (lighter: being built)", color: FARM_PLOT_COLORS.field, opacity: 1 },
+          ].map((d) => (
+            <div className="legend-row" key={d.label}>
+              <span className="swatch" style={{ background: d.color, opacity: d.opacity }} />
+              <span>{d.label}</span>
+            </div>
+          ))}
           <div className="legend-row">
             <span className="swatch line-swatch" style={{ background: ZONING_PENDING_COLOR }} />
-            <span>Change on the way</span>
-          </div>
-          <div className="legend-row">
-            <span className="swatch" style={{ background: FARM_PLOT_COLORS.farmland, opacity: 0.6 }} />
-            <span>Farmland</span>
-          </div>
-          <div className="legend-row">
-            <span className="swatch" style={{ background: FARM_PLOT_COLORS.zoned }} />
-            <span>Zoned for Agri-PV</span>
-          </div>
-          <div className="legend-row">
-            <span className="swatch" style={{ background: FARM_PLOT_COLORS.field }} />
-            <span>Agri-PV field</span>
+            <span>Zone on the way</span>
           </div>
         </div>
       )}

@@ -14,7 +14,6 @@ import { existsAt } from "../sim/lifetime";
 import { market } from "../sim/market";
 import { useSimDay } from "../sim/store";
 import { computeHeatingTechnologyBreakdown } from "../sim/yearReport";
-import { zoning } from "../sim/zoning";
 import { formatCHF } from "./format";
 import { mapFocus } from "../map/mapFocus";
 import { useStockBuildings } from "./useStock";
@@ -363,17 +362,6 @@ export function DistrictHeatPanel() {
   }, [buildings, simDay, version]);
 
   const coverage = useMemo(() => networkCoverage(buildings, simDay), [buildings, simDay, version]); // eslint-disable-line react-hooks/exhaustive-deps
-  // District-heat priority zones (zoning.ts): how much land, and how many buildings there on a piped street.
-  const priority = useMemo(() => {
-    let areaM2 = 0;
-    for (const p of zoning.getParcels()) if (zoning.stateAt(p.id, simDay)?.dhPriority) areaM2 += p.areaM2;
-    if (areaM2 === 0) return null;
-    let onPipes = 0;
-    for (const b of buildings) {
-      if (existsAt(b, simDay) && zoning.fossilHeatingBannedAt(b, simDay) && districtHeat.servesAt(b.streetSegments, simDay)) onPipes++;
-    }
-    return { areaM2, onPipes };
-  }, [buildings, simDay, version]); // eslint-disable-line react-hooks/exhaustive-deps
   const quote = useMemo(() => districtHeat.quote(simDay), [version, simDay]); // eslint-disable-line react-hooks/exhaustive-deps
   const demand = useMemo(() => streetDemand(buildings, quote.segments, simDay), [buildings, quote, simDay]);
   const pipesUnderConstruction = [
@@ -484,17 +472,6 @@ export function DistrictHeatPanel() {
             <span>On a piped street, not connected</span>
             <span className="info-value">{stats.connectable}</span>
           </div>
-          {priority && (
-            <div
-              className="info-row"
-              title="District-heat priority zones (set in the Zoning layer): no new oil or gas heating there, and a new building on a piped street must connect"
-            >
-              <span>Priority zones · on a piped street</span>
-              <span className="info-value">
-                {(priority.areaM2 / 10_000).toFixed(1)} ha · {priority.onPipes} buildings
-              </span>
-            </div>
-          )}
           {stats.awaiting > 0 && (
             <div className="info-row">
               <span>Can connect once the pipes are in</span>

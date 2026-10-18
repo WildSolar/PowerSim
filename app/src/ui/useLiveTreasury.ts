@@ -25,8 +25,6 @@ export interface LiveTreasury {
   utilityMonths: number;
   /** Subsidies paid out so far this year, as decisions happened. */
   paidOutRp: number;
-  /** Value-capture levies (zoning) received so far this year. */
-  receivedRp: number;
   /** Money borrowed so far this year. */
   borrowedRp: number;
 }
@@ -77,19 +75,17 @@ export function useLiveTreasury(dataset: MunicipalityDataset): LiveTreasury {
   }, [dataset.buildings, yearStartMs, year]);
 
   const paidOutRp = treasury.paidOutTotal(yearStartMs, simDay + DAY_MS);
-  const receivedRp = treasury.received(yearStartMs, simDay + DAY_MS, "zoningLevy"); // value-capture levies (zoning)
   const borrowedRp = treasury.received(yearStartMs, simDay + DAY_MS, "borrowing");
   const allocationPaidRp = allocationSoFarRp(budgetRp, year, simDay);
   const utility = settledUtilitySoFar(year, simDay + DAY_MS);
   const utilityRp = departmentUtilityRp(year, utility);
   return {
-    balanceRp: openingRp === null ? null : openingRp + allocationPaidRp + utilityRp - paidOutRp + receivedRp + borrowedRp,
+    balanceRp: openingRp === null ? null : openingRp + allocationPaidRp + utilityRp - paidOutRp + borrowedRp,
     budgetRp,
     allocationSoFarRp: allocationPaidRp,
     utilityRp,
     utilityMonths: utility.months,
     paidOutRp,
-    receivedRp,
     borrowedRp,
   };
 }

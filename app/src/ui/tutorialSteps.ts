@@ -279,7 +279,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     chapter: "Building things",
     target: "tools",
     say: [
-      "Below the views are your planning tools. Here you don't just colour the map — you build: district heating pipes and heat plants, public chargers, a stronger grid, zoning changes, solar on public and rented roofs, Agri-PV over fields, wind turbines.",
+      "Below the views are your planning tools. Here you don't just colour the map — you build: district heating pipes and heat plants, public chargers, a stronger grid, solar on public and rented roofs and over car parks, Agri-PV over fields, wind turbines.",
     ],
   },
   {

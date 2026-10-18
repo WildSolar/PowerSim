@@ -16,6 +16,7 @@ export type ColorMode =
   | "districtHeat"
   | "evCharging"
   | "zoning"
+  | "agriPv"
   | "publicBuildings"
   | "roofSolar"
   | "wind"
@@ -265,8 +266,7 @@ export const ZONING_LEGEND: LegendEntry[] = [
   { bucket: "public", label: "Public use", color: "#7fa7c9" },
 ];
 export const ZONING_BUILDING_COLOR = "#d9d6cf";
-export const DH_PRIORITY_COLOR = "#c8641e";
-export const HIGH_STANDARD_COLOR = "#0d7a52";
+// An Agri-PV zone on its way: the fields' outline.
 export const ZONING_PENDING_COLOR = "#f2b01e";
 // Wind turbines (sim/wind.ts), by how far their site has come.
 export const WIND_SITE_COLORS = { planned: "#6f6d66", underWay: "#2a78d6", ready: "#1baf7a", turning: "#0d7a52", stopped: "#c2410c" } as const;
@@ -280,8 +280,9 @@ export const CAR_PARK_LEGEND: LegendEntry[] = [
   { bucket: "private", label: "Private car park", color: "#8f8b80" },
 ];
 
-// Farmland in the zoning layer, by where it stands for Agri-PV (sim/agriPv.ts).
-export const FARM_PLOT_COLORS = { farmland: "#9cbf73", planned: "#e6c229", zoned: "#e6c229", fieldBuilding: "#3d5a80", field: "#3d5a80" } as const;
+// Farmland in the Agri-PV layer, by where it stands (sim/agriPv.ts). Zoned, under way and fields are
+// a validated set (all pairs); farmland is the neutral bucket.
+export const FARM_PLOT_COLORS = { farmland: "#9cbf73", planned: "#eda100", zoned: "#eda100", underWay: "#4a3aa7", fieldBuilding: "#2a78d6", field: "#2a78d6" } as const;
 
 // The EV charging layer: buildings where most households have a wallbox, and elsewhere the quality
 // of public charging around (publicCharging.ts) — below the floor, too little to rely on. Whether

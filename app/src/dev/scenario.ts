@@ -8,7 +8,7 @@
  */
 
 import { dataUrl } from "../data/loadDataset";
-import type { MunicipalityDataset, SiteZone } from "../data/types";
+import type { MunicipalityDataset } from "../data/types";
 import { approval } from "../sim/approval";
 import { toDateMs } from "../sim/calendar";
 import { cachedEmissionsForYear, computeEmissionsForYear } from "../sim/emissions";
@@ -30,7 +30,7 @@ import { publicCharging } from "../sim/publicCharging";
 import { grid } from "../sim/grid";
 import { heatPumpSiting } from "../sim/heatPumpSiting";
 import { sizeUnreportedSources } from "../sim/districtHeatStats";
-import { zoning, type ZoningAction } from "../sim/zoning";
+import { zoning } from "../sim/zoning";
 import { fleets } from "../sim/fleet";
 import { tariffStore } from "../sim/tariffStore";
 import { market } from "../sim/market";
@@ -57,9 +57,6 @@ export interface ScenarioSpec {
   costTrends?: boolean;
   /** Tariff changes at the start (e.g. the municipal public charging prices). */
   tariff?: Record<string, number>;
-  /** Zoning changes, put forward for every parcel of a zone type (as the plan stands then) in the
-   * given calendar year — voted on only with withApproval. */
-  zoning?: { zone: SiteZone; action: ZoningAction; year?: number }[];
   /** Run the approval model too (votes and game over included). Off by default: the physical effect of
    * a measure is easier to judge without a referendum striking it down. */
   withApproval?: boolean;
@@ -77,10 +74,8 @@ export interface ScenarioRow {
   buildings: number;
   dwellings: number;
   gfaM2: number;
-  zoningLevyChf: number;
   /** Transformer areas by load band at the last readings, and how many can't take more draw / feed-in. */
   grid: Record<string, number>;
-  zoningLevyFromRezoningChf: number;
   heating: Record<string, number>;
   heatPumpShare: number;
   carSlots: { evShare: number };
@@ -140,7 +135,6 @@ function snapshot(dataset: MunicipalityDataset, year: number, atMs: number): Sce
     buildings: buildings.length,
     dwellings: buildings.reduce((sum, b) => sum + b.dwellings.length, 0),
     gfaM2: Math.round(buildings.reduce((sum, b) => sum + (b.footprintAreaM2 ?? 0) * Math.max(1, b.floorCount ?? 2), 0)),
-    zoningLevyChf: Math.round(zoning.leviesTotalRp(atMs) / 100),
     grid: grid.getAreas().reduce(
       (counts, a) => {
         counts[grid.bucket(a, atMs)] = (counts[grid.bucket(a, atMs)] ?? 0) + 1;
@@ -151,7 +145,6 @@ function snapshot(dataset: MunicipalityDataset, year: number, atMs: number): Sce
       },
       {} as Record<string, number>,
     ),
-    zoningLevyFromRezoningChf: Math.round(zoning.rezoningLeviesRp(atMs) / 100),
     heating,
     heatPumpShare: Math.round((heatPumps / (buildings.length || 1)) * 1000) / 1000,
     carSlots: { evShare: Math.round((evSlots / (carSlots || 1)) * 1000) / 1000 },
@@ -226,19 +219,9 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     }
   };
   if (spec.tariff) tariffStore.set(spec.tariff);
-  const pendingZoning = [...(spec.zoning ?? [])];
-  const zoneDue = (year: number, atMs: number) => {
-    for (const z of pendingZoning.filter((p) => (p.year ?? startYear) <= year)) {
-      zoning.clearSelection();
-      zoning.selectMany(zoning.parcelIdsInZone(z.zone, atMs));
-      zoning.submit(z.action, stock.getAll(), atMs, { withoutVote: !spec.withApproval });
-      pendingZoning.splice(pendingZoning.indexOf(z), 1);
-    }
-  };
   setCostTrendsEnabled(spec.costTrends ?? true);
   enactDue(startYear, 0);
   buildDue(startYear, 0);
-  zoneDue(startYear, 0);
 
   for (;;) {
     const previous = new Date(toDateMs(t));
@@ -263,7 +246,6 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     }
     enactDue(year, t);
     buildDue(year, t);
-    zoneDue(year, t);
 
     const newYear = now.getUTCFullYear() !== previous.getUTCFullYear();
     if (newYear && spec.autoChargers) {

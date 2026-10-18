@@ -624,6 +624,7 @@ const UTILITY_LINES: { key: keyof UtilityMonth | "concessionFee"; label: string;
   { key: "publicChargingUpkeepRp", label: "Public charger upkeep", cost: true },
   { key: "roofContractCostRp", label: "Roof rent and upkeep (utility's solar)", cost: true },
   { key: "windUpkeepRp", label: "Wind turbine upkeep", cost: true },
+  { key: "agriPvUpkeepRp", label: "Agri-PV upkeep and rent (utility's fields)", cost: true },
   { key: "concessionFee", label: "Concession fee to the town", cost: true },
   { key: "publicSolarSavingsRp", label: "Solar on public buildings (credited to you)", cost: false },
 ];
@@ -660,7 +661,8 @@ function utilityChart(param: string | null, nowMs: number): ChartData {
       f.districtHeatUpkeepRp +
       f.publicChargingUpkeepRp +
       f.roofContractCostRp +
-      f.windUpkeepRp,
+      f.windUpkeepRp +
+      f.agriPvUpkeepRp,
   );
   return {
     xs: list.map((f) => f.year + 0.5),

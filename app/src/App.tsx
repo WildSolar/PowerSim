@@ -24,7 +24,7 @@ import { LayerLegend } from "./ui/LayerLegend";
 import { TopBar } from "./ui/TopBar";
 import { DistrictHeatPanel } from "./ui/DistrictHeatPanel";
 import { EvChargingPanel } from "./ui/EvChargingPanel";
-import { ZoningPanel } from "./ui/ZoningPanel";
+import { AgriPvPanel } from "./ui/AgriPvPanel";
 import { GridPanel } from "./ui/GridPanel";
 import { PublicBuildingsPanel } from "./ui/PublicBuildingsPanel";
 import { CarParksPanel } from "./ui/CarParksPanel";
@@ -252,7 +252,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         networkTariff.init(() => stock.getAll());
         advisors.init(() => stock.getAll(), `advisors:${loaded.bfsNumber}`);
         wind.init(loaded, () => stock.getAll(), `wind:${loaded.bfsNumber}`);
-        zoning.init(loaded); // before the stock: new buildings ask their parcel what it allows
+        zoning.init(loaded); // before the stock: new buildings ask their parcel's zone
         heatPumpSiting.init(loaded, () => stock.getAll()); // before the stock: heating decisions ask it where a heat pump may go
         publicCharging.init(loaded, 0);
         publicCharging.setBuildingLookup((egid) => stock.lookup(egid));
@@ -370,8 +370,8 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
       <DistrictHeatPanel />
     ) : colorMode === "evCharging" ? (
       <EvChargingPanel />
-    ) : colorMode === "zoning" ? (
-      <ZoningPanel />
+    ) : colorMode === "agriPv" ? (
+      <AgriPvPanel />
     ) : colorMode === "grid" ? (
       <GridPanel />
     ) : colorMode === "wind" ? (

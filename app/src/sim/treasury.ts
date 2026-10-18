@@ -115,7 +115,7 @@ function zeroPayouts(): PayoutsByCategory {
 
 /** Money coming in outside the yearly accounts: the value-capture levy on zoning gains (zoning.ts),
  * due when a project that gains from a zoning change gets its permit, and borrowed money (debt.ts). */
-export type ReceiptKind = "zoningLevy" | "borrowing";
+export type ReceiptKind = "borrowing";
 
 export interface Receipt {
   atMs: number;
@@ -169,7 +169,7 @@ class Treasury {
     this.notify();
   }
 
-  recordReceipt(atMs: number, amountRp: number, ref: string, kind: ReceiptKind = "zoningLevy"): void {
+  recordReceipt(atMs: number, amountRp: number, ref: string, kind: ReceiptKind): void {
     if (!(amountRp > 0)) return;
     this.receipts.push({ atMs, amountRp, ref, kind });
     this.notify();

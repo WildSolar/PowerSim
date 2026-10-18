@@ -15,6 +15,7 @@ import {
   PanelsTopLeft,
   School,
   Sun,
+  Tractor,
   UtilityPole,
   Wind,
   Zap,
@@ -38,6 +39,7 @@ const VIEWS: LayerDef[] = [
   { mode: "groundHeat", label: "Ground heat", Icon: Drill },
   { mode: "power", label: "Power draw", Icon: Zap },
   { mode: "solar", label: "Solar", Icon: Sun },
+  { mode: "zoning", label: "Zoning", Icon: LandPlot },
 ];
 
 /** Planning tools are where the municipality builds and decides on the map. */
@@ -45,10 +47,10 @@ const TOOLS: LayerDef[] = [
   { mode: "districtHeat", label: "District heating", Icon: Factory },
   { mode: "evCharging", label: "EV charging", Icon: EvCharger },
   { mode: "grid", label: "Grid", Icon: UtilityPole },
-  { mode: "zoning", label: "Zoning", Icon: LandPlot },
   { mode: "publicBuildings", label: "Public buildings", Icon: School },
   { mode: "roofSolar", label: "Roof solar", Icon: PanelsTopLeft },
   { mode: "carParks", label: "Car parks", Icon: CircleParking },
+  { mode: "agriPv", label: "Agri-PV", Icon: Tractor },
   { mode: "wind", label: "Wind", Icon: Wind },
 ];
 

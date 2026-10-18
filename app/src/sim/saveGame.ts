@@ -50,7 +50,6 @@ import { tariffStore } from "./tariffStore";
 import { treasury } from "./treasury";
 import { restoreYearReport, snapshotYearReport } from "./yearReport";
 import { resetYearEndWatcher } from "./yearEndWatcher";
-import { zoning } from "./zoning";
 import { decodeJson, encodeJson, fromBase64, gunzip, gzip, toBase64 } from "./saveCodec";
 import { VERSION_LABEL } from "../changelog";
 
@@ -97,7 +96,6 @@ interface SaveState {
   modeChains: ReturnType<typeof snapshotModeChains>;
   solar: ReturnType<typeof snapshotSolar>;
   stock: ReturnType<typeof stock.snapshot>;
-  zoning: ReturnType<typeof zoning.snapshot>;
   districtHeat: ReturnType<typeof districtHeat.snapshot>;
   grid: ReturnType<typeof grid.snapshot>;
   publicCharging: ReturnType<typeof publicCharging.snapshot>;
@@ -176,7 +174,6 @@ export function captureState(transparency: boolean): Omit<SaveState, "yearReport
     modeChains: snapshotModeChains(),
     solar: snapshotSolar(),
     stock: stock.snapshot(),
-    zoning: zoning.snapshot(),
     districtHeat: districtHeat.snapshot(),
     grid: grid.snapshot(),
     publicCharging: publicCharging.snapshot(slotRefOf),
@@ -271,7 +268,6 @@ export function applySave(file: SaveFile): void {
   restoreModeChains(s.modeChains);
   restoreSolar(s.solar);
   stock.restore(s.stock);
-  zoning.restore(s.zoning);
   districtHeat.restore(s.districtHeat);
   grid.restore(s.grid);
   // Slot handles and vehicles cached what they found at the start; they re-derive from here.
@@ -279,13 +275,11 @@ export function applySave(file: SaveFile): void {
   fleets.resetCaches();
   publicCharging.restore(s.publicCharging, (ref) => slotFromRef(ref as SlotRef | null));
   approval.restore(s.approval, (key) =>
-    key.startsWith("zoning:")
-      ? (accepted) => zoning.voteResult(Number(key.slice("zoning:".length)), accepted)
-      : key.startsWith("agriPv:")
-        ? (accepted) => agriPv.voteResult(Number(key.slice("agriPv:".length)), accepted)
-        : key.startsWith("wind:")
-          ? (accepted, atMs) => wind.voteResult(key.split(":")[1], accepted, atMs)
-          : (accepted, atMs, yes) => measures.resolveVote(key, accepted, atMs, yes),
+    key.startsWith("agriPv:")
+      ? (accepted) => agriPv.voteResult(Number(key.slice("agriPv:".length)), accepted)
+      : key.startsWith("wind:")
+        ? (accepted, atMs) => wind.voteResult(key.split(":")[1], accepted, atMs)
+        : (accepted, atMs, yes) => measures.resolveVote(key, accepted, atMs, yes),
   );
   debt.restore(s.debt);
   studies.restore(s.studies);

@@ -1,7 +1,8 @@
 // Agri-PV (sim/agriPv.ts): solar over farmland that stays farmed, on fields the municipality zones
-// for it, built by businesses that buy the power. Informed placeholders.
+// for it, developed by businesses that buy the power, energy cooperatives, or the municipality
+// itself. Informed placeholders.
 
-// Designating fields: the planning work, like a zoning change (config/zoning.ts), and its procedure.
+// Designating fields: the planning work for a change to the zoning plan, and its procedure.
 export const AGRI_PV_PLANNING_COST_CHF = 40_000;
 export const AGRI_PV_PLANNING_COST_CHF_PER_HA = 3_000;
 export const AGRI_PV_LEAD_MONTHS = 24;
@@ -49,6 +50,19 @@ export const AGRI_PV_LIFETIME_YEARS = 25;
 export const AGRI_PV_BUILD_MONTHS = 12;
 export const AGRI_PV_MIN_KWP = 200;
 
+// The permit for a field (a year): outside the building zones, the canton's exceptional permit —
+// the developer shows the farming goes on and gains — and the building permit. Then, now and then,
+// an appeal (landscape protection, neighbours), which takes a year or more in the courts and is
+// sometimes upheld: then the field rests a few years before anyone takes it up again. The
+// developer pays: a business or a cooperative its own, the municipality from the treasury.
+export const AGRI_PV_PERMIT_COST_CHF = 60_000;
+export const AGRI_PV_PERMIT_COST_CHF_PER_HA = 10_000;
+export const AGRI_PV_PERMIT_MONTHS = 12;
+export const AGRI_PV_APPEAL_CHANCE = 0.3;
+export const AGRI_PV_APPEAL_YEARS: [number, number] = [1, 3];
+export const AGRI_PV_APPEAL_UPHELD_CHANCE = 0.2;
+export const AGRI_PV_RETRY_YEARS = 3;
+
 // Who invests: businesses that use a lot of electricity, through a power purchase agreement (PPA):
 // they take the field's power as it comes, instead of buying that energy from the utility (they
 // still pay for the grid). Each looks into it now and then, at the zoned field nearest to them.
@@ -60,3 +74,12 @@ export const AGRI_PV_CONSIDER_PER_YEAR = 0.15;
 export const AGRI_PV_PPA_COVER_SHARE = 0.6;
 // How much the numbers are guessed at (a share of the yearly cost, as for every investment decision).
 export const AGRI_PV_UNCERTAINTY_FRACTION = 0.25;
+
+// Energy cooperatives (Energiegenossenschaften): residents pooling their savings for a field, and
+// selling all its power to the utility at the feed-in price. Now and then one looks into each free
+// zoned field, and takes it up if the feed-in pays for the build, the rent and the upkeep with a
+// little to spare — its members want their money back, not a big return. What they can raise
+// limits how big a field they take on.
+export const AGRI_PV_COOP_CONSIDER_PER_YEAR = 0.1;
+export const AGRI_PV_COOP_MIN_RETURN = 0.1;
+export const AGRI_PV_COOP_MAX_CHF = 3_000_000;

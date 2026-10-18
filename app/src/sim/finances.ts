@@ -81,10 +81,10 @@ export interface MunicipalFinances {
   publicChargingUpkeepRp: number; // keeping those chargers running
   roofContractCostRp: number; // the utility's arrays on rented roofs: the rent, and their upkeep (roofContracts.ts)
   windUpkeepRp: number; // the utility's wind turbines (wind.ts)
+  agriPvUpkeepRp: number; // the utility's own Agri-PV fields: their upkeep and the farmers' rent (agriPv.ts)
   profitTransferRp: number; // handed to the town's general account: the concession fee (three quarters of the profit, the year before the player took office)
   deliveredKWh: number; // electricity sold to consumers in basic supply (the concession fee is reckoned on networkKWh, every kWh carried)
   publicSolarSavingsRp: number; // what the solar on public buildings saved them and earned feeding in — credited to the department, which paid for it
-  zoningLevyRp: number; // value-capture levy on projects that gained from a zoning change (zoning.ts)
   borrowedRp: number; // money borrowed this year (debt.ts) — cash in, not income
   governmentAllocationRp: number; // this year's allocation from the overall government (a placeholder framing, see config/treasury.ts)
   spendingRp: PayoutsByCategory; // the municipality's own top-ups, per kind, paid out as decisions happened this year — never the federal/cantonal grants
@@ -133,6 +133,7 @@ export interface UtilityMonth {
   publicChargingUpkeepRp: number;
   roofContractCostRp: number;
   windUpkeepRp: number;
+  agriPvUpkeepRp: number;
   /** Not money: electricity sold to consumers (kWh), what the concession fee is reckoned on. */
   deliveredKWh: number;
   /** Not the utility's: what the public buildings' panels saved and earned (Rp), the department's. */
@@ -157,6 +158,7 @@ const UTILITY_KEYS: (keyof UtilityMonth)[] = [
   "publicChargingUpkeepRp",
   "roofContractCostRp",
   "windUpkeepRp",
+  "agriPvUpkeepRp",
 ];
 
 /** The utility's profit (or loss) in a month. */
@@ -174,7 +176,8 @@ export function utilityProfitRp(m: UtilityMonth): number {
     m.districtHeatUpkeepRp -
     m.publicChargingUpkeepRp -
     m.roofContractCostRp -
-    m.windUpkeepRp
+    m.windUpkeepRp -
+    m.agriPvUpkeepRp
   );
 }
 
@@ -303,17 +306,28 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
 
   // The utility's own arrays on rented roofs make part of the town's solar: no feed-in is paid for
   // what they make (the utility keeps it, saving power it would buy at wholesale).
-  // Agri-PV fields too — and their partners take that energy instead of buying it (they still pay
-  // for the grid).
-  // What the fields made, as the town's generation counts it (snow on the panels, a feed-in limit).
-  // The partners take their share of each field's power; the utility buys the rest at the feed-in price.
+  // Agri-PV fields: a business partner takes its share of its field's power instead of buying that
+  // energy (it still pays for the grid), and the utility buys the rest at the feed-in price, like a
+  // cooperative's; the municipality's own fields are the utility's, like its roof arrays.
   const fields = agriPv.plantsBefore(times[times.length - 1] + 1);
-  const ppaShares = new Map(agriPv.getFields().map((f) => [`agri-pv:${f.id}`, f.ppaShare ?? 1]));
-  const fieldsW = times.map((t) => {
+  const projects = new Map(agriPv.getProjects().map((p) => [`agri-pv:${p.id}`, p]));
+  const ppaW: number[] = [];
+  const ownFieldsW: number[] = [];
+  for (const t of times) {
     const sun = irradianceWm2(t);
-    return fields.reduce((sum, p) => sum - pvPowerWAt(p, t, sun) * (ppaShares.get(p.plantId) ?? 1), 0);
-  });
-  const ppaKWh = energyKWh(times, fieldsW);
+    let ppa = 0;
+    let own = 0;
+    for (const plant of fields) {
+      const p = projects.get(plant.plantId);
+      const w = -pvPowerWAt(plant, t, sun);
+      if (p?.developer === "municipality") own += w;
+      else ppa += w * (p?.ppaShare ?? 0);
+    }
+    ppaW.push(ppa);
+    ownFieldsW.push(own);
+  }
+  const ppaKWh = energyKWh(times, ppaW);
+  const ownFieldsKWh = energyKWh(times, ownFieldsW);
   // And the utility's wind turbines: no feed-in for what they make.
   const turbines = effectivePowerPlantsAtWind(midMonthMs);
   const windKWh = energyKWh(times, times.map((t) => turbines.reduce((sum, p) => sum + windPowerW(p, t), 0)));
@@ -334,7 +348,7 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
     networkRevenueRp: split.networkRp - charging.kWh * networkAvgRpKWh + networkTariff.meters(midMonthMs) * tariff.baseFeeRpPerMonth,
     networkKWh: grossKWh,
     networkOffPeakKWh: split.offPeakKWh,
-    feedInPaidRp: Math.max(0, flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh) - flatCostRp(times, contractW, tariff.feedInPriceRpKWh) - ppaKWh * tariff.feedInPriceRpKWh - windKWh * tariff.feedInPriceRpKWh),
+    feedInPaidRp: Math.max(0, flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh) - flatCostRp(times, contractW, tariff.feedInPriceRpKWh) - (ppaKWh + ownFieldsKWh + windKWh) * tariff.feedInPriceRpKWh),
     wholesaleCostRp: flows.boughtKWh * (tariff.wholesalePriceRpKWh + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare),
     surplusSoldRp: flows.soldRp,
     gridMaintenanceCostRp: grossKWh * tariff.gridMaintenanceRpKWh,
@@ -345,6 +359,7 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
     publicChargingUpkeepRp: charging.upkeepRp,
     roofContractCostRp: roofContracts.yearlyCostRp(midMonthMs) / 12,
     windUpkeepRp: wind.upkeepRpPerYear(midMonthMs) / 12,
+    agriPvUpkeepRp: agriPv.upkeepRpPerYear(midMonthMs) / 12,
     deliveredKWh: basicKWh,
     publicSolarSavingsRp,
   };
@@ -399,6 +414,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     publicChargingUpkeepRp,
     roofContractCostRp,
     windUpkeepRp,
+    agriPvUpkeepRp,
     deliveredKWh,
     publicSolarSavingsRp,
   } = utility;
@@ -410,7 +426,6 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
   treasury.settleThrough(yearEndMs);
   const spendingRp = treasury.paidOut(yearStartMs, yearEndMs);
   const spendingTotalRp = PAYOUT_CATEGORIES.reduce((sum, c) => sum + spendingRp[c], 0);
-  const zoningLevyRp = treasury.received(yearStartMs, yearEndMs, "zoningLevy");
   const borrowedRp = treasury.received(yearStartMs, yearEndMs, "borrowing");
   const dwellingsAtYearStart = buildings.reduce((sum, b) => sum + (existsAt(b, yearStartMs) ? b.dwellings.length : 0), 0);
   const governmentAllocationRp = treasury.allocationRp(dwellingsAtYearStart, allocationApprovalFactor(approval.atYearStart(year)));
@@ -423,7 +438,6 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     districtHeatRevenueRp +
     publicChargingRevenueRp +
     surplusSoldRp +
-    zoningLevyRp +
     borrowedRp +
     publicSolarSavingsRp +
     governmentAllocationRp -
@@ -435,6 +449,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     publicChargingUpkeepRp -
     roofContractCostRp -
     windUpkeepRp -
+    agriPvUpkeepRp -
     profitTransferRp -
     spendingTotalRp;
 
@@ -455,10 +470,10 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
     publicChargingUpkeepRp,
     roofContractCostRp,
     windUpkeepRp,
+    agriPvUpkeepRp,
     profitTransferRp,
     deliveredKWh,
     publicSolarSavingsRp,
-    zoningLevyRp,
     borrowedRp,
     governmentAllocationRp,
     spendingRp,
@@ -515,7 +530,6 @@ export function operatingIncomeRp(f: MunicipalFinances): number {
     f.publicChargingRevenueRp +
     f.surplusSoldRp +
     f.publicSolarSavingsRp +
-    f.zoningLevyRp +
     f.governmentAllocationRp -
     f.feedInPaidRp -
     f.wholesaleCostRp -
@@ -525,6 +539,7 @@ export function operatingIncomeRp(f: MunicipalFinances): number {
     f.publicChargingUpkeepRp -
     f.roofContractCostRp -
     f.windUpkeepRp -
+    f.agriPvUpkeepRp -
     f.profitTransferRp
   );
 }

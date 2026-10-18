@@ -15,11 +15,10 @@ import { stock } from "../sim/stock";
 import { useSimDay } from "../sim/store";
 import { PAYOUT_CATEGORIES, PAYOUT_LABEL, treasury, type PayoutCategory } from "../sim/treasury";
 import { wind } from "../sim/wind";
-import { zoning } from "../sim/zoning";
 import { formatCHF } from "./format";
 import { useStockBuildings } from "./useStock";
 
-type IncomeKind = "allocation" | "utility" | "levy" | "borrowing";
+type IncomeKind = "allocation" | "utility" | "borrowing";
 type EntryKind = IncomeKind | PayoutCategory;
 
 interface Entry {
@@ -33,7 +32,6 @@ interface Entry {
 const INCOME_LABEL: Record<IncomeKind, string> = {
   allocation: "Government allocation",
   utility: "Municipal utility (your share)",
-  levy: "Value-capture levy (zoning)",
   borrowing: "Borrowed",
 };
 
@@ -65,7 +63,10 @@ function describePayout(category: PayoutCategory, ref: string): string {
   if (ref === "district-heat-network") return "Pipes for a district heating extension";
   if (ref.startsWith("grid-battery-")) return `Neighbourhood battery · area ${grid.getArea(Number(after("grid-battery-")))?.name ?? ""}`;
   if (ref.startsWith("grid-")) return `Reinforcing the station · area ${grid.getArea(Number(after("grid-")))?.name ?? ""}`;
-  if (ref.startsWith("zoning-")) return zoning.getChanges().find((c) => String(c.id) === after("zoning-"))?.title ?? "A zoning change";
+  if (ref.startsWith("agri-pv-permit:") || ref.startsWith("agri-pv-build:")) {
+    const p = agriPv.getProjects().find((x) => String(x.id) === ref.slice(ref.indexOf(":") + 1));
+    return `${ref.startsWith("agri-pv-permit:") ? "Permit" : "Panels"} · Agri-PV at ${p ? agriPv.fieldName(p) : "a field"}`;
+  }
   if (ref.startsWith("agri-pv-")) return agriPv.getDesignations().find((d) => String(d.id) === after("agri-pv-"))?.title ?? "An Agri-PV zone";
   if (ref === "wind-study") return "The wind study";
   if (ref.startsWith("wind-zoning:")) return `Zoning plan · wind site ${wind.getSite(after("wind-zoning:"))?.name ?? ""}`;
@@ -93,11 +94,7 @@ function ledger(buildings: Building[], nowMs: number): Entry[] {
   }
   for (const r of treasury.getReceipts()) {
     if (r.atMs > nowMs) continue;
-    entries.push(
-      r.kind === "borrowing"
-        ? { atMs: r.atMs, kind: "borrowing", detail: loanLabel(r.ref), amountRp: r.amountRp }
-        : { atMs: r.atMs, kind: "levy", detail: addressOf(r.ref), amountRp: r.amountRp },
-    );
+    entries.push({ atMs: r.atMs, kind: "borrowing", detail: loanLabel(r.ref), amountRp: r.amountRp });
   }
 
   // The allocation: a twelfth at the start of each month.

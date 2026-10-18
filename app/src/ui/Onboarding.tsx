@@ -110,7 +110,7 @@ export function WelcomeBriefing({ town, onStart, onSkipGuide }: { town: string; 
           <div>
             <dt>What you control</dt>
             <dd>
-              Grants, laws and programmes in the Town hall; district heating, chargers, the grid and zoning on the map; the utility's prices. People decide
+              Grants, laws and programmes in the Town hall; district heating, chargers, the grid, solar and wind on the map; the utility's prices. People decide
               for themselves — you change what they find worth doing.
             </dd>
           </div>

@@ -51,7 +51,6 @@ import { tariffStore } from "./tariffStore";
 import type { Tariff } from "./tariff";
 import { dailyMeanTempC } from "./weather";
 import { priceFactor } from "./costTrends";
-import { zoning } from "./zoning";
 import { gridDrawBlockedAt } from "./gridLimits";
 import { heatPumpSiting } from "./heatPumpSiting";
 import { EARLY_SWITCH } from "../config/earlySwitch";
@@ -166,12 +165,8 @@ function candidatesAt(
   const tariff = tariffStore.at(atMs);
   const estimate = annualHeatingEstimate(building, atMs);
   const scale = sizeScale(building);
-  const priorityZone = zoning.fossilHeatingBannedAt(building, atMs);
-  const fossilBanned = policyStore.get().fossilHeatingInstallBanned || priorityZone;
+  const fossilBanned = policyStore.get().fossilHeatingInstallBanned;
   const gridBlocked = gridDrawBlockedAt(building, atMs);
-  // In a district heating priority zone, a building the pipes reach has to connect: district heat
-  // is its only choice.
-  const mustConnect = priorityZone && (incumbent === "districtHeating" || districtHeat.servesAt(building.streetSegments, atMs));
   const avgElecRpKWh = (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2;
 
   const candidates = HEATING_SYSTEM_ORDER.map((id) => {
@@ -205,7 +200,6 @@ function candidatesAt(
         (id === "districtHeating" ? incumbent === "districtHeating" || districtHeat.servesAt(building.streetSegments, atMs) : true) &&
         !(fossilBanned && (id === "gasBoiler" || id === "oilBoiler")) &&
         !(isHeatPump(id) && !isHeatPump(incumbent) && gridBlocked) &&
-        !(mustConnect && id !== "districtHeating") &&
         // Wood only where there is wood heating already: a new one needs a store room and
         // deliveries, and the town discourages it for the fine dust.
         !(id === "woodPellet" && (newBuild || incumbent !== "woodPellet")) &&
