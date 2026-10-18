@@ -23,11 +23,15 @@ export interface Release {
 export const CHANGELOG: Release[] = [
   {
     version: "0.7.0",
-    date: null,
+    date: "2026-10-18",
+    title: "Prices, fields and who drives",
+    summary:
+      "Your electricity price now works as on a real Swiss bill: an energy price you set and a network fee the regulator sets, with feed-in at the federal reference price, a dynamic tariff on the next day's market prices, and big businesses free to leave for the open market. Advisors write once a year with what to do next. Agri-PV gets its own tool and a road like a wind park's — zone, permit, build — with farmers who may say no, and cooperatives and the town itself among the developers. Public transport near home shapes who drives, and a data centre may come to town with heat to spare.",
     added: [
       "Advisors: retain a roof solar, mobility, district heating or finance advisor for a yearly fee, and each writes once a year with what it found — the best roofs for the utility's solar, where the next chargers should go, the streets your network should reach next, and what next year's power will cost before you set your prices. Each pick opens its planning tool there.",
       "Electric van and lorry grant, a new measure: a flat sum for each electric van or lorry a business buys, set separately for each.",
       "Wiki: “All topics” at the top of the contents, and in each article's heading, takes you back to the overview of every topic.",
+      "A data centre may come to town: in some municipalities, years into the game, one goes up on open land in a work zone. It draws as much power as thousands of homes — certified renewable, so it adds nothing to the town's emissions — and a year after it opens it offers its waste heat to the utility for next to nothing: a large, cheap, steady source for district heating, through a heat pump.",
       "Agri-PV has its own tool. A field now goes a road like a wind park: you zone it, then someone takes it up and applies for the permit — which may be appealed, and now and then struck down — and builds. Besides businesses buying the power, energy cooperatives may take fields up and sell the power at the feed-in price, and you can develop a zoned field yourself: permit and panels from the treasury, the power the utility's own. The farmer has the last word: no one knows beforehand who would have panels over their field, a no stands for three years, and more farmers come round as acceptance grows.",
     ],
     changed: [
@@ -37,7 +41,6 @@ export const CHANGELOG: Release[] = [
       "Large businesses — 100 MWh a year or more at one site — may buy their energy on the open market, and many already do. Each October, those still in basic supply weigh your energy price for next year against a supplier's offer, and leave for good if the market is cheaper by enough. They still pay the network fee. The Prices tab shows how many have left and the market's offer.",
       "Wholesale power moves every year: the utility buys most of a year's power ahead, a third in each of the three years before, and the rest month by month — so the market's ups and downs reach it smoothed, not flattened. The Prices tab shows what next year's power, mostly bought already, will cost.",
       "Where people live shapes how they get around: the better a home is served by public transport — by the federal quality classes, from a busy station close by to a bus that hardly comes — the likelier its people take it, and the likelier the rest drive. The town's overall split stays the same; cars, and the need for chargers, gather where public transport is thin. A home's panel shows its class.",
-      "A data centre may come to town: in some municipalities, years into the game, one goes up on open land in a work zone. It draws as much power as thousands of homes — certified renewable, so it adds nothing to the town's emissions — and a year after it opens it offers its waste heat to the utility for next to nothing: a large, cheap, steady source for district heating, through a heat pump.",
       "Zoning is now a view: it shows the town's plan as it is. Rezoning, extra floors, district heating priority zones and high-standard zones are gone, and with them the zoning levy.",
       "Carbon removal contracts are bought and paid month by month, rather than in one bill each January: from the year after a counted year gets the town down to the line, each month buys a twelfth of what that year left, up to the share set.",
     ],
