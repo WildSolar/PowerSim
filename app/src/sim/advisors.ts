@@ -329,7 +329,7 @@ class Advisors {
       const u = r.utility!;
       const p = utilityProfitRp(u);
       profitRp += p;
-      keptRp += p - townTakeRp(Math.floor(r.month / 12), p, u.deliveredKWh) + u.publicSolarSavingsRp;
+      keptRp += p - townTakeRp(Math.floor(r.month / 12), p, u.networkKWh) + u.publicSolarSavingsRp;
       boughtKWh += r.boughtKWh ?? 0;
       deliveredKWh += u.deliveredKWh;
     }

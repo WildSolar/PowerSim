@@ -82,7 +82,7 @@ export interface MunicipalFinances {
   roofContractCostRp: number; // the utility's arrays on rented roofs: the rent, and their upkeep (roofContracts.ts)
   windUpkeepRp: number; // the utility's wind turbines (wind.ts)
   profitTransferRp: number; // handed to the town's general account: the concession fee (three quarters of the profit, the year before the player took office)
-  deliveredKWh: number; // electricity sold to consumers — what the concession fee is reckoned on
+  deliveredKWh: number; // electricity sold to consumers in basic supply (the concession fee is reckoned on networkKWh, every kWh carried)
   publicSolarSavingsRp: number; // what the solar on public buildings saved them and earned feeding in — credited to the department, which paid for it
   zoningLevyRp: number; // value-capture levy on projects that gained from a zoning change (zoning.ts)
   borrowedRp: number; // money borrowed this year (debt.ts) — cash in, not income
@@ -186,30 +186,30 @@ export function concessionRpPerKWh(): number {
   let kWh = 0;
   if (booked) {
     profitRp = utilityProfitRp(booked);
-    kWh = booked.deliveredKWh;
+    kWh = booked.networkKWh;
   } else {
     for (let m = 0; m < 12; m++) {
       const month = utilityMonths.get(BASELINE_YEAR * 12 + m);
       if (!month) continue;
       profitRp += utilityProfitRp(month);
-      kWh += month.deliveredKWh;
+      kWh += month.networkKWh;
     }
   }
   return kWh > 0 ? (Math.max(0, profitRp) * (1 - UTILITY_PROFIT_RETAINED_SHARE)) / kWh : 0;
 }
 
-/** What the town's general account takes of the utility's result: the concession fee on what was
- * sold — or, for the year before the player took office, three quarters of a profit (nothing of a
+/** What the town's general account takes of the utility's result: the concession fee on what the
+ * grid carried — or, for the year before the player took office, three quarters of a profit (nothing of a
  * loss). */
-export function townTakeRp(year: number, profitRp: number, deliveredKWh: number): number {
+export function townTakeRp(year: number, profitRp: number, networkKWh: number): number {
   if (year <= BASELINE_YEAR) return Math.max(0, profitRp) * (1 - UTILITY_PROFIT_RETAINED_SHARE);
-  return deliveredKWh * concessionRpPerKWh();
+  return networkKWh * concessionRpPerKWh();
 }
 
 /** What the department keeps of the utility's months so far: the result less the town's take — all
  * of it beyond the fee, a loss too — and the public buildings' solar savings. */
-export function departmentUtilityRp(year: number, months: { profitRp: number; deliveredKWh: number; publicSolarSavingsRp: number }): number {
-  return months.profitRp - townTakeRp(year, months.profitRp, months.deliveredKWh) + months.publicSolarSavingsRp;
+export function departmentUtilityRp(year: number, months: { profitRp: number; networkKWh: number; publicSolarSavingsRp: number }): number {
+  return months.profitRp - townTakeRp(year, months.profitRp, months.networkKWh) + months.publicSolarSavingsRp;
 }
 
 /** Settled months, by year * 12 + month: once a month is over and sampled, its accounts are final. */
@@ -254,11 +254,14 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
   // The year's sheet (one per year); wholesale power at the month's market price.
   const tariff: Tariff = tariffStore.at(toSimTimeMs(Date.UTC(year, month, 15)));
   const greenShare = policyStore.get().greenPowerShare / 100;
-  const { times, series, dynamicW, dhHeatPumpW } = await monthElectricity(buildings, realPlants, year, month);
+  const { times, series, dynamicW, dhHeatPumpW, marketW } = await monthElectricity(buildings, realPlants, year, month);
   const consumptionW = consumptionSeriesW(series);
   const grossKWh = energyKWh(times, consumptionW);
+  // The businesses on the open market: the grid carries their power, their supplier sells it.
+  const basicW = consumptionW.map((w, i) => Math.max(0, w - marketW[i]));
+  const basicKWh = energyKWh(times, basicW);
   // The district heating heat pumps: the utility's own use — bought with the rest, sold to no one.
-  const withHeatPumpsW = consumptionW.map((w, i) => w + dhHeatPumpW[i]);
+  const withHeatPumpsW = basicW.map((w, i) => w + dhHeatPumpW[i]);
   // Hour by hour: what the town drew beyond what it made, bought over the contracts; the surplus,
   // sold on the spot market — after the neighbourhood batteries took what they could.
   const flows = powerFlows(times, withHeatPumpsW, series.solarW, grid.batteriesInService(toSimTimeMs(Date.UTC(year, month, 15))), tariff.wholesalePriceRpKWh);
@@ -320,13 +323,14 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
     return arrays.reduce((sum, a) => sum + (a.installedAtMs <= t ? a.capacityKw * 1000 * roofPvShare(a.egid, t, sun) : 0), 0);
   });
   const split = electricityCostSplitRp(times, consumptionW, tariff, dynamicW);
+  const basicSplit = electricityCostSplitRp(times, basicW, tariff, dynamicW);
   const energyAvgRpKWh = (tariff.energyPeakRpKWh + tariff.energyOffPeakRpKWh) / 2;
   const networkAvgRpKWh = (tariff.networkPeakRpKWh + tariff.networkOffPeakRpKWh) / 2;
   return {
     // The energy price from consumers in basic supply, the network fee from everyone on the grid and
     // the meters' base fees — less the municipality's own chargers' power (the utility's own use,
     // sold at their own price), and the Agri-PV partners' energy (they take the field's instead).
-    energyRevenueRp: split.energyRp - charging.kWh * energyAvgRpKWh - ppaKWh * agriPv.ppaEnergyValueRpPerKWh(midMonthMs),
+    energyRevenueRp: basicSplit.energyRp - charging.kWh * energyAvgRpKWh - ppaKWh * agriPv.ppaEnergyValueRpPerKWh(midMonthMs),
     networkRevenueRp: split.networkRp - charging.kWh * networkAvgRpKWh + networkTariff.meters(midMonthMs) * tariff.baseFeeRpPerMonth,
     networkKWh: grossKWh,
     networkOffPeakKWh: split.offPeakKWh,
@@ -341,17 +345,17 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
     publicChargingUpkeepRp: charging.upkeepRp,
     roofContractCostRp: roofContracts.yearlyCostRp(midMonthMs) / 12,
     windUpkeepRp: wind.upkeepRpPerYear(midMonthMs) / 12,
-    deliveredKWh: grossKWh,
+    deliveredKWh: basicKWh,
     publicSolarSavingsRp,
   };
 }
 
 /** The utility's settled months of a year up to `atMs`, in order from January (stopping at the
  * first not yet settled), summed. */
-export function settledUtilitySoFar(year: number, atMs: number): { months: number; profitRp: number; deliveredKWh: number; publicSolarSavingsRp: number } {
+export function settledUtilitySoFar(year: number, atMs: number): { months: number; profitRp: number; networkKWh: number; publicSolarSavingsRp: number } {
   let months = 0;
   let profitRp = 0;
-  let deliveredKWh = 0;
+  let networkKWh = 0;
   let publicSolarSavingsRp = 0;
   for (let m = 0; m < 12; m++) {
     if (toSimTimeMs(Date.UTC(year, m + 1, 1)) > atMs) break;
@@ -359,10 +363,10 @@ export function settledUtilitySoFar(year: number, atMs: number): { months: numbe
     if (!settled) break;
     months++;
     profitRp += utilityProfitRp(settled);
-    deliveredKWh += settled.deliveredKWh;
+    networkKWh += settled.networkKWh;
     publicSolarSavingsRp += settled.publicSolarSavingsRp;
   }
-  return { months, profitRp, deliveredKWh, publicSolarSavingsRp };
+  return { months, profitRp, networkKWh, publicSolarSavingsRp };
 }
 
 /** The government's allocation paid so far in a year: a twelfth at the start of each month. */
@@ -412,7 +416,7 @@ async function computeFinances(buildings: Building[], realPlants: PowerPlant[], 
   const governmentAllocationRp = treasury.allocationRp(dwellingsAtYearStart, allocationApprovalFactor(approval.atYearStart(year)));
   // The utility's profit, and what the town's general account takes of it (the concession fee).
   const profitRp = utilityProfitRp(utility);
-  const profitTransferRp = townTakeRp(year, profitRp, deliveredKWh);
+  const profitTransferRp = townTakeRp(year, profitRp, networkKWh);
   const netIncomeRp =
     energyRevenueRp +
     networkRevenueRp +

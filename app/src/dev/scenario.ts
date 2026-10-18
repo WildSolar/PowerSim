@@ -25,6 +25,7 @@ import { districtHeatSources } from "../sim/districtHeatSources";
 import { carParks } from "../sim/carParks";
 import { removals } from "../sim/removals";
 import { networkTariff } from "../sim/networkTariff";
+import { marketAccess } from "../sim/marketAccess";
 import { publicCharging } from "../sim/publicCharging";
 import { grid } from "../sim/grid";
 import { heatPumpSiting } from "../sim/heatPumpSiting";
@@ -201,6 +202,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   fleets.init(dataset, (egid) => stock.lookup(egid)); // before the stock: it commits their decisions
   stock.init(dataset);
   bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building
+  marketAccess.init(() => stock.getAll(), (y) => tariffStore.sheetFor(y), `market-access:${dataset.bfsNumber}`);
   grid.init(dataset, () => stock.getAll()); // last: it reads every building's draw, public chargers included
   sizeUnreportedSources(stock.getAll(), 0);
 
@@ -250,6 +252,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     carParks.advance(t);
     removals.advance(t);
     networkTariff.advance(t);
+    marketAccess.advance(t);
     grid.advance(t);
     if (spec.reinforceGrid) {
       for (const area of grid.getAreas()) {

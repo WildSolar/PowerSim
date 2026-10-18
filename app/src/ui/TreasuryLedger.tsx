@@ -119,12 +119,12 @@ function ledger(buildings: Building[], nowMs: number): Entry[] {
 
   // The utility: each settled month's share (the share of the year so far, less the months before —
   // as the treasury counts it), or a booked year in one go where its months weren't kept.
-  const byYear = new Map<number, { month: number; profitRp: number; deliveredKWh: number; publicSolarSavingsRp: number }[]>();
+  const byYear = new Map<number, { month: number; profitRp: number; networkKWh: number; publicSolarSavingsRp: number }[]>();
   for (const r of monthRecords.all()) {
     if (!r.utility) continue;
     const year = Math.floor(r.month / 12);
     const list = byYear.get(year) ?? [];
-    list.push({ month: r.month % 12, profitRp: utilityProfitRp(r.utility), deliveredKWh: r.utility.deliveredKWh, publicSolarSavingsRp: r.utility.publicSolarSavingsRp });
+    list.push({ month: r.month % 12, profitRp: utilityProfitRp(r.utility), networkKWh: r.utility.networkKWh, publicSolarSavingsRp: r.utility.publicSolarSavingsRp });
     byYear.set(year, list);
   }
   for (let year = BASELINE_YEAR; year <= nowYear; year++) {
@@ -134,13 +134,13 @@ function ledger(buildings: Building[], nowMs: number): Entry[] {
       entries.push({ atMs: toSimTimeMs(Date.UTC(year + 1, 0, 1)) - 1, kind: "utility", detail: `The year ${year}`, amountRp: departmentUtilityShareRp(f) + f.publicSolarSavingsRp });
       continue;
     }
-    const sum = { profitRp: 0, deliveredKWh: 0, publicSolarSavingsRp: 0 };
+    const sum = { profitRp: 0, networkKWh: 0, publicSolarSavingsRp: 0 };
     let before = 0;
     for (const m of months) {
       const atMs = toSimTimeMs(Date.UTC(year, m.month + 1, 1));
       if (atMs > nowMs) break;
       sum.profitRp += m.profitRp;
-      sum.deliveredKWh += m.deliveredKWh;
+      sum.networkKWh += m.networkKWh;
       sum.publicSolarSavingsRp += m.publicSolarSavingsRp;
       const share = departmentUtilityRp(year, sum);
       entries.push({ atMs, kind: "utility", detail: `${formatDate(toSimTimeMs(Date.UTC(year, m.month, 15))).replace(/^\d+ /, "")} settled`, amountRp: share - before });

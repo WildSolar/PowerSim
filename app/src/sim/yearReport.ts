@@ -39,6 +39,7 @@ import { historyTimeSteps, sampleDynamicConsumptionW, sampleMunicipalityCategory
 import { ANNUAL_CAR_KM, ICE_CAR_L_PER_100KM } from "./mobilitySystems";
 import { slotsWithVehicleAt } from "./mobility";
 import { fleets } from "./fleet";
+import { marketAccess } from "./marketAccess";
 import { effectivePowerPlantsAt, roofPotentialKw } from "./solarAdoption";
 import { spaceHeatingThermalDemandW } from "./spaceHeating";
 import type { Tariff } from "./tariff";
@@ -108,6 +109,8 @@ export interface YearElectricityMonth {
   dynamicW: number[];
   /** What the district heating heat pumps draw (W): the utility's own use, not sold to anyone. */
   dhHeatPumpW: number[];
+  /** What the businesses on the open market draw (W): carried by the grid, their energy their supplier's. */
+  marketW: number[];
 }
 
 const electricityByMonth = new Map<number, Promise<YearElectricityMonth>>();
@@ -125,6 +128,8 @@ const electricityByMonth = new Map<number, Promise<YearElectricityMonth>>();
 interface ElectricitySample {
   series: CategorySeries;
   dynamicW: number;
+  /** What the businesses buying on the open market draw (W): their energy isn't the utility's. */
+  marketW: number;
 }
 interface FuelSample {
   iceCarSlots: number;
@@ -154,7 +159,11 @@ function electricitySampleAt(buildings: Building[], realPlants: PowerPlant[], ye
     // The plants in service at the instant — never later ones: asking for those would settle solar
     // decisions early, under whatever measures are in force now.
     const plants = effectivePowerPlantsAt(buildings, realPlants, t);
-    sample = { series: sampleMunicipalityCategorySeries(buildings, [t], tariff, plants), dynamicW: sampleDynamicConsumptionW(buildings, [t], tariff)[0] };
+    sample = {
+      series: sampleMunicipalityCategorySeries(buildings, [t], tariff, plants),
+      dynamicW: sampleDynamicConsumptionW(buildings, [t], tariff)[0],
+      marketW: marketAccess.marketPowerW(buildings, t),
+    };
     slots[i] = sample;
   }
   return sample;
@@ -298,7 +307,7 @@ export function monthElectricity(buildings: Building[], realPlants: PowerPlant[]
     timed("month electricity: record", () => recordMonthElectricity(buildings, year, month, times, series, dhHeatPumpW, plants, monthEndMs - 1));
     await yieldToEventLoop();
     timed("month assets: record", () => recordMonthAssets(buildings, year, month, plants, monthEndMs - 1));
-    return { times, series, dynamicW: samples.map((s) => s.dynamicW), dhHeatPumpW };
+    return { times, series, dynamicW: samples.map((s) => s.dynamicW), dhHeatPumpW, marketW: samples.map((s) => s.marketW ?? 0) };
   }, "month electricity");
 }
 

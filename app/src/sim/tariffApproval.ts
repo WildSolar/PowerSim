@@ -16,7 +16,8 @@ import {
   REFERENCE_HOUSEHOLD_KWH,
 } from "../config/tariff";
 import { approval, setPriceStances, type Stances } from "./approval";
-import { toDateMs } from "./calendar";
+import { toDateMs, toSimTimeMs } from "./calendar";
+import { marketAccess } from "./marketAccess";
 import { market } from "./market";
 import type { TariffSheet } from "./tariff";
 import { sheetPrices, tariffStore, type TariffPublication } from "./tariffStore";
@@ -71,7 +72,8 @@ export function stancesFor(sheet: TariffSheet, year: number): Stances {
   return {
     tenants: bill * BILL_WEIGHT.tenants + heat,
     homeowners: bill * BILL_WEIGHT.homeowners + heat + feedIn,
-    business: bill * BILL_WEIGHT.business,
+    // Businesses on the open market don't buy their energy here.
+    business: bill * BILL_WEIGHT.business * (1 - marketAccess.businessShareOnMarket(toSimTimeMs(Date.UTC(year, 0, 1)))),
     drivers: bill * BILL_WEIGHT.drivers,
   };
 }

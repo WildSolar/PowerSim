@@ -12,6 +12,8 @@ import { householdBillChf, householdEnergyRpKWh, previewReaction } from "../sim/
 import { energyPriceCap } from "../sim/tariffCap";
 import { BASE_FEE_MAX_CHF_PER_MONTH, TARIFF_CAP_MARGIN } from "../config/tariff";
 import { sheetPrices, tariffStore } from "../sim/tariffStore";
+import { businessEnergyRpKWh, marketAccess, marketOfferRpKWh } from "../sim/marketAccess";
+import { MARKET_ACCESS_MIN_KWH } from "../config/marketAccess";
 import { DynamicPriceChart } from "./DynamicPriceChart";
 import "./tariffControl.css";
 
@@ -88,6 +90,7 @@ export function TariffControl() {
   const cap = energyPriceCap(targetYear);
   const average = householdEnergyRpKWh(draft);
   const overCap = average > cap.capRpKWh + 0.005;
+  const access = useMemo(() => marketAccess.stats(simDay), [Math.floor(simDay / 86_400_000)]);
   const pricesNow = sheetPrices(inForce, nowYear);
   const pricesNext = sheetPrices(draft, targetYear);
 
@@ -159,6 +162,17 @@ export function TariffControl() {
           <span>Average energy price, against the regulator&apos;s ceiling</span>
           <span className={overCap ? "up" : ""}>
             {average.toFixed(1)} of {cap.capRpKWh.toFixed(1)} Rp/kWh
+          </span>
+        </div>
+        <div
+          className="tariff-preview-line"
+          title={`Businesses using ${(MARKET_ACCESS_MIN_KWH / 1000).toLocaleString("en-GB")} MWh a year or more may buy their energy on the open market — and once gone, don't come back. They still pay the network fee here. Each October, those still in basic supply weigh next year's energy price against a supplier's offer.`}
+        >
+          <span>
+            Large businesses on the open market ({access.sites} of {access.eligible})
+          </span>
+          <span>
+            {Math.round(access.businessShare * 100)}% of business use · offer for {targetYear}: {marketOfferRpKWh(targetYear).toFixed(1)} vs your {businessEnergyRpKWh(draft).toFixed(1)} Rp/kWh
           </span>
         </div>
         <div className="tariff-preview-line">

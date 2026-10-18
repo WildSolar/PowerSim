@@ -640,7 +640,7 @@ function utilityChart(param: string | null, nowMs: number): ChartData {
     const value = (r: MonthRecord) => {
       const u = r.utility!;
       const year = Math.floor(r.month / 12);
-      return line.key === "concessionFee" ? townTakeRp(year, utilityProfitRp(u), u.deliveredKWh) : (u[line.key] as number);
+      return line.key === "concessionFee" ? townTakeRp(year, utilityProfitRp(u), u.networkKWh) : (u[line.key] as number);
     };
     return {
       ...m,

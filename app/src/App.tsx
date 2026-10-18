@@ -56,6 +56,7 @@ import { carParks } from "./sim/carParks";
 import { removals } from "./sim/removals";
 import { advisors } from "./sim/advisors";
 import { networkTariff } from "./sim/networkTariff";
+import { marketAccess } from "./sim/marketAccess";
 import { cachedEmissionsForYear } from "./sim/emissions";
 import { wind } from "./sim/wind";
 import { districtHeatLines } from "./sim/districtHeatLines";
@@ -276,6 +277,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
           publicCharging.publicBuildingChargerCandidates(atMs).length === 0 ? "Every public building (campus) already has chargers." : null,
         );
         bookInitialPublicCharging(stock.getAll()); // after the stock: it needs every building
+        marketAccess.init(() => stock.getAll(), (y) => tariffStore.sheetFor(y), `market-access:${loaded.bfsNumber}`); // after the stock: it weighs every business
         grid.init(loaded, () => stock.getAll()); // last: it reads every building's draw, public chargers included
         sizeUnreportedSources(stock.getAll(), 0); // the starting networks that didn't report their capacity
         debt.init(() => stock.getAll(), `rates:${loaded.bfsNumber}`);
