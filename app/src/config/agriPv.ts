@@ -43,8 +43,18 @@ export const AGRI_PV_SYSTEM_WEIGHTS_OTHER: Record<AgriPvSystem, number> = { vert
 export const AGRI_PV_CAPEX_CHF_PER_KWP_AT_500KWP = 1_000;
 export const AGRI_PV_CAPEX_SCALE_EXPONENT = 0.17;
 export const AGRI_PV_CAPEX_FLOOR_CHF_PER_KWP = 600;
-// What the farmer gets for the land under the panels, a year.
+// What the farmer gets for the land under the panels, a year: the typical ask. Each farmer asks
+// their own, spread around it (log-normal).
 export const AGRI_PV_RENT_CHF_PER_HA_YEAR = 3_000;
+export const AGRI_PV_RENT_SPREAD = 0.35;
+
+// The farmer has the last word: a zoned field is only built on if whoever farms it agrees, and no
+// one knows beforehand who will. At first about a third would; as acceptance grows (the dialogue,
+// fields to see), more come round — up to this share more at full acceptance. A farmer who says no
+// is left alone for a few years, then may be asked again.
+export const AGRI_PV_FARMER_WILLING_SHARE = 0.35;
+export const AGRI_PV_FARMER_ACCEPTANCE_PULL = 0.4;
+export const AGRI_PV_FARMER_RETRY_YEARS = 3;
 export const AGRI_PV_UPKEEP_CHF_PER_KWP_YEAR = 15;
 export const AGRI_PV_LIFETIME_YEARS = 25;
 export const AGRI_PV_BUILD_MONTHS = 12;

@@ -1035,9 +1035,11 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
             FARM_PLOT_COLORS.zoned,
             "underWay",
             FARM_PLOT_COLORS.underWay,
+            "refused",
+            FARM_PLOT_COLORS.refused,
             FARM_PLOT_COLORS.field,
           ],
-          "fill-opacity": ["match", ["get", "state"], "farmland", 0.22, "planned", 0.25, "zoned", 0.45, "underWay", 0.5, "fieldBuilding", 0.35, 0.65],
+          "fill-opacity": ["match", ["get", "state"], "farmland", 0.22, "planned", 0.25, "zoned", 0.45, "refused", 0.45, "underWay", 0.5, "fieldBuilding", 0.35, 0.65],
         },
       });
       map.addLayer({
@@ -1964,6 +1966,8 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
               ? `Agri-PV: ${AGRI_PV_PHASE_LABEL[project.phase].toLowerCase()}`
               : state === "zoned"
                 ? `zoned for Agri-PV (suits ${kind})`
+                : state === "refused"
+                  ? "zoned for Agri-PV — the farmer said no, for now"
                 : state === "planned"
                   ? "Agri-PV zone on the way"
                   : "farmland";

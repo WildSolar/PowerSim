@@ -63,6 +63,8 @@ export function AgriPvFieldCard() {
   const live = project && project.phase !== "struckDown" ? project : undefined;
   const state = agriPv.stateAt(id, now);
   const free = agriPv.isFree(id, now);
+  const answer = agriPv.farmerAnswer(id, now);
+  const askAgain = agriPv.askAgainFromMs(id);
   const e = agriPv.economics(id, now);
   const wholesale = tariffStore.at(now).wholesalePriceRpKWh;
   const restingUntil = project ? agriPv.restingUntil(project) : null;
@@ -74,6 +76,8 @@ export function AgriPvFieldCard() {
           ? `${AGRI_PV_PHASE_LABEL[live.phase]}${live.phaseUntilMs ? ` · until ${monthYear(live.phaseUntilMs)}` : ""}`
           : state === "zoned"
             ? "Zoned for Agri-PV"
+            : state === "refused"
+              ? "Zoned for Agri-PV — the farmer said no"
             : state === "planned"
               ? "Agri-PV zone on its way"
               : "Farmland"}
@@ -110,15 +114,28 @@ export function AgriPvFieldCard() {
       {live?.developer === "cooperative" && <p className="dh-note">The cooperative sells all the power to the utility at the feed-in price.</p>}
       {live?.developer === "municipality" && <p className="dh-note">The utility&apos;s own: it pays no feed-in for the power, and buys that much less.</p>}
 
+      {state === "refused" && answer && (
+        <p className="dh-note">
+          Asked in {monthYear(answer.atMs)}, the farmer didn&apos;t want panels over the field. They may be asked again from {monthYear(askAgain ?? now)} — farmers come round as
+          acceptance grows.
+        </p>
+      )}
       {free && (
         <>
           <h4 className="dh-subtitle">Develop it yourself</h4>
+          <div className="info-row" title="Whoever farms the field has the last word: no one knows beforehand whether they'd have panels over it">
+            <span>The farmer</span>
+            <span className="info-value">{answer?.yes ? `Agreed (${monthYear(answer.atMs)})` : "Not asked yet"}</span>
+          </div>
           <div className="info-row">
             <span>Panels</span>
             <span className="info-value">{formatCHF(e.buildCostRp)}</span>
           </div>
-          <div className="info-row" title="Paid by the utility each year: the upkeep, and the farmer's rent for the land under the panels">
-            <span>Upkeep and rent</span>
+          <div
+            className="info-row"
+            title={answer?.yes ? "Paid by the utility each year: the upkeep, and the rent the farmer asks for the land under the panels" : "Paid by the utility each year: the upkeep, and a typical rent for the land — the farmer names their own once asked"}
+          >
+            <span>Upkeep and rent{answer?.yes ? "" : " (typical)"}</span>
             <span className="info-value">{formatCHF(e.upkeepRpPerYear + e.rentRpPerYear)} a year</span>
           </div>
           <div className="info-row" title="The power the utility needn't buy, at this year's wholesale price">
@@ -126,13 +143,19 @@ export function AgriPvFieldCard() {
             <span className="info-value">{formatCHF(e.yearlyKWh * wholesale)} a year</span>
           </div>
           <p className="dh-note">
-            Businesses and energy cooperatives may take this field up on their own. To develop it yourself, apply for the permit ({AGRI_PV_PERMIT_MONTHS} months, sometimes
-            appealed); the panels are paid when you order them, in service {AGRI_PV_BUILD_MONTHS} months on.
+            Businesses and energy cooperatives may take this field up on their own. To develop it yourself, ask the farmer first — a no stands for a few years — then apply for
+            the permit ({AGRI_PV_PERMIT_MONTHS} months, sometimes appealed); the panels are paid when you order them, in service {AGRI_PV_BUILD_MONTHS} months on.
           </p>
           <div className="dh-actions">
-            <button className="dh-order" onClick={() => agriPv.applyForPermit(id, simClock.getSimTimeMs())}>
-              Apply for the permit — {formatCHF(agriPv.permitCostRp(id))}
-            </button>
+            {answer?.yes ? (
+              <button className="dh-order" onClick={() => agriPv.applyForPermit(id, simClock.getSimTimeMs())}>
+                Apply for the permit — {formatCHF(agriPv.permitCostRp(id))}
+              </button>
+            ) : (
+              <button className="dh-order" onClick={() => agriPv.askFarmer(id, simClock.getSimTimeMs())}>
+                Ask the farmer
+              </button>
+            )}
           </div>
         </>
       )}
@@ -203,6 +226,9 @@ export function AgriPvPanel() {
       // Newest first; struck-down fields drop off once they may be taken up again.
       projects: [...live].reverse(),
       free: plots.filter((p) => agriPv.isFree(p.id, now)),
+      refused: plots.filter((p) => agriPv.stateAt(p.id, now) === "refused").length,
+      asked: plots.filter((p) => agriPv.farmerAnswer(p.id, now) !== undefined || agriPv.askAgainFromMs(p.id) !== null).length,
+      agreed: plots.filter((p) => agriPv.farmerAnswer(p.id, now)?.yes).length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now, version, plots]);
@@ -242,7 +268,13 @@ export function AgriPvPanel() {
           {summary.inService} · {mw(summary.inServiceKw)}
         </span>
       </div>
-      <div className="info-row" title="How far people have come round to solar over farmland: it softens the opposition to Agri-PV zones, new and in force">
+      <div className="info-row" title="Farmers on zoned fields asked so far, by whoever wanted to build: how many agreed, and how many said no (a no stands for a few years)">
+        <span>Farmers asked · agreed</span>
+        <span className="info-value">
+          {summary.asked} · {summary.agreed}
+        </span>
+      </div>
+      <div className="info-row" title="How far people have come round to solar over farmland: it softens the opposition to Agri-PV zones, new and in force, and brings farmers round">
         <span>Acceptance</span>
         <span className="info-value">{Math.round(agriPv.getAcceptance() * 100)}%</span>
       </div>
@@ -322,12 +354,19 @@ export function AgriPvPanel() {
               <button key={p.id} className={`ev-list-row${p.id === selectedId ? " selected" : ""}`} onClick={() => pick(p.id)}>
                 <span className="ev-list-name">{p.name ?? "Field"}</span>
                 <span className="info-value">
-                  {hectares(p.areaM2)} · {mw(e.capacityKw)}
+                  {mw(e.capacityKw)} · {agriPv.farmerAnswer(p.id, now)?.yes ? "farmer agreed" : "farmer not asked"}
                 </span>
               </button>
             );
           })}
-          <p className="dh-note tool-list-hint">Pick a field: its card has the permit, to develop it yourself.</p>
+          <p className="dh-note tool-list-hint">Pick a field: its card asks the farmer, and has the permit, to develop it yourself.</p>
+        </>
+      )}
+      {summary.refused > 0 && (
+        <>
+          <p className="dh-note">
+            {summary.refused} zoned field{summary.refused === 1 ? "" : "s"} where the farmer said no, for now.
+          </p>
         </>
       )}
     </>

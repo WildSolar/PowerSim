@@ -117,6 +117,7 @@ export function LayerLegend({ mode }: { mode: ColorMode }) {
           {[
             { label: "Farmland — click to pick for a zone", color: FARM_PLOT_COLORS.farmland, opacity: 0.6 },
             { label: "Zoned for Agri-PV", color: FARM_PLOT_COLORS.zoned, opacity: 1 },
+            { label: "Zoned, but the farmer said no (for now)", color: FARM_PLOT_COLORS.refused, opacity: 1 },
             { label: "Permit under way, or ready to build", color: FARM_PLOT_COLORS.underWay, opacity: 1 },
             { label: "Agri-PV field (lighter: being built)", color: FARM_PLOT_COLORS.field, opacity: 1 },
           ].map((d) => (

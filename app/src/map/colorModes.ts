@@ -281,8 +281,8 @@ export const CAR_PARK_LEGEND: LegendEntry[] = [
 ];
 
 // Farmland in the Agri-PV layer, by where it stands (sim/agriPv.ts). Zoned, under way and fields are
-// a validated set (all pairs); farmland is the neutral bucket.
-export const FARM_PLOT_COLORS = { farmland: "#9cbf73", planned: "#eda100", zoned: "#eda100", underWay: "#4a3aa7", fieldBuilding: "#2a78d6", field: "#2a78d6" } as const;
+// a validated set (all pairs); farmland, and zoned fields whose farmer said no, are neutral.
+export const FARM_PLOT_COLORS = { farmland: "#9cbf73", planned: "#eda100", zoned: "#eda100", refused: "#8f8b80", underWay: "#4a3aa7", fieldBuilding: "#2a78d6", field: "#2a78d6" } as const;
 
 // The EV charging layer: buildings where most households have a wallbox, and elsewhere the quality
 // of public charging around (publicCharging.ts) — below the floor, too little to rely on. Whether
