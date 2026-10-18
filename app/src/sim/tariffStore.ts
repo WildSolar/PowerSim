@@ -19,6 +19,7 @@ import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { simClock } from "./engine";
 import { market } from "./market";
 import { networkTariff } from "./networkTariff";
+import { feedInBaseRpKWh, feedInYearBaseRpKWh, resetFeedIn } from "./feedIn";
 import { DEFAULT_SHEET, type Tariff, type TariffSheet } from "./tariff";
 
 /** What a kWh costs a consumer in basic supply under a sheet in a year: its energy price and the
@@ -63,6 +64,7 @@ class TariffStore {
 
   /** A new game: the starting sheet, in force this year and next. */
   init(): void {
+    resetFeedIn();
     this.sheets = new Map([[BASELINE_YEAR, { ...DEFAULT_SHEET }]]);
     this.currentMonth = Number.NaN;
     this.refresh();
@@ -156,6 +158,8 @@ class TariffStore {
       peakPriceRpKWh: prices.peakRpKWh,
       offPeakPriceRpKWh: prices.offPeakRpKWh,
       baseFeeRpPerMonth: prices.baseFeeRpPerMonth,
+      feedInPriceRpKWh: feedInBaseRpKWh(atMs) + sheet.feedInBonusRpKWh,
+      feedInExpectedRpKWh: feedInYearBaseRpKWh(yearOf(atMs)) + sheet.feedInBonusRpKWh,
       oilPriceRpPerLiter: market.price("oil", atMs),
       gasPriceRpKWh: market.price("gas", atMs),
       woodPelletPriceRpKWh: interpolateCurve(WOOD_PELLET_PRICE_RP_PER_KWH, yearOf(atMs)),

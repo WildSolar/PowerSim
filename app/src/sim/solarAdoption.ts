@@ -356,7 +356,7 @@ function candidateEconomics(building: Building, candidateCapacityKw: number, sun
     overFeedLawKWh: 0,
     overFeedGridKWh: 0,
     peakRpKWh: tariff.peakPriceRpKWh,
-    feedInRpKWh: tariff.feedInPriceRpKWh,
+    feedInRpKWh: tariff.feedInExpectedRpKWh,
   };
   const mean = (f: (j: number) => number, i: number, dtHours: number) => ((f(i - 1) + f(i)) / 2) * (dtHours / 1000);
   const selfUse = (j: number) => Math.min(consumptionW[j], productionW(j));

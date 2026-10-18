@@ -9,7 +9,6 @@
 
 import {
   BENCHMARK_DISTRICT_HEAT_RP_KWH,
-  BENCHMARK_FEED_IN_RP_KWH,
   BENCHMARK_HOUSEHOLD_RP_KWH,
   BENCHMARK_WHOLESALE_RP_KWH,
   HOUSEHOLD_OFF_PEAK_SHARE,
@@ -18,6 +17,8 @@ import {
 import { approval, setPriceStances, type Stances } from "./approval";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { marketAccess } from "./marketAccess";
+import { feedInYearBaseRpKWh } from "./feedIn";
+import { BENCHMARK_FEED_IN_BONUS_RP_KWH } from "../config/feedIn";
 import { market } from "./market";
 import type { TariffSheet } from "./tariff";
 import { sheetPrices, tariffStore, type TariffPublication } from "./tariffStore";
@@ -68,7 +69,9 @@ function feeling(ratio: number): number {
 export function stancesFor(sheet: TariffSheet, year: number): Stances {
   const bill = feeling(householdRpKWh(sheet, year) / benchmarkRpKWh(year));
   const heat = feeling(sheet.districtHeatingPriceRpKWh / BENCHMARK_DISTRICT_HEAT_RP_KWH) * DISTRICT_HEAT_WEIGHT;
-  const feedIn = Math.max(-FEED_IN_WEIGHT, Math.min(FEED_IN_WEIGHT, (sheet.feedInPriceRpKWh / BENCHMARK_FEED_IN_RP_KWH - 1) * FEED_IN_WEIGHT));
+  // What panels earn here against elsewhere: the federal price is the same, the bonus is the utility's.
+  const federal = feedInYearBaseRpKWh(year);
+  const feedIn = Math.max(-FEED_IN_WEIGHT, Math.min(FEED_IN_WEIGHT, ((federal + sheet.feedInBonusRpKWh) / (federal + BENCHMARK_FEED_IN_BONUS_RP_KWH) - 1) * FEED_IN_WEIGHT));
   return {
     tenants: bill * BILL_WEIGHT.tenants + heat,
     homeowners: bill * BILL_WEIGHT.homeowners + heat + feedIn,

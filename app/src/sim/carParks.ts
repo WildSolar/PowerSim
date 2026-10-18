@@ -252,7 +252,7 @@ class CarParks {
   private yearlyValueRp(lot: CarPark, atMs: number, selfShare: number): number {
     const t = tariffStore.at(atMs);
     const retail = (t.peakPriceRpKWh + t.offPeakPriceRpKWh) / 2;
-    return this.yearlyKWh(lot, atMs) * (selfShare * retail + (1 - selfShare) * t.feedInPriceRpKWh);
+    return this.yearlyKWh(lot, atMs) * (selfShare * retail + (1 - selfShare) * t.feedInExpectedRpKWh);
   }
 
   /** What building a canopy costs at `atMs`, and what the federal payment covers. */

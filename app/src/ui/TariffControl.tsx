@@ -14,6 +14,8 @@ import { BASE_FEE_MAX_CHF_PER_MONTH, TARIFF_CAP_MARGIN } from "../config/tariff"
 import { sheetPrices, tariffStore } from "../sim/tariffStore";
 import { businessEnergyRpKWh, marketAccess, marketOfferRpKWh } from "../sim/marketAccess";
 import { MARKET_ACCESS_MIN_KWH } from "../config/marketAccess";
+import { feedInYearBaseRpKWh } from "../sim/feedIn";
+import { FEED_IN_MINIMUM_RP_KWH } from "../config/feedIn";
 import { DynamicPriceChart } from "./DynamicPriceChart";
 import "./tariffControl.css";
 
@@ -34,7 +36,7 @@ const FIELDS: { key: SheetField; label: string; max: number; step: number; unit:
   { key: "energyPeakRpKWh", label: "Peak", max: 80, step: 0.5, unit: "Rp/kWh", group: "energy" },
   { key: "baseFeeChfPerMonth", label: "Base fee", max: BASE_FEE_MAX_CHF_PER_MONTH, step: 1, unit: "CHF/month", group: "network", title: "Per meter and month: the more of the grid's allowance it raises, the less each kWh carries" },
   { key: "networkOffPeakShare", label: "Off-peak rate", max: 100, step: 5, unit: "% of peak", scale: 100, group: "network", title: "How much cheaper the network fee is at night" },
-  { key: "feedInPriceRpKWh", label: "Feed-in", max: 40, step: 0.5, unit: "Rp/kWh", group: "solar", title: "What the utility pays for solar power fed into the grid" },
+  { key: "feedInBonusRpKWh", label: "Your bonus", max: 30, step: 0.5, unit: "Rp/kWh", group: "solar", title: "What the utility adds to the federal feed-in price, typically for the certificate of origin" },
   { key: "districtHeatingPriceRpKWh", label: "District heating", max: 40, step: 0.5, unit: "Rp/kWh", group: "other" },
   { key: "publicChargingAcRpKWh", label: "Public charging", max: 120, step: 0.5, unit: "Rp/kWh", group: "other", title: "At the municipality's own on-street chargers" },
   { key: "publicChargingDcRpKWh", label: "Fast charging", max: 150, step: 0.5, unit: "Rp/kWh", group: "other", title: "At the municipality's own fast-charging hubs" },
@@ -121,6 +123,14 @@ export function TariffControl() {
               onChange={(v) => setDraft((d) => ({ ...d, [f.key]: v }))}
               groupLabel={i === 0 || FIELDS[i - 1].group !== f.group ? GROUP_LABEL[f.group] : null}
             />
+            {f.key === "feedInBonusRpKWh" && (
+              <ComputedRow
+                label="Feed-in, all in"
+                now={feedInYearBaseRpKWh(nowYear) + inForce.feedInBonusRpKWh}
+                next={feedInYearBaseRpKWh(targetYear) + draft.feedInBonusRpKWh}
+                title={`The federal price — the quarter's reference market price, weighted by when solar produces, but at least ${FEED_IN_MINIMUM_RP_KWH} Rp — and your bonus, over the year`}
+              />
+            )}
             {f.key === "networkOffPeakShare" && (
               <>
                 <ComputedRow label="Off-peak" now={pricesNow.networkOffPeakRpKWh} next={pricesNext.networkOffPeakRpKWh} title="Set by the regulator from what the grid costs: you choose only how it is raised" />

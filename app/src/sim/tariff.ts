@@ -22,7 +22,7 @@ export interface TariffSheet {
   offPeakEndHour: number; // e.g. 6 — off-peak ends the next morning
   baseFeeChfPerMonth: number; // the network's monthly base fee per meter
   networkOffPeakShare: number; // the off-peak network fee as a share of the peak one (the regulator sets the level — networkTariff.ts)
-  feedInPriceRpKWh: number; // grid feed-in remuneration for exported solar
+  feedInBonusRpKWh: number; // the utility's own bonus on top of the federal feed-in price (feedIn.ts)
   districtHeatingPriceRpKWh: number; // per kWh of heat delivered
   publicChargingAcRpKWh: number; // at the municipality's own on-street chargers — see publicCharging.ts
   publicChargingDcRpKWh: number; // at the municipality's own fast-charging hubs
@@ -38,6 +38,8 @@ export interface Tariff extends TariffSheet {
   peakPriceRpKWh: number; // energy and network together, peak — what a kWh costs a consumer in basic supply
   offPeakPriceRpKWh: number; // ...off-peak
   baseFeeRpPerMonth: number; // the base fee, per meter and month
+  feedInPriceRpKWh: number; // what solar fed into the grid earns this quarter: the reference market price (or the federal minimum) and the bonus
+  feedInExpectedRpKWh: number; // ...over the year, as an owner weighing panels expects it
   oilPriceRpPerLiter: number; // per liter of heating oil burned
   gasPriceRpKWh: number; // per kWh of gas burned (not thermal delivered — see billing.ts)
   woodPelletPriceRpKWh: number; // per kWh of wood pellets burned

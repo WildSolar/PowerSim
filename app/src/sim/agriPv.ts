@@ -420,7 +420,7 @@ class AgriPv {
     const costRp = kw * capexRpPerKwp(kw, atMs) * AGRI_PV_SYSTEMS[system].capexFactor;
     const rentRp = (plot.areaM2 / 10_000) * AGRI_PV_RENT_CHF_PER_HA_YEAR * 100;
     const upkeepRp = kw * AGRI_PV_UPKEEP_CHF_PER_KWP_YEAR * 100;
-    const savedRp = fieldKWh * (ppaShare * this.ppaEnergyValueRpPerKWh(atMs) + (1 - ppaShare) * tariffStore.at(atMs).feedInPriceRpKWh);
+    const savedRp = fieldKWh * (ppaShare * this.ppaEnergyValueRpPerKWh(atMs) + (1 - ppaShare) * tariffStore.at(atMs).feedInExpectedRpKWh);
     type Choice = "none" | "field";
     const candidates: RenewalCandidate<Choice>[] = [
       { id: "none", available: true, annualizedCostRp: 0, lifetimeMeanYears: AGRI_PV_LIFETIME_YEARS, greenness: 0 },

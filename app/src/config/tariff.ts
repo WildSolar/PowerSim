@@ -17,8 +17,9 @@ export const DEFAULT_SHEET: TariffSheet = {
   // and the off-peak rate as a share of the peak one.
   baseFeeChfPerMonth: 6,
   networkOffPeakShare: 0.6,
-  // Ballpark Swiss figures: feed-in and district heat sit below the electricity tariff.
-  feedInPriceRpKWh: 8,
+  // Feed-in: the federal price (config/feedIn.ts) and the utility's bonus on top; district heat
+  // sits below the electricity tariff.
+  feedInBonusRpKWh: 2,
   districtHeatingPriceRpKWh: 12,
   // At the municipality's own public chargers (private operators charge their own, config/charging.ts).
   publicChargingAcRpKWh: 45,
@@ -57,5 +58,4 @@ export const TARIFF_CAP_MARGIN = 0.2;
 export const ENERGY_SALES_COST_RP_KWH = 2;
 
 /** What feed-in and district heat are judged against. */
-export const BENCHMARK_FEED_IN_RP_KWH = 8;
 export const BENCHMARK_DISTRICT_HEAT_RP_KWH = 12;
