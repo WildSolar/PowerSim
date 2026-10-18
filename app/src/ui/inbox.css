@@ -407,6 +407,50 @@
   border-color: var(--ink);
 }
 
+/* An advisor's picks: each opens its planning tool there. */
+.letter-picks {
+  margin: 14px 0 4px;
+  padding: 0;
+  list-style: none;
+  counter-reset: pick;
+}
+
+.letter-picks li + li {
+  margin-top: 6px;
+}
+
+.letter-picks button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.letter-picks button:hover {
+  border-color: var(--ink);
+}
+
+.letter-pick-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.letter-pick-detail {
+  padding-left: 19px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
 /* The local paper */
 
 .paper {

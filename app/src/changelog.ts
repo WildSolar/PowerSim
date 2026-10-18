@@ -25,6 +25,7 @@ export const CHANGELOG: Release[] = [
     version: "0.7.0",
     date: null,
     added: [
+      "Advisors: retain a roof solar, mobility, district heating or finance advisor for a yearly fee, and each writes once a year with what it found — the best roofs for the utility's solar, where the next chargers should go, the streets your network should reach next, and what next year's power will cost before you set your prices. Each pick opens its planning tool there.",
       "Electric van and lorry grant, a new measure: a flat sum for each electric van or lorry a business buys, set separately for each.",
       "Wiki: “All topics” at the top of the contents, and in each article's heading, takes you back to the overview of every topic.",
     ],

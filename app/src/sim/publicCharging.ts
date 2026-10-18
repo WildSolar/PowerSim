@@ -1153,6 +1153,34 @@ class PublicCharging {
     );
   }
 
+  /** The mobility advisor's view (advisors.ts): where most households went without a charger over
+   * the year before `atMs` — less what sites opened or ordered since will serve — as up to `count`
+   * spots, each with how many households, snapped to the street; and the lorries and vans that would
+   * have gone electric at a fast-charging hub or a lorry park, and where most of them are. */
+  adviseSites(atMs: number, count: number): { spots: { lon: number; lat: number; street: string | null; households: number }[]; fleet: { lon: number; lat: number; vehicles: number } | null } {
+    let demand = this.unmetDemand(atMs - YEAR_MS, atMs);
+    const spots: { lon: number; lat: number; street: string | null; households: number }[] = [];
+    while (spots.length < count && demand.length > 0) {
+      let best: typeof demand = [];
+      for (const d of demand) {
+        const group = demand.filter((o) => Math.hypot(o.x - d.x, o.y - d.y) <= DEMAND_RADIUS_M.ac);
+        if (group.length > best.length) best = group;
+      }
+      if (best.length < 2) break;
+      const [lon, lat] = this.projection.toLonLat(best.reduce((s, d) => s + d.x, 0) / best.length, best.reduce((s, d) => s + d.y, 0) / best.length);
+      const snapped = streets.snapToStreet(lon, lat);
+      spots.push({ lon: snapped?.lon ?? lon, lat: snapped?.lat ?? lat, street: snapped?.street ?? null, households: best.length });
+      demand = demand.filter((d) => !best.includes(d));
+    }
+    const fleet = this.unmet.filter((d) => d.kind !== "ac" && d.atMs >= atMs - YEAR_MS && d.atMs < atMs && !this.sites.some((s) => s.openedAtMs > d.atMs && (s.kind === "fleet" || s.kind === "dc") && Math.hypot(d.x - s.x, d.y - s.y) <= DEMAND_RADIUS_M.fleet));
+    let hub: { lon: number; lat: number; vehicles: number } | null = null;
+    if (fleet.length > 0) {
+      const [lon, lat] = this.projection.toLonLat(fleet.reduce((s, d) => s + d.x, 0) / fleet.length, fleet.reduce((s, d) => s + d.y, 0) / fleet.length);
+      hub = { lon, lat, vehicles: fleet.length };
+    }
+    return { spots, fleet: hub };
+  }
+
   private operatorRound(year: number): boolean {
     const now = yearStartMs(year);
     const opensAt = now + OPERATOR_BUILD_MONTHS * MONTH_MS;

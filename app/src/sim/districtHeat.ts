@@ -530,13 +530,31 @@ class DistrictHeatNetwork {
     return order;
   }
 
-  /** The selected segments that don't touch the network (piped or being built, or a source's
-   * junction, ordered ones included) — directly, or through other segments of the same selection. */
-  private unconnectedOf(selected: number[]): number[] {
+  /** The junctions the network reaches: its pipes (built or being laid), its sources and its direct
+   * lines' ends — where an extension can start. */
+  reachedNodes(): Set<number> {
     const reached = new Set<number>();
     for (const s of this.sources) reached.add(s.node);
     for (const id of this.builtAtMs.keys()) for (const n of streets.nodesOf(id)) reached.add(n);
     for (const l of this.lines) reached.add(l.a).add(l.b);
+    return reached;
+  }
+
+  /** Whether a segment has pipes, built or being laid. */
+  isPiped(segmentId: number): boolean {
+    return this.builtAtMs.has(segmentId);
+  }
+
+  /** Plans exactly these segments as the extension (the district heating advisor's pick). */
+  selectOnly(segmentIds: number[]): void {
+    this.selection = new Set(segmentIds.filter((id) => !this.builtAtMs.has(id) && streets.get(id)));
+    this.notify();
+  }
+
+  /** The selected segments that don't touch the network (piped or being built, or a source's
+   * junction, ordered ones included) — directly, or through other segments of the same selection. */
+  private unconnectedOf(selected: number[]): number[] {
+    const reached = this.reachedNodes();
     const pending = new Set(selected);
     let progress = true;
     while (pending.size > 0 && progress) {

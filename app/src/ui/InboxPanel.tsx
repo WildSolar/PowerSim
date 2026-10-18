@@ -3,7 +3,8 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { mapFocus } from "../map/mapFocus";
 import { formatDate } from "../sim/calendar";
 import { simClock } from "../sim/engine";
-import { inbox, type Edition, type Letter } from "../sim/inbox";
+import { districtHeat } from "../sim/districtHeat";
+import { inbox, type Edition, type Letter, type LetterPick } from "../sim/inbox";
 import { letters, type LetterRequest } from "../sim/letters";
 import { useSimDay } from "../sim/store";
 import { stock } from "../sim/stock";
@@ -28,7 +29,17 @@ function monthYear(atMs: number): string {
 }
 
 /** Letters from residents and groups, the requests among them, and the local paper. */
-export function InboxPanel({ initial, onClose, onSelectBuilding }: { initial: InboxSelection; onClose: () => void; onSelectBuilding: (egid: string) => void }) {
+export function InboxPanel({
+  initial,
+  onClose,
+  onSelectBuilding,
+  onOpenTool,
+}: {
+  initial: InboxSelection;
+  onClose: () => void;
+  onSelectBuilding: (egid: string) => void;
+  onOpenTool: (tool: LetterPick["tool"]) => void;
+}) {
   useSyncExternalStore(
     (l) => inbox.subscribe(l),
     () => inbox.getVersion(),
@@ -62,6 +73,21 @@ export function InboxPanel({ initial, onClose, onSelectBuilding }: { initial: In
       mapFocus.focusBuilding(building, 17);
     } else {
       mapFocus.request({ lon: focus.lon, lat: focus.lat, minZoom: 16 });
+    }
+  };
+
+  // An advisor's pick: its planning tool opens there — a roof's card, a spot for chargers, or the
+  // streets planned as a district heating extension.
+  const openPick = (pick: LetterPick) => {
+    onClose();
+    onOpenTool(pick.tool);
+    const building = pick.egid ? stock.lookup(pick.egid) : undefined;
+    if (pick.tool === "districtHeat" && pick.segments) districtHeat.selectOnly(pick.segments);
+    if (building) {
+      onSelectBuilding(building.egid);
+      mapFocus.focusBuilding(building, 17);
+    } else {
+      mapFocus.request({ lon: pick.lon, lat: pick.lat, minZoom: 16.5 });
     }
   };
 
@@ -158,7 +184,7 @@ export function InboxPanel({ initial, onClose, onSelectBuilding }: { initial: In
                 <p className="inbox-empty">No edition yet.</p>
               )
             ) : selectedLetter ? (
-              <LetterView letter={selectedLetter} onShowOnMap={showOnMap} />
+              <LetterView letter={selectedLetter} onShowOnMap={showOnMap} onOpenPick={openPick} />
             ) : (
               <p className="inbox-empty">Pick a letter from the list.</p>
             )}
@@ -169,7 +195,15 @@ export function InboxPanel({ initial, onClose, onSelectBuilding }: { initial: In
   );
 }
 
-function LetterView({ letter, onShowOnMap }: { letter: Letter; onShowOnMap: (focus: { lon: number; lat: number; egid?: string }) => void }) {
+function LetterView({
+  letter,
+  onShowOnMap,
+  onOpenPick,
+}: {
+  letter: Letter;
+  onShowOnMap: (focus: { lon: number; lat: number; egid?: string }) => void;
+  onOpenPick: (pick: LetterPick) => void;
+}) {
   const request = letter.requestId ? letters.getRequest(letter.requestId) : undefined;
   return (
     <article className="letter">
@@ -184,6 +218,20 @@ function LetterView({ letter, onShowOnMap }: { letter: Letter; onShowOnMap: (foc
       {letter.paragraphs.map((p, i) => (
         <p key={i}>{p}</p>
       ))}
+      {letter.picks && letter.picks.length > 0 && (
+        <ol className="letter-picks">
+          {letter.picks.map((pick, i) => (
+            <li key={i}>
+              <button onClick={() => onOpenPick(pick)} title="Open it in its planning tool">
+                <span className="letter-pick-label">
+                  <MapPin size={13} strokeWidth={1.75} aria-hidden /> {pick.label}
+                </span>
+                <span className="letter-pick-detail">{pick.detail}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
       <p className="letter-sign">— {letter.from}</p>
       {request && letter.kind === "request" && (
         <div className={`letter-request request-${request.status}`}>

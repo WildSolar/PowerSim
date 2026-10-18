@@ -530,6 +530,58 @@ export const MEASURE_CATALOG: MeasureDef[] = [
 
   // --- Carbon removal ---------------------------------------------------------------------
   {
+    id: "advisor-roof-solar",
+    category: "information",
+    topic: "advisors",
+    title: "Roof solar advisor",
+    summary:
+      "A consultant who goes through every large roof the utility could rent and writes each March with the ten that would return the most on an array — at your rent, today's panel prices and the market — and how many owners would likely accept.",
+    params: [],
+    leadTimeMonths: 3,
+    effects: () => ({ advisorRoofSolar: 1 }),
+    annualCostRp: () => 100_000 * CHF,
+    approval: () => ({}),
+  },
+  {
+    id: "advisor-mobility",
+    category: "information",
+    topic: "advisors",
+    title: "Mobility advisor",
+    summary:
+      "A consultant who writes each February with where a new public charging site would do most good — where most households who wanted an electric car went without a charger over the past year — and whether vans and lorries need a hub.",
+    params: [],
+    leadTimeMonths: 3,
+    effects: () => ({ advisorMobility: 1 }),
+    annualCostRp: () => 50_000 * CHF,
+    approval: () => ({}),
+  },
+  {
+    id: "advisor-district-heat",
+    category: "information",
+    topic: "advisors",
+    title: "District heating advisor",
+    summary:
+      "A consultant who writes each April with the streets next to your network that would likely bring the most heat per metre of pipe within five years — buildings on oil, gas or wood whose heating is due for replacement, and how many owners here choose district heat.",
+    params: [],
+    leadTimeMonths: 3,
+    effects: () => ({ advisorDistrictHeat: 1 }),
+    annualCostRp: () => 80_000 * CHF,
+    approval: () => ({}),
+  },
+  {
+    id: "advisor-finance",
+    category: "information",
+    topic: "advisors",
+    title: "Finance advisor",
+    summary:
+      "A consultant who writes each June, before you set next year's prices: what the utility made, what next year's power — mostly bought already — will cost, the price change that would keep its result, and where the Swiss average is heading.",
+    params: [],
+    leadTimeMonths: 3,
+    effects: () => ({ advisorFinance: 1 }),
+    annualCostRp: () => 60_000 * CHF,
+    approval: () => ({}),
+  },
+  {
     id: "carbon-removal",
     category: "infrastructure",
     topic: "removal",

@@ -232,6 +232,24 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "advisors",
+    title: "Advisors",
+    blocks: [
+      p(
+        "Advisors are consultants you retain for a yearly fee (Town hall → Measures → Advisors). Each starts a few months after you hire it, writes a first report the month after, and from then on once a year, in its own month. A report is a letter with a ranked list: click an entry and its planning tool opens there.",
+      ),
+      list([
+        "Roof solar advisor (CHF 100,000 a year, each March): the ten large roofs where an array of the utility's would return the most for what it costs — the panels less the federal payment, your rent and the upkeep, against the power it saves buying — and how many owners would accept at your rent. An entry opens the roof's card in the Roof solar tool. See \"Roof contracts\".",
+        "Mobility advisor (CHF 50,000 a year, each February): where a new public charging site would do most good — where most households who wanted an electric car over the past year went without a charger with room, after counting the sites opened or ordered since — and whether vans and lorries need a hub. An entry opens the EV charging tool there. See \"Public charging\".",
+        "District heating advisor (CHF 80,000 a year, each April): the streets next to your network that would likely bring the most heat per metre of pipe within five years. It counts the buildings along each heating with oil, gas or wood, how likely their heating is to need replacing in that time, and how many owners choose district heat when the pipes are in their street — from the town's own record where there is one. An entry opens the District heating tool with the streets planned, so you see the extension's cost and can order it. See \"District heating network\".",
+        "Finance advisor (CHF 60,000 a year, each June, before you set next year's prices): what the utility made over the last twelve months and what your department kept; what next year's power, mostly bought already, will cost and what that does to the utility's result; the price change that would keep it; and where the Swiss average is heading. See \"Tariffs & energy prices\".",
+      ]),
+      note(
+        "Advisors know what a consultant would: prices, bills and the town's own record. Where they look ahead — whose heating will wear out, what next year's power costs — they estimate, from the age of what is installed and the usual lifetimes, and from what the utility has bought; owners still decide for themselves, and a supply crisis can upset any forecast.",
+      ),
+    ],
+  },
+  {
     id: "information",
     title: "What you know — and what it takes to find out",
     blocks: [
@@ -1051,7 +1069,7 @@ export const WIKI_GROUPS: WikiGroup[] = [
     id: "governing",
     title: "Governing",
     blurb: "What you can decide, what people think of it, and what you are aiming for.",
-    sections: ["measures", "approval", "information", "letters", "emissions", "score"],
+    sections: ["measures", "approval", "information", "advisors", "letters", "emissions", "score"],
   },
   {
     id: "money",

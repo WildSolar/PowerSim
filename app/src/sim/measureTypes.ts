@@ -21,9 +21,9 @@ export const MEASURE_CATEGORY_LABEL: Record<MeasureCategory, string> = {
 };
 
 /** What a measure is about — how the town hall groups them. */
-export type MeasureTopic = "heating" | "buildings" | "mobility" | "grid" | "advice" | "removal";
+export type MeasureTopic = "heating" | "buildings" | "mobility" | "grid" | "advice" | "advisors" | "removal";
 
-export const MEASURE_TOPIC_ORDER: MeasureTopic[] = ["heating", "buildings", "mobility", "grid", "advice", "removal"];
+export const MEASURE_TOPIC_ORDER: MeasureTopic[] = ["heating", "buildings", "mobility", "grid", "advice", "advisors", "removal"];
 
 export const MEASURE_TOPIC_LABEL: Record<MeasureTopic, string> = {
   heating: "Heating",
@@ -31,6 +31,7 @@ export const MEASURE_TOPIC_LABEL: Record<MeasureTopic, string> = {
   mobility: "Mobility",
   grid: "Grid & power",
   advice: "Advice & campaigns",
+  advisors: "Advisors",
   removal: "Carbon removal",
 };
 

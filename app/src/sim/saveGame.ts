@@ -38,6 +38,7 @@ import { roofContracts } from "./roofContracts";
 import { agriPv } from "./agriPv";
 import { carParks } from "./carParks";
 import { removals } from "./removals";
+import { advisors } from "./advisors";
 import { wind } from "./wind";
 import { monthRecords } from "./monthRecords";
 import { restoreSolar, snapshotSolar } from "./solarAdoption";
@@ -113,6 +114,7 @@ interface SaveState {
   agriPv: ReturnType<typeof agriPv.snapshot>;
   carParks: ReturnType<typeof carParks.snapshot>;
   removals: ReturnType<typeof removals.snapshot>;
+  advisors: ReturnType<typeof advisors.snapshot>;
   wind: ReturnType<typeof wind.snapshot>;
   monthRecords: ReturnType<typeof monthRecords.snapshot>;
   yearReport: Awaited<ReturnType<typeof snapshotYearReport>>;
@@ -190,6 +192,7 @@ export function captureState(transparency: boolean): Omit<SaveState, "yearReport
     agriPv: agriPv.snapshot(),
     carParks: carParks.snapshot(),
     removals: removals.snapshot(),
+    advisors: advisors.snapshot(),
     wind: wind.snapshot(),
     monthRecords: monthRecords.snapshot(),
   };
@@ -292,6 +295,7 @@ export function applySave(file: SaveFile): void {
   agriPv.restore(s.agriPv);
   carParks.restore(s.carParks);
   removals.restore(s.removals);
+  advisors.restore(s.advisors);
   wind.restore(s.wind);
   monthRecords.restore(s.monthRecords);
   restoreYearReport(s.yearReport);

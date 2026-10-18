@@ -21,7 +21,22 @@ export interface Letter {
   paragraphs: string[];
   /** A place the letter is about, to show on the map — a building, when it is about one. */
   focus?: { lon: number; lat: number; egid?: string };
+  /** Places a report ranks (an advisor's picks, advisors.ts): each opens its planning tool there. */
+  picks?: LetterPick[];
   requestId?: string;
+}
+
+export interface LetterPick {
+  label: string;
+  detail: string;
+  lon: number;
+  lat: number;
+  /** A building it is about (its panel opens in the tool). */
+  egid?: string;
+  /** The planning tool it opens. */
+  tool: "roofSolar" | "evCharging" | "districtHeat";
+  /** District heating: the street segments to plan as an extension. */
+  segments?: number[];
 }
 
 export interface NewsStory {

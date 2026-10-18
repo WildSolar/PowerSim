@@ -54,6 +54,7 @@ import { roofContracts } from "./sim/roofContracts";
 import { agriPv } from "./sim/agriPv";
 import { carParks } from "./sim/carParks";
 import { removals } from "./sim/removals";
+import { advisors } from "./sim/advisors";
 import { cachedEmissionsForYear } from "./sim/emissions";
 import { wind } from "./sim/wind";
 import { districtHeatLines } from "./sim/districtHeatLines";
@@ -100,7 +101,7 @@ function returnToMenu() {
 // Dev-only handle for inspecting the simulation from the browser console.
 if (import.meta.env.DEV) import("./dev/scenario").then((m) => Object.assign(window, { __scenario: m.runScenario }));
 if (import.meta.env.DEV) import("./dev/perf").then((m) => Object.assign(window, { __perf: m.runPerf, __perfYearEnd: m.timeYearEndReport, __perfNewYear: m.timeNewYearPieces, __perfMapTick: m.timeMapPowerTick, __perfRolling: m.timeRollingChart, __perfMonth: m.timeMonthTurn }));
-if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore, tariffStore, market, inbox, dynamicTariff, grid, districtHeat, districtHeatSources, districtHeatLines, roofContracts, agriPv, carParks, wind, publicCharging, fleets, letters, newspaper, debt, studies, finances: financesModule } });
+if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore, tariffStore, market, inbox, dynamicTariff, grid, districtHeat, districtHeatSources, districtHeatLines, roofContracts, agriPv, carParks, advisors, wind, publicCharging, fleets, letters, newspaper, debt, studies, finances: financesModule } });
 if (import.meta.env.DEV) import("./sim/saveGame").then((m) => Object.assign(window, { __save: m }));
 if (import.meta.env.DEV) import("./sim/history").then((m) => Object.assign(window, { __history: m }));
 if (import.meta.env.DEV) import("./dev/par").then((m) => Object.assign(window, { __computePar: m.computePar }));
@@ -246,6 +247,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         agriPv.init(loaded, () => stock.getAll(), `agripv:${loaded.bfsNumber}`);
         carParks.init(loaded, `carparks:${loaded.bfsNumber}`);
         removals.init(cachedEmissionsForYear);
+        advisors.init(() => stock.getAll(), `advisors:${loaded.bfsNumber}`);
         wind.init(loaded, () => stock.getAll(), `wind:${loaded.bfsNumber}`);
         zoning.init(loaded); // before the stock: new buildings ask their parcel what it allows
         heatPumpSiting.init(loaded, () => stock.getAll()); // before the stock: heating decisions ask it where a heat pump may go
@@ -459,6 +461,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
           initial={inboxSelection}
           onClose={() => setInboxSelection(null)}
           onSelectBuilding={selectBuilding}
+          onOpenTool={(tool) => setColorMode(tool)}
         />
       )}
       {showFeedback && <FeedbackDialog onClose={() => setShowFeedback(false)} />}
