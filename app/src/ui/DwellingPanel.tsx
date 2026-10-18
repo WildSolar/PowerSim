@@ -12,6 +12,8 @@ import {
   HISTORY_REFRESH_MS,
 } from "../sim/history";
 import { useSimTime, useTariff } from "../sim/store";
+import { transit } from "../sim/transit";
+import type { TransitClass } from "../config/mobility";
 import { simClock } from "../sim/engine";
 import { BillSection } from "./BillSection";
 import { DEVICE_CATEGORIES } from "./deviceCategories";
@@ -36,6 +38,14 @@ export interface DwellingPanelProps {
 }
 
 const DAY_MS = 24 * 60 * 60_000;
+
+const TRANSIT_CLASS_LABEL: Record<TransitClass, string> = {
+  A: "very good (class A)",
+  B: "good (class B)",
+  C: "fair (class C)",
+  D: "basic (class D)",
+  none: "next to none",
+};
 
 function formatHourOfDay(ms: number): string {
   const h = (((ms % DAY_MS) + DAY_MS) % DAY_MS) / 3_600_000;
@@ -141,6 +151,12 @@ export function DwellingPanel({ building, dwelling, allBuildings, realPlants, on
       </div>
 
       <h3 className="section-heading">Mobility</h3>
+      <div
+        className="ev-session-note"
+        title="The federal public transport quality class of where the building stands (ÖV-Güteklassen): how near the next stop is, and how often it's served. The better served, the likelier a household gets about by public transport."
+      >
+        Public transport here: {TRANSIT_CLASS_LABEL[transit.classOf(building)]}.
+      </div>
       {mobilitySlots.map((slot) => {
         const charging = slotCharging(building, dwelling, slot.slotIndex, simTimeMs);
         const isCarEV = slot.vehicleType === "carEV";

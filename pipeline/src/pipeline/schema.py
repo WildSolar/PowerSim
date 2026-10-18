@@ -99,3 +99,5 @@ class MunicipalityDataset:
     # Open-air car parks of about 20 spaces and up, for solar canopies — see sources/car_parks.py:
     # {id, name, access, spaces, area_m2, host_egid, rings}.
     car_parks: list = field(default_factory=list)
+    # Public transport quality classes (ÖV-Güteklassen, ARE), [{class, rings}] — see sources/transit.py.
+    transit_classes: list = field(default_factory=list)

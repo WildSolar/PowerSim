@@ -76,8 +76,9 @@ import { setMeasureAvailability } from "./sim/measureAvailability";
 import { studies } from "./sim/studies";
 import { municipalSolarCandidates } from "./sim/solarAdoption";
 import { zoning } from "./sim/zoning";
+import { transit } from "./sim/transit";
 import { fleets } from "./sim/fleet";
-import { bookInitialPublicCharging } from "./sim/mobility";
+import { bookInitialPublicCharging, mobilitySlotCount } from "./sim/mobility";
 import { policyStore } from "./sim/policy";
 import { approval } from "./sim/approval";
 import { market } from "./sim/market";
@@ -253,6 +254,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         advisors.init(() => stock.getAll(), `advisors:${loaded.bfsNumber}`);
         wind.init(loaded, () => stock.getAll(), `wind:${loaded.bfsNumber}`);
         zoning.init(loaded); // before the stock: new buildings ask their parcel's zone
+        transit.init(loaded, (egid) => stock.lookup(egid), (b, d) => mobilitySlotCount(b.egid, d)); // before the stock: households' modes ask how well they're served
         heatPumpSiting.init(loaded, () => stock.getAll()); // before the stock: heating decisions ask it where a heat pump may go
         publicCharging.init(loaded, 0);
         publicCharging.setBuildingLookup((egid) => stock.lookup(egid));

@@ -897,13 +897,18 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "How people get around changes slowly. Every 5–10 years a life event — a new job, a child, a move — makes someone rethink it. The town starts with the Swiss average from the federal mobility survey (about 69% car, 11% bike and on foot, 20% public transport); the mobility measures — a bicycle network, better public transport, parking management — shift each such rethink a little.",
       ),
       p(
+        "Where someone lives matters too. The federal public transport quality classes grade every place from A (very good: a busy station or tram stop close by) to D (basic), by how near the next stop is and how often it is served; beyond them there is next to no public transport. The better served a home, the likelier its people take public transport — in a town with both very good and very poor service, from about a third of people down to well under a tenth — and the likelier the rest drive. The town as a whole keeps the average split: what changes is where the cars are, and so where chargers are needed, not how many. A home's panel shows its class.",
+      ),
+      p(
         "Separately, a car wears out after about 14 years and a bike after 8–10, and is replaced by the same kind. Whether the new one is electric is a real choice, made like a heating replacement (see \"When things wear out\"): the price less grants, the running costs (electricity against petrol, at the prices in Town hall → Prices), and how the owner leans. The electric share at the start is the town's real one, from the federal vehicle register.",
       ),
       p(
         "An electric car needs somewhere to charge: at home, with a wallbox, at the household electricity price — or at public chargers and, for some, at work, at their price and with the hassle. A household weighs the two and takes the cheaper; with neither, an electric car isn't an option (see \"Public charging\"). About a third of electric car owners wait for the night rate, if the car will still be charged by morning; a day's driving takes 6–16 kWh.",
       ),
       p("A home's panel shows how its people get around, and every change of car, bike or habit."),
-      note("E-bikes use too little electricity to show, and an ordinary bike almost always wins over an e-bike on price."),
+      note(
+        "E-bikes use too little electricity to show, and an ordinary bike almost always wins over an e-bike on price. How much likelier public transport is in each class is a rough estimate from the federal mobility survey; the classes themselves are the Federal Office for Spatial Development's.",
+      ),
     ],
   },
   {

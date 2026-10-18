@@ -30,6 +30,7 @@ import {
   MOBILITY_TWO_SLOT_ROOM_SLOPE,
   MODE_LIFETIME_MEAN_YEARS,
   MODE_WEIBULL_SHAPE,
+  TRANSIT_MAX_SHARE,
   VEHICLE_BIAS_MAGNITUDE_RP_PER_YEAR,
   VEHICLE_UNCERTAINTY_FRACTION,
   VEHICLE_WEIBULL_SHAPE,
@@ -54,6 +55,7 @@ import {
 import { modeAt, modeChainEntry, modeEventsUpTo, type ModeChainEntry, type ModeEvent } from "./modeRenewal";
 import type { Building } from "../data/types";
 import { policyStore } from "./policy";
+import { transit } from "./transit";
 import { municipalVehicleSubsidyRp } from "./subsidies";
 import { hashSeed, mulberry32 } from "./rng";
 import {
@@ -114,9 +116,9 @@ export function mobilitySlotCount(egid: string, dwelling: Dwelling): 1 | 2 {
 // However much infrastructure and restriction the municipality adds, the car keeps at least this share.
 const MIN_CAR_SHARE = 0.15;
 
-/** The modal split a household's next life event draws from: the survey baseline, with whatever the
- * municipality has done (bike lanes, better transit, parking rules) moving trips off the car. */
-function modeTargetShares(): Record<MobilityMode, number> {
+/** The town's modal split: the survey baseline, with whatever the municipality has done (bike lanes,
+ * better transit, parking rules) moving trips off the car. */
+function townModeShares(): Record<MobilityMode, number> {
   const p = policyStore.get();
   const car = MOBILITY_MODE_CATALOG.car.targetShare;
   const wanted = (p.modeShiftToBikePts + p.modeShiftToOtherPts) / 100;
@@ -127,6 +129,15 @@ function modeTargetShares(): Record<MobilityMode, number> {
     bike: MOBILITY_MODE_CATALOG.bike.targetShare + (p.modeShiftToBikePts / 100) * scale,
     other: MOBILITY_MODE_CATALOG.other.targetShare + (p.modeShiftToOtherPts / 100) * scale,
   };
+}
+
+/** The modal split a household's next life event draws from: the town's, with public transport
+ * likelier the better its home is served (transit.ts) — the car and the bike sharing the rest. */
+function modeTargetShares(egid: string): Record<MobilityMode, number> {
+  const town = townModeShares();
+  const other = Math.min(TRANSIT_MAX_SHARE, town.other * transit.factor(egid));
+  const rest = (1 - other) / Math.max(1e-9, town.car + town.bike);
+  return { car: town.car * rest, bike: town.bike * rest, other };
 }
 
 function modeEntityKey(egid: string, ewid: string, slotIndex: number): string {
@@ -141,7 +152,7 @@ function modeChainFor(egid: string, ewid: string, slotIndex: number, simTimeMs: 
       labelFor: (id) => MOBILITY_MODE_CATALOG[id].label,
       weibullShape: MODE_WEIBULL_SHAPE,
       lifetimeMeanYears: MODE_LIFETIME_MEAN_YEARS,
-      targetShares: modeTargetShares,
+      targetShares: () => modeTargetShares(egid),
     },
     simTimeMs,
   );

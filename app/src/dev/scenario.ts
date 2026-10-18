@@ -31,6 +31,7 @@ import { grid } from "../sim/grid";
 import { heatPumpSiting } from "../sim/heatPumpSiting";
 import { sizeUnreportedSources } from "../sim/districtHeatStats";
 import { zoning } from "../sim/zoning";
+import { transit } from "../sim/transit";
 import { fleets } from "../sim/fleet";
 import { tariffStore } from "../sim/tariffStore";
 import { market } from "../sim/market";
@@ -183,7 +184,8 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   streets.init(dataset);
   districtHeat.init(dataset);
   districtHeatSources.init(dataset, () => stock.getAll());
-  zoning.init(dataset); // before the stock: new buildings ask their parcel what it allows
+  zoning.init(dataset); // before the stock: new buildings ask their parcel's zone
+  transit.init(dataset, (egid) => stock.lookup(egid), (b, d) => mobilitySlotCount(b.egid, d)); // before the stock: households' modes ask how well they're served
   heatPumpSiting.init(dataset, () => stock.getAll()); // before the stock: heating decisions ask it where a heat pump may go
   // Car parks: their owners build canopies with no measure at all, so a do-nothing run has them too.
   carParks.init(dataset, `carparks:${dataset.bfsNumber}`);

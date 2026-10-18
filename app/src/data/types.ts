@@ -128,6 +128,9 @@ export interface MunicipalityDataset {
   /** Open-air car parks of about 20 spaces and up, for solar canopies (OpenStreetMap) — see
    * pipeline/sources/car_parks.py. Absent in older datasets. */
   carParks?: CarParkData[];
+  /** The public transport quality classes (ÖV-Güteklassen, ARE), one entry per area — see
+   * pipeline/sources/transit.py. Absent in older datasets. */
+  transitClasses?: { class: "A" | "B" | "C" | "D"; rings: [number, number][][] }[];
 }
 
 /** An open-air car park (pipeline/sources/car_parks.py). */

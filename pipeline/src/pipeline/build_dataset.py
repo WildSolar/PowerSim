@@ -36,6 +36,7 @@ from .sources import wind as wind_source
 from .sources import streets as streets_source
 from .sources import exclusions as exclusions_source
 from .sources import car_parks as car_parks_source
+from .sources import transit as transit_source
 from .sources import gwr, powerplants, sites as sites_source, statent, stock_history
 
 DEFAULT_BFS_NUMBER = 247  # Schlieren
@@ -122,7 +123,7 @@ def _district_heat(bfs_number: int, buildings_df, segments, boundary_lv95, posit
     return network
 
 
-REFRESHABLE = ("streets", "district-heat", "farm", "wind", "car-parks")
+REFRESHABLE = ("streets", "district-heat", "farm", "wind", "car-parks", "transit")
 
 
 def refresh(bfs_number: int, parts: list[str]) -> Path:
@@ -133,7 +134,8 @@ def refresh(bfs_number: int, parts: list[str]) -> Path:
     - "district-heat": GWR for the district-heated buildings and entrances, the BFE's networks and
       heat sources, the land cover;
     - "farm": the farmland plots;
-    - "car-parks": the open-air car parks (OpenStreetMap)."""
+    - "car-parks": the open-air car parks (OpenStreetMap);
+    - "transit": the public transport quality classes (ARE)."""
     path = next(
         (p for p in OUTPUT_DIR.glob("*.json") if p.name != INDEX_FILENAME and json.loads(p.read_text(encoding="utf-8")).get("bfsNumber") == bfs_number),
         None,
@@ -156,6 +158,10 @@ def refresh(bfs_number: int, parts: list[str]) -> Path:
         footprints = {b["egid"]: make_valid(Polygon([coords.lonlat_to_lv95(lon, lat) for lon, lat in b["footprint"]])) for b in data["buildings"] if b.get("footprint") and len(b["footprint"]) >= 4}
         data["carParks"] = _to_camel(car_parks_source.fetch_car_parks(boundary_lv95, footprints))
         print(f"  {len(data['carParks'])} car parks, {sum(c['spaces'] for c in data['carParks'])} spaces")
+    if "transit" in parts:
+        print(f"Refreshing public transport classes in {path.name}...")
+        data["transitClasses"] = _to_camel(transit_source.fetch_transit_classes(boundary_lv95))
+        print(f"  {len(data['transitClasses'])} areas ({', '.join(sorted({t['class'] for t in data['transitClasses']}))})")
     if "streets" in parts:
         _refresh_streets(bfs_number, data, boundary_lv95)
     if "district-heat" in parts or "streets" in parts:
@@ -328,6 +334,10 @@ def build(bfs_number: int) -> MunicipalityDataset:
     )
     print(f"  {len(car_parks)} car parks of {car_parks_source.MIN_SPACES} spaces or more, {sum(c['spaces'] for c in car_parks)} spaces")
 
+    print("Fetching public transport classes (ARE)...")
+    transit_classes = transit_source.fetch_transit_classes(boundary_lv95)
+    print(f"  {len(transit_classes)} areas")
+
     print("Fetching the heat-use atlas (canton ZH)...")
     heat_use = heat_use_source.fetch_heat_use(boundary_lv95)
     if heat_use:
@@ -429,6 +439,7 @@ def build(bfs_number: int) -> MunicipalityDataset:
         zone_parcels=zone_parcels,
         heat_use=heat_use,
         car_parks=car_parks,
+        transit_classes=transit_classes,
     )
 
 

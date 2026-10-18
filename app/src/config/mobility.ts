@@ -42,6 +42,16 @@ export const MOBILITY_MODE_CATALOG: Record<MobilityMode, MobilityModeSpec> = {
   other: { mode: "other", label: "Public transit / other", icon: "🚌", color: "#2a78d6", targetShare: 0.2 },
 };
 
+// Public transport near home (sim/transit.ts): the federal quality classes, A (very good) to D
+// (basic), and "none". A household's chance of getting about by public transport is weighted by its
+// home's class — normalised over the town, so the split above holds for the town as a whole. The
+// Mikrozensus finds public transport's share about four times higher with very good service than
+// with next to none; informed placeholders in between.
+export type TransitClass = "A" | "B" | "C" | "D" | "none";
+export const TRANSIT_CLASS_WEIGHT: Record<TransitClass, number> = { A: 2, B: 1.5, C: 1.1, D: 0.75, none: 0.5 };
+/** However well served, a household's chance of public transport stays below this. */
+export const TRANSIT_MAX_SHARE = 0.6;
+
 export type VehicleTypeId = "carEV" | "carICE" | "bikeElectric" | "bikeStandard";
 
 export interface VehicleTypeSpec {
