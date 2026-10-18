@@ -11,7 +11,7 @@ import { dataUrl } from "../data/loadDataset";
 import type { MunicipalityDataset, SiteZone } from "../data/types";
 import { approval } from "../sim/approval";
 import { toDateMs } from "../sim/calendar";
-import { computeEmissionsForYear } from "../sim/emissions";
+import { cachedEmissionsForYear, computeEmissionsForYear } from "../sim/emissions";
 import { currentHeatingSystemId } from "../sim/heatingRenewal";
 import { existsAt } from "../sim/lifetime";
 import { measures } from "../sim/measures";
@@ -23,6 +23,7 @@ import { streets } from "../sim/streets";
 import { districtHeat } from "../sim/districtHeat";
 import { districtHeatSources } from "../sim/districtHeatSources";
 import { carParks } from "../sim/carParks";
+import { removals } from "../sim/removals";
 import { publicCharging } from "../sim/publicCharging";
 import { grid } from "../sim/grid";
 import { heatPumpSiting } from "../sim/heatPumpSiting";
@@ -191,6 +192,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   heatPumpSiting.init(dataset, () => stock.getAll()); // before the stock: heating decisions ask it where a heat pump may go
   // Car parks: their owners build canopies with no measure at all, so a do-nothing run has them too.
   carParks.init(dataset, `carparks:${dataset.bfsNumber}`);
+  removals.init(cachedEmissionsForYear);
   publicCharging.init(dataset, 0);
   publicCharging.setBuildingLookup((egid) => stock.lookup(egid));
   publicCharging.setBuildingsProvider(() => stock.getAll());
@@ -244,6 +246,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     stock.advance(t);
     publicCharging.advance(t);
     carParks.advance(t);
+    removals.advance(t);
     grid.advance(t);
     if (spec.reinforceGrid) {
       for (const area of grid.getAreas()) {

@@ -39,6 +39,17 @@ export const SHOCK_DECAY_MONTHS = 15;
 /** How exposed each price is to a shock: gas most, petrol least. */
 export const SHOCK_EXPOSURE: Record<Commodity, number> = { oil: 0.7, gas: 1, petrol: 0.4, wholesale: 0.8 };
 
+// Wholesale electricity as a Swiss utility buys it: most of a year's power in tranches on the
+// forward market over the three years before (a third each year), the rest month by month at the
+// spot price. Forward prices wander from year to year — up or down by about a quarter, a trend
+// tending to carry on into the next year — so what a year's power costs moves by about a tenth a
+// year, smoothed rather than flattened; the spot share adds a little more month to month.
+export const WHOLESALE_HEDGED_SHARE = 0.85;
+export const WHOLESALE_HEDGE_YEARS = 3;
+export const WHOLESALE_FORWARD_SIGMA = 0.25;
+export const WHOLESALE_FORWARD_PERSISTENCE = 0.5;
+export const WHOLESALE_SPOT_MONTHLY_SIGMA = 0.15;
+
 // The local grid's upkeep per kWh delivered — the utility's cost, not a price anyone sets. Grid usage
 // fees in Switzerland run around 10-12 Rp/kWh plus levies; 13 covers the grid (and its capital costs)
 // and leaves the utility a margin of a few million on a town of 20,000.

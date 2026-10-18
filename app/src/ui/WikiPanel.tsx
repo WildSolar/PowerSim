@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, Banknote, Building2, Car, Compass, Flame, Landmark, Plug, Search, Users, X, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, Banknote, Building2, Car, Compass, Flame, Landmark, LayoutGrid, Plug, Search, Users, X, Zap } from "lucide-react";
 import { WIKI_GROUPS, WIKI_SECTIONS, type WikiBlock, type WikiSection } from "./wikiContent";
 import { usePauseWhileOpen } from "./usePauseWhileOpen";
 import "./wiki.css";
@@ -84,7 +84,7 @@ function leadIn(item: string): string | null {
   return words <= (m[2] === " —" ? 4 : 6) ? m[1] + m[2] : null;
 }
 
-function Article({ section, query, onOpen }: { section: WikiSection; query: string; onOpen: (id: string) => void }) {
+function Article({ section, query, onOpen, onHome }: { section: WikiSection; query: string; onOpen: (id: string) => void; onHome: () => void }) {
   const group = GROUP_OF.get(section.id);
   const index = READING_ORDER.indexOf(section.id);
   const prev = index > 0 ? SECTION_BY_ID.get(READING_ORDER[index - 1]) : undefined;
@@ -92,7 +92,12 @@ function Article({ section, query, onOpen }: { section: WikiSection; query: stri
   const rich = (text: string) => <RichText text={text} selfId={section.id} query={query} onOpen={onOpen} />;
   return (
     <article className="wiki-article">
-      {group && <div className="wiki-kicker">{group.title}</div>}
+      <div className="wiki-kicker">
+        <button className="wiki-crumb" onClick={onHome} title="Back to every topic">
+          All topics
+        </button>
+        {group && <> › {group.title}</>}
+      </div>
       <h1>{section.title}</h1>
       {section.blocks.map((block, i) => {
         if (block.type === "p") return <p key={i}>{rich(block.text ?? "")}</p>;
@@ -260,6 +265,12 @@ export function WikiPanel({ onClose }: WikiPanelProps) {
           <input type="search" placeholder="Search the wiki" value={query} onChange={(e) => setQuery(e.target.value)} />
         </label>
         <nav className="wiki-toc" aria-label="Contents">
+          {!matching && (
+            <button className={`wiki-toc-home${section === null ? " active" : ""}`} aria-current={section === null ? "page" : undefined} onClick={() => open(null)}>
+              <LayoutGrid size={14} strokeWidth={1.75} aria-hidden />
+              All topics
+            </button>
+          )}
           {WIKI_GROUPS.map((g) => {
             const Icon = GROUP_ICON[g.id] ?? Compass;
             const ids = matching ? g.sections.filter((id) => matching.has(id)) : g.sections;
@@ -285,7 +296,7 @@ export function WikiPanel({ onClose }: WikiPanelProps) {
         </nav>
       </aside>
       <div className="wiki-body" ref={bodyRef}>
-        {searching ? <Results query={trimmed} onOpen={open} /> : section ? <Article section={section} query="" onOpen={open} /> : <FrontPage onOpen={open} />}
+        {searching ? <Results query={trimmed} onOpen={open} /> : section ? <Article section={section} query="" onOpen={open} onHome={() => open(null)} /> : <FrontPage onOpen={open} />}
       </div>
     </div>
   );

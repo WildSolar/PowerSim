@@ -32,6 +32,22 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     approval: () => ({ homeowners: 0.5, tenants: 0.1, business: 0.2, climate: 0.6 }),
   },
   {
+    id: "fleet-ev-grant",
+    category: "subsidy",
+    topic: "mobility",
+    subsidyCategory: "vehicle",
+    title: "Electric van and lorry grant",
+    summary:
+      "A municipal grant for a business buying an electric van or lorry, paid when it buys one. An electric lorry still costs about twice a diesel one; a grant closes part of the gap, and the vehicle charges at the business's own yard, or at a fast-charging hub for lorries if there is one.",
+    params: [
+      { kind: "slider", key: "van", label: "Per electric van", min: 0, max: 20000, step: 1000, unit: "CHF each", default: 6000 },
+      { kind: "slider", key: "truck", label: "Per electric lorry", min: 0, max: 150000, step: 5000, unit: "CHF each", default: 40000 },
+    ],
+    leadTimeMonths: 1,
+    effects: (p) => ({ fleetEvVanSubsidyRp: num(p, "van") * CHF, fleetEvTruckSubsidyRp: num(p, "truck") * CHF }),
+    approval: () => ({ business: 0.5, climate: 0.4, homeowners: -0.05 }),
+  },
+  {
     id: "car-park-solar-subsidy",
     category: "subsidy",
     topic: "buildings",
@@ -519,7 +535,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "removal",
     title: "Carbon removal contracts",
     summary:
-      "The municipality pays for CO2 to be taken out of the air — biochar, direct air capture, capture at a waste-to-energy plant — to balance the emissions it can't avoid. Removals count only for the hard-to-avoid rest: once the town's own emissions are down to a fifth of 2026's. From then on they are bought each year for what is left, up to the share set here, at the price of the day — around CHF 450 a tonne today, getting cheaper — and paid each January for the year before. Until then the contract costs nothing.",
+      "The municipality pays for CO2 to be taken out of the air — biochar, direct air capture, capture at a waste-to-energy plant — to balance the emissions it can't avoid. Removals count only for the hard-to-avoid rest: once the town's own emissions are down to a fifth of 2026's. From the year after it gets there, they are bought month by month for what is left, up to the share set here, at the price of the day — around CHF 450 a tonne today, getting cheaper — and paid each month. Until then the contract costs nothing.",
     params: [{ kind: "slider", key: "share", label: "Cover up to", min: 1, max: 20, step: 1, unit: "% of 2026's emissions", default: 10 }],
     leadTimeMonths: 6,
     effects: (p) => ({ removalShareOfBaseline: num(p, "share") }),

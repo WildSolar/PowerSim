@@ -17,13 +17,11 @@
  * redo the *baseline* year's full chunked computation every time.
  */
 
+import { removals } from "./removals";
 import { GREEN_POWER_MAX_EMISSION_REDUCTION } from "../config/policy";
-import { REMOVAL_CAP_SHARE, REMOVAL_PRICE_CHF_PER_T } from "../config/removals";
 import { RESIDENTS_PER_DWELLING } from "../config/treasury";
-import { interpolateCurve } from "../config/curve";
 import { BASELINE_YEAR, toSimTimeMs } from "./calendar";
 import { existsAt } from "./lifetime";
-import { treasury } from "./treasury";
 import { policyStore } from "./policy";
 import type { Building, PowerPlant } from "../data/types";
 import {
@@ -90,14 +88,11 @@ export function computeEmissionsForYear(buildings: Building[], plants: PowerPlan
   return pending;
 }
 
-/** What a tonne removed costs in a year (CHF). */
-export function removalPriceChfPerT(year: number): number {
-  return interpolateCurve(REMOVAL_PRICE_CHF_PER_T, year);
-}
+export { removalPriceChfPerT } from "./removals";
 
 async function countYear(buildings: Building[], plants: PowerPlant[], year: number): Promise<EmissionsBreakdown> {
-  // The baseline first: removals are capped against it.
-  const baseline = year > BASELINE_YEAR ? await computeEmissionsForYear(buildings, plants, BASELINE_YEAR) : null;
+  // The baseline first: the removals bought are capped against it.
+  if (year > BASELINE_YEAR) await computeEmissionsForYear(buildings, plants, BASELINE_YEAR);
 
   const [heatingTechnology, netElectricityKWh, iceCarLiters] = await Promise.all([
     computeHeatingTechnologyBreakdown(buildings, year),
@@ -121,15 +116,9 @@ async function countYear(buildings: Building[], plants: PowerPlant[], year: numb
 
   const totalKgCO2 = electricityKgCO2 + gasKgCO2 + oilKgCO2 + districtHeatingKgCO2 + mobilityKgCO2;
 
-  // Removal contracts in force at the year's end count only once the town's own emissions are down
-  // to a tenth of the baseline — they are for the hard-to-avoid rest. Then they buy for what is
-  // left, up to their share of the baseline, and are paid in January; until then, nothing is bought.
-  const residualLine = baseline ? REMOVAL_CAP_SHARE * baseline.totalKgCO2 : 0;
-  const contracted = baseline ? (Math.min(policyStore.get().removalShareOfBaseline / 100, REMOVAL_CAP_SHARE) * baseline.totalKgCO2) : 0;
-  const removalsKgCO2 = baseline && totalKgCO2 <= residualLine ? Math.max(0, Math.min(contracted, totalKgCO2)) : 0;
-  if (removalsKgCO2 > 0) {
-    treasury.recordPayout("removals", toSimTimeMs(Date.UTC(year + 1, 0, 1)), (removalsKgCO2 / 1000) * removalPriceChfPerT(year) * 100, `removals-${year}`);
-  }
+  // What the removal contracts bought through the year, month by month (removals.ts) — never more
+  // than the town emitted.
+  const removalsKgCO2 = year > BASELINE_YEAR ? Math.min(removals.boughtInYear(year), totalKgCO2) : 0;
 
   const yearEndMs = toSimTimeMs(Date.UTC(year + 1, 0, 1)) - 1;
   const dwellings = buildings.reduce((sum, b) => sum + (existsAt(b, yearEndMs) ? b.dwellings.length : 0), 0);

@@ -22,6 +22,18 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.7.0",
+    date: null,
+    added: [
+      "Electric van and lorry grant, a new measure: a flat sum for each electric van or lorry a business buys, set separately for each.",
+      "Wiki: “All topics” at the top of the contents, and in each article's heading, takes you back to the overview of every topic.",
+    ],
+    changed: [
+      "Wholesale power moves every year: the utility buys most of a year's power ahead, a third in each of the three years before, and the rest month by month — so the market's ups and downs reach it smoothed, not flattened. The Prices tab shows what next year's power, mostly bought already, will cost.",
+      "Carbon removal contracts are bought and paid month by month, rather than in one bill each January: from the year after a counted year gets the town down to the line, each month buys a twelfth of what that year left, up to the share set.",
+    ],
+  },
+  {
     version: "0.6.0",
     date: "2026-10-17",
     title: "Car parks, district heat and the numbers",

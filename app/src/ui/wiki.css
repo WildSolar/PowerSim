@@ -446,3 +446,43 @@
 .wiki-list li strong {
   font-weight: 600;
 }
+
+/* Back to the overview of every topic: at the top of the contents, and in an article's kicker. */
+.wiki-toc-home {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--r-2);
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.wiki-toc-home:hover {
+  background: var(--fill);
+}
+
+.wiki-toc-home.active {
+  background: var(--selected);
+  color: var(--on-selected);
+}
+
+.wiki-crumb {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}

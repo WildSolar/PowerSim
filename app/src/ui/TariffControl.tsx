@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { MAX_SPREAD_RP_KWH, SUGGESTED_SPREAD_RP_KWH } from "../config/dynamicTariff";
-import type { Commodity } from "../config/market";
+import { WHOLESALE_HEDGED_SHARE, type Commodity } from "../config/market";
 import { approval } from "../sim/approval";
 import { toDateMs } from "../sim/calendar";
 import { estimateUptake } from "../sim/dynamicTariff";
@@ -269,8 +269,10 @@ function DynamicTariffDraft({
   );
 }
 
-/** Prices nobody in the town sets: what they are this month, and a year ago. */
+/** Prices nobody in the town sets: what they are this month, and a year ago — and what next year's
+ * power, mostly bought ahead, costs. */
 function MarketPrices({ atMs }: { atMs: number }) {
+  const nextYear = new Date(toDateMs(atMs)).getUTCFullYear() + 1;
   return (
     <div className="tariff-markets">
       <div className="tariff-title">Energy markets</div>
@@ -296,6 +298,11 @@ function MarketPrices({ atMs }: { atMs: number }) {
           );
         })}
       </div>
+      <p className="tech-prices-note">
+        The utility buys most of a year's power ahead, a share in each of the three years before, and the rest month by month. For {nextYear}, {Math.round(WHOLESALE_HEDGED_SHARE * 100)}% is
+        bought already, at about <strong>{market.hedgedPrice(nextYear).toFixed(1)} Rp/kWh</strong> (this year {market.hedgedPrice(nextYear - 1).toFixed(1)}); a supply crisis
+        would still lift it.
+      </p>
     </div>
   );
 }

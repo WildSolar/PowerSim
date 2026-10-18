@@ -92,6 +92,8 @@ export function subsidyCategoryForDecision(kind: DecisionLogKind): PayoutCategor
       return "solar";
     case "mobility-vehicle-car":
     case "mobility-vehicle-bike":
+    case "fleet-van":
+    case "fleet-truck":
       return "vehicle";
     default:
       return null;

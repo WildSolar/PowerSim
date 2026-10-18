@@ -52,6 +52,7 @@ import { toDateMs } from "./calendar";
 import { totalFloorAreaM2 } from "./commercial";
 import { existsAt } from "./lifetime";
 import { policyStore } from "./policy";
+import { municipalFleetSubsidyRp } from "./subsidies";
 import { publicCharging, usableOption, type ChargingNeed, type ChargingOption, type ChargingSite } from "./publicCharging";
 import {
   chooseNext,
@@ -154,10 +155,14 @@ function candidatesFor(
     }
     if (lsvaApplies(spec.electric)) runningRp += spec.annualKm * LSVA_RP_PER_KM;
     const available = spec.electric ? access.kind !== "none" : vehicleClass === "truck" || !policyStore.get().iceCarPurchaseBanned;
+    // The municipality's grant for an electric one: never more than it costs.
+    const purchaseRp = spec.purchaseCostRp * priceFactor(id, atMs);
+    const subsidyRp = Math.min(purchaseRp, municipalFleetSubsidyRp(id));
     return {
       id,
       available,
-      annualizedCostRp: (spec.purchaseCostRp * priceFactor(id, atMs)) / spec.lifetimeMeanYears + runningRp,
+      annualizedCostRp: (purchaseRp - subsidyRp) / spec.lifetimeMeanYears + runningRp,
+      ...(subsidyRp > 0 ? { municipalSubsidyRp: subsidyRp } : {}),
       lifetimeMeanYears: spec.lifetimeMeanYears,
       greenness: spec.greenness,
       onChosen: spec.electric ? onElectricChosen : undefined,

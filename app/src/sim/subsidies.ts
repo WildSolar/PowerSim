@@ -6,6 +6,7 @@
  */
 
 import type { HeatingSystemId } from "./heatingSystems";
+import type { FleetVehicleId } from "../config/fleet";
 import type { VehicleTypeId } from "./mobilitySystems";
 import { policyStore } from "./policy";
 
@@ -26,4 +27,12 @@ export function municipalVehicleSubsidyRp(id: VehicleTypeId, early = false): num
   const p = policyStore.get();
   if (id !== "carEV") return 0;
   return p.evGrantEarlyOnly && !early ? 0 : p.evSubsidyRp;
+}
+
+/** Flat municipal grant, Rp, for a business buying this van or lorry: electric ones only. */
+export function municipalFleetSubsidyRp(id: FleetVehicleId): number {
+  const p = policyStore.get();
+  if (id === "vanEV") return p.fleetEvVanSubsidyRp;
+  if (id === "truckEV") return p.fleetEvTruckSubsidyRp;
+  return 0;
 }

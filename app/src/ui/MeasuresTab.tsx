@@ -259,12 +259,12 @@ function RemovalProjection({ sharePct, nowMs }: { sharePct: number; nowMs: numbe
   const lastT = last ? last.totalKgCO2 / 1000 : null;
   const t = (x: number) => `${Math.round(x).toLocaleString("de-CH")} t`;
   return (
-    <div className="measure-note" title="Contracts buy for what is left of the town's emissions, up to the share set, once those are down to a fifth of the baseline year's — paid each January for the year before, at that year's price per tonne (falling over time).">
+    <div className="measure-note" title="Once a counted year has the town's emissions down to a fifth of the baseline year's, the contracts buy month by month for what is left, up to the share set — paid each month, at that year's price per tonne (falling over time).">
       At full cover: about {formatCHFCompact(coverT * price * 100)} a year — {t(coverT)} at CHF {Math.round(price)} a tonne this year.{" "}
       {lastT === null
         ? `It applies once the town's emissions are down to ${t(lineT)} a year (a fifth of ${BASELINE_YEAR}'s).`
         : lastT <= lineT
-          ? `Last year's ${t(lastT)} are within the line (${t(lineT)}): it would buy ${t(Math.min(coverT, lastT))}, about ${formatCHFCompact(Math.min(coverT, lastT) * price * 100)}.`
+          ? `Last year's ${t(lastT)} are within the line (${t(lineT)}): it buys ${t(Math.min(coverT, lastT))} this year, about ${formatCHFCompact((Math.min(coverT, lastT) * price * 100) / 12)} a month.`
           : `It applies once the town's emissions are down to ${t(lineT)} a year; last year they were ${t(lastT)} (${Math.round((lastT / (baseline.totalKgCO2 / 1000)) * 100)}% of ${BASELINE_YEAR}'s).`}
     </div>
   );

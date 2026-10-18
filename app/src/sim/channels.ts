@@ -31,6 +31,8 @@ export interface Channels {
   heatPumpGrantEarlyOnly: boolean; // ...paid only when it replaces a working oil or gas boiler early
   evSubsidyRp: number; // flat municipal grant per electric car bought
   evGrantEarlyOnly: boolean; // ...paid only when it replaces a working petrol or diesel car early
+  fleetEvVanSubsidyRp: number; // municipal grant per electric van a business buys
+  fleetEvTruckSubsidyRp: number; // ...per electric lorry
   retrofitSubsidyRpPerM2: number; // municipal top-up per m2 of envelope on an upgrade
   retrofitMinClass: EnergyClassId | "none"; // an envelope renovation must reach at least this class
   fossilHeatingInstallBanned: boolean; // no new gas or oil heating when a system is replaced
@@ -83,6 +85,8 @@ export const CHANNEL_DEFAULTS: Channels = {
   heatPumpGrantEarlyOnly: false,
   evSubsidyRp: 0,
   evGrantEarlyOnly: false,
+  fleetEvVanSubsidyRp: 0,
+  fleetEvTruckSubsidyRp: 0,
   retrofitSubsidyRpPerM2: 0,
   retrofitMinClass: "none",
   fossilHeatingInstallBanned: false,
@@ -137,6 +141,8 @@ const COMBINERS: { [K in keyof Channels]: Combiner<Channels[K]> } = {
   heatPumpGrantEarlyOnly: any,
   evSubsidyRp: sum,
   evGrantEarlyOnly: any,
+  fleetEvVanSubsidyRp: sum,
+  fleetEvTruckSubsidyRp: sum,
   retrofitSubsidyRpPerM2: sum,
   retrofitMinClass: strictestClass,
   fossilHeatingInstallBanned: any,

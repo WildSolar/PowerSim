@@ -53,6 +53,8 @@ import { districtHeatSources } from "./sim/districtHeatSources";
 import { roofContracts } from "./sim/roofContracts";
 import { agriPv } from "./sim/agriPv";
 import { carParks } from "./sim/carParks";
+import { removals } from "./sim/removals";
+import { cachedEmissionsForYear } from "./sim/emissions";
 import { wind } from "./sim/wind";
 import { districtHeatLines } from "./sim/districtHeatLines";
 import { monthRecords } from "./sim/monthRecords";
@@ -243,6 +245,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         roofContracts.init(loaded, () => stock.getAll(), `roofs:${loaded.bfsNumber}`);
         agriPv.init(loaded, () => stock.getAll(), `agripv:${loaded.bfsNumber}`);
         carParks.init(loaded, `carparks:${loaded.bfsNumber}`);
+        removals.init(cachedEmissionsForYear);
         wind.init(loaded, () => stock.getAll(), `wind:${loaded.bfsNumber}`);
         zoning.init(loaded); // before the stock: new buildings ask their parcel what it allows
         heatPumpSiting.init(loaded, () => stock.getAll()); // before the stock: heating decisions ask it where a heat pump may go
