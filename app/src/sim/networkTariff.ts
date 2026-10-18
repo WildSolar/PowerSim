@@ -75,10 +75,11 @@ class NetworkTariff {
     this.unsubscribeClock = simClock.subscribe(() => this.advance(simClock.getSimTimeMs()));
   }
 
-  /** Fixes next year's allowance once its tariff is due (the clock calls it; so do the dev runners). */
+  /** Fixes a year's allowance once its tariff is due — next year's at the end of August; in the
+   * game's first year, at New Year (the clock calls it; so do the dev runners). */
   advance(atMs: number): void {
-    const next = yearOf(atMs) + 1;
-    if (atMs > dueMs(next) && !this.allowances.has(next)) this.allowances.set(next, this.compute(next, atMs));
+    const year = yearOf(atMs);
+    for (const y of [year, year + 1]) if (y > BASELINE_YEAR && atMs > dueMs(y) && !this.allowances.has(y)) this.allowances.set(y, this.compute(y, atMs));
   }
 
   /** The household and business meters on the grid at `atMs`. */
