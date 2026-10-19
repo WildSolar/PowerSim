@@ -110,7 +110,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "A loaded game picks up exactly where it was saved, paused: the same town, the same households and their pending decisions, the same accounts, votes and letters.",
       ),
       note(
-        "For now a save only loads into the version of the game that made it (the version is shown in the game menu and on the start screen). A save from another version is listed but can't be loaded.",
+        "A save loads into any release of the same version — a 0.9.0 save into 0.9.1 and later 0.9 releases — so fixes don't cost you your runs. A new version (0.10) starts afresh: its changes to the game are too deep for older saves, which are listed but can't be loaded. The version is shown in the game menu and on the start screen.",
       ),
     ],
   },

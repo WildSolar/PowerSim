@@ -38,8 +38,14 @@ dataset and the seeds (geometry, profiles, weather, rates, spatial indexes) and
 pure caches stay out. Check a change with the round trip: in dev, load a save
 and compare `window.__stateAfterLoad` with the saved state.
 
-Saves carry the git commit (`__GAME_VERSION__`, vite.config.ts) and only load
-into the same build; there is no migration yet.
+Saves load into any build of the same minor version (0.9.x) with the same
+`SAVE_FORMAT_VERSION` (saveGame.ts) — so players keep their runs across patch
+releases. **Within a minor version, keep older saves loading**: a new field
+restores with a default when the save doesn't have it (`s.x ?? default`), a
+renamed or removed one is read the old way too. Only if that's impossible,
+raise `SAVE_FORMAT_VERSION` — every save of this minor version then stops
+loading, so prefer a new minor version. A new minor version starts afresh: no
+migration, older versions' saves don't load.
 
 ## Versions and the changelog
 

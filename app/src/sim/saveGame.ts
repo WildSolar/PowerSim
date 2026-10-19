@@ -53,8 +53,14 @@ import { resetYearEndWatcher } from "./yearEndWatcher";
 import { decodeJson, encodeJson, fromBase64, gunzip, gzip, toBase64 } from "./saveCodec";
 import { VERSION_LABEL } from "../changelog";
 
-/** This build's version: a save only loads into the build that made it. */
+/** This build's version (its git commit). */
 export const GAME_VERSION: string = __GAME_VERSION__;
+
+/** The shape of the saved state. A save loads into any build of the same minor version (0.9.x)
+ * with the same number here — so a patch release keeps everyone's saves. Raise it only when a
+ * change can't read older saves of this minor version any more (see CLAUDE.md); a new minor
+ * version starts afresh either way. */
+export const SAVE_FORMAT_VERSION = 1;
 
 const FORMAT = "commune-zero-save";
 /** The prefix of an exported save string. */
@@ -65,8 +71,10 @@ export interface SaveMeta {
   format: typeof FORMAT;
   /** The build (git commit) that made it: only the same build loads it. */
   version: string;
-  /** The public version that made it ("0.1.0"), for the lists. Absent in the earliest saves. */
+  /** The public version that made it ("0.1.0"). Absent in the earliest saves. */
   release?: string;
+  /** SAVE_FORMAT_VERSION when it was made. Absent before saves loaded across builds. */
+  saveFormat?: number;
   /** When it was saved, in real time (ISO). */
   savedAt: string;
   /** The player's name for it ("Autosave" for the automatic one). */
@@ -147,6 +155,7 @@ export async function captureSave(run: RunInfo, name: string): Promise<{ meta: S
     format: FORMAT,
     version: GAME_VERSION,
     release: VERSION_LABEL,
+    saveFormat: SAVE_FORMAT_VERSION,
     savedAt: new Date().toISOString(),
     name,
     slug: run.slug,
@@ -224,17 +233,32 @@ export function versionOf(meta: SaveMeta): string {
   return meta.release ? `${meta.release}, build ${meta.version}` : `build ${meta.version}`;
 }
 
-/** Whether a save can be loaded into this build. */
+/** "0.9.1" or "0.9.0-dev" → "0.9". */
+function minorOf(release: string | undefined): string | null {
+  const m = release ? /^(\d+)\.(\d+)\./.exec(release) : null;
+  return m ? `${m[1]}.${m[2]}` : null;
+}
+
+/** Whether a save can be loaded into this build: the build that made it, or any build of the same
+ * minor version with the same save format (a patch release keeps saves). */
 export function isCompatible(meta: SaveMeta): boolean {
-  return meta.version === GAME_VERSION;
+  if (meta.version === GAME_VERSION) return true;
+  const minor = minorOf(meta.release);
+  return minor !== null && minor === minorOf(VERSION_LABEL) && meta.saveFormat === SAVE_FORMAT_VERSION;
+}
+
+/** Why a save can't be loaded here, in a sentence (for the lists and the error). */
+export function incompatibility(meta: SaveMeta): string {
+  const made = versionOf(meta);
+  if (minorOf(meta.release) !== minorOf(VERSION_LABEL))
+    return `This save was made with Commune Zéro ${made}; this is ${VERSION_LABEL}. Saves carry over between releases of the same version (${minorOf(VERSION_LABEL)}.x), not from one version to the next.`;
+  return meta.saveFormat === undefined
+    ? `This save was made with Commune Zéro ${made}, before saves could carry over to newer builds; this is ${VERSION_LABEL}, build ${GAME_VERSION}.`
+    : `This save was made with Commune Zéro ${made}, in an older save format this release can't read; this is ${VERSION_LABEL}, build ${GAME_VERSION}.`;
 }
 
 function checkVersion(meta: SaveMeta): void {
-  if (!isCompatible(meta)) {
-    throw new SaveError(
-      `This save was made with another version of Commune Zéro (${versionOf(meta)}; this is ${VERSION_LABEL}, build ${GAME_VERSION}). For now, a save can only be loaded into the exact version that made it.`,
-    );
-  }
+  if (!isCompatible(meta)) throw new SaveError(incompatibility(meta));
 }
 
 /** A save as text, to copy elsewhere. */
