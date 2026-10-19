@@ -76,6 +76,20 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "sound",
+    title: "Sound & music",
+    blocks: [
+      p(
+        "Buttons click softly, sliders and switches tick, and a letter that wants your attention — a vote, a request, an advisor's report or news of a project — arrives with a short chime; a vote's or an election's result with a lower one. The Year in Review opens on a small chord, and ordering, building or enacting something sounds a short rise. Letters that wait quietly make no sound.",
+      ),
+      p(
+        "The music is calm and slow: a few soft chords in turn, with a bell now and then. It is made as it plays, so it never quite repeats, and it steps back while the Year in Review is open.",
+      ),
+      p("Game menu → Sound turns the music and the sound effects on or off, each with its own volume; M mutes everything at once. The music starts off. Your choice is kept in this browser, not in your saves."),
+      note("Browsers only allow sound once you have clicked or pressed a key, so the game is silent until then."),
+    ],
+  },
+  {
     id: "saving",
     title: "Saving your game",
     blocks: [
@@ -108,6 +122,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Space — pause or resume (at the speed you paused from).",
         "Tab — the next speed (Slow → Medium → Fast, then Slow again); while paused, resumes at the next speed.",
         "1 / 2 / 3 — Slow, Medium or Fast.",
+        "M — mute all sound, or bring it back (see \"Sound & music\").",
         "W A S D — move the map, relative to the way you're facing.",
         "Q / E — turn the view left or right.",
         "R / F — tilt the view toward the horizon or toward straight down.",
@@ -1099,7 +1114,7 @@ export const WIKI_GROUPS: WikiGroup[] = [
     id: "start",
     title: "Getting started",
     blurb: "What the game is, how to find your way around, and how time passes.",
-    sections: ["overview", "controls", "map-layers", "time", "year-in-review", "saving"],
+    sections: ["overview", "controls", "map-layers", "time", "year-in-review", "saving", "sound"],
   },
   {
     id: "governing",

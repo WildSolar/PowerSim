@@ -11,6 +11,7 @@ import { letters, type LetterRequest } from "../sim/letters";
 import { MEASURE_CATALOG } from "../sim/measureCatalog";
 import { useSimDay } from "../sim/store";
 import { stock } from "../sim/stock";
+import { sfx } from "../audio/sfx";
 import "./inbox.css";
 
 export interface InboxSelection {
@@ -325,6 +326,8 @@ export function InboxToast({ onOpen }: { onOpen: (selection: InboxSelection) => 
       const important = arrived.kind === "voteResult" || arrived.kind === "election" || arrived.kind === "warning";
       if (showingImportant && !important) return; // a vote result isn't pushed aside by the next letter
       showingImportant = important;
+      if (important) sfx.important();
+      else sfx.ping();
       setItem(arrived);
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {

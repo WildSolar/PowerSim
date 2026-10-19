@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { sound, type SoundSettings } from "../audio/sound";
 import { AboutPanel } from "./AboutPanel";
 import { guide } from "./Onboarding";
 import { Check, Copy, Download, Save, X } from "lucide-react";
@@ -119,6 +120,8 @@ export function GameMenu({ run, onClose, onMainMenu, onFeedback }: { run: RunInf
           )}
         </section>
 
+        <SoundSection />
+
         <section className="gm-section">
           <h2>Feedback</h2>
           <p className="gm-note">Something broke, something was unclear, an idea? Your game can go along, so we see what you saw.</p>
@@ -201,5 +204,41 @@ export function GameMenu({ run, onClose, onMainMenu, onFeedback }: { run: RunInf
       {showChangelog && <ChangelogPanel onClose={() => setShowChangelog(false)} />}
       {showAbout && <AboutPanel onClose={() => setShowAbout(false)} />}
     </div>
+  );
+}
+
+/** Music and sound effects: each on or off, with its volume (kept in this browser). */
+function SoundSection() {
+  const settings = useSyncExternalStore(
+    (l) => sound.subscribe(l),
+    () => sound.get(),
+  );
+  const row = (label: string, on: keyof SoundSettings, volume: keyof SoundSettings) => (
+    <div className="gm-sound-row">
+      <label className="gm-sound-toggle">
+        <input type="checkbox" checked={settings[on] as boolean} onChange={(e) => sound.set({ [on]: e.target.checked })} />
+        {label}
+      </label>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.05}
+        value={settings[volume] as number}
+        disabled={!settings[on]}
+        aria-label={`${label} volume`}
+        onChange={(e) => sound.set({ [volume]: Number(e.target.value) })}
+      />
+    </div>
+  );
+  return (
+    <section className="gm-section">
+      <h2>Sound</h2>
+      {row("Music", "music", "musicVolume")}
+      {row("Sound effects", "effects", "effectsVolume")}
+      <p className="gm-note">
+        {settings.muted ? "Muted — press M to hear it again." : "M mutes everything, and unmutes it."} The music is made as it plays: calm, and never quite the same.
+      </p>
+    </section>
   );
 }

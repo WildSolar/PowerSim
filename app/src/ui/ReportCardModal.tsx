@@ -1,4 +1,7 @@
+import { useEffect } from "react";
 import { approval } from "../sim/approval";
+import { sound } from "../audio/sound";
+import { sfx } from "../audio/sfx";
 import { measures } from "../sim/measures";
 import { ENERGY_CLASS_CATALOG } from "../sim/energyClass";
 import { existsAt } from "../sim/lifetime";
@@ -96,6 +99,12 @@ export interface ReportCardModalProps {
  * (unlike emissions/finances) is cheap enough to call directly, synchronously,
  * every render — it only ever reads solarAdoption.ts's own cache. */
 export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps) {
+  // A small chord as it opens, and the music steps back while it's read.
+  useEffect(() => {
+    sfx.yearEnd();
+    sound.duck(true);
+    return () => sound.duck(false);
+  }, [year]);
   const yearEndMs = toSimTimeMs(Date.UTC(year + 1, 0, 1)) - 1;
   const standing = dataset.buildings.filter((b) => existsAt(b, yearEndMs));
   const development = stock.summaryForYear(year);

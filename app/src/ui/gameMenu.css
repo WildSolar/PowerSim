@@ -244,3 +244,28 @@
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
+
+/* Sound: a switch and a volume per row. */
+.gm-sound-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0;
+}
+
+.gm-sound-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.gm-sound-row input[type="range"] {
+  width: 100%;
+}
+
+.gm-sound-row input[type="range"]:disabled {
+  opacity: 0.4;
+}
