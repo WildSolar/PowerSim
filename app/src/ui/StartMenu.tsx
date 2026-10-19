@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { ShareDialog } from "./ShareButtons";
+import { inviteText } from "./share";
 import { FeedbackDialog } from "./FeedbackDialog";
 import { LEADERBOARD_ENABLED } from "../leaderboard/client";
 import { LeaderboardPanel } from "./LeaderboardPanel";
@@ -42,6 +44,7 @@ export function StartMenu({ onStart, onTutorial }: Props) {
   const [showAbout, setShowAbout] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   // The latest save this version can load, to carry on with in one click.
   const [latest, setLatest] = useState<StoredSave | null>(null);
   const [continueError, setContinueError] = useState<string | null>(null);
@@ -105,6 +108,7 @@ export function StartMenu({ onStart, onTutorial }: Props) {
           </button>
           <button onClick={() => setShowAbout(true)}>About & credits</button>
           {LEADERBOARD_ENABLED && <button onClick={() => setShowLeaderboard(true)}>Leaderboard</button>}
+          <button onClick={() => setShowShare(true)}>Tell a friend</button>
         </div>
         {IS_BETA && (
           <section className="start-menu-beta" aria-label="Beta">
@@ -214,6 +218,7 @@ export function StartMenu({ onStart, onTutorial }: Props) {
       {showAbout && <AboutPanel onClose={() => setShowAbout(false)} />}
       {showLeaderboard && <LeaderboardPanel initial={null} onClose={() => setShowLeaderboard(false)} />}
       {showFeedback && <FeedbackDialog pause={false} withGame={false} onClose={() => setShowFeedback(false)} />}
+      {showShare && <ShareDialog text={inviteText(null)} onClose={() => setShowShare(false)} />}
     </div>
   );
 }

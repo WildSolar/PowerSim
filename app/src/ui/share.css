@@ -1,0 +1,114 @@
+/* Sharing (ShareButtons.tsx): the end screen, the start screen's "Tell a friend", the game menu. */
+
+.share-text {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.share-url {
+  color: var(--ink-3);
+}
+
+.share-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.share-native {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-2);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.share-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.share-link:hover {
+  background: var(--fill);
+}
+
+/* The dialog. */
+
+.share-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.share-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 20, 18, 0.35);
+}
+
+.share-dialog {
+  position: relative;
+  width: min(520px, 100%);
+  padding: 20px 22px 22px;
+  border-radius: var(--r-3);
+  background: var(--surface);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
+}
+
+.share-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.share-dialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.share-close {
+  display: inline-flex;
+  padding: 4px;
+  border: none;
+  border-radius: var(--r-2);
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.share-close:hover {
+  background: var(--fill);
+}
+
+.share-intro {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}

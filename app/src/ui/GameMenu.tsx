@@ -1,4 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { SharePreview } from "./ShareButtons";
+import { inviteText } from "./share";
 import { sound, type SoundSettings } from "../audio/sound";
 import { AboutPanel } from "./AboutPanel";
 import { guide } from "./Onboarding";
@@ -118,6 +120,12 @@ export function GameMenu({ run, onClose, onMainMenu, onFeedback }: { run: RunInf
               ))}
             </ul>
           )}
+        </section>
+
+        <section className="gm-section">
+          <h2>Tell a friend</h2>
+          <p className="gm-note">Enjoying it? It's free, in the browser — send it to someone who'd like it.</p>
+          <SharePreview text={inviteText(run.municipality)} />
         </section>
 
         <SoundSection />

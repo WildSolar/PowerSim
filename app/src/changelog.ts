@@ -25,7 +25,7 @@ export const CHANGELOG: Release[] = [
     version: "0.9.0",
     date: null,
     added: [
-      "Share your result from the end screen — your phone's or browser's share menu, WhatsApp, X, Bluesky, Facebook, LinkedIn, Reddit or e-mail — with a line about your run and a link to the game.",
+      "Share your result from the end screen — your phone's or browser's share menu, WhatsApp, X, Bluesky, Facebook, LinkedIn, Reddit or e-mail — with a line about your run and a link to the game. Or tell a friend about the game any time: on the start screen, and in the game menu.",
       "The start screen says plainly that this is a beta, and takes your feedback from right there.",
       "Feedback is sent straight from the game — no mail program or account needed — with your game attached if you like. Have a GitHub account? The form can also open an issue there. About & credits lists the contact address.",
       "A leaderboard: at the end of a run that reaches 2050 (or hands over early), put it on the board for its town, difficulty, starting year and version, under a name of your choice. Leaderboard on the start screen shows every board.",

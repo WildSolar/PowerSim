@@ -31,6 +31,13 @@ export function shareText(s: ShareStory): string {
   return `I cut ${s.municipality}'s emissions per resident by ${s.cut ?? 0}% by 2050${hard} in Commune Zéro: ${points}${rank}. Can you get it to net zero?`;
 }
 
+/** An invitation to play — from the start screen, or (naming the town) from a running game. */
+export function inviteText(municipality: string | null): string {
+  return municipality
+    ? `I'm running the energy department of ${municipality} in Commune Zéro — a free browser game about taking a real Swiss town to net zero by 2050. Give it a try!`
+    : "Commune Zéro: a free browser game about taking a real Swiss town to net zero by 2050 — its buildings, its grid, its voters. Give it a try!";
+}
+
 /** Whether the browser has its own share sheet. */
 export function canShareNatively(): boolean {
   return typeof navigator !== "undefined" && typeof navigator.share === "function";

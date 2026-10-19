@@ -4,10 +4,9 @@ import { buildSubmission, LEADERBOARD_ENABLED, lastName, rememberSubmission, run
 import { NAME_MAX, nameProblem, type SubmitResult } from "../leaderboard/rules";
 import type { GameOver } from "../sim/approval";
 import { getRunId } from "../sim/score";
-import { Check, Copy, Share2 } from "lucide-react";
 import { LeaderboardPanel } from "./LeaderboardPanel";
-import { canShareNatively, GAME_URL, shareLinks, shareNatively, shareText, type ShareStory } from "./share";
-import { copyText } from "./feedback";
+import { shareText, type ShareStory } from "./share";
+import { SharePreview } from "./ShareButtons";
 import "./leaderboard.css";
 import { BASELINE_YEAR, formatDate } from "../sim/calendar";
 import { NET_ZERO_TARGET_YEAR, scoreSoFar } from "../sim/score";
@@ -211,29 +210,10 @@ function SubmitRun({
 
 /** Sharing the run: the browser's own share sheet, each platform's share page, or the text to copy. */
 function ShareRun({ story }: { story: ShareStory }) {
-  const text = shareText(story);
-  const [copied, setCopied] = useState(false);
   return (
     <section className="yr-card end-share">
       <h2>Share it</h2>
-      <p className="end-share-text">
-        {text} <span className="end-share-url">{GAME_URL.replace(/^https:\/\//, "")}</span>
-      </p>
-      <div className="end-share-buttons">
-        {canShareNatively() && (
-          <button className="yr-close" onClick={() => void shareNatively(text)}>
-            <Share2 size={15} strokeWidth={1.9} aria-hidden /> Share…
-          </button>
-        )}
-        {shareLinks(text).map((l) => (
-          <a key={l.id} className="end-share-link" href={l.href} target="_blank" rel="noopener noreferrer">
-            {l.label}
-          </a>
-        ))}
-        <button className="end-share-link" onClick={async () => setCopied(await copyText(`${text} ${GAME_URL}`))}>
-          {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />} {copied ? "Copied" : "Copy"}
-        </button>
-      </div>
+      <SharePreview text={shareText(story)} />
     </section>
   );
 }

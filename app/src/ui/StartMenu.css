@@ -363,8 +363,9 @@
 
 .start-menu-version {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
+  gap: 8px 14px;
   margin-top: 22px;
   font-size: 12.5px;
   color: var(--ink-3);
@@ -536,4 +537,9 @@
 
 .start-menu-beta button:hover {
   filter: brightness(1.08);
+}
+
+/* Each link stays whole; the row wraps between them. */
+.start-menu-version > * {
+  white-space: nowrap;
 }
