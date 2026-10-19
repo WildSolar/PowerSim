@@ -1770,7 +1770,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     };
   }, [colorMode, dataset]);
 
-  // Roof solar layer: large roofs by where their contract stands, kept current as owners answer
+  // PV Contracting layer: large roofs by where their contract stands, kept current as owners answer
   // and arrays are built.
   useEffect(() => {
     const map = mapRef.current;

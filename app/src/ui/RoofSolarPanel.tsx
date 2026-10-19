@@ -133,7 +133,7 @@ function nameOf(b: Building | undefined, egid: string): string {
   return b?.address ?? `Building ${egid}`;
 }
 
-/** The Roof solar layer's panel: the rent the utility offers, the roofs whose owners accepted (to
+/** The PV Contracting layer's panel: the rent the utility offers, the roofs whose owners accepted (to
  * build), and the utility's arrays. Roofs are offered one by one, from their cards (or from the roof
  * solar advisor's report). */
 export function RoofSolarPanel({ buildings, onSelectBuilding }: { buildings: Building[]; onSelectBuilding: (egid: string) => void }) {
@@ -274,7 +274,7 @@ export function RoofSolarPanel({ buildings, onSelectBuilding }: { buildings: Bui
   return (
     <ToolPanel
       mode="roofSolar"
-      title="Roof solar"
+      title="PV Contracting"
       titleExtra={<PlotLink chart="rooftop-solar" title="Rooftop solar over time" />}
       overview={overview}
       build={build}

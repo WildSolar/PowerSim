@@ -276,7 +276,7 @@ class RoofContracts {
     return total;
   }
 
-  /** A building's bucket on the Roof solar layer (colorModes.ts's ROOF_SOLAR_LEGEND). */
+  /** A building's bucket on the PV Contracting layer (colorModes.ts's ROOF_SOLAR_LEGEND). */
   bucket(b: Building, atMs: number): string {
     const c = this.latest(b.egid);
     if (c?.status === "built") return "utility";
@@ -376,7 +376,7 @@ class RoofContracts {
             ? ` We have ordered the panels — ${Math.round(kw)} kWp in all, in service in about ${ROOF_INSTALL_MONTHS} months.`
             : built.length > 0
               ? ` We have ordered panels for ${built.length} of them (${Math.round(kw)} kWp); the rest are waiting for your go-ahead, which has to come within a year.`
-              : " The roofs are ours to build on for a year — give the go-ahead in the Roof solar layer."),
+              : " The roofs are ours to build on for a year — give the go-ahead in the PV Contracting layer."),
       );
     }
     if (own.length > 0) {

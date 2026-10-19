@@ -141,7 +141,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "EV charging — where households could charge an electric car, and every public charger by how full it is; build chargers here (see \"Public charging\").",
         "Grid — the transformer areas and how loaded they are; reinforce them or add batteries here (see \"The electricity grid\").",
         "Public buildings — the municipality's own buildings and what they carry; order solar and chargers for them here (see \"Public buildings\").",
-        "Roof solar — large roofs by where a roof contract stands; rent them and put the utility's solar on them here (see \"Roof contracts\").",
+        "PV Contracting — large roofs by where a roof contract stands; rent them and put the utility's solar on them here (see \"Roof contracts\").",
         "Car parks — the open-air car parks big enough for a solar canopy, whose they are and what is built over them; cover the town's own here (see \"Solar over car parks\").",
         "Agri-PV — the farmland outside the building zones, the fields zoned for solar and those taken up; zone fields, or develop one yourself, here (see \"Agri-PV\").",
         "Wind — where turbines could stand, once a study has looked, and each wind park's long road through zoning, permit and the courts (see \"Wind power\").",
@@ -783,7 +783,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Roof contracts",
     blocks: [
       p(
-        "Many large roofs stay bare even where panels would pay: the owner lacks the cash, the time, or the interest. The utility can step in — rent the roof and put its own solar on it, as many Swiss utilities do. Open the Roof solar tool: it shows every roof of a building over 300 m² by where it stands, and the drawer sets the rent you offer, per m² of roof the panels cover, a year.",
+        "Many large roofs stay bare even where panels would pay: the owner lacks the cash, the time, or the interest. The utility can step in — rent the roof and put its own solar on it, as many Swiss utilities do. Open the PV Contracting tool: it shows every roof of a building over 360 m² by where it stands, and the drawer sets the rent you offer, per m² of roof the panels cover, a year.",
       ),
       list([
         "Offering: click a roof to see what an array there would mean — its size, what it costs to build, what a year of its output saves, the rent and the upkeep — and offer its owner the contract. Roofs are offered one at a time; the drawer says how many owners in ten would say yes at your rent, and the roof solar advisor (see \"Advisors\") ranks the roofs that would return the most.",

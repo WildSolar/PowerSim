@@ -28,7 +28,8 @@ export const CHANGELOG: Release[] = [
       "Advisors have their own page in the Town hall, one sub-page each — greyed out while not retained, and retained or let go right there. The latest report stays on the advisor's page, and you can act on it directly: offer a roof's owner the contract (and build once they accept), order the chargers the mobility advisor proposes, order the pipes the district heating advisor proposes — or look at each on the map first. Each proposal shows what has become of it since. An advisor's letter now just says the report has come, with a link to it.",
     ],
     changed: [
-      "Roof solar: roofs are offered one at a time — the offer to every large roof at once is gone. And the utility no longer builds the moment an owner accepts unless you tick the box: accepted roofs wait in the drawer for you to build them.",
+      "The Roof solar tool is now called PV Contracting, and a roof has to be a little bigger to be worth a contract: a building of 360 m² or more, up from 300.",
+      "PV Contracting: roofs are offered one at a time — the offer to every large roof at once is gone. And the utility no longer builds the moment an owner accepts unless you tick the box: accepted roofs wait in the drawer for you to build them.",
     ],
   },
   {

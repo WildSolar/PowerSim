@@ -245,7 +245,7 @@ export const PUBLIC_BUILDINGS_LEGEND: LegendEntry[] = [
   { bucket: "other", label: "Not a public building", color: "#e4e2dc" },
 ];
 
-// The Roof solar layer: large roofs by where a roof contract stands (sim/roofContracts.ts).
+// The PV Contracting layer: large roofs by where a roof contract stands (sim/roofContracts.ts).
 export const ROOF_SOLAR_LEGEND: LegendEntry[] = [
   { bucket: "utility", label: "The utility's solar", color: "#0d7a52" },
   { bucket: "accepted", label: "Accepted, to build", color: "#1baf7a" },

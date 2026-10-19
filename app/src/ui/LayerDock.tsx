@@ -48,7 +48,7 @@ const TOOLS: LayerDef[] = [
   { mode: "evCharging", label: "EV charging", Icon: EvCharger },
   { mode: "grid", label: "Grid", Icon: UtilityPole },
   { mode: "publicBuildings", label: "Public buildings", Icon: School },
-  { mode: "roofSolar", label: "Roof solar", Icon: PanelsTopLeft },
+  { mode: "roofSolar", label: "PV Contracting", Icon: PanelsTopLeft },
   { mode: "carParks", label: "Car parks", Icon: CircleParking },
   { mode: "agriPv", label: "Agri-PV", Icon: Tractor },
   { mode: "wind", label: "Wind", Icon: Wind },
