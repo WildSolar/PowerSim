@@ -12,6 +12,10 @@ pipeline/data/raw/
 node_modules/
 app/dist/
 
+# Cloudflare (the leaderboard Worker's local state)
+leaderboard/.wrangler/
+.lbtest/
+
 # Editor/OS
 .vscode/
 .DS_Store

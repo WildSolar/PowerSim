@@ -33,7 +33,7 @@ import { CarParksPanel } from "./ui/CarParksPanel";
 import { ReportCardModal } from "./ui/ReportCardModal";
 import { EndScreen } from "./ui/EndScreen";
 import { loadPar } from "./sim/par";
-import { getFinishedYear, NET_ZERO_TARGET_YEAR } from "./sim/score";
+import { getFinishedYear, NET_ZERO_TARGET_YEAR, startRun } from "./sim/score";
 import { StartMenu } from "./ui/StartMenu";
 import { WikiPanel } from "./ui/WikiPanel";
 import { GameMenu } from "./ui/GameMenu";
@@ -307,6 +307,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         inbox.init();
         monthRecords.init();
         letters.init(loaded, () => stock.getAll(), `letters:${loaded.bfsNumber}`);
+        startRun(); // a fresh run id (a save brings its own)
         if (restore) {
           applySave(restore);
           // Dev check: the state right after loading, to compare with the save (see saveGame.ts).
@@ -461,9 +462,9 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         ) : null}
       </div>
       {gameOver ? (
-        <EndScreen municipality={dataset.name} over={gameOver} onMainMenu={returnToMenu} />
+        <EndScreen municipality={dataset.name} slug={slug} difficulty={difficulty} over={gameOver} onMainMenu={returnToMenu} />
       ) : finished ? (
-        <EndScreen municipality={dataset.name} over={null} onMainMenu={returnToMenu} onKeepPlaying={() => setFinished(false)} />
+        <EndScreen municipality={dataset.name} slug={slug} difficulty={difficulty} over={null} onMainMenu={returnToMenu} onKeepPlaying={() => setFinished(false)} />
       ) : null}
       {townHall && (
         <TownHall

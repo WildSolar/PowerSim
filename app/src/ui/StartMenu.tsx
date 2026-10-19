@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { LEADERBOARD_ENABLED } from "../leaderboard/client";
+import { LeaderboardPanel } from "./LeaderboardPanel";
 import { loadMunicipalityIndex, type MunicipalityIndexEntry } from "../data/loadDataset";
 import { DEFAULT_DIFFICULTY, DIFFICULTY_ORDER, DIFFICULTY_SPECS, type Difficulty } from "../config/difficulty";
 import { LoadGamePanel } from "./LoadGamePanel";
@@ -37,6 +39,7 @@ export function StartMenu({ onStart, onTutorial }: Props) {
   const [showChangelog, setShowChangelog] = useState(false);
   const [unseen, setUnseen] = useState(hasUnseenRelease);
   const [showAbout, setShowAbout] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   // The latest save this version can load, to carry on with in one click.
   const [latest, setLatest] = useState<StoredSave | null>(null);
   const [continueError, setContinueError] = useState<string | null>(null);
@@ -99,6 +102,7 @@ export function StartMenu({ onStart, onTutorial }: Props) {
             What's new{unseen && <span className="start-menu-new">New</span>}
           </button>
           <button onClick={() => setShowAbout(true)}>About & credits</button>
+          {LEADERBOARD_ENABLED && <button onClick={() => setShowLeaderboard(true)}>Leaderboard</button>}
         </div>
         {smallScreen && (
           <p className="start-menu-small-screen">
@@ -195,6 +199,7 @@ export function StartMenu({ onStart, onTutorial }: Props) {
       </div>
       {showChangelog && <ChangelogPanel onClose={() => setShowChangelog(false)} />}
       {showAbout && <AboutPanel onClose={() => setShowAbout(false)} />}
+      {showLeaderboard && <LeaderboardPanel initial={null} onClose={() => setShowLeaderboard(false)} />}
     </div>
   );
 }

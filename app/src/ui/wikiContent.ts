@@ -327,6 +327,22 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
   {
+    id: "leaderboard",
+    title: "The leaderboard",
+    blocks: [
+      p(
+        "A run that reaches 2050 — or hands over early at net zero — can go on the leaderboard: at the end, choose a name and submit it. Its place shows at once, and Leaderboard on the start screen (or on the end screen) shows every board.",
+      ),
+      p(
+        "A score only compares within the same town, difficulty and starting year, and the same version of the game (0.9, 0.10, …): balance changes between versions, and par is different for every town and difficulty. So each is a board of its own; older versions' boards stay to look at. Each run goes on once.",
+      ),
+      p(
+        "What is sent: the name, the town, the difficulty, the version, and the run's emissions per resident year by year — from which the leaderboard works the score out again, so a score has to add up. Nothing else about you or your game.",
+      ),
+      note("Names are filtered for slurs and obscenities in several languages, but not moderated: each is chosen by the player who submitted it. And a score is checked for whether it adds up, not replayed — the leaderboard trusts that players play fair."),
+    ],
+  },
+  {
     id: "score",
     title: "Score & the end of the game",
     blocks: [
@@ -1120,7 +1136,7 @@ export const WIKI_GROUPS: WikiGroup[] = [
     id: "governing",
     title: "Governing",
     blurb: "What you can decide, what people think of it, and what you are aiming for.",
-    sections: ["measures", "approval", "information", "advisors", "letters", "emissions", "score"],
+    sections: ["measures", "approval", "information", "advisors", "letters", "emissions", "score", "leaderboard"],
   },
   {
     id: "money",

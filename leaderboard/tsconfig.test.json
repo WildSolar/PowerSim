@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node10",
+    "ignoreDeprecations": "6.0",
+    "lib": ["ES2022", "DOM", "DOM.AsyncIterable"],
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "typeRoots": ["../app/node_modules/@types"],
+    "rootDir": ".."
+  },
+  "include": ["src", "test", "../app/src/leaderboard/rules.ts"]
+}

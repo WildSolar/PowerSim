@@ -49,6 +49,22 @@ export interface Score {
 
 // The year the run was finished early in, if it was.
 let finishedYear: number | null = null;
+// The run's own random id: the leaderboard takes one entry per run (leaderboard/client.ts).
+let runId = newRunId();
+
+function newRunId(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
+}
+
+/** A new game: a new run id (a loaded one keeps its own, from the save). */
+export function startRun(): void {
+  runId = newRunId();
+  finishedYear = null;
+}
+
+export function getRunId(): string {
+  return runId;
+}
 const listeners = new Set<() => void>();
 
 /** Finishes the run at the end of `year` (at net zero, books in order — handover.ts): the years
@@ -68,12 +84,13 @@ export function subscribeFinished(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-export function snapshotScore(): { finishedYear: number | null } {
-  return { finishedYear };
+export function snapshotScore(): { finishedYear: number | null; runId: string } {
+  return { finishedYear, runId };
 }
 
-export function restoreScore(s: { finishedYear: number | null } | undefined): void {
+export function restoreScore(s: { finishedYear: number | null; runId?: string } | undefined): void {
   finishedYear = s?.finishedYear ?? null;
+  runId = s?.runId ?? newRunId();
   listeners.forEach((l) => l());
 }
 

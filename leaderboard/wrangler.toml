@@ -1,0 +1,15 @@
+# Commune Zéro's leaderboard (README.md). Deploy from this folder: npx wrangler deploy
+name = "commune-zero-leaderboard"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# The game's address (GitHub Pages) and the dev server — the only pages allowed to call.
+# Replace <owner> with your GitHub user name.
+[vars]
+ALLOWED_ORIGINS = "https://<owner>.github.io,http://localhost:5173"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "commune-zero-leaderboard"
+# Filled in from the output of: npx wrangler d1 create commune-zero-leaderboard
+database_id = "<database-id>"

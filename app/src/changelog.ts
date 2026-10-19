@@ -25,6 +25,7 @@ export const CHANGELOG: Release[] = [
     version: "0.9.0",
     date: null,
     added: [
+      "A leaderboard: at the end of a run that reaches 2050 (or hands over early), put it on the board for its town, difficulty, starting year and version, under a name of your choice. Leaderboard on the start screen shows every board.",
       "Sound: soft clicks, a chime when a letter wants your attention, a chord for the Year in Review — and calm ambient music, made as it plays. Game menu → Sound turns each on or off with its own volume (the music starts off); M mutes everything.",
       "Green bonds can be rolled over: when one falls due within the year, the finance advisor says so, and on their page you can replace it with a new ten-year bond at today's rate — as much as residents will subscribe, the treasury repaying the rest. It adds no debt and carries no earmark.",
       "The installed capacity chart shows, as a dashed line, how much of the town's solar and wind its utility and the town own: their turbines, the arrays on public buildings and rented roofs, the car-park canopies and Agri-PV fields.",

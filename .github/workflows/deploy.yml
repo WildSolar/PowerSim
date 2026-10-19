@@ -3,7 +3,7 @@
 # "GitHub Actions" as its source (Settings → Pages). Only the municipalities listed in
 # app/public/data/index.json ship (vite.config.ts). The Feedback button's address comes from the
 # repository variable FEEDBACK_EMAIL, the GoatCounter site code (anonymous usage counts) from
-# GOATCOUNTER_CODE.
+# GOATCOUNTER_CODE, the leaderboard's address (leaderboard/README.md) from LEADERBOARD_URL.
 name: Deploy to GitHub Pages
 
 on:
@@ -41,6 +41,9 @@ jobs:
           # The GoatCounter site code (the "xyz" of xyz.goatcounter.com): the repository variable
           # GOATCOUNTER_CODE. Without it, nothing is counted.
           VITE_GOATCOUNTER_CODE: ${{ vars.GOATCOUNTER_CODE }}
+          # The leaderboard Worker's address (https://commune-zero-leaderboard.<you>.workers.dev): the
+          # repository variable LEADERBOARD_URL. Without it, there is no leaderboard.
+          VITE_LEADERBOARD_URL: ${{ vars.LEADERBOARD_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist

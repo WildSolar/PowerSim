@@ -1,4 +1,11 @@
+import { useState } from "react";
+import type { Difficulty } from "../config/difficulty";
+import { buildSubmission, LEADERBOARD_ENABLED, lastName, rememberSubmission, runBoard, runEligible, submitRun, submittedEntryId } from "../leaderboard/client";
+import { NAME_MAX, nameProblem, type SubmitResult } from "../leaderboard/rules";
 import type { GameOver } from "../sim/approval";
+import { getRunId } from "../sim/score";
+import { LeaderboardPanel } from "./LeaderboardPanel";
+import "./leaderboard.css";
 import { BASELINE_YEAR, formatDate } from "../sim/calendar";
 import { NET_ZERO_TARGET_YEAR, scoreSoFar } from "../sim/score";
 import { parThrough, parYears } from "../sim/par";
@@ -8,7 +15,21 @@ import "./endScreen.css";
 
 /** The end of a run: voted out or recalled (`over`), or 2050 done. The score so far stands — the
  * years a defeat cut short score nothing. */
-export function EndScreen({ municipality, over, onMainMenu, onKeepPlaying }: { municipality: string; over: GameOver | null; onMainMenu: () => void; onKeepPlaying?: () => void }) {
+export function EndScreen({
+  municipality,
+  slug,
+  difficulty,
+  over,
+  onMainMenu,
+  onKeepPlaying,
+}: {
+  municipality: string;
+  slug: string;
+  difficulty: Difficulty;
+  over: GameOver | null;
+  onMainMenu: () => void;
+  onKeepPlaying?: () => void;
+}) {
   const score = scoreSoFar();
   const par = parThrough(NET_ZERO_TARGET_YEAR);
   const total = Math.round(score.total);
@@ -87,6 +108,8 @@ export function EndScreen({ municipality, over, onMainMenu, onKeepPlaying }: { m
           <ScoreChart years={score.years} par={parYears()} firstYear={BASELINE_YEAR + 1} lastYear={NET_ZERO_TARGET_YEAR} />
         </section>
 
+        {LEADERBOARD_ENABLED && <SubmitRun municipality={municipality} slug={slug} difficulty={difficulty} over={over !== null} />}
+
         <div className="end-actions">
           {onKeepPlaying && (
             <button className="end-secondary" onClick={onKeepPlaying}>
@@ -99,5 +122,70 @@ export function EndScreen({ municipality, over, onMainMenu, onKeepPlaying }: { m
         </div>
       </div>
     </div>
+  );
+}
+
+/** Putting the run on the leaderboard: a name, checked as it is typed, and the run's place. */
+function SubmitRun({ municipality, slug, difficulty, over }: { municipality: string; slug: string; difficulty: Difficulty; over: boolean }) {
+  const runId = getRunId();
+  const [name, setName] = useState(lastName());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<SubmitResult | null>(null);
+  const [already] = useState(() => submittedEntryId(runId) !== null);
+  const [showBoard, setShowBoard] = useState(false);
+  const board = runBoard(slug, difficulty);
+  const eligible = !over && runEligible();
+  const problem = name.trim() === "" ? null : nameProblem(name);
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await submitRun(buildSubmission(slug, difficulty, name));
+      rememberSubmission(runId, r.id, name.trim());
+      setResult(r);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="yr-card">
+      <h2>Leaderboard</h2>
+      <div className="lb-submit">
+        {!eligible ? (
+          <p className="lb-submit-note">Only a run that reaches {NET_ZERO_TARGET_YEAR} — or hands over early at net zero — goes on the leaderboard.</p>
+        ) : result ? (
+          <p className="lb-submit-done">
+            On the board: <strong>#{result.rank}</strong> of {result.entries} for {municipality} ({difficulty}, from {board.startYear}, version {board.version}).
+          </p>
+        ) : already ? (
+          <p className="lb-submit-done">This run is on the leaderboard.</p>
+        ) : (
+          <>
+            <p className="lb-submit-note">
+              Put this run on the {municipality} board ({difficulty}, from {board.startYear}, version {board.version}) under a name of your choice. What's sent is
+              the name and the run's emissions, year by year — nothing else.
+            </p>
+            <div className="lb-submit-row">
+              <input type="text" value={name} maxLength={NAME_MAX + 8} placeholder="Your name" aria-label="Your name" onChange={(e) => setName(e.target.value)} />
+              <button className="yr-close" disabled={busy || name.trim() === "" || problem !== null} onClick={submit}>
+                {busy ? "Submitting…" : "Submit"}
+              </button>
+            </div>
+            {(problem ?? error) && <span className="lb-submit-problem">{problem ?? error}</span>}
+          </>
+        )}
+        <div>
+          <button className="end-secondary" onClick={() => setShowBoard(true)}>
+            View the leaderboard
+          </button>
+        </div>
+      </div>
+      {showBoard && <LeaderboardPanel initial={board} onClose={() => setShowBoard(false)} />}
+    </section>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { LEADERBOARD_ENABLED } from "../leaderboard/client";
 import { X } from "lucide-react";
 import { VERSION_LABEL } from "../changelog";
 import { GAME_VERSION } from "../sim/saveGame";
@@ -82,6 +83,12 @@ export function AboutPanel({ onClose }: { onClose: () => void }) {
               The game runs entirely in your browser; your runs and saves stay there. The published game counts visits and a few milestones — a game started,
               a year reached, the tutorial finished — anonymously, with GoatCounter: no cookies, nothing about you, nothing about your game beyond that.
               {ANALYTICS_ENABLED ? "" : " (Not in this copy.)"}
+            </p>
+            <p className="cl-summary">
+              Only if you put a finished run on the leaderboard does anything about it leave your browser: the name you choose, the town, the difficulty and
+              version, and the run's emissions year by year — kept on Cloudflare, shown to everyone who opens the leaderboard. Your address is used only to
+              limit how often one connection can submit, as a one-way hash kept for a day.
+              {LEADERBOARD_ENABLED ? "" : " (There is no leaderboard in this copy.)"}
             </p>
           </section>
 
