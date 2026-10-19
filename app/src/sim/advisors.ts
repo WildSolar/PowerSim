@@ -65,7 +65,7 @@ const LETTER_POINTER = "My report, with what you can do about each of them, is i
 
 /** How far the district heating advisor looks ahead, and how long a run of street it suggests. */
 const DH_HORIZON_YEARS = 5;
-const DH_RUN_MAX_M = 400;
+const DH_RUN_MAX_M = 480;
 /** What share of owners on a piped street choose district heat when they replace a boiler, before
  * the town has a record of its own — and how many of its own cases outweigh that guess. */
 const DH_UPTAKE_PRIOR = 0.4;
@@ -452,6 +452,11 @@ class Advisors {
         ? `The treasury holds ${mchf(balance)}${owed > 0 ? `, and the town owes ${mchf(owed)}` : ""}. Next year's prices are yours to publish by the end of August (Town hall → Prices).`
         : "Next year's prices are yours to publish by the end of August (Town hall → Prices).",
     ];
+    const rollover = debt.rolloverOffer(atMs);
+    if (rollover)
+      paragraphs.push(
+        `Your green bond of ${mchf(rollover.loan.outstandingRp)} at ${rollover.loan.ratePct.toFixed(2)}% falls due in ${new Date(toDateMs(rollover.maturesAtMs)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}, to be repaid in one go. Residents would put ${mchf(rollover.maxRp)} into a new one at today's ${rollover.ratePct.toFixed(2)}% — you can roll it over from my page in the Town hall.`,
+      );
     return { subject: `Next year's power: ${up ? "dearer" : "cheaper"} by about ${Math.abs(nextRp - thisRp).toFixed(1)} Rp/kWh`, paragraphs };
   }
 

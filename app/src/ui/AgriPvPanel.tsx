@@ -3,7 +3,7 @@ import { ToolListGroup, ToolListRow } from "./ToolList";
 import { FARM_PLOT_COLORS } from "../map/colorModes";
 import { AGRI_PV_BUILD_MONTHS, AGRI_PV_LEAD_MONTHS, AGRI_PV_PERMIT_MONTHS, AGRI_PV_SYSTEMS } from "../config/agriPv";
 import { mapFocus } from "../map/mapFocus";
-import { AGRI_PV_DEVELOPER_LABEL, AGRI_PV_PHASE_LABEL, agriPv, partnerName, type AgriPvDesignation, type AgriPvDeveloper, type AgriPvProject } from "../sim/agriPv";
+import { AGRI_PV_DEVELOPER_LABEL, AGRI_PV_PHASE_LABEL, agriPv, stopped, partnerName, type AgriPvDesignation, type AgriPvDeveloper, type AgriPvProject } from "../sim/agriPv";
 import { approval, votePct } from "../sim/approval";
 import { formatDate } from "../sim/calendar";
 import { simClock } from "../sim/engine";
@@ -62,7 +62,7 @@ export function AgriPvFieldCard() {
   const plot = id ? agriPv.getPlot(id) : undefined;
   if (!id || !plot) return null;
   const project = agriPv.projectOn(id);
-  const live = project && project.phase !== "struckDown" ? project : undefined;
+  const live = project && !stopped(project) ? project : undefined;
   const state = agriPv.stateAt(id, now);
   const free = agriPv.isFree(id, now);
   const answer = agriPv.farmerAnswer(id, now);
@@ -200,7 +200,7 @@ function projectRow(p: AgriPvProject, now: number, selectedId: string | null) {
       ? ""
       : p.phase === "building"
         ? ` · ready ${monthYear(p.installedAtMs ?? now)}`
-        : p.phase === "struckDown"
+        : stopped(p)
           ? resting
             ? ` · can be taken up again from ${monthYear(resting)}`
             : ""
@@ -208,7 +208,7 @@ function projectRow(p: AgriPvProject, now: number, selectedId: string | null) {
   return (
     <ToolListRow
       key={p.id}
-      color={p.phase === "struckDown" ? FARM_PLOT_COLORS.refused : FARM_PLOT_COLORS[state === "farmland" || state === "planned" ? "zoned" : state]}
+      color={stopped(p) ? FARM_PLOT_COLORS.refused : FARM_PLOT_COLORS[state === "farmland" || state === "planned" ? "zoned" : state]}
       title={agriPv.fieldName(p)}
       figure={mw(p.capacityKw)}
       detail={`${DEVELOPER_SHORT[p.developer]}${stage}`}
@@ -232,7 +232,7 @@ export function AgriPvPanel() {
   const selectedId = agriPv.getSelectedId();
   const summary = useMemo(() => {
     const projects = agriPv.getProjects();
-    const live = projects.filter((p) => p.phase !== "struckDown" || (agriPv.restingUntil(p) ?? 0) > now);
+    const live = projects.filter((p) => !stopped(p) || (agriPv.restingUntil(p) ?? 0) > now);
     return {
       farmM2: plots.reduce((sum, p) => sum + p.areaM2, 0),
       zonedM2: agriPv.zonedAreaM2(now),
@@ -317,7 +317,7 @@ export function AgriPvPanel() {
       <ToolListGroup title="Permit, or in the courts">
         {summary.projects.filter((p) => p.phase === "permitting" || p.phase === "appeal" || p.phase === "permitted").map((p) => projectRow(p, now, selectedId))}
       </ToolListGroup>
-      <ToolListGroup title="Struck down in court">{summary.projects.filter((p) => p.phase === "struckDown").map((p) => projectRow(p, now, selectedId))}</ToolListGroup>
+      <ToolListGroup title="Refused, or struck down in court">{summary.projects.filter(stopped).map((p) => projectRow(p, now, selectedId))}</ToolListGroup>
     </>
   );
 

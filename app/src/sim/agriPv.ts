@@ -41,6 +41,7 @@ import {
   AGRI_PV_ACCEPTANCE_PER_FIELD,
   AGRI_PV_ACCEPTANCE_PER_YEAR_DIALOGUE,
   AGRI_PV_APPEAL_CHANCE,
+  AGRI_PV_PERMIT_REFUSED_CHANCE,
   AGRI_PV_APPEAL_UPHELD_CHANCE,
   AGRI_PV_APPEAL_YEARS,
   AGRI_PV_BUILD_MONTHS,
@@ -125,6 +126,7 @@ export type AgriPvPhase =
   | "permitted" // permitted, waiting on the municipality to build
   | "building"
   | "operating"
+  | "refused" // the canton refused the permit — the field rests
   | "struckDown"; // the appeal was upheld — the field rests
 
 export interface AgriPvProject {
@@ -286,7 +288,7 @@ class AgriPv {
 
   /** When a field struck down in court may be taken up again. */
   restingUntil(p: AgriPvProject): number | null {
-    return p.phase === "struckDown" ? p.phaseFromMs + AGRI_PV_RETRY_YEARS * YEAR_MS : null;
+    return stopped(p) ? p.phaseFromMs + AGRI_PV_RETRY_YEARS * YEAR_MS : null;
   }
 
   /** Whether a zoned plot is free for a developer to take up at `atMs`: no project on it (or one
@@ -352,7 +354,7 @@ class AgriPv {
 
   stateAt(plotId: string, atMs: number): PlotState {
     const p = this.projectOn(plotId);
-    if (p && p.phase !== "struckDown") {
+    if (p && !stopped(p)) {
       if (p.installedAtMs !== undefined) return p.installedAtMs <= atMs ? "field" : "fieldBuilding";
       return "underWay";
     }
@@ -549,6 +551,11 @@ class AgriPv {
     return this.projects.reduce((sum, f) => sum + (f.installedAtMs !== undefined && f.installedAtMs <= atMs ? f.capacityKw : 0), 0);
   }
 
+  /** The municipality's own fields in service at `atMs` (kW). */
+  municipalCapacityAtKw(atMs: number): number {
+    return this.projects.reduce((sum, f) => sum + (f.developer === "municipality" && f.installedAtMs !== undefined && f.installedAtMs <= atMs ? f.capacityKw : 0), 0);
+  }
+
   /** The energy the fields' partners take instead of buying it from the utility, at `atMs`'s
    * tariff: what they would have paid for it, less the grid fee they still pay (Rp per kWh). */
   ppaEnergyValueRpPerKWh(atMs: number): number {
@@ -703,6 +710,17 @@ class AgriPv {
     const rng = mulberry32(hashSeed(this.seed, "project", String(p.id), p.phase));
     switch (p.phase) {
       case "permitting": {
+        if (rng() < AGRI_PV_PERMIT_REFUSED_CHANCE) {
+          p.phase = "refused";
+          p.phaseFromMs = atMs;
+          p.phaseUntilMs = null;
+          p.log.push({ atMs, text: `The canton refused the permit: the farming wouldn't gain enough to set the landscape aside. The field can be taken up again in ${AGRI_PV_RETRY_YEARS} years.` });
+          if (p.developer === "municipality")
+            this.letter(atMs, `Agri-PV at ${this.fieldName(p)}: permit refused`, [
+              "The canton has refused the permit for the municipality's Agri-PV field: in its view the farming there wouldn't gain enough from the panels to justify building outside the building zone. The planning costs are spent; the field can be taken up again in a few years.",
+            ]);
+          break;
+        }
         if (rng() >= AGRI_PV_APPEAL_CHANCE) {
           this.permitted(p, atMs, "The permit was granted, and no one appealed.");
           break;
@@ -779,7 +797,7 @@ class AgriPv {
     if (policyStore.get().agriPvDialogue > 0) this.acceptance = Math.min(AGRI_PV_ACCEPTANCE_MAX, this.acceptance + AGRI_PV_ACCEPTANCE_PER_YEAR_DIALOGUE / 12);
     if (!this.plots.some((p) => this.isFree(p.id, atMs))) return false;
     let started = false;
-    const withField = new Set(this.projects.filter((p) => p.partnerEgid && p.phase !== "struckDown").map((p) => p.partnerEgid));
+    const withField = new Set(this.projects.filter((p) => p.partnerEgid && !stopped(p)).map((p) => p.partnerEgid));
     const chance = monthlyChance(AGRI_PV_CONSIDER_PER_YEAR);
     for (const b of this.consumers(atMs)) {
       if (withField.has(b.egid)) continue;
@@ -846,12 +864,18 @@ class AgriPv {
 
 export const agriPv = new AgriPv();
 
+/** Whether a project has stopped — the permit refused or struck down — and its field rests. */
+export function stopped(p: AgriPvProject): boolean {
+  return p.phase === "refused" || p.phase === "struckDown";
+}
+
 export const AGRI_PV_PHASE_LABEL: Record<AgriPvPhase, string> = {
   permitting: "Permit procedure",
   appeal: "Appealed, in the courts",
   permitted: "Permitted — ready to build",
   building: "Being built",
   operating: "In service",
+  refused: "Permit refused",
   struckDown: "Struck down in court",
 };
 

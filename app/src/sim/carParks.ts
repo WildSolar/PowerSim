@@ -213,6 +213,11 @@ class CarParks {
     return this.canopies.reduce((sum, c) => sum + (c.installedAtMs <= atMs ? c.capacityKw : 0), 0);
   }
 
+  /** The town's own canopies in service at `atMs`, together (kW). */
+  municipalCapacityAtKw(atMs: number): number {
+    return this.canopies.reduce((sum, c) => sum + (c.owner === "municipal" && c.installedAtMs <= atMs ? c.capacityKw : 0), 0);
+  }
+
   /** What every lot could carry, together (kW). */
   potentialKw(): number {
     return this.lots.reduce((sum, l) => sum + l.canopyKw, 0);

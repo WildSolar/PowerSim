@@ -5,9 +5,10 @@ import { formatDate } from "../sim/calendar";
 import { districtHeat } from "../sim/districtHeat";
 import { districtHeatSources } from "../sim/districtHeatSources";
 import { simClock } from "../sim/engine";
-import { cannotPay } from "../sim/fiscalRules";
+import { couldNotPay } from "../sim/fiscalRules";
 import type { LetterPick } from "../sim/inbox";
 import { measures } from "../sim/measures";
+import { debt } from "../sim/debt";
 import { buildCostRp, publicCharging, sizesFor } from "../sim/publicCharging";
 import { roofContracts } from "../sim/roofContracts";
 import { stock } from "../sim/stock";
@@ -29,7 +30,7 @@ export function openAdvisorPage(id: AdvisorId): void {
 
 /** Re-renders when anything a pick's state depends on changes. */
 function useAdvisorState(): void {
-  for (const store of [measures, advisors, roofContracts, publicCharging, districtHeat, districtHeatSources]) {
+  for (const store of [measures, advisors, roofContracts, publicCharging, districtHeat, districtHeatSources, debt]) {
     // eslint-disable-next-line react-hooks/rules-of-hooks -- a fixed list, called in the same order every render
     useSyncExternalStore(
       (l) => store.subscribe(l),
@@ -60,7 +61,8 @@ function Chip({ tone, children }: { tone: "good" | "pending" | "off"; children: 
 }
 
 function ActionButton({ costRp, now, onClick, children }: { costRp: number; now: number; onClick: () => void; children: React.ReactNode }) {
-  const short = cannotPay(costRp, now);
+  // Asked quietly: drawing the page refuses nothing (cannotPay would tell the player it did).
+  const short = couldNotPay(costRp, now);
   return (
     <button className="advisor-act" disabled={short} title={short ? "The treasury can't pay for it now (Treasury: borrow first)" : undefined} onClick={onClick}>
       {children}
@@ -175,6 +177,44 @@ function FactoryAction({ pick, now }: { pick: LetterPick; now: number }) {
   );
 }
 
+/** A green bond falling due within the year, and rolling it over into a new one at today's rate (as
+ * long as the finance advisor is retained; the offer is worked out now, not when the report came). */
+function RolloverAction({ now }: { now: number }) {
+  const offer = advisors.retained("finance") ? debt.rolloverOffer(now) : null;
+  const pending = debt.getLoans().find((l) => l.refinances && l.status === "pending");
+  if (pending)
+    return (
+      <div className="advisor-pick">
+        <div className="advisor-pick-text">
+          <strong>Green bond rolled over</strong>
+          <span>
+            {formatCHF(pending.principalRp)} at {pending.ratePct.toFixed(2)}%: residents subscribe until {monthYear(pending.startMs)}; it repays the maturing bond.
+          </span>
+        </div>
+      </div>
+    );
+  if (!offer) return null;
+  const short = offer.maxRp < offer.loan.outstandingRp;
+  return (
+    <div className="advisor-pick">
+      <div className="advisor-pick-text">
+        <strong>
+          Green bond falling due {monthYear(offer.maturesAtMs)}: {formatCHF(offer.loan.outstandingRp)} at {offer.loan.ratePct.toFixed(2)}%
+        </strong>
+        <span>
+          Residents would put {formatCHF(offer.maxRp)} into a new ten-year bond at today&apos;s {offer.ratePct.toFixed(2)}%
+          {short ? " — not all of it: the treasury repays the rest." : "."} No new money, so no earmark — and it adds no debt.
+        </span>
+      </div>
+      <div className="advisor-pick-actions">
+        <button className="advisor-act" onClick={() => debt.rollOverGreenBond(offer.loan.id, simClock.getSimTimeMs())}>
+          Roll it over — {formatCHF(offer.maxRp)}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function PickRow({ pick, report, now, onShowOnMap }: { pick: LetterPick; report: AdvisorReport; now: number; onShowOnMap: (pick: LetterPick) => void }) {
   return (
     <li className="advisor-pick">
@@ -246,6 +286,7 @@ function AdvisorPage({ id, now, onShowOnMap, onOpenPrices }: { id: AdvisorId; no
               ))}
             </ol>
           )}
+          {id === "finance" && <RolloverAction now={now} />}
           {id === "finance" && (
             <div className="advisor-terms">
               <button className="advisor-act" onClick={onOpenPrices}>

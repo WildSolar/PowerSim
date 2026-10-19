@@ -245,6 +245,8 @@ function capacityChart(nowMs: number): ChartData {
       { key: "carParks", label: "Car park canopies (MWp)", color: "#b5523b", kind: "stack", values: records.map((r) => (r.assets!.carParkKw ?? 0) / 1000) },
       { key: "agri", label: "Agri-PV (MWp)", color: "#2f9e8f", kind: "stack", values: records.map((r) => r.assets!.agriPvKw / 1000) },
       { key: "wind", label: "Wind (MW)", color: "#4a3aa7", kind: "stack", values: records.map((r) => r.assets!.windKw / 1000) },
+      // Of it all, what the town and its utility own: a line over the stack.
+      { key: "own", label: "Of it, the town's and its utility's own (MW)", color: "#6f6d66", kind: "line", dashed: true, values: records.map((r) => (r.assets!.ownKw ?? 0) / 1000) },
     ],
   };
 }

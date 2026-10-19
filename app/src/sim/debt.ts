@@ -80,6 +80,18 @@ export interface Loan {
   status: "pending" | "active" | "repaid";
   /** A green bond's promise: as much green investment by the deadline. */
   earmark?: { deadlineMs: number; status: "open" | "met" | "missed" };
+  /** A green bond that rolls over a maturing one (its id) — no new money, so no earmark. */
+  refinances?: string;
+  /** A maturing green bond already rolled over (the new one's id). */
+  refinancedBy?: string;
+}
+
+/** A green bond maturing within the year, and what residents would put into a new one to replace it. */
+export interface RolloverOffer {
+  loan: Loan;
+  maturesAtMs: number;
+  maxRp: number;
+  ratePct: number;
 }
 
 export type DebtEvent =
@@ -249,11 +261,53 @@ class Debt {
     const heldRp = this.loans.filter((l) => l.kind === "greenBond" && l.status !== "repaid").reduce((sum, l) => sum + (l.status === "active" ? l.outstandingRp : l.principalRp), 0);
     const appetiteRp = Math.max(0, residents * GREEN_BOND_HOLDINGS_CHF_PER_RESIDENT * demand * 100 - heldRp);
     const maxRp = round1000(Math.min(this.headroomRp(atMs), residents * GREEN_BOND_CHF_PER_RESIDENT * demand * 100, appetiteRp));
-    const last = this.loans.filter((l) => l.kind === "greenBond").reduce((m, l) => Math.max(m, l.orderedAtMs), Number.NEGATIVE_INFINITY);
+    const last = this.loans.filter((l) => l.kind === "greenBond" && !l.refinances).reduce((m, l) => Math.max(m, l.orderedAtMs), Number.NEGATIVE_INFINITY);
     let blocked = this.borrowingBlocked(atMs);
     if (!blocked && atMs - last < GREEN_BOND_MIN_MONTHS_APART * MONTH_MS) blocked = "A green bond was offered less than a year ago; residents need time before the next.";
     if (!blocked && maxRp <= 0) blocked = "Residents already hold as many of the town's green bonds as they want; the next can be sold once earlier ones are repaid.";
     return { maxRp, ratePct: this.greenBondRatePct(atMs), blocked, heldRp };
+  }
+
+  /** When a green bond is repaid in one go. */
+  maturityMs(loan: Loan): number {
+    return loan.startMs + loan.termYears * 12 * MONTH_MS;
+  }
+
+  /** The green bond maturing next within the year, not yet rolled over, and what residents would
+   * subscribe to a new one replacing it, at today's rate: no more than it, nor than they would hold
+   * once it is repaid. A rollover adds no debt, so it goes ahead near the limit too. */
+  rolloverOffer(atMs: number): RolloverOffer | null {
+    const due = this.loans
+      .filter((l) => l.kind === "greenBond" && l.status === "active" && !l.refinancedBy && this.maturityMs(l) > atMs && this.maturityMs(l) - atMs <= 12 * MONTH_MS)
+      .sort((a, b) => this.maturityMs(a) - this.maturityMs(b))[0];
+    if (!due) return null;
+    const residents = this.residents(atMs);
+    const climate = approval.getBlocLevels().climate;
+    const demand = GREEN_BOND_DEMAND_RANGE[0] + (GREEN_BOND_DEMAND_RANGE[1] - GREEN_BOND_DEMAND_RANGE[0]) * Math.min(1, Math.max(0, (climate - 30) / 50));
+    const heldRp = this.loans.filter((l) => l.kind === "greenBond" && l.status !== "repaid").reduce((sum, l) => sum + (l.status === "active" ? l.outstandingRp : l.principalRp), 0);
+    const appetiteRp = Math.max(0, residents * GREEN_BOND_HOLDINGS_CHF_PER_RESIDENT * demand * 100 - (heldRp - due.outstandingRp));
+    const maxRp = round1000(Math.min(due.outstandingRp, appetiteRp));
+    return maxRp > 0 ? { loan: due, maturesAtMs: this.maturityMs(due), maxRp, ratePct: this.greenBondRatePct(atMs) } : null;
+  }
+
+  /** Rolls a maturing green bond over: a new one at today's rate, its subscription closing as the
+   * old one falls due (or in a couple of months, if sooner), whose money repays it. */
+  rollOverGreenBond(loanId: string, atMs: number): Loan | null {
+    const offer = this.rolloverOffer(atMs);
+    if (!offer || offer.loan.id !== loanId) return null;
+    const loan = this.add({
+      kind: "greenBond",
+      requestedRp: offer.maxRp,
+      principalRp: offer.maxRp,
+      ratePct: offer.ratePct,
+      termYears: GREEN_BOND_TERM_YEARS,
+      orderedAtMs: atMs,
+      startMs: Math.max(atMs + GREEN_BOND_SUBSCRIPTION_MONTHS * MONTH_MS, offer.maturesAtMs),
+    });
+    loan.refinances = offer.loan.id;
+    offer.loan.refinancedBy = loan.id;
+    this.bump();
+    return loan;
   }
 
   /** How much federal decarbonisation money can be drawn now: half the investments of the last
@@ -360,19 +414,20 @@ class Debt {
     this.lastMonth = month;
   }
 
-  /** The first of a month: instalments and interest for the month before, the overdraft, earmarks,
-   * the rating and the canton's view. */
+  /** The first of a month: instalments and interest for the month before (paid on its last moment,
+   * so December's close the year it belongs to), the overdraft, earmarks, the rating and the canton's view. */
   private monthly(atMs: number): void {
+    const paidAtMs = atMs - 1;
     for (const loan of this.loans) {
       if (loan.status !== "active" || loan.startMs >= atMs) continue;
       const interest = (loan.outstandingRp * loan.ratePct) / 100 / 12;
-      treasury.recordPayout("interest", atMs, interest, loan.id);
+      treasury.recordPayout("interest", paidAtMs, interest, loan.id);
       const maturity = loan.startMs + loan.termYears * 12 * MONTH_MS;
       let principal = 0;
       if (loan.kind === "greenBond") principal = atMs >= maturity - MONTH_MS / 2 ? loan.outstandingRp : 0;
       else principal = Math.min(loan.outstandingRp, Math.max(0, this.monthlyPaymentRp(loan) - interest));
       if (principal > 0) {
-        treasury.recordPayout("debtRepayment", atMs, principal, loan.id);
+        treasury.recordPayout("debtRepayment", paidAtMs, principal, loan.id);
         loan.outstandingRp -= principal;
       }
       if (loan.outstandingRp <= 100) {
@@ -391,7 +446,7 @@ class Debt {
 
     // The overdraft: interest on a negative balance.
     const balance = this.balanceRp(atMs);
-    if (balance !== null && balance < 0) treasury.recordPayout("interest", atMs, (-balance * this.overdraftRatePct(atMs)) / 100 / 12, "overdraft");
+    if (balance !== null && balance < 0) treasury.recordPayout("interest", paidAtMs, (-balance * this.overdraftRatePct(atMs)) / 100 / 12, "overdraft");
 
     // The rating, and the canton.
     // Down at once; up a notch only after a year of earning better.
@@ -440,7 +495,7 @@ class Debt {
     loan.status = "active";
     loan.outstandingRp = loan.principalRp;
     treasury.recordReceipt(atMs, loan.principalRp, loan.id, "borrowing");
-    if (loan.kind === "greenBond") {
+    if (loan.kind === "greenBond" && !loan.refinances) {
       loan.earmark = { deadlineMs: atMs + GREEN_BOND_EARMARK_MONTHS * MONTH_MS, status: "open" };
     }
     this.bump();

@@ -5,7 +5,7 @@ import { allocationApprovalFactor, approval } from "../sim/approval";
 import { BASELINE_YEAR, formatDate, toDateMs, toSimTimeMs } from "../sim/calendar";
 import { debt, type LoanKind } from "../sim/debt";
 import { districtHeat } from "../sim/districtHeat";
-import { bookedFinances, departmentUtilityRp, departmentUtilityShareRp, utilityProfitRp } from "../sim/finances";
+import { allocationPaidAtMs, bookedFinances, departmentUtilityRp, departmentUtilityShareRp, utilityProfitRp } from "../sim/finances";
 import { grid } from "../sim/grid";
 import { existsAt } from "../sim/lifetime";
 import { MEASURE_BY_ID } from "../sim/measureCatalog";
@@ -102,7 +102,7 @@ function ledger(buildings: Building[], nowMs: number): Entry[] {
     );
   }
 
-  // The allocation: a twelfth at the start of each month.
+  // The allocation: a twelfth on the last day of each month.
   const booked = new Map(bookedFinances().map((f) => [f.year, f]));
   const nowYear = new Date(toDateMs(nowMs)).getUTCFullYear();
   for (let year = BASELINE_YEAR; year <= nowYear; year++) {
@@ -113,7 +113,7 @@ function ledger(buildings: Building[], nowMs: number): Entry[] {
       yearly = treasury.allocationRp(dwellings, allocationApprovalFactor(approval.atYearStart(year)));
     }
     for (let m = 0; m < 12; m++) {
-      const atMs = toSimTimeMs(Date.UTC(year, m, 1));
+      const atMs = allocationPaidAtMs(year, m);
       if (atMs > nowMs) break;
       entries.push({ atMs, kind: "allocation", detail: `${formatDate(atMs).replace(/^\d+ /, "")}: a twelfth of ${formatCHF(yearly)}`, amountRp: yearly / 12 });
     }

@@ -68,9 +68,13 @@ export const AGRI_PV_MIN_KWP = 200;
 export const AGRI_PV_PERMIT_COST_CHF = 60_000;
 export const AGRI_PV_PERMIT_COST_CHF_PER_HA = 10_000;
 export const AGRI_PV_PERMIT_MONTHS = 12;
-export const AGRI_PV_APPEAL_CHANCE = 0.3;
+// The canton refuses the permit outright this often — the farming doesn't gain enough, the landscape
+// matters more here — and the field rests; of those it grants, this many are appealed, and of those
+// this many upheld in court.
+export const AGRI_PV_PERMIT_REFUSED_CHANCE = 0.12;
+export const AGRI_PV_APPEAL_CHANCE = 0.45;
 export const AGRI_PV_APPEAL_YEARS: [number, number] = [1, 3];
-export const AGRI_PV_APPEAL_UPHELD_CHANCE = 0.2;
+export const AGRI_PV_APPEAL_UPHELD_CHANCE = 0.3;
 export const AGRI_PV_RETRY_YEARS = 3;
 
 // Who invests: businesses that use a lot of electricity, through a power purchase agreement (PPA):

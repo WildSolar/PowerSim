@@ -52,6 +52,10 @@ export interface MonthAssets {
   agriPvKw: number;
   carParkKw?: number;
   windKw: number;
+  /** Of all the generation (rooftops too), the town's and its utility's own (kW): the wind turbines,
+   * the utility's arrays on rented roofs, solar on public buildings, the town's car-park canopies and
+   * its own Agri-PV fields. */
+  ownKw?: number;
   /** Batteries' storage (kWh): homes' and the neighbourhood batteries. */
   homeBatteryKwh: number;
   gridBatteryKwh: number;

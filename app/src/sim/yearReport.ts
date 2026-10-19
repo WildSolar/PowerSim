@@ -40,7 +40,7 @@ import { ANNUAL_CAR_KM, ICE_CAR_L_PER_100KM } from "./mobilitySystems";
 import { slotsWithVehicleAt } from "./mobility";
 import { fleets } from "./fleet";
 import { marketAccess } from "./marketAccess";
-import { effectivePowerPlantsAt, roofPotentialKw } from "./solarAdoption";
+import { contractArrays, effectivePowerPlantsAt, municipalArrays, roofPotentialKw } from "./solarAdoption";
 import { spaceHeatingThermalDemandW } from "./spaceHeating";
 import type { Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
@@ -626,6 +626,11 @@ function recordMonthAssets(buildings: Building[], year: number, month: number, p
       agriPvKw: agriPv.capacityAtKw(endMs),
       carParkKw: carParks.capacityAtKw(endMs),
       windKw: wind.turbinesAt(endMs).reduce((sum, p) => sum + (p.capacityKw ?? 0), 0),
+      ownKw:
+        wind.turbinesAt(endMs).reduce((sum, p) => sum + (p.capacityKw ?? 0), 0) +
+        [...contractArrays(), ...municipalArrays()].reduce((sum, a) => sum + (a.installedAtMs <= endMs ? a.capacityKw : 0), 0) +
+        carParks.municipalCapacityAtKw(endMs) +
+        agriPv.municipalCapacityAtKw(endMs),
       homeBatteryKwh,
       gridBatteryKwh: grid.batteriesInService(endMs).kwh,
       dhPipeM: districtHeat.pipedLengthM(endMs) + districtHeat.trunkLengthM(endMs) + districtHeat.lineLengthM(endMs),

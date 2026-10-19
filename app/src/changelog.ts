@@ -22,6 +22,25 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.9.0",
+    date: null,
+    added: [
+      "Green bonds can be rolled over: when one falls due within the year, the finance advisor says so, and on their page you can replace it with a new ten-year bond at today's rate — as much as residents will subscribe, the treasury repaying the rest. It adds no debt and carries no earmark.",
+      "The installed capacity chart shows, as a dashed line, how much of the town's solar and wind its utility and the town own: their turbines, the arrays on public buildings and rented roofs, the car-park canopies and Agri-PV fields.",
+    ],
+    changed: [
+      "Agri-PV permits are no formality any more: the canton refuses about one in eight outright, nearly half of those granted are appealed, and the courts strike about a third of those down.",
+      "The district heating advisor proposes longer runs of connected streets — about a fifth longer.",
+      "The Treasury's Accounts, Ledger and Borrowing are listed down the side, as on the Measures and Advisors pages.",
+      "The Town hall, the inbox and the wiki replace each other: opening one closes whichever was open.",
+      "The government's allocation is paid on the last day of each month, rather than the first.",
+    ],
+    fixed: [
+      "The treasury at year end shown in the Year in Review now matches the top bar: December's allocation, interest and instalments count in the year they belong to.",
+      "The advisors' pages no longer say the treasury can't pay for a proposal you haven't acted on.",
+    ],
+  },
+  {
     version: "0.8.0",
     date: "2026-10-19",
     title: "Advisors, owners and the grid",

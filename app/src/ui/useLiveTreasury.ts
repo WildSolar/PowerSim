@@ -14,7 +14,7 @@ const SETTLE_DELAY_MS = 3000; // give the Year in Review first go at computing t
 export interface LiveTreasury {
   /** Where the treasury stands right now, or null while last year's accounts are still being settled. */
   balanceRp: number | null;
-  /** The overall government's allocation for this year, paid a twelfth at the start of each month. */
+  /** The overall government's allocation for this year, paid a twelfth on the last day of each month. */
   budgetRp: number;
   /** How much of it has been paid so far. */
   allocationSoFarRp: number;

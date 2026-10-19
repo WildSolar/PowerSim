@@ -17,6 +17,12 @@ import { PlotLink } from "./PlotLink";
 
 type Section = "accounts" | "ledger" | "borrowing";
 
+const SECTIONS: { id: Section; label: string }[] = [
+  { id: "accounts", label: "Accounts" },
+  { id: "ledger", label: "Ledger" },
+  { id: "borrowing", label: "Borrowing" },
+];
+
 /** How the ledger's payout categories read in the accounts. */
 const GROUPS: { label: string; categories: PayoutCategory[]; note?: string }[] = [
   { label: "Subsidies", categories: ["solar", "heating", "vehicle", "retrofit"], note: "paid as households decide" },
@@ -41,19 +47,22 @@ function utilityMarginRp(f: MunicipalFinances): number {
 export function TreasuryTab({ dataset, initialSection = "accounts" }: { dataset: MunicipalityDataset; initialSection?: Section }) {
   const [section, setSection] = useState<Section>(initialSection);
   return (
-    <div className="panel-typography treasury-tab">
-      <div className="treasury-sections">
-        <button className={section === "accounts" ? "active" : ""} onClick={() => setSection("accounts")}>
-          🧾 Accounts
-        </button>
-        <button className={section === "ledger" ? "active" : ""} onClick={() => setSection("ledger")}>
-          📒 Ledger
-        </button>
-        <button className={section === "borrowing" ? "active" : ""} onClick={() => setSection("borrowing")}>
-          🏦 Borrowing
-        </button>
+    <div className="panel-typography treasury-tab treasury-layout">
+      <aside className="measures-rail">
+        <h3>Treasury</h3>
+        <ul>
+          {SECTIONS.map((s) => (
+            <li key={s.id}>
+              <button className={section === s.id ? "active" : ""} aria-pressed={section === s.id} onClick={() => setSection(s.id)}>
+                <span>{s.label}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </aside>
+      <div className="treasury-section">
+        {section === "accounts" ? <Accounts dataset={dataset} /> : section === "ledger" ? <TreasuryLedger dataset={dataset} /> : <BorrowingTab />}
       </div>
-      {section === "accounts" ? <Accounts dataset={dataset} /> : section === "ledger" ? <TreasuryLedger dataset={dataset} /> : <BorrowingTab />}
     </div>
   );
 }

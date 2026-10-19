@@ -420,11 +420,17 @@ export function settledUtilitySoFar(year: number, atMs: number): { months: numbe
   return { months, profitRp, networkKWh, publicSolarSavingsRp };
 }
 
-/** The government's allocation paid so far in a year: a twelfth at the start of each month. */
+/** The government's allocation paid so far in a year: a twelfth on the last day of each month (so
+ * the year-end shows all twelve, as its closing balance does). */
 export function allocationSoFarRp(allocationRp: number, year: number, atMs: number): number {
-  const d = new Date(toDateMs(atMs));
-  const months = d.getUTCFullYear() < year ? 0 : d.getUTCFullYear() > year ? 12 : d.getUTCMonth() + 1;
+  let months = 0;
+  while (months < 12 && allocationPaidAtMs(year, months) <= atMs) months++;
   return (allocationRp * months) / 12;
+}
+
+/** When month `month` (0–11) of `year`'s twelfth of the allocation is paid: its last day. */
+export function allocationPaidAtMs(year: number, month: number): number {
+  return toSimTimeMs(Date.UTC(year, month + 1, 0));
 }
 
 async function computeFinances(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<MunicipalFinances> {

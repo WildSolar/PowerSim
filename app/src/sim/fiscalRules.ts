@@ -41,6 +41,13 @@ export function cannotPay(costRp: number, atMs: number): boolean {
   return true;
 }
 
+/** The same question without refusing anything: for a screen deciding whether to offer a purchase. */
+export function couldNotPay(costRp: number, atMs: number): boolean {
+  if (frozen(atMs)) return true;
+  const b = balance(atMs);
+  return b !== null && b < costRp;
+}
+
 export function setSpendingFreeze(check: (atMs: number) => boolean): void {
   frozen = check;
 }

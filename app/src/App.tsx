@@ -146,6 +146,23 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
   const [inboxSelection, setInboxSelection] = useState<InboxSelection | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  // The Town hall, the wiki and the inbox each fill the screen: opening one closes the others.
+  const inboxOpen = inboxSelection !== null;
+  useEffect(() => {
+    if (!showTownHall) return;
+    setShowWiki(false);
+    setInboxSelection(null);
+  }, [showTownHall]);
+  useEffect(() => {
+    if (!showWiki) return;
+    setTownHall(null);
+    setInboxSelection(null);
+  }, [showWiki]);
+  useEffect(() => {
+    if (!inboxOpen) return;
+    setTownHall(null);
+    setShowWiki(false);
+  }, [inboxOpen]);
   // A new game opens with the briefing (a loaded one doesn't).
   const [showBriefing, setShowBriefing] = useState(!restore && !tutorial);
   // The tutorial runs over the game until it's done (then this is an ordinary game in that town).
