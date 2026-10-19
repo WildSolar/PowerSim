@@ -1,7 +1,7 @@
 /**
- * Which chart the Charts tab shows (ChartsTab.tsx), and the way to it from elsewhere: a PlotLink
+ * Which chart (or At a glance) the Statistics tab shows (ChartsTab.tsx), and the way to it from elsewhere: a PlotLink
  * next to a transformer, a network or an account asks for its chart, and App opens the town hall
- * on the Charts tab.
+ * on the Statistics tab.
  */
 
 export interface ChartSelection {
@@ -11,7 +11,7 @@ export interface ChartSelection {
 }
 
 class ChartNav {
-  private selection: ChartSelection = { id: "electricity", param: null };
+  private selection: ChartSelection = { id: "glance", param: null };
   private readonly listeners = new Set<() => void>();
   private opener: (() => void) | null = null;
 
@@ -24,13 +24,13 @@ class ChartNav {
     this.listeners.forEach((l) => l());
   }
 
-  /** Shows a chart: selects it and opens the town hall's Charts tab. */
+  /** Shows a chart: selects it and opens the town hall's Statistics tab. */
   open(id: string, param: string | null = null): void {
     this.select(id, param);
     this.opener?.();
   }
 
-  /** App: how to open the Charts tab. */
+  /** App: how to open the Statistics tab. */
   setOpener(opener: (() => void) | null): void {
     this.opener = opener;
   }

@@ -47,8 +47,9 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
   const x = (v: number) => PAD.left + ((v - data.from) / span) * (W - PAD.left - PAD.right);
   const y = (v: number) => PAD.top + ((yMax - v) / (yMax - yMin)) * (H - PAD.top - PAD.bottom);
   const yearStep = span > 16 ? 5 : span > 8 ? 2 : 1;
-  const yearTicks: number[] = [];
-  for (let t = Math.ceil(data.from); t <= data.to; t++) if (t === data.from || t === data.to || t % yearStep === 0) yearTicks.push(t);
+  const yearTicks: { x: number; label: string }[] = [];
+  if (data.xTicks) yearTicks.push(...data.xTicks);
+  else for (let t = Math.ceil(data.from); t <= data.to; t++) if (t === data.from || t === data.to || t % yearStep === 0) yearTicks.push({ x: t, label: String(t) });
 
   const areaPath = (j: number) => {
     const top = tops[j];
@@ -118,8 +119,8 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
             </g>
           ))}
           {yearTicks.map((t) => (
-            <text key={t} className="tick" x={x(t)} y={H - 8} textAnchor="middle">
-              {t}
+            <text key={t.x} className="tick" x={x(t.x)} y={H - 8} textAnchor="middle">
+              {t.label}
             </text>
           ))}
           {n > 0 &&

@@ -1,16 +1,11 @@
 import { X } from "lucide-react";
 import type { MunicipalityDataset } from "../data/types";
-import { sampleMunicipalityCategorySeries } from "../sim/history";
-import { effectivePowerPlantsAt } from "../sim/solarAdoption";
-import { useSimDay, useSimSpeed, useTariff } from "../sim/store";
-import { tariffKey } from "../sim/tariff";
+import { useSimSpeed } from "../sim/store";
 import { PAUSE_SPEED } from "../sim/timeControls";
 import { AdvisorsTab } from "./AdvisorsTab";
 import { ChartsTab } from "./ChartsTab";
 import type { LetterPick } from "../sim/inbox";
-import { CityStatsTab } from "./CityStatsTab";
 import { DecisionLogTab } from "./DecisionLogTab";
-import { HistoricalEnergySection } from "./HistoricalEnergySection";
 import { MeasuresTab } from "./MeasuresTab";
 import { OverviewTab } from "./OverviewTab";
 import { TreasuryTab } from "./TreasuryTab";
@@ -19,7 +14,7 @@ import { TechnologyPrices } from "./TechnologyPrices";
 import { usePauseWhileOpen } from "./usePauseWhileOpen";
 import "./townHall.css";
 
-export type TownHallSection = "overview" | "measures" | "advisors" | "treasury" | "prices" | "stats" | "charts" | "log";
+export type TownHallSection = "overview" | "measures" | "advisors" | "treasury" | "prices" | "charts" | "log";
 
 const SECTIONS: { id: TownHallSection; title: string; blurb: string }[] = [
   { id: "overview", title: "Overview", blurb: "Where the town stands, what the canton and the Confederation have in store, and what was decided lately." },
@@ -27,8 +22,7 @@ const SECTIONS: { id: TownHallSection; title: string; blurb: string }[] = [
   { id: "advisors", title: "Advisors", blurb: "Consultants you retain for a yearly fee: each reports once a year with what to do next, and you can act on it from here." },
   { id: "treasury", title: "Treasury", blurb: "The department's accounts, year by year, and its borrowing." },
   { id: "prices", title: "Prices", blurb: "What the municipal utility charges, and where technology prices are heading." },
-  { id: "stats", title: "Statistics", blurb: "Where the town's energy goes, now and over time." },
-  { id: "charts", title: "Charts", blurb: "How the town has changed since you took office: energy, the grid, the residents and the books, month by month." },
+  { id: "charts", title: "Statistics", blurb: "Where the town stands now, and how it has changed since you took office: energy, the grid, the residents and the books, month by month." },
   { id: "log", title: "Decision log", blurb: "Every choice households, owners and businesses made, with the options they weighed." },
 ];
 
@@ -49,17 +43,9 @@ export interface TownHallProps {
 export function TownHall({ dataset, transparency, section, onSection, onClose, onShowPick }: TownHallProps) {
   const sections = SECTIONS.filter((s) => s.id !== "log" || transparency);
   const current = sections.find((s) => s.id === section) ?? sections[0];
-  const tariff = useTariff();
-  const currentDay = useSimDay();
   const speed = useSimSpeed();
 
   usePauseWhileOpen();
-
-  // Only resolved for Statistics, and only while it's open — effectivePowerPlantsAt locks in that
-  // year's solar adoptions (once, the first time it's ever queried) under whatever policy is set
-  // right then (solarAdoption.ts's retroactive-but-frozen rule), so merely opening the town hall
-  // must never trigger it.
-  const plants = section === "stats" ? effectivePowerPlantsAt(dataset.buildings, dataset.powerPlants, currentDay) : dataset.powerPlants;
 
   return (
     <div className="town-hall" role="dialog" aria-label="Town hall">
@@ -95,21 +81,10 @@ export function TownHall({ dataset, transparency, section, onSection, onClose, o
           {current.id === "measures" && <MeasuresTab />}
           {current.id === "advisors" && <AdvisorsTab onShowOnMap={onShowPick} onOpenPrices={() => onSection("prices")} />}
           {current.id === "treasury" && <TreasuryTab dataset={dataset} />}
-          {current.id === "stats" && (
-            <div className="th-stats">
-              <section>
-                <CityStatsTab dataset={dataset} />
-              </section>
-              <section className="panel-typography">
-                <HistoricalEnergySection
-                  entityId="municipality"
-                  sampler={(times) => sampleMunicipalityCategorySeries(dataset.buildings, times, tariff, plants)}
-                  tariffKey={`${tariffKey(tariff)}:${currentDay}`}
-                />
-              </section>
-            </div>
-          )}
-          {current.id === "charts" && <ChartsTab />}
+          {/* Only while Statistics is open does At a glance resolve the solar plants: effectivePowerPlantsAt
+              locks in that year's solar adoptions under the policy of the moment (solarAdoption.ts), so
+              merely opening the town hall must never trigger it. */}
+          {current.id === "charts" && <ChartsTab dataset={dataset} />}
           {current.id === "log" && <DecisionLogTab dataset={dataset} />}
         </div>
       </div>

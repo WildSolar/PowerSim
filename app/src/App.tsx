@@ -137,7 +137,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
     setSelectedEgid(egid);
     setSelectedEwid(null);
   };
-  // A chart link (PlotLink.tsx) opens the town hall on its Charts tab.
+  // A chart link (PlotLink.tsx) opens the town hall on its Statistics tab.
   useEffect(() => {
     chartNav.setOpener(() => setTownHall("charts"));
     return () => chartNav.setOpener(null);

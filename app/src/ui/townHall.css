@@ -176,21 +176,6 @@
   border-radius: var(--r-3);
 }
 
-.th-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-  gap: 24px;
-  align-items: start;
-}
-
-.th-stats > section {
-  padding: 20px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-3);
-  min-width: 0;
-}
-
 @media (max-width: 720px) {
   .th-header {
     flex-wrap: wrap;
@@ -204,9 +189,6 @@
   }
   .th-page {
     padding: 20px 16px 40px;
-  }
-  .th-stats {
-    grid-template-columns: 1fr;
   }
 }
 

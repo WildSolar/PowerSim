@@ -1,5 +1,5 @@
 /**
- * The charts in the town hall's Charts tab (ChartsTab.tsx): what the town looked like over time.
+ * The charts in the town hall's Statistics tab (ChartsTab.tsx): what the town looked like over time.
  * Each chart reads what the game already keeps — the monthly record (sim/monthRecords.ts), the
  * transformers' readings, the booked accounts, the payouts, the counted emissions, approval — and
  * turns it into series for TimeChart.tsx. Nothing here counts anything new.
@@ -55,6 +55,8 @@ export interface ChartData {
   /** Moments marked on the chart (the player's decisions), listed in the tooltip of their month. */
   events?: { x: number; label: string }[];
   eventsLabel?: string;
+  /** The x axis's labels, where they aren't years (the last 24 hours). */
+  xTicks?: { x: number; label: string }[];
 }
 
 export interface ChartParam {
@@ -94,7 +96,7 @@ function monthly(nowMs: number, pick: (r: MonthRecord) => boolean): { records: M
 }
 
 /** kWh into a unit the chart reads well at its largest value. */
-function energyUnit(maxKWh: number): { unit: string; scale: number } {
+export function energyUnit(maxKWh: number): { unit: string; scale: number } {
   if (maxKWh >= 2_000_000) return { unit: "GWh", scale: 1e-6 };
   if (maxKWh >= 2_000) return { unit: "MWh", scale: 1e-3 };
   return { unit: "kWh", scale: 1 };
@@ -110,7 +112,7 @@ const color = (key: string) => DEVICE_CATEGORIES.find((c) => c.key === key)?.col
 
 // --- electricity ---
 
-const ELECTRICITY_GROUPS: { key: string; label: string; color: string; of: (keyof NonNullable<MonthRecord["electricityKWh"]>)[] }[] = [
+export const ELECTRICITY_GROUPS: { key: string; label: string; color: string; of: (keyof NonNullable<MonthRecord["electricityKWh"]>)[] }[] = [
   { key: "homes", label: "Homes: appliances and lighting", color: color("plugLoad"), of: ["fridge", "lighting", "cooking", "laundry", "plugLoad"] },
   { key: "commercial", label: "Businesses", color: color("commercial"), of: ["commercial"] },
   { key: "heatPump", label: "Heat pumps: space heating", color: color("heatPump"), of: ["heatPump"] },
@@ -167,16 +169,19 @@ function tradeChart(nowMs: number): ChartData {
 
 // --- heat ---
 
+/** The month record's heat (heatingKWh) by key, and the heating system each is. */
+export const HEAT_KEYS = [
+  ["airHeatPump", "airHeatPump"],
+  ["groundHeatPump", "groundHeatPump"],
+  ["districtHeating", "districtHeating"],
+  ["wood", "woodPellet"],
+  ["gas", "gasBoiler"],
+  ["oil", "oilBoiler"],
+] as const;
+
 function heatChart(nowMs: number): ChartData {
   const { records, ...m } = monthly(nowMs, (r) => !!r.heatingKWh);
-  const keys = [
-    ["airHeatPump", "airHeatPump"],
-    ["groundHeatPump", "groundHeatPump"],
-    ["districtHeating", "districtHeating"],
-    ["wood", "woodPellet"],
-    ["gas", "gasBoiler"],
-    ["oil", "oilBoiler"],
-  ] as const;
+  const keys = HEAT_KEYS;
   const raw = keys.map(([k]) => records.map((r) => r.heatingKWh![k] ?? 0));
   const { unit, scale } = energyUnit(stackMax(raw.map((values) => ({ values })), records.length));
   return {

@@ -1,10 +1,12 @@
 import { useSyncExternalStore } from "react";
+import type { MunicipalityDataset } from "../data/types";
 import { approval } from "../sim/approval";
 import { grid } from "../sim/grid";
 import { monthRecords } from "../sim/monthRecords";
 import { useSimDay } from "../sim/store";
 import { chartNav } from "./chartNav";
 import { CHART_GROUPS, CHARTS } from "./charts";
+import { GlanceView } from "./GlanceView";
 import { TimeChart } from "./TimeChart";
 import "./charts.css";
 
@@ -15,8 +17,12 @@ const EMPTY: Record<string, string> = {
   utility: "The utility's accounts are booked at the end of each year.",
 };
 
-/** The town hall's Charts tab: the list of charts on the left, the chosen one in the middle. */
-export function ChartsTab() {
+/** The rail's first entry, ahead of the charts: where the town stands now (GlanceView.tsx). */
+export const GLANCE_ID = "glance";
+
+/** The town hall's Statistics tab: the list on the left — At a glance, then the charts — and the
+ * chosen one in the middle. */
+export function ChartsTab({ dataset }: { dataset: MunicipalityDataset }) {
   const selection = useSyncExternalStore(
     (l) => chartNav.subscribe(l),
     () => chartNav.get(),
@@ -36,25 +42,35 @@ export function ChartsTab() {
   );
   const now = useSimDay();
 
+  const glance = selection.id === GLANCE_ID;
   const chart = CHARTS.find((c) => c.id === selection.id) ?? CHARTS[0];
   const options = chart.param?.options() ?? [];
   const param = chart.param ? (options.find((o) => o.value === selection.param)?.value ?? chart.param.defaultValue?.() ?? options[0]?.value ?? "") : null;
-  const data = chart.data(param, now);
+  const data = glance ? null : chart.data(param, now);
 
   return (
     <div className="charts-tab">
-      <nav className="charts-list" aria-label="Charts">
+      <nav className="charts-list" aria-label="Statistics">
+        <section>
+          <h3>Now</h3>
+          <button className={glance ? "active" : ""} aria-current={glance ? "true" : undefined} onClick={() => chartNav.select(GLANCE_ID)}>
+            At a glance
+          </button>
+        </section>
         {CHART_GROUPS.map((g) => (
           <section key={g}>
             <h3>{g}</h3>
             {CHARTS.filter((c) => c.group === g).map((c) => (
-              <button key={c.id} className={c.id === chart.id ? "active" : ""} aria-current={c.id === chart.id ? "true" : undefined} onClick={() => chartNav.select(c.id, c.id === chart.id ? param : null)}>
+              <button key={c.id} className={!glance && c.id === chart.id ? "active" : ""} aria-current={!glance && c.id === chart.id ? "true" : undefined} onClick={() => chartNav.select(c.id, c.id === chart.id ? param : null)}>
                 {c.title}
               </button>
             ))}
           </section>
         ))}
       </nav>
+      {glance ? (
+        <GlanceView dataset={dataset} />
+      ) : (
       <section className="charts-main">
         <header className="charts-head">
           <div>
@@ -74,8 +90,9 @@ export function ChartsTab() {
             </label>
           )}
         </header>
-        <TimeChart data={data} emptyText={EMPTY[chart.id] ?? "Nothing recorded yet: each month is counted once it is over."} />
+        <TimeChart data={data!} emptyText={EMPTY[chart.id] ?? "Nothing recorded yet: each month is counted once it is over."} />
       </section>
+      )}
     </div>
   );
 }

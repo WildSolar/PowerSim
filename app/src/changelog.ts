@@ -34,6 +34,7 @@ export const CHANGELOG: Release[] = [
       "The Treasury's Accounts, Ledger and Borrowing are listed down the side, as on the Measures and Advisors pages.",
       "The Town hall, the inbox and the wiki replace each other: opening one closes whichever was open.",
       "The government's allocation is paid on the last day of each month, rather than the first.",
+      "Statistics and Charts are one page: Town hall → Statistics opens on the town at a glance — its power over the last 24 hours, the town then and now with a link to each chart, and its energy over the last month or year, heat included, with how much its own solar and wind covered — and lists the charts below. It opens at once, instead of working out the town's history again each time.",
       "Debt is measured against the department's income averaged over the last three years, so one poor year for the utility no longer cuts what you may borrow at once.",
       "Air conditioning matters now: homes cool on hot days, offices, shops, hotels and hospitals whenever it is warm and they are open, and each hot summer makes it more common — about a third of homes by 2050. A building on a ground-source heat pump cools through its probes for next to nothing. Cooling takes two or three percent of the town's power by the 2040s, mostly at sunny middays.",
       "The climate warms over the years — about a third of a degree a decade, summers faster — and summers bring heatwaves, more often and hotter as time goes on. Winters need a little less heating.",

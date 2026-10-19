@@ -717,7 +717,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Wood. A wood chip combined heat and power plant, anywhere in the municipality: heat for the network and power for the grid. To stay renewable, new wood plants together may burn no more than the town's own forest grows — in many towns, not much. And its neighbours mind the lorries and the chimney: homeowners and tenants within 300 m hold it against you for as long as it runs, more the more homes are near.",
       ]),
       p(
-        "Running costs differ: waste heat costs least to run, then the heat pumps (their electricity), then wood (the chips, less the power it sells). A network uses its sources in that order, and the boilers last. Every source also has a yearly upkeep for its size, whether it runs or not. A heat pump's electricity is part of the town's: the utility buys it hour by hour with everyone else's — so midday solar can run it in spring and autumn, and in a winter cold spell it adds to the power bought when power is dearest — and it shows in the town's electricity (Charts → Electricity, and the Year in Review's electricity by use) and counts with the town's electricity in the emissions. Wood and waste heat count as clean, as in the national inventory; the boilers count their oil or gas. The heat pumps stand on the medium-voltage grid, not on a neighbourhood's transformer station.",
+        "Running costs differ: waste heat costs least to run, then the heat pumps (their electricity), then wood (the chips, less the power it sells). A network uses its sources in that order, and the boilers last. Every source also has a yearly upkeep for its size, whether it runs or not. A heat pump's electricity is part of the town's: the utility buys it hour by hour with everyone else's — so midday solar can run it in spring and autumn, and in a winter cold spell it adds to the power bought when power is dearest — and it shows in the town's electricity (Statistics → Electricity, and the Year in Review's electricity by use) and counts with the town's electricity in the emissions. Wood and waste heat count as clean, as in the national inventory; the boilers count their oil or gas. The heat pumps stand on the medium-voltage grid, not on a neighbourhood's transformer station.",
       ),
       note(
         "Where heat could come from is real: the incinerators, treatment plants and industrial heat demand are the federal energy office's, the aquifers the canton's, and the forest and the water the land survey's. Which factories offer their heat, and how much, is the game's guess from their branch. Sizes, prices and costs are estimates. Deep geothermal heat isn't in the game yet: in Switzerland it is still about a decade away.",
@@ -1062,7 +1062,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Each building's and home's panel shows its last 24 hours — energy by use (heating, appliances, car charging and so on) and a live power chart — and its history over the last days, weeks and months.",
       ),
       p(
-        "Town hall → Statistics does the same for the whole town: energy by use for a day, week, month or year — once with businesses and once without, since business use dwarfs the rest — the town's power draw and solar output, and its energy history. It also shows how residents get around, and the share of electric cars and bikes, at the start and now.",
+        "Town hall → Statistics opens on the whole town at a glance: its power over the last 24 hours, by use, against what its solar (and wind) made; the town then and now — homes, how buildings are heated, solar, batteries, electric cars, vans and lorries, how residents get around, overloaded transformers, CO₂ per resident — each with a link to its chart; and its energy over the last month or the last 12 months: electricity by use, how much of it the town's own solar and wind covered, and heat by heating system, with the share from oil and gas. Below At a glance come the charts (see \"Charts\").",
       ),
       note("History shows finished days, weeks and months only, so its bars don't change once drawn."),
     ],
@@ -1072,7 +1072,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Charts",
     blocks: [
       p(
-        "Town hall → Charts shows how the town has changed since you took office. Pick a chart on the left; hover over it to read the numbers for a month or a year. A small grey chart icon next to a panel's title — the grid, a transformer, district heating, roof solar, wind, the modal split, the accounts, approval — opens the matching chart directly.",
+        "The charts in Town hall → Statistics show how the town has changed since you took office. Pick a chart on the left; hover over it to read the numbers for a month or a year. A small grey chart icon next to a panel's title — the grid, a transformer, district heating, roof solar, wind, the modal split, the accounts, approval — opens the matching chart directly.",
       ),
       list([
         "Electricity — what the town used each month, by what used it (homes, businesses, heat pumps, hot water, cooling, electric cars), and what its solar panels and wind turbines made.",

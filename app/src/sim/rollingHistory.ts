@@ -1,6 +1,5 @@
 /**
- * The municipality's "last 24h" series (City stats' Net power and Solar charts, and its Day
- * energy pie), sampled incrementally. Instead of 48 instants spaced evenly back from "now" —
+ * The municipality's "last 24h" series (the Statistics page's At a glance), sampled incrementally. Instead of 48 instants spaced evenly back from "now" —
  * which all shift every refresh, so every refresh was a full municipality-wide pass — the
  * window is sampled on a fixed half-hour grid, and each grid instant is computed once and kept
  * while it's inside the window. A refresh then only samples the grid instants that entered the
@@ -12,6 +11,9 @@
  * Each instant is sampled on its own: its snow cover and its set of solar plants are the ones at
  * that instant, so a cached sample reads the same however the window happened to reach it.
  * Samples depend on the tariff (EV charging responds to it), so a tariff change starts afresh.
+ *
+ * A first look (or one after a long jump) needs the whole window: warmLast24h fills it a sample at a
+ * time, yielding between them, so the page shows at once and the chart follows.
  */
 
 import type { Building, PowerPlant } from "../data/types";
@@ -50,21 +52,40 @@ function sampleAt(buildings: Building[], realPlants: PowerPlant[], t: number, ta
 
 /** Every category over the 24h up to `nowMs`: the window's two ends plus every half-hour grid
  * instant between them, oldest first. */
+/** Drops what no longer applies — another tariff, instants before the window — and returns the
+ * window's start and the grid instant just before it. */
+function prepare(nowMs: number, tariff: Tariff): { startMs: number; gridBeforeStart: number } {
+  const key = tariffKey(tariff);
+  if (key !== cacheTariffKey) {
+    gridSamples.clear();
+    cacheTariffKey = key;
+  }
+  const startMs = nowMs - HISTORY_WINDOW_MS;
+  const gridBeforeStart = Math.floor(startMs / ROLLING_GRID_MS) * ROLLING_GRID_MS;
+  for (const t of gridSamples.keys()) if (t < gridBeforeStart) gridSamples.delete(t);
+  return { startMs, gridBeforeStart };
+}
+
+/** Samples the window's grid instants not yet kept, one at a time with a yield between them, so
+ * sampleMunicipalityLast24h then only has "now" left to do. Stops when `cancelled()` says so. */
+export async function warmLast24h(buildings: Building[], realPlants: PowerPlant[], nowMs: number, tariff: Tariff, cancelled: () => boolean): Promise<void> {
+  const { gridBeforeStart } = prepare(nowMs, tariff);
+  for (let t = gridBeforeStart; t <= nowMs; t += ROLLING_GRID_MS) {
+    if (gridSamples.has(t)) continue;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (cancelled()) return;
+    if (tariffKey(tariff) !== cacheTariffKey) return;
+    gridSamples.set(t, sampleAt(buildings, realPlants, t, tariff));
+  }
+}
+
 export function sampleMunicipalityLast24h(
   buildings: Building[],
   realPlants: PowerPlant[],
   nowMs: number,
   tariff: Tariff,
 ): { times: number[]; series: CategorySeries } {
-  const key = tariffKey(tariff);
-  if (key !== cacheTariffKey) {
-    gridSamples.clear();
-    cacheTariffKey = key;
-  }
-
-  const startMs = nowMs - HISTORY_WINDOW_MS;
-  const gridBeforeStart = Math.floor(startMs / ROLLING_GRID_MS) * ROLLING_GRID_MS;
-  for (const t of gridSamples.keys()) if (t < gridBeforeStart) gridSamples.delete(t);
+  const { startMs, gridBeforeStart } = prepare(nowMs, tariff);
 
   const gridSample = (t: number): CategorySample => {
     let sample = gridSamples.get(t);
