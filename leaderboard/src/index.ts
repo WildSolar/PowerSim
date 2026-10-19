@@ -1,10 +1,16 @@
 /**
- * Commune Zéro's leaderboard: a Cloudflare Worker with a D1 database (README.md for setting it up).
+ * Commune Zéro's server: the leaderboard and feedback, a Cloudflare Worker with a D1 database and
+ * an R2 bucket (README.md for setting it up).
  *
  *   GET    /boards          every board that has entries, with how many
  *   GET    /scores?version=&slug=&difficulty=&startYear=&limit=   a board's best, highest first
  *   POST   /submit          a finished run (rules.ts Submission) → its id, rank and the board's size
- *   DELETE /scores/:id      removes an entry (Authorization: Bearer ADMIN_TOKEN)
+ *   DELETE /scores/:id      removes an entry (admin)
+ *   POST   /feedback        feedback from the game (rules.ts FeedbackSubmission), its save to R2,
+ *                           and an e-mail to the admin (mail.ts)
+ *   GET    /admin           the admin page (adminPage.ts), which uses:
+ *   GET    /admin/feedback, GET /admin/feedback/:id/save, POST /admin/feedback/:id/status,
+ *   DELETE /admin/feedback/:id                        (admin: Authorization: Bearer ADMIN_TOKEN)
  *
  * Nothing is taken on trust: the score is worked out again from the run's years (rules.ts
  * checkScore), the name goes through the same filter as in the game (nameProblem), a run goes on
@@ -12,11 +18,26 @@
  * only a salted hash, for a day, for that limit.
  */
 
-import { boardId, checkScore, DIFFICULTIES, nameProblem, tidyName, wellFormed, type BoardKey, type LeaderboardDifficulty } from "../../app/src/leaderboard/rules";
-import { D1Store, type D1Database, type Store } from "./store";
+import {
+  boardId,
+  checkScore,
+  DIFFICULTIES,
+  feedbackProblem,
+  nameProblem,
+  tidyName,
+  wellFormed,
+  type BoardKey,
+  type FeedbackSubmission,
+  type LeaderboardDifficulty,
+} from "../../app/src/leaderboard/rules";
+import { adminPage } from "./adminPage";
+import { feedbackMail, resendMailer, type MailConfig, type SendMail } from "./mail";
+import { D1Store, R2Blobs, saveKey, type Blobs, type D1Database, type R2Bucket, type Store } from "./store";
 
-export interface Env {
+export interface Env extends MailConfig {
   DB: D1Database;
+  /** Feedback's saves. */
+  FEEDBACK_SAVES: R2Bucket;
   /** The game's origins allowed to call (comma-separated, e.g. "https://name.github.io,http://localhost:5173"); empty: any. */
   ALLOWED_ORIGINS?: string;
   /** For removing entries (a Worker secret). */
@@ -26,16 +47,36 @@ export interface Env {
 }
 
 const MAX_BODY_BYTES = 16_000;
+const MAX_FEEDBACK_BYTES = 32_000_000;
 const SUBMISSIONS_PER_HOUR = 5;
+const FEEDBACK_PER_HOUR = 6;
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 const MAX_LIMIT = 100;
 
+interface ExecutionContext {
+  waitUntil(promise: Promise<unknown>): void;
+}
+
 export default {
-  fetch(request: Request, env: Env): Promise<Response> {
-    return handle(request, new D1Store(env.DB), env);
+  fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    return handle(request, new D1Store(env.DB), env, Date.now(), {
+      blobs: env.FEEDBACK_SAVES ? new R2Blobs(env.FEEDBACK_SAVES) : null,
+      sendMail: resendMailer(env),
+      waitUntil: (p) => ctx.waitUntil(p),
+    });
   },
 };
+
+/** What the handler needs besides the store: where saves go, how mail goes, and how to finish work
+ * after answering. */
+export interface Deps {
+  blobs: Blobs | null;
+  sendMail: SendMail | null;
+  waitUntil: (p: Promise<unknown>) => void;
+}
+
+const NO_DEPS: Deps = { blobs: null, sendMail: null, waitUntil: () => {} };
 
 function corsHeaders(request: Request, env: Pick<Env, "ALLOWED_ORIGINS">): Record<string, string> {
   const origin = request.headers.get("Origin") ?? "";
@@ -72,8 +113,24 @@ function boardFromQuery(url: URL): BoardKey | null {
   return { version, slug, difficulty: difficulty as LeaderboardDifficulty, startYear };
 }
 
+/** Whether the request carries the admin token. */
+async function isAdmin(request: Request, env: Pick<Env, "ADMIN_TOKEN">): Promise<boolean> {
+  const token = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  return !!env.ADMIN_TOKEN && token.length === env.ADMIN_TOKEN.length && (await sha256(token)) === (await sha256(env.ADMIN_TOKEN));
+}
+
+/** One more submission of this kind from this address, unless it has had its share this hour. */
+async function withinLimit(request: Request, store: Store, env: Pick<Env, "IP_SALT">, kind: string, perHour: number, now: number): Promise<boolean> {
+  const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+  const ipHash = await sha256(`${env.IP_SALT ?? "commune-zero"}|${kind}|${Math.floor(now / DAY_MS)}|${ip}`);
+  await store.pruneSubmissions(now - DAY_MS);
+  if ((await store.submissionsSince(ipHash, now - HOUR_MS)) >= perHour) return false;
+  await store.logSubmission(ipHash, now);
+  return true;
+}
+
 /** The request handler, apart from Cloudflare's entry point so it can be tried against any Store. */
-export async function handle(request: Request, store: Store, env: Omit<Env, "DB">, now = Date.now()): Promise<Response> {
+export async function handle(request: Request, store: Store, env: Omit<Env, "DB" | "FEEDBACK_SAVES">, now = Date.now(), deps: Deps = NO_DEPS): Promise<Response> {
   const cors = corsHeaders(request, env);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   const url = new URL(request.url);
@@ -106,11 +163,7 @@ export async function handle(request: Request, store: Store, env: Omit<Env, "DB"
       if ("problem" in checked) return json({ error: "The run doesn't add up." }, 422, cors);
       if ((await store.findByRun(body.runId)) !== null) return json({ error: "This run is already on the leaderboard." }, 409, cors);
 
-      const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
-      const ipHash = await sha256(`${env.IP_SALT ?? "commune-zero"}|${Math.floor(now / DAY_MS)}|${ip}`);
-      await store.pruneSubmissions(now - DAY_MS);
-      if ((await store.submissionsSince(ipHash, now - HOUR_MS)) >= SUBMISSIONS_PER_HOUR) return json({ error: "That's enough for now — try again in an hour." }, 429, cors);
-      await store.logSubmission(ipHash, now);
+      if (!(await withinLimit(request, store, env, "score", SUBMISSIONS_PER_HOUR, now))) return json({ error: "That's enough for now — try again in an hour." }, 429, cors);
 
       const board = boardId(body);
       const score = Math.round(checked.score * 10) / 10;
@@ -135,9 +188,74 @@ export async function handle(request: Request, store: Store, env: Omit<Env, "DB"
 
     const remove = /^\/scores\/(\d+)$/.exec(url.pathname);
     if (request.method === "DELETE" && remove) {
-      const token = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-      if (!env.ADMIN_TOKEN || token.length !== env.ADMIN_TOKEN.length || (await sha256(token)) !== (await sha256(env.ADMIN_TOKEN))) return json({ error: "Not allowed." }, 403, cors);
+      if (!(await isAdmin(request, env))) return json({ error: "Not allowed." }, 403, cors);
       return (await store.delete(Number(remove[1]))) ? json({ deleted: Number(remove[1]) }, 200, cors) : json({ error: "No such entry." }, 404, cors);
+    }
+
+    if (request.method === "POST" && url.pathname === "/feedback") {
+      const text = await request.text();
+      if (text.length > MAX_FEEDBACK_BYTES) return json({ error: "That's too big to send." }, 413, cors);
+      let body: unknown;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        return json({ error: "Not feedback." }, 400, cors);
+      }
+      const problem = feedbackProblem(body);
+      if (problem) return json({ error: problem }, 422, cors);
+      const f = body as FeedbackSubmission;
+      if (!(await withinLimit(request, store, env, "feedback", FEEDBACK_PER_HOUR, now))) return json({ error: "That's a lot of feedback at once — try again in an hour." }, 429, cors);
+      const hasSave = f.save !== null && deps.blobs !== null;
+      const id = await store.insertFeedback({ kind: f.kind, message: f.message, details: f.details, version: f.version, build: f.build, crash: f.crash, hasSave, createdAt: now });
+      if (hasSave) await deps.blobs!.put(saveKey(id), f.save!);
+      const item = await store.getFeedback(id);
+      if (item && deps.sendMail) {
+        const mail = feedbackMail(item, `${url.origin}/admin`);
+        deps.waitUntil(deps.sendMail(mail.subject, mail.text).catch(() => {}));
+      }
+      return json({ id }, 201, cors);
+    }
+
+    // --- the admin page and what it calls (same origin: no CORS needed) ---
+
+    if (request.method === "GET" && url.pathname === "/admin") {
+      const nonce = crypto.randomUUID().replace(/-/g, "");
+      return new Response(adminPage(nonce), {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "Content-Security-Policy": `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+          "X-Content-Type-Options": "nosniff",
+          "Referrer-Policy": "no-referrer",
+        },
+      });
+    }
+
+    if (url.pathname.startsWith("/admin/")) {
+      if (!(await isAdmin(request, env))) return json({ error: "Not allowed." }, 403, cors);
+      if (request.method === "GET" && url.pathname === "/admin/feedback") {
+        const limit = Math.max(1, Math.min(500, Number(url.searchParams.get("limit")) || 100));
+        return json({ items: await store.listFeedback(limit) }, 200, cors);
+      }
+      const save = /^\/admin\/feedback\/(\d+)\/save$/.exec(url.pathname);
+      if (request.method === "GET" && save) {
+        const text = deps.blobs ? await deps.blobs.get(saveKey(Number(save[1]))) : null;
+        return text === null
+          ? json({ error: "No game attached." }, 404, cors)
+          : new Response(text, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", ...cors } });
+      }
+      const status = /^\/admin\/feedback\/(\d+)\/status$/.exec(url.pathname);
+      if (request.method === "POST" && status) {
+        const wanted = ((await request.json().catch(() => ({}))) as { status?: string }).status;
+        if (wanted !== "new" && wanted !== "done") return json({ error: "new or done?" }, 400, cors);
+        return (await store.setFeedbackStatus(Number(status[1]), wanted)) ? json({ ok: true }, 200, cors) : json({ error: "No such feedback." }, 404, cors);
+      }
+      const one = /^\/admin\/feedback\/(\d+)$/.exec(url.pathname);
+      if (request.method === "DELETE" && one) {
+        const id = Number(one[1]);
+        await deps.blobs?.delete(saveKey(id));
+        return (await store.deleteFeedback(id)) ? json({ deleted: id }, 200, cors) : json({ error: "No such feedback." }, 404, cors);
+      }
     }
 
     return json({ error: "Not found." }, 404, cors);

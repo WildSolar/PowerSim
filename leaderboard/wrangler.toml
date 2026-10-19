@@ -1,4 +1,5 @@
-# Commune Zéro's leaderboard (README.md). Deploy from this folder: npx wrangler deploy
+# Commune Zéro's server: the leaderboard and feedback (README.md). Deploy from this folder:
+#   npx wrangler deploy
 name = "commune-zero-leaderboard"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
@@ -7,6 +8,16 @@ compatibility_date = "2025-01-01"
 # server — the only pages allowed to call.
 [vars]
 ALLOWED_ORIGINS = "https://commune-zero.ch,https://www.commune-zero.ch,https://wildsolar.github.io,http://localhost:5173"
+
+# Feedback: where the e-mail about it goes, and who it's from (a domain verified with Resend; the
+# key is a secret: npx wrangler secret put RESEND_API_KEY).
+FEEDBACK_TO = "admin@commune-zero.ch"
+FEEDBACK_FROM = "Commune Zéro <feedback@commune-zero.ch>"
+
+# Feedback's attached games: npx wrangler r2 bucket create commune-zero-feedback
+[[r2_buckets]]
+binding = "FEEDBACK_SAVES"
+bucket_name = "commune-zero-feedback"
 
 [[d1_databases]]
 binding = "DB"

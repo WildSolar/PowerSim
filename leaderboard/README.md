@@ -1,9 +1,12 @@
-# Commune Zéro — leaderboard
+# Commune Zéro — server (leaderboard and feedback)
 
-A Cloudflare Worker (`src/index.ts`) with a D1 database (`schema.sql`). The game talks to it from
-the end screen and the start screen (`app/src/leaderboard/`); the rules both sides apply — what a
-submission is, the name filter, the score worked out again — are in `app/src/leaderboard/rules.ts`.
-Without a leaderboard address in the build, the game simply has no leaderboard.
+A Cloudflare Worker (`src/index.ts`) with a D1 database (`schema.sql`) and an R2 bucket. The game
+talks to it for the leaderboard (end screen, start screen) and to send feedback (`app/src/leaderboard/`,
+`app/src/ui/feedback.ts`); the rules both sides apply — what a submission is, the name filter, the
+score worked out again, what feedback may contain — are in `app/src/leaderboard/rules.ts`. Feedback
+is e-mailed to the admin through Resend (`src/mail.ts`) and listed on the admin page,
+`<address>/admin` (`src/adminPage.ts`). Without the server's address in the build, the game has no
+leaderboard and falls back to e-mail for feedback.
 
 ## Setting it up (once)
 
@@ -54,6 +57,46 @@ tool the first time.
    repository variable: `LEADERBOARD_URL` = the Worker's address. Then run the "Deploy to GitHub
    Pages" workflow again; the Leaderboard button appears on the start screen.
 
+## Feedback (once)
+
+8. **A bucket for the games attached to feedback**:
+
+   ```
+   npx wrangler r2 bucket create commune-zero-feedback
+   ```
+
+   (Cloudflare may ask you to enable R2 on the account first, in the dashboard under R2 — free up
+   to 10 GB, but it asks for a payment method on file.)
+
+9. **The feedback table** — the schema again (it only adds what's missing):
+
+   ```
+   npx wrangler d1 execute commune-zero-leaderboard --remote --file=schema.sql
+   ```
+
+10. **Resend, for the e-mail** (resend.com, free up to 3,000 mails a month):
+    - Sign up, then Domains → Add domain → `commune-zero.ch` (region: Europe).
+    - Resend shows a few DNS records (a TXT record for DKIM, and an MX and a TXT record for a
+      `send` subdomain). Add each at Hostpoint exactly as shown — names and values. They don't
+      touch your own mail at `admin@commune-zero.ch`.
+    - Back at Resend, click Verify (minutes to an hour).
+    - API Keys → Create API key (permission: sending access, domain: commune-zero.ch), and give it
+      to the Worker:
+
+      ```
+      npx wrangler secret put RESEND_API_KEY
+      ```
+
+    Where it goes and who it's from are `FEEDBACK_TO` and `FEEDBACK_FROM` in `wrangler.toml`.
+
+11. **Deploy the Worker** (`npx wrangler deploy`), and on GitHub set the repository variable
+    `FEEDBACK_EMAIL` to `admin@commune-zero.ch` (the address shown if sending ever fails), then
+    deploy the game.
+
+Reading feedback: open `<address>/admin`, enter the admin token (kept for that browser tab only).
+Each report shows its details; "Download the game" saves the player's run as a `.txt` file that
+loads from the game's start screen (Load game → from a file).
+
 To try the leaderboard from the dev server (`npm run dev`), put
 `VITE_LEADERBOARD_URL=<address>` in `app/.env.local` (not committed) — `http://localhost:5173` is
 already allowed.
@@ -89,13 +132,15 @@ The handler runs against an in-memory store in Node, with the app's TypeScript:
 
 ```
 ../app/node_modules/.bin/tsc -p tsconfig.test.json --outDir ../.lbtest
-node ../.lbtest/leaderboard/test/run.js          # the tests: names, scores, limits, removal
-node ../.lbtest/leaderboard/test/devServer.js    # a local leaderboard on http://localhost:8787
+node ../.lbtest/leaderboard/test/run.js          # the tests: names, scores, limits, removal, feedback
+node ../.lbtest/leaderboard/test/devServer.js    # a local server on http://localhost:8787 (admin token: dev; mails are printed)
 ```
 
 ## What it keeps
 
-Per entry: the name, the board (version, town, difficulty, starting year), the score worked out
-from the run's years, par, the net-zero and hand-over years, the game's version and build, and when.
-For the rate limit (five submissions an hour per connection), a salted hash of the address, deleted
-after a day. Nothing else.
+Per leaderboard entry: the name, the board (version, town, difficulty, starting year), the score
+worked out from the run's years, par, the net-zero and hand-over years, the game's version and
+build, and when. Per feedback: what it's about, the message, the details the game adds (version,
+town, in-game date, approval, browser, screen size, a crash's error), and the attached game if the
+player ticked it (in R2). For the rate limits (five scores, six feedbacks an hour per connection), a
+salted hash of the address, deleted after a day. Nothing else.

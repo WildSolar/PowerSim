@@ -1,6 +1,20 @@
 /** The leaderboard's Store kept in memory — for the tests (run.ts) and the local server (devServer.ts). */
 
-import type { NewEntry, Store } from "../src/store";
+import type { FeedbackItem } from "../../app/src/leaderboard/rules";
+import type { Blobs, NewEntry, NewFeedback, Store } from "../src/store";
+
+export class MemoryBlobs implements Blobs {
+  items = new Map<string, string>();
+  async put(key: string, text: string) {
+    this.items.set(key, text);
+  }
+  async get(key: string) {
+    return this.items.get(key) ?? null;
+  }
+  async delete(key: string) {
+    this.items.delete(key);
+  }
+}
 
 export class MemoryStore implements Store {
   entries: (NewEntry & { id: number })[] = [];
@@ -44,5 +58,27 @@ export class MemoryStore implements Store {
     const n = this.entries.length;
     this.entries = this.entries.filter((e) => e.id !== id);
     return this.entries.length < n;
+  }
+  feedback: FeedbackItem[] = [];
+  async insertFeedback(f: NewFeedback) {
+    const id = this.feedback.length + 1;
+    this.feedback.push({ id, ...f, status: "new" });
+    return id;
+  }
+  async listFeedback(limit: number) {
+    return [...this.feedback].sort((a, b) => b.createdAt - a.createdAt).slice(0, limit);
+  }
+  async getFeedback(id: number) {
+    return this.feedback.find((f) => f.id === id) ?? null;
+  }
+  async setFeedbackStatus(id: number, status: FeedbackItem["status"]) {
+    const f = this.feedback.find((x) => x.id === id);
+    if (f) f.status = status;
+    return !!f;
+  }
+  async deleteFeedback(id: number) {
+    const n = this.feedback.length;
+    this.feedback = this.feedback.filter((f) => f.id !== id);
+    return this.feedback.length < n;
   }
 }

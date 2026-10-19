@@ -8,7 +8,7 @@
 import { nameProblem, type Submission } from "../../app/src/leaderboard/rules";
 import { handle } from "../src/index";
 import type { Store } from "../src/store";
-import { MemoryStore } from "./memoryStore";
+import { MemoryBlobs, MemoryStore } from "./memoryStore";
 
 let failures = 0;
 function expect(label: string, ok: boolean, detail = ""): void {
@@ -102,6 +102,47 @@ async function main(): Promise<void> {
   expect("origins compare without case", upper.headers.get("Access-Control-Allow-Origin") === "http://localhost:5173");
   expect("a stranger's origin gets no CORS", (await call(store, "GET", "/boards", undefined, { Origin: "https://evil.example" })).cors === null);
   expect("preflight answers", (await call(store, "OPTIONS", "/submit")).status === 204);
+
+  // --- feedback ---
+  const fbStore = new MemoryStore();
+  const blobs = new MemoryBlobs();
+  const mails: { subject: string; text: string }[] = [];
+  const pending: Promise<unknown>[] = [];
+  const deps = { blobs, sendMail: async (subject: string, text: string) => void mails.push({ subject, text }), waitUntil: (p: Promise<unknown>) => void pending.push(p) };
+  const env = { ALLOWED_ORIGINS: "http://localhost:5173", ADMIN_TOKEN: "secret-token", IP_SALT: "salt" };
+  const fb = (body: unknown, headers: Record<string, string> = {}, path = "/feedback", method = "POST") =>
+    handle(
+      new Request(`https://lb.example${path}`, { method, body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body), headers: { Origin: "http://localhost:5173", "CF-Connecting-IP": "198.51.100.9", ...headers } }),
+      fbStore,
+      env,
+      1_800_000_000_000,
+      deps,
+    );
+  const feedback = { kind: "An idea", message: "More wind, please.\nAnd <b>bold</b> ideas.", details: "Version: 0.9.0\nBrowser: test", version: "0.9.0", build: "abc", crash: false, save: "CZ1:aGVsbG8=" };
+  const posted = await fb(feedback);
+  await Promise.all(pending);
+  expect("feedback is accepted", posted.status === 201);
+  expect("its save is kept", blobs.items.get("feedback/1.txt") === "CZ1:aGVsbG8=");
+  expect("an e-mail goes out", mails.length === 1 && mails[0].subject.includes("#1") && mails[0].text.includes("https://lb.example/admin"), mails[0]?.subject ?? "none");
+  expect("empty feedback is refused", (await fb({ ...feedback, message: " ", save: null })).status === 422);
+  expect("a crash report needs no words", (await fb({ ...feedback, message: "", crash: true, save: null })).status === 201);
+  expect("junk feedback is refused", (await fb("{nope")).status === 400);
+  expect("the admin list needs the token", (await fb(undefined, {}, "/admin/feedback", "GET")).status === 403);
+  const list = await fb(undefined, { Authorization: "Bearer secret-token" }, "/admin/feedback", "GET");
+  const items = ((await list.json()) as { items: { id: number; message: string; hasSave: boolean }[] }).items;
+  expect("the admin list has both", items.length === 2 && items.some((i) => i.hasSave), JSON.stringify(items.map((i) => i.id)));
+  const saveRes = await fb(undefined, { Authorization: "Bearer secret-token" }, "/admin/feedback/1/save", "GET");
+  expect("the save downloads", saveRes.status === 200 && (await saveRes.text()) === "CZ1:aGVsbG8=");
+  expect("marking done works", (await fb({ status: "done" }, { Authorization: "Bearer secret-token" }, "/admin/feedback/1/status")).status === 200 && (await fbStore.getFeedback(1))?.status === "done");
+  expect("deleting removes the save too", (await fb(undefined, { Authorization: "Bearer secret-token" }, "/admin/feedback/1", "DELETE")).status === 200 && !blobs.items.has("feedback/1.txt"));
+  const page = await fb(undefined, {}, "/admin", "GET");
+  const html = await page.text();
+  const csp = page.headers.get("Content-Security-Policy") ?? "";
+  const nonce = /nonce-([0-9a-f]+)/.exec(csp)?.[1] ?? "";
+  expect("the admin page is served with a strict policy", page.status === 200 && csp.includes("default-src 'none'") && nonce.length > 10 && html.includes(`nonce="${nonce}"`) && !html.includes("secret-token"));
+  const fbFlood: number[] = [];
+  for (let i = 0; i < 6; i++) fbFlood.push((await fb({ ...feedback, save: null })).status);
+  expect("feedback is limited per hour", fbFlood.includes(429), fbFlood.join(","));
 
   console.log(failures === 0 ? "\nAll passed." : `\n${failures} failed.`);
   if (failures > 0) (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1;

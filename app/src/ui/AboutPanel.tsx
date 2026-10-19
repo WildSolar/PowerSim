@@ -78,6 +78,18 @@ export function AboutPanel({ onClose }: { onClose: () => void }) {
           </section>
 
           <section className="cl-group">
+            <h3>Contact</h3>
+            <p className="cl-summary">
+              Questions, ideas or problems: the Feedback button in the game, or{" "}
+              <a href="mailto:admin@commune-zero.ch">admin@commune-zero.ch</a>. If you have a GitHub account, you can also{" "}
+              <a href="https://github.com/WildSolar/PowerSim/issues" target="_blank" rel="noopener noreferrer">
+                open an issue
+              </a>
+              .
+            </p>
+          </section>
+
+          <section className="cl-group">
             <h3>Privacy</h3>
             <p className="cl-summary">
               The game runs entirely in your browser; your runs and saves stay there. The published game counts visits and a few milestones — a game started,
@@ -89,6 +101,10 @@ export function AboutPanel({ onClose }: { onClose: () => void }) {
               version, and the run's emissions year by year — kept on Cloudflare, shown to everyone who opens the leaderboard. Your address is used only to
               limit how often one connection can submit, as a one-way hash kept for a day.
               {LEADERBOARD_ENABLED ? "" : " (There is no leaderboard in this copy.)"}
+            </p>
+            <p className="cl-summary">
+              Feedback you send goes to the game's server on Cloudflare and is read only by whoever runs the game: your words, where you were in the game,
+              your browser and screen size, and — if you tick it — your game as a save. It isn't published.
             </p>
           </section>
 

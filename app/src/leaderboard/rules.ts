@@ -216,3 +216,52 @@ export interface SubmitResult {
   rank: number;
   entries: number;
 }
+
+// --- feedback (the same server: ui/feedback.ts sends it, the admin page lists it) ---
+
+export const FEEDBACK_MESSAGE_MAX = 6_000;
+export const FEEDBACK_DETAILS_MAX = 6_000;
+/** A save as text (saveToString): a few MB; this leaves room. */
+export const FEEDBACK_SAVE_MAX = 30_000_000;
+
+export interface FeedbackSubmission {
+  /** What it's about ("Something broke"…). */
+  kind: string;
+  message: string;
+  /** Where the player was: version, town, date, browser — and a crash's error (feedback.ts reportText). */
+  details: string;
+  version: string;
+  build: string;
+  /** Sent from the crash screen. */
+  crash: boolean;
+  /** The run, as a save string, if the player attached it. */
+  save: string | null;
+}
+
+/** Why a feedback submission can't be taken, or null when it can. */
+export function feedbackProblem(x: unknown): string | null {
+  if (!x || typeof x !== "object") return "Not feedback.";
+  const f = x as Record<string, unknown>;
+  if (typeof f.kind !== "string" || f.kind.length === 0 || f.kind.length > 80) return "What is it about?";
+  if (typeof f.message !== "string" || f.message.length > FEEDBACK_MESSAGE_MAX) return `At most ${FEEDBACK_MESSAGE_MAX} characters, please.`;
+  if (typeof f.details !== "string" || f.details.length > FEEDBACK_DETAILS_MAX) return "Not feedback.";
+  if (typeof f.version !== "string" || f.version.length > 32 || typeof f.build !== "string" || f.build.length > 40) return "Not feedback.";
+  if (typeof f.crash !== "boolean") return "Not feedback.";
+  if (f.save !== null && (typeof f.save !== "string" || f.save.length > FEEDBACK_SAVE_MAX)) return "The attached game is too big.";
+  if (f.message.trim() === "" && !f.crash && f.save === null) return "Write a few words, please.";
+  return null;
+}
+
+/** A feedback item as the admin page lists it. */
+export interface FeedbackItem {
+  id: number;
+  kind: string;
+  message: string;
+  details: string;
+  version: string;
+  build: string;
+  crash: boolean;
+  hasSave: boolean;
+  status: "new" | "done";
+  createdAt: number;
+}

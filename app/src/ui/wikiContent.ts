@@ -104,7 +104,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Every time you close a Year in Review, the game also saves itself to an autosave, which the next one replaces. The start screen's Continue picks up the latest save in this browser in one click.",
       ),
       p(
-        "If something in the game breaks, it pauses and offers to save your run — in this browser as “Before the crash”, and as a file — so you can reload and carry on from there. The Feedback button (top right, and in the game menu) sends a report: a few words of yours, where you were in the game, and, if you like, your save, so the problem can be seen exactly as you saw it.",
+        "If something in the game breaks, it pauses and offers to save your run — in this browser as “Before the crash”, and as a file — so you can reload and carry on from there. The Feedback button (top right, and in the game menu) sends a report straight from the game: a few words of yours, where you were in the game, and, if you like, your game itself, so the problem can be seen exactly as you saw it. No e-mail or account needed; if you have a GitHub account, you can open an issue there instead (it's public, and can't take your game along).",
       ),
       p(
         "A loaded game picks up exactly where it was saved, paused: the same town, the same households and their pending decisions, the same accounts, votes and letters.",

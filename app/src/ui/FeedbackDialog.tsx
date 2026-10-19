@@ -1,8 +1,8 @@
-import { Check, Copy, X } from "lucide-react";
+import { Check, Copy, ExternalLink, X } from "lucide-react";
 import { track } from "../analytics";
 import { useEffect, useState } from "react";
 import { crashes, type Crash } from "../sim/crash";
-import { copyText, downloadSave, FEEDBACK_EMAIL, FEEDBACK_KINDS, openEmail, reportText, type FeedbackKind } from "./feedback";
+import { copyText, downloadSave, FEEDBACK_EMAIL, FEEDBACK_KINDS, FEEDBACK_SENDABLE, issueUrl, openEmail, reportText, sendFeedback, type FeedbackKind } from "./feedback";
 import { usePauseWhileOpen } from "./usePauseWhileOpen";
 import "./feedback.css";
 
@@ -12,32 +12,69 @@ function PauseWhileOpen() {
   return null;
 }
 
-/** Tell the person running the playtest what happened: a few words, the save, where you were. */
+type Outcome =
+  | { kind: "sent"; id: number; saveError: string | null }
+  // Not sent (no server, or it failed): the report to copy into an e-mail.
+  | { kind: "manual"; report: string; saveFile: string | null; saveError: string | null; reason: string | null };
+
+/** Tell whoever runs the game what happened: a few words, the save, where you were — sent straight
+ * from here when the game has its server, else by e-mail. */
 export function FeedbackDialog({ onClose, crash = null, pause = true }: { onClose: () => void; crash?: Crash | null; pause?: boolean }) {
   const [kind, setKind] = useState<FeedbackKind>(crash ? "Something broke" : FEEDBACK_KINDS[0]);
   const [message, setMessage] = useState("");
   const [attachSave, setAttachSave] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState<{ report: string; saveFile: string | null; saveError: string | null } | null>(null);
-  useEffect(() => track(crash ? "feedback/crash" : "feedback/open", "Feedback form opened"), [crash]);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [copied, setCopied] = useState(false);
+  useEffect(() => track(crash ? "feedback/crash" : "feedback/open", "Feedback form opened"), [crash]);
 
-  const send = async () => {
-    setBusy(true);
+  const run = crashes.getRun();
+  const canSend = message.trim() !== "" || crash !== null || attachSave;
+
+  /** The e-mail route: the save downloaded as a file to attach, the report to paste. */
+  const manual = async (reason: string | null) => {
     let saveFile: string | null = null;
     let saveError: string | null = null;
     if (attachSave) {
       try {
-        saveFile = await downloadSave(crashes.getRun(), "Feedback");
+        saveFile = await downloadSave(run, "Feedback");
       } catch (e) {
         saveError = (e as Error).message;
       }
     }
-    const report = reportText({ kind, message, run: crashes.getRun(), crash, saveFile });
-    setSent({ report, saveFile, saveError });
-    setBusy(false);
-    if (FEEDBACK_EMAIL) openEmail(`Commune Zéro: ${kind}`, report + (saveFile ? `\n\nPlease attach the save file from your downloads: ${saveFile}` : ""));
+    const report = reportText({ kind, message, run, crash, saveFile });
+    setOutcome({ kind: "manual", report, saveFile, saveError, reason });
+    if (FEEDBACK_EMAIL && reason === null) openEmail(`Commune Zéro: ${kind}`, report + (saveFile ? `\n\nPlease attach the save file from your downloads: ${saveFile}` : ""));
   };
+
+  const send = async () => {
+    setBusy(true);
+    try {
+      if (FEEDBACK_SENDABLE) {
+        try {
+          const { id, saveError } = await sendFeedback({ kind, message, run, crash, attachSave });
+          setOutcome({ kind: "sent", id, saveError });
+          track("feedback/sent", "Feedback sent");
+        } catch (e) {
+          await manual((e as Error).message);
+        }
+      } else {
+        await manual(null);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const github = (
+    <p className="fb-note fb-github">
+      Have a GitHub account? You can also{" "}
+      <a className="fb-link" href={issueUrl(kind, reportText({ kind, message, run, crash }))} target="_blank" rel="noopener noreferrer">
+        open an issue on GitHub <ExternalLink size={12} aria-hidden />
+      </a>{" "}
+      — it's public there, and can't take your game along.
+    </p>
+  );
 
   return (
     <div className="fb-layer">
@@ -51,7 +88,7 @@ export function FeedbackDialog({ onClose, crash = null, pause = true }: { onClos
           </button>
         </header>
 
-        {!sent ? (
+        {!outcome ? (
           <>
             <p className="fb-note">
               Thanks for playing. Anything helps: what broke, what was unclear, what felt too easy or too hard. Your game version, the in-game date and your
@@ -76,50 +113,69 @@ export function FeedbackDialog({ onClose, crash = null, pause = true }: { onClos
               onChange={(e) => setMessage(e.target.value)}
               placeholder={crash ? "What were you doing just before it happened?" : "Tell us in your own words…"}
             />
-            <label className="fb-check">
-              <input type="checkbox" checked={attachSave} onChange={(e) => setAttachSave(e.target.checked)} />
-              <span>Attach my game (downloads a save file to add to the email) — it lets us see exactly what you saw</span>
-            </label>
+            {run && (
+              <label className="fb-check">
+                <input type="checkbox" checked={attachSave} onChange={(e) => setAttachSave(e.target.checked)} />
+                <span>
+                  Attach my game — it lets us see exactly what you saw
+                  {FEEDBACK_SENDABLE ? "" : " (downloads a save file to add to the email)"}
+                </span>
+              </label>
+            )}
             <div className="fb-actions">
-              <button className="fb-primary" disabled={busy} onClick={send}>
-                {busy ? "Preparing…" : FEEDBACK_EMAIL ? "Write the email" : "Prepare the report"}
+              <button className="fb-primary" disabled={busy || !canSend} onClick={send}>
+                {busy ? (FEEDBACK_SENDABLE ? "Sending…" : "Preparing…") : FEEDBACK_SENDABLE ? "Send" : FEEDBACK_EMAIL ? "Write the email" : "Prepare the report"}
               </button>
               <button className="fb-secondary" onClick={onClose}>
                 Cancel
               </button>
             </div>
+            {github}
+          </>
+        ) : outcome.kind === "sent" ? (
+          <>
+            <p className="fb-note">
+              <strong>Sent — thank you!</strong> It arrived as report #{outcome.id}
+              {attachSave && !outcome.saveError && run ? ", with your game" : ""}. We read every one.
+            </p>
+            {outcome.saveError && <p className="fb-note fb-bad">Your game couldn't be attached ({outcome.saveError}); the report alone still helps.</p>}
+            <div className="fb-actions">
+              <button className="fb-primary" onClick={onClose}>
+                Done
+              </button>
+            </div>
           </>
         ) : (
           <>
+            {outcome.reason && <p className="fb-note fb-bad">It couldn't be sent from here ({outcome.reason}). Please send it by e-mail instead:</p>}
             {FEEDBACK_EMAIL ? (
               <p className="fb-note">
-                Your mail app should open with the report.
-                {sent.saveFile && (
+                {outcome.reason ? "" : "Your mail app should open with the report. "}
+                {outcome.saveFile && (
                   <>
-                    {" "}
-                    Please attach <strong>{sent.saveFile}</strong> from your downloads folder before sending.
+                    Please attach <strong>{outcome.saveFile}</strong> from your downloads folder.{" "}
                   </>
-                )}{" "}
-                If no mail app opened, copy the report below and send it to <strong>{FEEDBACK_EMAIL}</strong>.
+                )}
+                {outcome.reason ? "Copy" : "If no mail app opened, copy"} the report below and send it to <strong>{FEEDBACK_EMAIL}</strong>.
               </p>
             ) : (
               <p className="fb-note">
                 Copy the report below and send it to whoever invited you to play
-                {sent.saveFile ? (
+                {outcome.saveFile ? (
                   <>
-                    , with <strong>{sent.saveFile}</strong> from your downloads folder attached
+                    , with <strong>{outcome.saveFile}</strong> from your downloads folder attached
                   </>
                 ) : null}
                 .
               </p>
             )}
-            {sent.saveError && <p className="fb-note fb-bad">The save couldn't be made ({sent.saveError}); the report alone still helps.</p>}
-            <textarea className="fb-input fb-report" readOnly rows={9} value={sent.report} onFocus={(e) => e.currentTarget.select()} aria-label="The report" />
+            {outcome.saveError && <p className="fb-note fb-bad">The save couldn't be made ({outcome.saveError}); the report alone still helps.</p>}
+            <textarea className="fb-input fb-report" readOnly rows={9} value={outcome.report} onFocus={(e) => e.currentTarget.select()} aria-label="The report" />
             <div className="fb-actions">
               <button
                 className="fb-secondary"
                 onClick={async () => {
-                  setCopied(await copyText(sent.report));
+                  setCopied(await copyText(outcome.report));
                 }}
               >
                 {copied ? <Check size={15} aria-hidden /> : <Copy size={15} aria-hidden />} {copied ? "Copied" : "Copy the report"}
@@ -128,6 +184,7 @@ export function FeedbackDialog({ onClose, crash = null, pause = true }: { onClos
                 Done
               </button>
             </div>
+            {github}
           </>
         )}
       </div>

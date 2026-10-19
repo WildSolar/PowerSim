@@ -1,4 +1,5 @@
--- The leaderboard's tables (src/store.ts). Applied once:
+-- The server's tables (src/store.ts): the leaderboard, and feedback. Applied once, and again after
+-- a table is added (every statement only creates what isn't there yet):
 --   npx wrangler d1 execute commune-zero-leaderboard --remote --file=schema.sql
 
 CREATE TABLE IF NOT EXISTS entries (
@@ -30,3 +31,20 @@ CREATE TABLE IF NOT EXISTS submissions (
 );
 
 CREATE INDEX IF NOT EXISTS submissions_ip ON submissions (ip_hash, at);
+
+-- Feedback from the game (its save, if attached, is in R2 as feedback/<id>.txt).
+CREATE TABLE IF NOT EXISTS feedback (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  message TEXT NOT NULL,
+  details TEXT NOT NULL,
+  version TEXT NOT NULL,
+  build TEXT NOT NULL,
+  crash INTEGER NOT NULL,
+  has_save INTEGER NOT NULL,
+  -- 'new' or 'done'
+  status TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS feedback_created ON feedback (created_at DESC);
