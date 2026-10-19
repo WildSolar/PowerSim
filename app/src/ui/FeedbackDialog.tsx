@@ -19,7 +19,18 @@ type Outcome =
 
 /** Tell whoever runs the game what happened: a few words, the save, where you were — sent straight
  * from here when the game has its server, else by e-mail. */
-export function FeedbackDialog({ onClose, crash = null, pause = true }: { onClose: () => void; crash?: Crash | null; pause?: boolean }) {
+export function FeedbackDialog({
+  onClose,
+  crash = null,
+  pause = true,
+  withGame = true,
+}: {
+  onClose: () => void;
+  crash?: Crash | null;
+  pause?: boolean;
+  /** Whether there is a game to attach (not from the start screen, where the last one may linger). */
+  withGame?: boolean;
+}) {
   const [kind, setKind] = useState<FeedbackKind>(crash ? "Something broke" : FEEDBACK_KINDS[0]);
   const [message, setMessage] = useState("");
   const [attachSave, setAttachSave] = useState(true);
@@ -28,8 +39,8 @@ export function FeedbackDialog({ onClose, crash = null, pause = true }: { onClos
   const [copied, setCopied] = useState(false);
   useEffect(() => track(crash ? "feedback/crash" : "feedback/open", "Feedback form opened"), [crash]);
 
-  const run = crashes.getRun();
-  const canSend = message.trim() !== "" || crash !== null || attachSave;
+  const run = withGame ? crashes.getRun() : null;
+  const canSend = message.trim() !== "" || crash !== null || (attachSave && run !== null);
 
   /** The e-mail route: the save downloaded as a file to attach, the report to paste. */
   const manual = async (reason: string | null) => {

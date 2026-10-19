@@ -4,7 +4,10 @@ import { buildSubmission, LEADERBOARD_ENABLED, lastName, rememberSubmission, run
 import { NAME_MAX, nameProblem, type SubmitResult } from "../leaderboard/rules";
 import type { GameOver } from "../sim/approval";
 import { getRunId } from "../sim/score";
+import { Check, Copy, Share2 } from "lucide-react";
 import { LeaderboardPanel } from "./LeaderboardPanel";
+import { canShareNatively, GAME_URL, shareLinks, shareNatively, shareText, type ShareStory } from "./share";
+import { copyText } from "./feedback";
 import "./leaderboard.css";
 import { BASELINE_YEAR, formatDate } from "../sim/calendar";
 import { NET_ZERO_TARGET_YEAR, scoreSoFar } from "../sim/score";
@@ -32,6 +35,7 @@ export function EndScreen({
 }) {
   const score = scoreSoFar();
   const par = parThrough(NET_ZERO_TARGET_YEAR);
+  const [rank, setRank] = useState<ShareStory["rank"]>(null);
   const total = Math.round(score.total);
   const vsPar = par === null ? null : total - Math.round(par);
   // The last year actually played (after finishing early, the rest only count).
@@ -108,7 +112,9 @@ export function EndScreen({
           <ScoreChart years={score.years} par={parYears()} firstYear={BASELINE_YEAR + 1} lastYear={NET_ZERO_TARGET_YEAR} />
         </section>
 
-        {LEADERBOARD_ENABLED && <SubmitRun municipality={municipality} slug={slug} difficulty={difficulty} over={over !== null} />}
+        {LEADERBOARD_ENABLED && <SubmitRun municipality={municipality} slug={slug} difficulty={difficulty} over={over !== null} onSubmitted={setRank} />}
+
+        <ShareRun story={{ municipality, difficulty, score: total, vsPar, netZeroYear: score.netZeroYear, cut, over: over !== null, rank }} />
 
         <div className="end-actions">
           {onKeepPlaying && (
@@ -126,7 +132,19 @@ export function EndScreen({
 }
 
 /** Putting the run on the leaderboard: a name, checked as it is typed, and the run's place. */
-function SubmitRun({ municipality, slug, difficulty, over }: { municipality: string; slug: string; difficulty: Difficulty; over: boolean }) {
+function SubmitRun({
+  municipality,
+  slug,
+  difficulty,
+  over,
+  onSubmitted,
+}: {
+  municipality: string;
+  slug: string;
+  difficulty: Difficulty;
+  over: boolean;
+  onSubmitted: (rank: { place: number; of: number }) => void;
+}) {
   const runId = getRunId();
   const [name, setName] = useState(lastName());
   const [busy, setBusy] = useState(false);
@@ -145,6 +163,7 @@ function SubmitRun({ municipality, slug, difficulty, over }: { municipality: str
       const r = await submitRun(buildSubmission(slug, difficulty, name));
       rememberSubmission(runId, r.id, name.trim());
       setResult(r);
+      onSubmitted({ place: r.rank, of: r.entries });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -186,6 +205,35 @@ function SubmitRun({ municipality, slug, difficulty, over }: { municipality: str
         </div>
       </div>
       {showBoard && <LeaderboardPanel initial={board} onClose={() => setShowBoard(false)} />}
+    </section>
+  );
+}
+
+/** Sharing the run: the browser's own share sheet, each platform's share page, or the text to copy. */
+function ShareRun({ story }: { story: ShareStory }) {
+  const text = shareText(story);
+  const [copied, setCopied] = useState(false);
+  return (
+    <section className="yr-card end-share">
+      <h2>Share it</h2>
+      <p className="end-share-text">
+        {text} <span className="end-share-url">{GAME_URL.replace(/^https:\/\//, "")}</span>
+      </p>
+      <div className="end-share-buttons">
+        {canShareNatively() && (
+          <button className="yr-close" onClick={() => void shareNatively(text)}>
+            <Share2 size={15} strokeWidth={1.9} aria-hidden /> Share…
+          </button>
+        )}
+        {shareLinks(text).map((l) => (
+          <a key={l.id} className="end-share-link" href={l.href} target="_blank" rel="noopener noreferrer">
+            {l.label}
+          </a>
+        ))}
+        <button className="end-share-link" onClick={async () => setCopied(await copyText(`${text} ${GAME_URL}`))}>
+          {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />} {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
     </section>
   );
 }

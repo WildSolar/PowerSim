@@ -25,6 +25,8 @@ export const CHANGELOG: Release[] = [
     version: "0.9.0",
     date: null,
     added: [
+      "Share your result from the end screen — your phone's or browser's share menu, WhatsApp, X, Bluesky, Facebook, LinkedIn, Reddit or e-mail — with a line about your run and a link to the game.",
+      "The start screen says plainly that this is a beta, and takes your feedback from right there.",
       "Feedback is sent straight from the game — no mail program or account needed — with your game attached if you like. Have a GitHub account? The form can also open an issue there. About & credits lists the contact address.",
       "A leaderboard: at the end of a run that reaches 2050 (or hands over early), put it on the board for its town, difficulty, starting year and version, under a name of your choice. Leaderboard on the start screen shows every board.",
       "Sound: soft clicks, a chime when a letter wants your attention, a chord for the Year in Review — and calm ambient music, made as it plays. Game menu → Sound turns each on or off with its own volume (the music starts off); M mutes everything.",
@@ -32,6 +34,7 @@ export const CHANGELOG: Release[] = [
       "The installed capacity chart shows, as a dashed line, how much of the town's solar and wind its utility and the town own: their turbines, the arrays on public buildings and rented roofs, the car-park canopies and Agri-PV fields.",
     ],
     changed: [
+      "Loading a town is a little more entertaining: the department settles in while it counts the year so far.",
       "The game has moved to its own address: commune-zero.ch. Saves and settings are kept by the browser per address, so a run saved on the old one (wildsolar.github.io) doesn't show here — sorry, and thank you for playing the beta.",
       "Agri-PV permits are no formality any more: the canton refuses about one in eight outright, nearly half of those granted are appealed, and the courts strike about a third of those down.",
       "The district heating advisor proposes longer runs of connected streets — about a fifth longer.",
@@ -257,6 +260,9 @@ export const CHANGELOG: Release[] = [
 ];
 
 export const CURRENT_RELEASE: Release = CHANGELOG[0];
+
+/** The game is in beta (the start screen says so, and asks for feedback). */
+export const IS_BETA = true;
 
 /** The public version, as the game shows it: "0.1.0", or "0.1.0-dev" while in development. */
 export const VERSION_LABEL: string = CURRENT_RELEASE.date ? CURRENT_RELEASE.version : `${CURRENT_RELEASE.version}-dev`;

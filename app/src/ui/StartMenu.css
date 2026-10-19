@@ -481,3 +481,59 @@
 .start-menu-continue + .start-menu-tutorial {
   margin-top: -8px;
 }
+
+/* The beta notice, under the title. */
+.start-menu-beta {
+  position: relative;
+  margin-top: 30px;
+  padding: 20px 22px 20px 24px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--r-3);
+  background: var(--surface);
+}
+
+.start-menu-beta h2 {
+  margin: 0 0 8px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.start-menu-beta-tag {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.start-menu-title .start-menu-beta p {
+  margin: 0 0 14px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.start-menu-beta button {
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-2);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.start-menu-beta button:hover {
+  filter: brightness(1.08);
+}

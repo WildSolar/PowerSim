@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { FeedbackDialog } from "./FeedbackDialog";
 import { LEADERBOARD_ENABLED } from "../leaderboard/client";
 import { LeaderboardPanel } from "./LeaderboardPanel";
 import { loadMunicipalityIndex, type MunicipalityIndexEntry } from "../data/loadDataset";
 import { DEFAULT_DIFFICULTY, DIFFICULTY_ORDER, DIFFICULTY_SPECS, type Difficulty } from "../config/difficulty";
 import { LoadGamePanel } from "./LoadGamePanel";
 import { ChangelogPanel, hasUnseenRelease } from "./ChangelogPanel";
-import { VERSION_LABEL } from "../changelog";
+import { IS_BETA, VERSION_LABEL } from "../changelog";
 import { isCompatible, openSave, type SaveFile } from "../sim/saveGame";
 import { listSaves, readSave, type StoredSave } from "../sim/saveStore";
 import { AboutPanel } from "./AboutPanel";
@@ -40,6 +41,7 @@ export function StartMenu({ onStart, onTutorial }: Props) {
   const [unseen, setUnseen] = useState(hasUnseenRelease);
   const [showAbout, setShowAbout] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   // The latest save this version can load, to carry on with in one click.
   const [latest, setLatest] = useState<StoredSave | null>(null);
   const [continueError, setContinueError] = useState<string | null>(null);
@@ -104,6 +106,17 @@ export function StartMenu({ onStart, onTutorial }: Props) {
           <button onClick={() => setShowAbout(true)}>About & credits</button>
           {LEADERBOARD_ENABLED && <button onClick={() => setShowLeaderboard(true)}>Leaderboard</button>}
         </div>
+        {IS_BETA && (
+          <section className="start-menu-beta" aria-label="Beta">
+            <span className="start-menu-beta-tag">Beta</span>
+            <h2>You're playing an early version</h2>
+            <p>
+              Commune Zéro is in beta: things may break, numbers may be off, and the balance is still being tuned. If something behaves unexpectedly — or
+              you have an idea — please tell us. Every report shapes the game.
+            </p>
+            <button onClick={() => setShowFeedback(true)}>Send feedback</button>
+          </section>
+        )}
         {smallScreen && (
           <p className="start-menu-small-screen">
             Commune Zéro is made for a laptop or desktop screen with a mouse. On a phone or a small tablet, parts of it will be cramped.
@@ -200,6 +213,7 @@ export function StartMenu({ onStart, onTutorial }: Props) {
       {showChangelog && <ChangelogPanel onClose={() => setShowChangelog(false)} />}
       {showAbout && <AboutPanel onClose={() => setShowAbout(false)} />}
       {showLeaderboard && <LeaderboardPanel initial={null} onClose={() => setShowLeaderboard(false)} />}
+      {showFeedback && <FeedbackDialog pause={false} withGame={false} onClose={() => setShowFeedback(false)} />}
     </div>
   );
 }

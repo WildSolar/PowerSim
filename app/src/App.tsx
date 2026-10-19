@@ -1,6 +1,7 @@
 import * as financesModule from "./sim/finances";
+import { LoadingScreen } from "./ui/LoadingScreen";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { BASELINE_YEAR, formatDate } from "./sim/calendar";
+import { BASELINE_YEAR, formatDate, toDateMs } from "./sim/calendar";
 import { crashes } from "./sim/crash";
 import { FeedbackDialog } from "./ui/FeedbackDialog";
 import { CrashBoundary, CrashScreen } from "./ui/CrashScreen";
@@ -116,6 +117,8 @@ if (import.meta.env.DEV) import("./dev/autoplay").then((m) => Object.assign(wind
 function Game({ slug, difficulty, transparency, restore, tutorial = false }: { slug: string; difficulty: Difficulty; transparency: boolean; restore?: SaveFile; tutorial?: boolean }) {
   const [dataset, setDataset] = useState<MunicipalityDataset | null>(null);
   const [loadingNote, setLoadingNote] = useState<string | null>(null);
+  // How far loading has got (0–1): the town's file, then each month of the year so far counted.
+  const [loadingProgress, setLoadingProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedEgid, setSelectedEgid] = useState<string | null>(null);
   const [selectedEwid, setSelectedEwid] = useState<string | null>(null);
@@ -253,6 +256,8 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
     loadDataset(dataUrl(`${slug}.json`))
       .then(async (loaded) => {
         if (cancelled) return;
+        setLoadingNote(`Reading ${loaded.name}'s ${loaded.buildings.length.toLocaleString("de-CH")} buildings`);
+        setLoadingProgress(0.15);
         loadPar(slug, difficulty); // what doing nothing scores here, if computed
         measures.init(difficulty); // before the stock: it registers the town size the measures' costs scale with
         market.init(`market:${loaded.bfsNumber}`); // before anything prices: the shocks of the whole game
@@ -319,7 +324,11 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         if (!restore) {
           const speed = simClock.getSpeed();
           simClock.setSpeed(0); // no game time passes behind the loading screen
-          await settleMonthsBeforeStart(loaded.powerPlants, (month) => setLoadingNote(`Counting the year so far: ${MONTH_NAMES[month]}…`));
+          const months = Math.max(1, new Date(toDateMs(simClock.getSimTimeMs())).getUTCMonth());
+          await settleMonthsBeforeStart(loaded.powerPlants, (month) => {
+            setLoadingNote(`Counting the year so far: ${MONTH_NAMES[month]}`);
+            setLoadingProgress(0.2 + (0.8 * month) / months);
+          });
           simClock.setSpeed(speed);
           if (cancelled) return;
         }
@@ -383,7 +392,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
     return <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>Failed to load dataset: {error}</div>;
   }
   if (!dataset) {
-    return <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>{loadingNote ?? "Loading…"}</div>;
+    return <LoadingScreen note={loadingNote} progress={loadingProgress} />;
   }
 
   const onSelectFromList = (egid: string) => selectBuilding(egid);

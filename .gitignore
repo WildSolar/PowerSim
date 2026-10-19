@@ -37,3 +37,6 @@ app/public/data/*
 # Par (sim/par.ts): computed with the game, not the pipeline — committed.
 !app/public/data/par/
 pipeline/.cache/
+
+# Visual Studio workspace files
+.vs/
