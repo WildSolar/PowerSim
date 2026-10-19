@@ -27,6 +27,8 @@ export interface LiveTreasury {
   paidOutRp: number;
   /** Money borrowed so far this year. */
   borrowedRp: number;
+  /** Swissgrid's compensation for the new solar on the grid, received so far this year. */
+  gridCompensationRp: number;
 }
 
 /** The treasury as of right now: last year's closing balance, plus this year's government
@@ -76,16 +78,18 @@ export function useLiveTreasury(dataset: MunicipalityDataset): LiveTreasury {
 
   const paidOutRp = treasury.paidOutTotal(yearStartMs, simDay + DAY_MS);
   const borrowedRp = treasury.received(yearStartMs, simDay + DAY_MS, "borrowing");
+  const gridCompensationRp = treasury.received(yearStartMs, simDay + DAY_MS, "gridCompensation");
   const allocationPaidRp = allocationSoFarRp(budgetRp, year, simDay);
   const utility = settledUtilitySoFar(year, simDay + DAY_MS);
   const utilityRp = departmentUtilityRp(year, utility);
   return {
-    balanceRp: openingRp === null ? null : openingRp + allocationPaidRp + utilityRp - paidOutRp + borrowedRp,
+    balanceRp: openingRp === null ? null : openingRp + allocationPaidRp + utilityRp - paidOutRp + borrowedRp + gridCompensationRp,
     budgetRp,
     allocationSoFarRp: allocationPaidRp,
     utilityRp,
     utilityMonths: utility.months,
     paidOutRp,
     borrowedRp,
+    gridCompensationRp,
   };
 }

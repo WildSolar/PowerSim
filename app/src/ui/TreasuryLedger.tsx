@@ -18,7 +18,7 @@ import { wind } from "../sim/wind";
 import { formatCHF } from "./format";
 import { useStockBuildings } from "./useStock";
 
-type IncomeKind = "allocation" | "utility" | "borrowing";
+type IncomeKind = "allocation" | "utility" | "borrowing" | "gridCompensation";
 type EntryKind = IncomeKind | PayoutCategory;
 
 interface Entry {
@@ -33,6 +33,7 @@ const INCOME_LABEL: Record<IncomeKind, string> = {
   allocation: "Government allocation",
   utility: "Municipal utility (your share)",
   borrowing: "Borrowed",
+  gridCompensation: "Swissgrid's grid compensation",
 };
 
 const LOAN_LABEL: Record<LoanKind, string> = { bank: "Bank loan", greenBond: "Green bond", federal: "Federal decarbonisation loan" };
@@ -94,7 +95,11 @@ function ledger(buildings: Building[], nowMs: number): Entry[] {
   }
   for (const r of treasury.getReceipts()) {
     if (r.atMs > nowMs) continue;
-    entries.push({ atMs: r.atMs, kind: "borrowing", detail: loanLabel(r.ref), amountRp: r.amountRp });
+    entries.push(
+      r.kind === "gridCompensation"
+        ? { atMs: r.atMs, kind: "gridCompensation", detail: `For the new solar on the grid in ${r.ref.slice(r.ref.indexOf(":") + 1)}`, amountRp: r.amountRp }
+        : { atMs: r.atMs, kind: "borrowing", detail: loanLabel(r.ref), amountRp: r.amountRp },
+    );
   }
 
   // The allocation: a twelfth at the start of each month.

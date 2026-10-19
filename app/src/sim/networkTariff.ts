@@ -153,6 +153,8 @@ class NetworkTariff {
     // The reinforcements and grid batteries paid for so far, as a yearly capital cost.
     let invested = 0;
     for (const p of treasury.getPayouts()) if (p.category === "grid" && p.atMs <= atMs) invested += p.amountRp;
+    // Less what Swissgrid has paid towards it: that part isn't charged to the town's grid users.
+    invested = Math.max(0, invested - treasury.received(Number.NEGATIVE_INFINITY, atMs + 1, "gridCompensation"));
     const capitalRp = invested * NETWORK_CAPITAL_ANNUITY;
     // What the grid collected beyond (or short of) its allowance in the years just before, a third a year.
     let correctionRp = 0;

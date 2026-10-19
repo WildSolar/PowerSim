@@ -167,7 +167,7 @@ export function TariffControl() {
         </div>
         <div
           className="tariff-preview-line"
-          title={`What the regulator allows for the energy: the power bought for ${targetYear} (${cap.wholesaleRpKWh.toFixed(1)} Rp) and the concession fee (${cap.concessionRpKWh.toFixed(1)} Rp) per kWh, plus ${Math.round(TARIFF_CAP_MARGIN * 100)}% return and ${cap.salesRpKWh.toFixed(1)} Rp of sales costs`}
+          title={`What the regulator allows for the energy: the power bought for ${targetYear} (${cap.wholesaleRpKWh.toFixed(1)} Rp) and the concession fee (${cap.concessionRpKWh.toFixed(1)} Rp) per kWh, plus ${Math.round(TARIFF_CAP_MARGIN * 100)}% return and ${cap.salesRpKWh.toFixed(1)} Rp of sales costs — and ${cap.feedInRpKWh.toFixed(1)} Rp for what solar fed in cost above its market value over the last twelve months (the federal minimum and your bonus)`}
         >
           <span>Average energy price, against the regulator&apos;s ceiling</span>
           <span className={overCap ? "up" : ""}>

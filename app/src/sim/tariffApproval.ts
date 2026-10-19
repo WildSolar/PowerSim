@@ -17,7 +17,8 @@ import {
 import { approval, setPriceStances, type Stances } from "./approval";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { marketAccess } from "./marketAccess";
-import { feedInYearBaseRpKWh } from "./feedIn";
+import { benchmarkFeedInSurchargeRpKWh, feedInYearBaseRpKWh } from "./feedIn";
+import { BASELINE_YEAR } from "./calendar";
 import { BENCHMARK_FEED_IN_BONUS_RP_KWH } from "../config/feedIn";
 import { market } from "./market";
 import type { TariffSheet } from "./tariff";
@@ -53,7 +54,8 @@ export function householdBillChf(sheet: TariffSheet, year: number): number {
 
 /** What households pay elsewhere in Switzerland in a year (Rp/kWh). */
 export function benchmarkRpKWh(year: number): number {
-  return BENCHMARK_HOUSEHOLD_RP_KWH + (market.yearAverage("wholesale", year) - BENCHMARK_WHOLESALE_RP_KWH);
+  // Utilities elsewhere count what they pay for solar above its market value in their energy price too.
+  return BENCHMARK_HOUSEHOLD_RP_KWH + (market.yearAverage("wholesale", year) - BENCHMARK_WHOLESALE_RP_KWH) + benchmarkFeedInSurchargeRpKWh(year) - benchmarkFeedInSurchargeRpKWh(BASELINE_YEAR);
 }
 
 /** What the typical household pays elsewhere in Switzerland in a year (CHF). */

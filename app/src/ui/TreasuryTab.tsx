@@ -137,6 +137,12 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
               <td className="pos">+{formatCHF(live.borrowedRp)}</td>
             </tr>
           )}
+          {live.gridCompensationRp > 0 && (
+            <tr>
+              <td title="For every kW of new solar on the town's grid, Swissgrid pays towards the reinforcements it makes necessary">Swissgrid&apos;s grid compensation</td>
+              <td className="pos">+{formatCHF(live.gridCompensationRp)}</td>
+            </tr>
+          )}
           {GROUPS.map((g) => {
             const v = sum(soFar, g.categories);
             return v > 0 ? (
@@ -234,7 +240,8 @@ function Accounts({ dataset }: { dataset: MunicipalityDataset }) {
             <tbody>
               {rows.map(({ f, closing }) => {
                 const running = sum(f.spendingRp, ["solar", "heating", "vehicle", "retrofit", "programs", "zoning", "interest"]);
-                const invested = sum(f.spendingRp, ["infrastructure", "districtHeat", "charging", "grid"]);
+                // Less Swissgrid's compensation for the new solar on the grid: it pays towards the reinforcements.
+                const invested = sum(f.spendingRp, ["infrastructure", "districtHeat", "charging", "grid"]) - (f.gridCompensationRp ?? 0);
                 return (
                   <tr key={f.year}>
                     <td>{f.year}</td>

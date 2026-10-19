@@ -115,7 +115,9 @@ function zeroPayouts(): PayoutsByCategory {
 
 /** Money coming in outside the yearly accounts: the value-capture levy on zoning gains (zoning.ts),
  * due when a project that gains from a zoning change gets its permit, and borrowed money (debt.ts). */
-export type ReceiptKind = "borrowing";
+/** Money in besides the allocation and the utility: loans and bonds (debt.ts), and Swissgrid's
+ * compensation for the grid reinforcements solar makes necessary (grid.ts). */
+export type ReceiptKind = "borrowing" | "gridCompensation";
 
 export interface Receipt {
   atMs: number;

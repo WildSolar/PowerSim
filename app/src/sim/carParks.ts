@@ -56,10 +56,13 @@ import { setExtraPlants, specificYieldKWhPerKwp } from "./solarAdoption";
 import { federalSubsidyRp } from "./solarSystems";
 import { tariffStore } from "./tariffStore";
 import { treasury } from "./treasury";
+import { feedInExpectedRpKWhFor } from "./feedIn";
 
 const DAY_MS = 24 * 60 * 60_000;
 const MONTH_MS = (365.25 * DAY_MS) / 12;
 const YEAR_MS = 365.25 * DAY_MS;
+
+const yearOf = (atMs: number) => new Date(toDateMs(atMs)).getUTCFullYear();
 
 export type CarParkOwner = "municipal" | "private";
 
@@ -252,7 +255,7 @@ class CarParks {
   private yearlyValueRp(lot: CarPark, atMs: number, selfShare: number): number {
     const t = tariffStore.at(atMs);
     const retail = (t.peakPriceRpKWh + t.offPeakPriceRpKWh) / 2;
-    return this.yearlyKWh(lot, atMs) * (selfShare * retail + (1 - selfShare) * t.feedInExpectedRpKWh);
+    return this.yearlyKWh(lot, atMs) * (selfShare * retail + (1 - selfShare) * feedInExpectedRpKWhFor(t, lot.canopyKw, yearOf(atMs)));
   }
 
   /** What building a canopy costs at `atMs`, and what the federal payment covers. */

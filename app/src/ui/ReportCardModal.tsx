@@ -180,6 +180,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
         ...(finances.current.surplusSoldRp > 0 ? [{ label: "Surplus power sold (spot market)", rp: finances.current.surplusSoldRp }] : []),
         { label: "Public charging sold (municipal chargers)", rp: finances.current.publicChargingRevenueRp },
         { label: "Borrowed (loans and bonds)", rp: finances.current.borrowedRp },
+        { label: "Swissgrid's grid compensation (for new solar)", rp: finances.current.gridCompensationRp ?? 0 },
       ]
     : [];
   const costs: LedgerRow[] = finances

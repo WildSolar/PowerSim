@@ -17,6 +17,8 @@
 
 import { timed } from "./devTiming";
 import {
+  GRID_COMPENSATION_MONTH,
+  GRID_SOLAR_COMPENSATION_CHF_PER_KW,
   SUMMER_PEAK_HUMP,
   WINTER_PEAK_HUMP,
   AUTO_REINFORCE_HEADROOM,
@@ -55,7 +57,7 @@ import { carParks } from "./carParks";
 import { irradianceWm2, pvPowerWAt } from "./pv";
 import { hashSeed, mulberry32 } from "./rng";
 import { snowDepthCm } from "./snow";
-import { effectivePowerPlantsAt } from "./solarAdoption";
+import { effectivePowerPlantsAt, solarInstallsInRange } from "./solarAdoption";
 import { streets } from "./streets";
 import { treasury } from "./treasury";
 import { priceFactor } from "./costTrends";
@@ -169,6 +171,8 @@ class Grid {
   private readingSamples = new Map<number, number[]>();
   private readingTimesMemo = new Map<string, number[]>();
   private measuredSummer = -Infinity;
+  /** The last year whose new solar Swissgrid has compensated. */
+  private compensatedYear = -Infinity;
   /** The player's setting: reinforce overloaded stations after each reading, money permitting. */
   private autoReinforce = false;
   private selectedId: number | null = null;
@@ -225,6 +229,7 @@ class Grid {
     this.readingTimesMemo = new Map();
     this.measuredWinter = startYear;
     this.measuredSummer = startYear;
+    this.compensatedYear = startYear - 1;
 
     this.unsubscribeClock?.();
     this.unsubscribeClock = simClock.subscribe(() => this.advance(simClock.getSimTimeMs()));
@@ -561,11 +566,28 @@ class Grid {
       this.reinforceAutomatically(atMs);
       changed = true;
     }
+    // Swissgrid's flat compensation for the year before's new solar, paid in spring.
+    const compensationDue = date.getUTCMonth() >= GRID_COMPENSATION_MONTH ? year - 1 : year - 2;
+    if (compensationDue > this.compensatedYear) {
+      for (let y = Math.max(this.compensatedYear + 1, compensationDue - 1); y <= compensationDue; y++) this.compensate(y, atMs);
+      this.compensatedYear = compensationDue;
+    }
     if (changed) {
       this.zones = null;
       this.zonesVersion++;
       this.notify();
     }
+  }
+
+  /** The new solar on the town's low-voltage grid in `year` since the game began — rooftops (owners',
+   * the utility's, the municipality's, new buildings') and car-park canopies — and Swissgrid's flat
+   * payment for it, into the treasury. */
+  private compensate(year: number, atMs: number): void {
+    const fromMs = Math.max(0, toSimTimeMs(Date.UTC(year, 0, 1)));
+    const toMs = toSimTimeMs(Date.UTC(year + 1, 0, 1));
+    if (toMs <= fromMs) return;
+    const kw = solarInstallsInRange(fromMs, toMs).capacityKw + Math.max(0, carParks.capacityAtKw(toMs - 1) - carParks.capacityAtKw(fromMs - 1));
+    treasury.recordReceipt(atMs, Math.round(kw * GRID_SOLAR_COMPENSATION_CHF_PER_KW * 100), `grid-compensation:${year}`, "gridCompensation");
   }
 
   /** The player's automatic reinforcement, if switched on: after a reading, each overloaded station
@@ -673,6 +695,7 @@ class Grid {
       areaOfEgid: this.areaOfEgid,
       measuredWinter: this.measuredWinter,
       measuredSummer: this.measuredSummer,
+      compensatedYear: this.compensatedYear,
       autoReinforce: this.autoReinforce,
       readingSamples: [...this.readingSamples],
     };
@@ -683,6 +706,7 @@ class Grid {
     this.areaOfEgid = s.areaOfEgid;
     this.measuredWinter = s.measuredWinter;
     this.measuredSummer = s.measuredSummer;
+    this.compensatedYear = s.compensatedYear;
     this.readingSamples = new Map(s.readingSamples ?? []);
     this.autoReinforce = s.autoReinforce ?? false;
     this.road = this.roadFor(this.areas.map((a) => [a.x, a.y] as XY));

@@ -99,6 +99,7 @@ import { chooseNext, type RenewalCandidate } from "./renewal";
 import { setExtraPlants, specificYieldKWhPerKwp } from "./solarAdoption";
 import { profileYearFactor } from "./pv";
 import { tariffStore } from "./tariffStore";
+import { feedInExpectedRpKWhFor } from "./feedIn";
 import { treasury } from "./treasury";
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -557,6 +558,12 @@ class AgriPv {
 
   // --- developers ---
 
+  /** What a field's power fed in is expected to earn over the year (Rp/kWh): a field this size gets
+   * no federal minimum, only the market's reference price and the utility's bonus. */
+  private feedInRpKWh(kw: number, atMs: number): number {
+    return feedInExpectedRpKWhFor(tariffStore.at(atMs), kw, new Date(toDateMs(atMs)).getUTCFullYear());
+  }
+
   /** A business's electricity use over the year before `atMs` (kWh). */
   private yearlyUseKWh(b: Building, atMs: number): number {
     const times = historyTimeSteps(atMs, YEAR_MS, 96);
@@ -592,7 +599,7 @@ class AgriPv {
     if (this.installationFor(plot.id).capacityKw < AGRI_PV_MIN_KWP || !this.askFarmer(plot.id, atMs)) return false;
     const e = this.economics(plot.id, atMs);
     const ppaShare = Math.min(1, (useKWh * AGRI_PV_PPA_COVER_SHARE) / e.yearlyKWh);
-    const savedRp = e.yearlyKWh * (ppaShare * this.ppaEnergyValueRpPerKWh(atMs) + (1 - ppaShare) * tariffStore.at(atMs).feedInExpectedRpKWh);
+    const savedRp = e.yearlyKWh * (ppaShare * this.ppaEnergyValueRpPerKWh(atMs) + (1 - ppaShare) * this.feedInRpKWh(e.capacityKw, atMs));
     type Choice = "none" | "field";
     const candidates: RenewalCandidate<Choice>[] = [
       { id: "none", available: true, annualizedCostRp: 0, lifetimeMeanYears: AGRI_PV_LIFETIME_YEARS, greenness: 0 },
@@ -619,7 +626,7 @@ class AgriPv {
     if (e0.capacityKw < AGRI_PV_MIN_KWP || e0.buildCostRp > AGRI_PV_COOP_MAX_CHF * 100 || !this.askFarmer(plot.id, atMs)) return false;
     const e = this.economics(plot.id, atMs); // with the farmer's own rent
     const costRp = e.buildCostRp / AGRI_PV_LIFETIME_YEARS + e.rentRpPerYear + e.upkeepRpPerYear;
-    const earnsRp = e.yearlyKWh * tariffStore.at(atMs).feedInExpectedRpKWh;
+    const earnsRp = e.yearlyKWh * this.feedInRpKWh(e.capacityKw, atMs);
     if (earnsRp < costRp * (1 + AGRI_PV_COOP_MIN_RETURN)) return false;
     this.start(plot.id, "cooperative", atMs, {});
     return true;

@@ -39,6 +39,12 @@ export const AUTO_REINFORCE_HEADROOM = 1.25;
 export const REINFORCE_BASE_CHF = 80_000;
 export const REINFORCE_CHF_PER_KVA = 150;
 export const REINFORCE_MONTHS = 9;
+// What the reinforcements solar makes necessary costs is shared out nationally: for every kW of new
+// generation on the low-voltage grid — rooftops, car-park canopies — Swissgrid pays the grid operator
+// a flat sum, whether a reinforcement is built or not (StromVV Art. 13e). Claimed for each year, paid
+// in the year after (here in March). Reinforcements for load — heat pumps, chargers — get nothing.
+export const GRID_SOLAR_COMPENSATION_CHF_PER_KW = 59;
+export const GRID_COMPENSATION_MONTH = 2;
 
 // Neighbourhood batteries at a station: each covers its power of the area's peak, in either
 // direction, and stores two hours of it. Today's installed prices (container, inverter, connection
