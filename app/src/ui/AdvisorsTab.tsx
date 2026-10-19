@@ -14,6 +14,7 @@ import { roofContracts } from "../sim/roofContracts";
 import { stock } from "../sim/stock";
 import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
+import { RentSlider } from "./RoofSolarPanel";
 import "./measures.css";
 import "./measuresPage.css";
 import "./advisorsPage.css";
@@ -104,6 +105,44 @@ function RoofAction({ pick, now }: { pick: LetterPick; now: number }) {
         Offer {quote ? `${formatCHF(Math.round(quote.rentRp / 100) * 100)} a year` : "the contract"} at CHF {roofContracts.getRent().toFixed(2)}/m²
       </button>
     </>
+  );
+}
+
+/** The roofs among the advisor's picks that can be offered a contract right now. */
+function offerableRoofs(picks: LetterPick[], now: number) {
+  return picks.flatMap((pick) => {
+    const b = pick.tool === "roofSolar" && pick.egid ? stock.lookup(pick.egid) : undefined;
+    if (!b) return [];
+    const status = roofContracts.latest(b.egid)?.status;
+    if (status === "offered" || status === "accepted" || status === "built" || status === "ownSolar") return [];
+    return roofContracts.eligibility(b, now).ok ? [b] : [];
+  });
+}
+
+/** The roof solar advisor's picks: the rent to offer, and offering it to every roof at once. */
+function RoofOffers({ picks, now }: { picks: LetterPick[]; now: number }) {
+  const roofs = offerableRoofs(picks, now);
+  const yearlyRp = roofs.reduce((sum, b) => sum + (roofContracts.quote(b, now)?.rentRp ?? 0), 0);
+  const inTen = Math.round(roofContracts.acceptanceShare() * 10);
+  return (
+    <div className="advisor-roof-offers">
+      <RentSlider />
+      <div className="advisor-terms">
+        <span>At this rent, about {inTen} owner{inTen === 1 ? "" : "s"} in ten would say yes.</span>
+        <button
+          className="advisor-act"
+          disabled={roofs.length === 0}
+          onClick={() => {
+            const at = simClock.getSimTimeMs();
+            for (const b of roofs) roofContracts.offer(b, at);
+          }}
+        >
+          {roofs.length === 0
+            ? "No roof left to offer"
+            : `Offer all ${roofs.length} roof${roofs.length === 1 ? "" : "s"} — ${formatCHF(Math.round(yearlyRp / 10_000) * 10_000)} a year in rent`}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -279,6 +318,7 @@ function AdvisorPage({ id, now, onShowOnMap, onOpenPrices }: { id: AdvisorId; no
           {report.paragraphs.map((p, i) => (
             <p key={i}>{p}</p>
           ))}
+          {id === "roofSolar" && report.picks && report.picks.length > 0 && <RoofOffers picks={report.picks} now={now} />}
           {report.picks && report.picks.length > 0 && (
             <ol className="advisor-picks">
               {report.picks.map((pick, i) => (

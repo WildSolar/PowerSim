@@ -238,11 +238,17 @@ class RoofContracts {
     return true;
   }
 
+  /** The share of owners likely to accept an offer at the current rent (less those it prompts to
+   * build their own). An expectation, not a promise. */
+  acceptanceShare(): number {
+    return (1 - OWNER_PROMPTED_SHARE / 2) * normalCdf(Math.log(this.rent / OWNER_ASK_MEDIAN_CHF_PER_M2) / OWNER_ASK_LOG_SPREAD);
+  }
+
   /** What offering every eligible roof at the current rent would likely bring: how many owners would
    * accept (the share whose ask the rent meets, less those who build their own), the arrays' size
    * and what building them would cost. An expectation, not a promise. */
   acceptanceEstimate(atMs: number): { roofs: number; accepting: number; capacityKw: number; costRp: number } {
-    const share = (1 - OWNER_PROMPTED_SHARE / 2) * normalCdf(Math.log(this.rent / OWNER_ASK_MEDIAN_CHF_PER_M2) / OWNER_ASK_LOG_SPREAD);
+    const share = this.acceptanceShare();
     let capacityKw = 0;
     let costRp = 0;
     const roofs = this.eligibleRoofs(atMs);

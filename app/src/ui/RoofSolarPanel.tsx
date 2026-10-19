@@ -23,7 +23,8 @@ function useRoofContracts(): number {
   );
 }
 
-function RentSlider() {
+/** The rent offered to roof owners (shared with the roof solar advisor's page). */
+export function RentSlider() {
   useRoofContracts();
   const rent = roofContracts.getRent();
   const [min, max] = ROOF_RENT_RANGE_CHF_PER_M2;
