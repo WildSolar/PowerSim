@@ -39,11 +39,12 @@ export default {
 
 function corsHeaders(request: Request, env: Pick<Env, "ALLOWED_ORIGINS">): Record<string, string> {
   const origin = request.headers.get("Origin") ?? "";
+  // Host names are case-insensitive, and browsers send them in lower case.
   const allowed = (env.ALLOWED_ORIGINS ?? "")
     .split(",")
-    .map((s) => s.trim())
+    .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
-  const allow = allowed.length === 0 ? "*" : allowed.includes(origin) ? origin : "";
+  const allow = allowed.length === 0 ? "*" : allowed.includes(origin.toLowerCase()) ? origin : "";
   return {
     ...(allow ? { "Access-Control-Allow-Origin": allow } : {}),
     "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",

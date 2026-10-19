@@ -98,6 +98,8 @@ async function main(): Promise<void> {
 
   expect("delete without the token is refused", (await call(store, "DELETE", "/scores/1")).status === 403);
   expect("delete with the token works", (await call(store, "DELETE", "/scores/1", undefined, { Authorization: "Bearer secret-token" })).status === 200);
+  const upper = await handle(new Request("https://lb.example/boards", { headers: { Origin: "http://localhost:5173" } }), store, { ALLOWED_ORIGINS: "http://LocalHost:5173" });
+  expect("origins compare without case", upper.headers.get("Access-Control-Allow-Origin") === "http://localhost:5173");
   expect("a stranger's origin gets no CORS", (await call(store, "GET", "/boards", undefined, { Origin: "https://evil.example" })).cors === null);
   expect("preflight answers", (await call(store, "OPTIONS", "/submit")).status === 204);
 
