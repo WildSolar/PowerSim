@@ -19,6 +19,7 @@
  * and feed into their transformer area's station (grid.ts).
  */
 
+import { gridFeedInBlockedAtPlace, SMALL_SOLAR_KWP } from "./gridLimits";
 import {
   CAR_PARK_BUILD_MONTHS,
   CAR_PARK_CAPEX_CHF_PER_KWP_AT_100KWP,
@@ -299,13 +300,19 @@ class CarParks {
    * from the treasury, today. A direct order waits out a spending freeze; the measure carries on. */
   buildMunicipal(lotId: string, atMs: number, { direct = true } = {}): Canopy | null {
     const lot = this.byId.get(lotId);
-    if (!lot || lot.owner !== "municipal" || this.canopyOn(lotId)) return null;
+    if (!lot || lot.owner !== "municipal" || this.canopyOn(lotId) || this.gridFull(lot, atMs)) return null;
     const q = this.quote(lot, atMs);
     if (direct && (spendingFrozen(atMs) || cannotPay(q.netRp, atMs))) return null;
     const canopy = this.addCanopy(lot, atMs, { costRp: q.costRp, subsidyRp: 0, mandated: false });
     treasury.recordPayout("infrastructure", atMs, q.netRp, `car-park-${lot.id}`);
     this.notify();
     return canopy;
+  }
+
+  /** Whether the grid where a lot stands is too full for its canopy at `atMs`: its area's summer
+   * feed-in is over capacity, and the town's canopy waits for the area to be reinforced. */
+  gridFull(lot: CarPark, atMs: number): boolean {
+    return lot.canopyKw > SMALL_SOLAR_KWP && gridFeedInBlockedAtPlace(lot.lon, lot.lat, atMs);
   }
 
   /** The town's lots still without a canopy. */
@@ -418,6 +425,7 @@ class CarParks {
       const count = whole + (mulberry32(hashSeed(this.seed, "car-park-programme", String(month)))() < perMonth - whole ? 1 : 0);
       if (count > 0) {
         const ranked = this.municipalCandidates()
+          .filter((lot) => !this.gridFull(lot, atMs))
           .map((lot) => ({ lot, r: this.municipalReturn(lot, atMs) }))
           .sort((a, b) => b.r - a.r || a.lot.id.localeCompare(b.lot.id));
         for (const { lot } of ranked.slice(0, count)) if (this.buildMunicipal(lot.id, atMs, { direct: false })) changed = true;

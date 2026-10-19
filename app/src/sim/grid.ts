@@ -236,6 +236,7 @@ class Grid {
     setGridLimits(
       (b, atMs) => this.drawBlockedAt(b, atMs),
       (b, atMs) => this.feedInBlockedAt(b, atMs),
+      (lon, lat, atMs) => this.feedInBlockedAtPlace(lon, lat, atMs),
     );
     this.notify();
   }
@@ -446,6 +447,12 @@ class Grid {
   /** Whether a building's area can't take more feed-in (large solar arrays) at `atMs`. */
   feedInBlockedAt(b: Building, atMs: number): boolean {
     const area = this.areas[this.areaIdOf(b)];
+    return !!area && this.effectivePeaks(area, atMs).feedInKw > this.capacityAt(area, atMs);
+  }
+
+  /** The same for a place off any building (a car park's canopy feeds in where it stands). */
+  feedInBlockedAtPlace(lon: number, lat: number, atMs: number): boolean {
+    const area = this.areas[this.siteAreaId(lon, lat)];
     return !!area && this.effectivePeaks(area, atMs).feedInKw > this.capacityAt(area, atMs);
   }
 

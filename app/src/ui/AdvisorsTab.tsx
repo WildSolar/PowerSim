@@ -75,6 +75,13 @@ function RoofAction({ pick, now }: { pick: LetterPick; now: number }) {
   const c = roofContracts.latest(b.egid);
   const quote = roofContracts.quote(b, now, c?.status === "accepted" ? c.rentChfPerM2 : undefined);
   if (c?.status === "built") return <Chip tone="good">{(c.installedAtMs ?? 0) > now ? `Array ordered, ready ${monthYear(c.installedAtMs ?? now)}` : "The utility's array is running"}</Chip>;
+  if (c?.status === "accepted" && quote?.gridFull)
+    return (
+      <>
+        <Chip tone="good">Accepted — build by {monthYear(c.buildByMs ?? now)}</Chip>
+        <Chip tone="pending">The grid here is full: reinforce the area first (Grid tool)</Chip>
+      </>
+    );
   if (c?.status === "accepted")
     return (
       <>

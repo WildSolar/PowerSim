@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { GRID_FULL_FOR_SOLAR } from "../sim/gridLimits";
 import { ToolListGroup, ToolListRow } from "./ToolList";
 import { CAR_PARK_LEGEND } from "../map/colorModes";
 import { CAR_PARK_BUILD_MONTHS } from "../config/carParks";
@@ -112,7 +113,9 @@ export function CarParkCard() {
               <span className="info-value">{monthYear(due)}</span>
             </div>
           )}
-          {lot.owner === "municipal" ? (
+          {lot.owner === "municipal" && carParks.gridFull(lot, now) ? (
+            <p className="dh-note grid-full">{GRID_FULL_FOR_SOLAR}</p>
+          ) : lot.owner === "municipal" ? (
             <>
               <p className="dh-note">
                 Built in {CAR_PARK_BUILD_MONTHS} months, paid by the treasury. What the panels save {host ? "the building next door" : "the town"} and earn feeding in is credited to you.

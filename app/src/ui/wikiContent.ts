@@ -733,7 +733,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       ),
       list([
         "Over the winter peak: no new heat pumps, wallboxes or business depot chargers (replacing one keeps its connection). Households charge in public instead, if they can.",
-        "Over the summer feed-in: a new solar array over 30 kWp connects only with a grid-friendly battery that keeps its feed-in to half its rating (see \"Home batteries\"). Household systems and what the building code requires still connect.",
+        "Over the summer feed-in: an owner's new solar array over 30 kWp connects only with a grid-friendly battery that keeps its feed-in to half its rating (see \"Home batteries\"). Household systems and what the building code requires still connect. Your own large arrays — the utility's on rented roofs, solar on public buildings, canopies over the town's car parks — wait until the area is reinforced: their cards say so, and the programmes pass such roofs by.",
         "New buildings are always connected.",
       ]),
       p(
@@ -798,7 +798,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Offering: click a roof to see what an array there would mean — its size, what it costs to build, what a year of its output saves, the rent and the upkeep — and offer its owner the contract. Roofs are offered one at a time; the drawer says how many owners in ten would say yes at your rent, and the roof solar advisor (see \"Advisors\") ranks the roofs that would return the most.",
         "The answer comes within weeks. Some owners take your letter as a prompt to look into solar themselves, and put up their own if it pays. The rest weigh your rent against what they want for their roof — which differs from owner to owner, most somewhere around CHF 1–4 per m². Offer more and more say yes; but every franc of rent comes out of what the array earns. Owners who wanted solar of their own but held back — kept putting it off, couldn't raise the money, couldn't agree — ask much less: for them, the contract is the way to panels. A no means you can't ask again for three years.",
-        "Building: once an owner accepts, you have a year to build — the drawer lists the roofs waiting, or tick its box to build as soon as an owner accepts. You pay what the owner would have paid, less the federal payment every installation gets, as an investment you may borrow for. The panels are in service about four months later; in a full grid area a large array comes with a grid-friendly battery.",
+        "Building: once an owner accepts, you have a year to build — the drawer lists the roofs waiting, or tick its box to build as soon as an owner accepts. You pay what the owner would have paid, less the federal payment every installation gets, as an investment you may borrow for. The panels are in service about four months later. Where the grid is full at summer middays, neither offer nor build goes ahead until the area is reinforced (see \"The electricity grid\") — an accepted roof waits in the drawer, and lapses after its year if the grid isn't ready.",
         "Earning: the arrays are the utility's. It pays no feed-in for what they make; their power saves buying from the wider grid at the wholesale price — or, at a sunny midday when the town already makes more than it uses, sells at the spot price. Against that it pays the rent and the arrays' upkeep, every year. Big roofs pay well; small ones barely cover their costs.",
       ]),
       note(

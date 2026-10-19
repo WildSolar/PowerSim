@@ -729,10 +729,11 @@ export function municipalSolarCandidates(buildings: Building[], realPlants: Powe
   );
 }
 
-/** The battery the municipality's array on `building` needs: a grid-friendly one when the area's
- * summer feed-in is over capacity and the array is large, otherwise none. */
-function municipalBatteryFor(building: Building, capacityKw: number, atMs: number): { kwh: number; kw: number; feedInCap: number | null } | null {
-  return capacityKw > SMALL_SOLAR_KWP && gridFeedInBlockedAt(building, atMs) ? batteryFor(capacityKw, GRID_FRIENDLY_FEED_IN_CAP) : null;
+/** Whether a large array of the town's or the utility's on `building` can't go up at `atMs`: its
+ * area's summer feed-in is over capacity, and no new large array connects there until the area is
+ * reinforced (a household-size one does). */
+export function gridFullForArray(building: Building, capacityKw: number, atMs: number): boolean {
+  return capacityKw > SMALL_SOLAR_KWP && gridFeedInBlockedAt(building, atMs);
 }
 
 const municipalReturnCache = new Map<string, number>();
@@ -770,19 +771,17 @@ function installMunicipalSolar(buildings: Building[], realPlants: PowerPlant[], 
       (ranked ? municipalSolarReturn(b, year, tariff) - municipalSolarReturn(a, year, tariff) : 0) ||
       hashSeed(a.egid, "municipal-solar", String(yearStartMs)) - hashSeed(b.egid, "municipal-solar", String(yearStartMs)),
   );
-  for (const building of candidates.slice(0, count)) {
+  let placed = 0;
+  for (const building of candidates) {
+    if (placed >= count) break;
     const usable = usableRoofFraction(building);
     const capacityKw = (building.footprintAreaM2 ?? 0) * usable * kwpPerM2At(year);
-    if (capacityKw <= 0) continue;
+    // Where the grid is full, the roof waits for the area to be reinforced.
+    if (capacityKw <= 0 || gridFullForArray(building, capacityKw, yearStartMs)) continue;
+    placed++;
     const installCostRp = capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year));
     const federalRp = federalSubsidyRp(capacityKw);
     const installedAtMs = dayInMonth(hashSeed(building.egid, "municipal-solar-day", String(yearStartMs)), yearStartMs);
-    const battery = municipalBatteryFor(building, capacityKw, yearStartMs);
-    if (battery) {
-      const costRp = homeBatteryCostRp(battery.kwh, installedAtMs);
-      batteryByEgid.set(building.egid, { installedAtMs, ...battery, costRp, municipalSubsidyRp: 0, origin: "municipal", gridCondition: true });
-      treasury.recordPayout("infrastructure", installedAtMs, costRp, building.egid);
-    }
     adoptionByEgid.set(building.egid, {
       installedAtMs,
       capacityKw,
@@ -801,31 +800,25 @@ const MUNICIPAL_SOLAR_INSTALL_MONTHS = 3;
 /** What putting solar on one public building at `atMs` would mean: its full usable roof, and what
  * the treasury pays for it (the price less the federal payment). Null if it has solar already (or
  * has it coming) or a roof that can't take panels (usableRoofFraction). */
-export function municipalSolarQuote(building: Building, realPlants: PowerPlant[], atMs: number): { capacityKw: number; costRp: number; batteryKwh: number | null } | null {
+export function municipalSolarQuote(building: Building, realPlants: PowerPlant[], atMs: number): { capacityKw: number; costRp: number; gridFull: boolean } | null {
   if (adoptionByEgid.has(building.egid) || realPvEgids(realPlants).has(building.egid)) return null;
   const year = new Date(toDateMs(atMs)).getUTCFullYear();
   const usable = usableRoofFraction(building);
   const capacityKw = (building.footprintAreaM2 ?? 0) * usable * kwpPerM2At(year);
   if (capacityKw <= 0) return null;
   const installCostRp = capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year));
-  // In a full area, a large array connects only with a grid-friendly battery.
-  const battery = municipalBatteryFor(building, capacityKw, atMs);
-  const batteryRp = battery ? homeBatteryCostRp(battery.kwh, atMs) : 0;
-  return { capacityKw, costRp: Math.max(0, installCostRp - federalSubsidyRp(capacityKw)) + batteryRp, batteryKwh: battery?.kwh ?? null };
+  // In a full area, a large array waits for the area to be reinforced.
+  return { capacityKw, costRp: Math.max(0, installCostRp - federalSubsidyRp(capacityKw)), gridFull: gridFullForArray(building, capacityKw, atMs) };
 }
 
 /** The municipality orders solar for one of its buildings now (the Public buildings layer): paid
  * today, generating once installed a few months on — the same as the measure does, but chosen. */
 export function installMunicipalSolarNow(building: Building, realPlants: PowerPlant[], atMs: number): boolean {
   const quote = municipalSolarQuote(building, realPlants, atMs);
-  if (!quote || cannotPay(quote.costRp, atMs)) return false;
+  if (!quote || quote.gridFull || cannotPay(quote.costRp, atMs)) return false;
   const year = new Date(toDateMs(atMs)).getUTCFullYear();
   const installCostRp = quote.capacityKw * installCostRpPerKwp(quote.capacityKw, priceFactorInYear("solar", year));
   const installedAtMs = atMs + MUNICIPAL_SOLAR_INSTALL_MONTHS * (YEAR_MS / 12);
-  const battery = municipalBatteryFor(building, quote.capacityKw, atMs);
-  if (battery) {
-    batteryByEgid.set(building.egid, { installedAtMs, ...battery, costRp: homeBatteryCostRp(battery.kwh, atMs), municipalSubsidyRp: 0, origin: "municipal", gridCondition: true });
-  }
   adoptionByEgid.set(building.egid, {
     installedAtMs,
     capacityKw: quote.capacityKw,
@@ -840,22 +833,20 @@ export function installMunicipalSolarNow(building: Building, realPlants: PowerPl
 }
 
 /** The array the whole usable roof of `building` would take in the year of `atMs`: its size, the
- * roof area it covers, what it costs installed and the federal payment towards it, and the battery
- * a full grid area requires of a large one. */
-export function roofArray(building: Building, atMs: number): { capacityKw: number; areaM2: number; installCostRp: number; federalRp: number; battery: { kwh: number; kw: number; feedInCap: number | null } | null; batteryRp: number } | null {
+ * roof area it covers, what it costs installed and the federal payment towards it, and whether the
+ * grid here is too full to take it (gridFullForArray). */
+export function roofArray(building: Building, atMs: number): { capacityKw: number; areaM2: number; installCostRp: number; federalRp: number; gridFull: boolean } | null {
   const year = new Date(toDateMs(atMs)).getUTCFullYear();
   const usable = usableRoofFraction(building);
   const areaM2 = (building.footprintAreaM2 ?? 0) * usable;
   const capacityKw = areaM2 * kwpPerM2At(year);
   if (capacityKw <= 0) return null;
-  const battery = municipalBatteryFor(building, capacityKw, atMs);
   return {
     capacityKw,
     areaM2,
     installCostRp: capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year)),
     federalRp: federalSubsidyRp(capacityKw),
-    battery,
-    batteryRp: battery ? homeBatteryCostRp(battery.kwh, atMs) : 0,
+    gridFull: gridFullForArray(building, capacityKw, atMs),
   };
 }
 
@@ -925,12 +916,9 @@ export function considerOwnSolarNow(building: Building, realPlants: PowerPlant[]
 export function installContractSolar(building: Building, realPlants: PowerPlant[], atMs: number, months: number): { capacityKw: number; areaM2: number; costRp: number; installedAtMs: number } | null {
   if (adoptionByEgid.has(building.egid) || realPvEgids(realPlants).has(building.egid) || spendingFrozen(atMs)) return null;
   const array = roofArray(building, atMs);
-  if (!array) return null;
-  if (cannotPay(Math.max(0, array.installCostRp - array.federalRp) + array.batteryRp, atMs)) return null;
+  if (!array || array.gridFull) return null;
+  if (cannotPay(Math.max(0, array.installCostRp - array.federalRp), atMs)) return null;
   const installedAtMs = atMs + months * (YEAR_MS / 12);
-  if (array.battery) {
-    batteryByEgid.set(building.egid, { installedAtMs, ...array.battery, costRp: array.batteryRp, municipalSubsidyRp: 0, origin: "municipal", gridCondition: true });
-  }
   adoptionByEgid.set(building.egid, {
     installedAtMs,
     capacityKw: array.capacityKw,
@@ -940,7 +928,7 @@ export function installContractSolar(building: Building, realPlants: PowerPlant[
     annualSavingsRp: 0,
     origin: "contract",
   });
-  const costRp = Math.max(0, array.installCostRp - array.federalRp) + array.batteryRp;
+  const costRp = Math.max(0, array.installCostRp - array.federalRp);
   treasury.recordPayout("infrastructure", atMs, costRp, `roof-contract:${building.egid}`);
   return { capacityKw: array.capacityKw, areaM2: array.areaM2, costRp, installedAtMs };
 }
@@ -990,7 +978,7 @@ function cooperativeRound(buildings: Building[], realPlants: PowerPlant[], year:
     const b = lookup.get(egid);
     if (!b || !isEligible(b, realPlants, year, monthStartMs)) continue;
     const array = roofArray(b, monthStartMs);
-    if (!array || array.battery) continue; // a full grid area: the cooperative can't connect plainly
+    if (!array || array.gridFull) continue; // a full grid area: the cooperative can't connect
     const grantRp = Math.min(array.capacityKw * policy.solarCoopGrantRpPerKwp, Math.max(0, array.installCostRp - array.federalRp));
     sunlight ??= yearSunlight(year);
     const valueRp = annualValueRp(candidateEconomics(b, array.capacityKw, sunlight, tariff), "solar", 0) * SOLAR_COOP_SALE_SHARE;

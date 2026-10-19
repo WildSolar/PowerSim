@@ -1,4 +1,5 @@
 import { useMemo, useSyncExternalStore } from "react";
+import { GRID_FULL_FOR_SOLAR } from "../sim/gridLimits";
 import type { Building, PowerPlant } from "../data/types";
 import { mapFocus } from "../map/mapFocus";
 import { formatDate } from "../sim/calendar";
@@ -67,7 +68,8 @@ export function PublicBuildingOrders({
             : "none"}
         </span>
       </div>
-      {solarQuote && (
+      {solarQuote?.gridFull && <p className="dh-note grid-full">{GRID_FULL_FOR_SOLAR}</p>}
+      {solarQuote && !solarQuote.gridFull && (
         <div className="dh-actions">
           <button
             className="dh-order"
@@ -76,13 +78,10 @@ export function PublicBuildingOrders({
               onOrdered();
             }}
           >
-            Put {solarQuote.capacityKw.toFixed(0)} kWp on its roof{solarQuote.batteryKwh !== null ? ` with a ${solarQuote.batteryKwh} kWh grid-friendly battery` : ""} for{" "}
+            Put {solarQuote.capacityKw.toFixed(0)} kWp on its roof for{" "}
             {formatCHF(solarQuote.costRp)}
           </button>
         </div>
-      )}
-      {solarQuote?.batteryKwh != null && (
-        <p className="dh-note">The grid here is full at summer middays: the array can only connect with a battery that keeps its feed-in to half its rating.</p>
       )}
       {!solar && !solarQuote && <p className="dh-note">Its roof isn't suited to panels: it faces the wrong way, lies in shade or is too cluttered.</p>}
 

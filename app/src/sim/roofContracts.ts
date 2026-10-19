@@ -17,6 +17,7 @@
  * is paid for them), against the rent and their upkeep (finances.ts).
  */
 
+import { GRID_FULL_FOR_SOLAR } from "./gridLimits";
 import { roofYearFactor } from "./pv";
 import {
   OWNER_ASK_LOG_SPREAD,
@@ -74,7 +75,7 @@ export interface RoofQuote {
   areaM2: number;
   /** Build cost less the federal payment, battery included (Rp). */
   costRp: number;
-  batteryKwh: number | null;
+  gridFull: boolean; // the grid here is too full to take the array (GRID_FULL_FOR_SOLAR)
   /** A year's output (kWh), and what it saves buying power at today's wholesale price (Rp). */
   yieldKWh: number;
   valueRp: number;
@@ -174,6 +175,7 @@ class RoofContracts {
     const c = this.latest(b.egid);
     if (c?.status === "offered") return { ok: false, reason: "The owner is considering your offer." };
     if (c?.status === "accepted") return { ok: false, reason: "The owner has accepted: build the array." };
+    if (roofArray(b, atMs)?.gridFull) return { ok: false, reason: GRID_FULL_FOR_SOLAR };
     if (c && (c.status === "declined" || c.status === "lapsed")) {
       const again = this.askAgainAtMs(c);
       if (atMs < again) return { ok: false, reason: `The owner said no; you can ask again from ${formatDate(again).replace(/^\d+ /, "")}.` };
@@ -203,12 +205,12 @@ class RoofContracts {
     const valueRp = yieldKWh * market.basePrice("wholesale", year);
     const rentRp = rent * array.areaM2 * 100;
     const upkeepRp = array.capacityKw * ROOF_UPKEEP_CHF_PER_KWP_YEAR * 100;
-    const costRp = Math.max(0, array.installCostRp - array.federalRp) + array.batteryRp;
+    const costRp = Math.max(0, array.installCostRp - array.federalRp);
     return {
       capacityKw: array.capacityKw,
       areaM2: array.areaM2,
       costRp,
-      batteryKwh: array.battery?.kwh ?? null,
+      gridFull: array.gridFull,
       yieldKWh,
       valueRp,
       rentRp,

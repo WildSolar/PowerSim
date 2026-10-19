@@ -1,4 +1,5 @@
 import { useMemo, useSyncExternalStore } from "react";
+import { GRID_FULL_FOR_SOLAR } from "../sim/gridLimits";
 import { ROOF_BUILD_WITHIN_MONTHS, ROOF_RENT_RANGE_CHF_PER_M2, ROOF_RENT_STEP_CHF_PER_M2 } from "../config/roofContracts";
 import type { Building } from "../data/types";
 import { mapFocus } from "../map/mapFocus";
@@ -63,11 +64,15 @@ export function RoofContractCard({ building, now }: { building: Building; now: n
     return (
       <div className="public-orders">
         <p className="dh-note">The owner accepted CHF {c.rentChfPerM2.toFixed(2)} per m². Build by {monthYear(c.buildByMs ?? now)}, or the contract lapses.</p>
-        <div className="dh-actions">
-          <button className="dh-order" onClick={() => roofContracts.build(building.egid, simClock.getSimTimeMs())}>
-            Build {quote ? `${quote.capacityKw.toFixed(0)} kWp for ${formatCHF(quote.costRp)}` : "the array"}
-          </button>
-        </div>
+        {quote?.gridFull ? (
+          <p className="dh-note grid-full">{GRID_FULL_FOR_SOLAR}</p>
+        ) : (
+          <div className="dh-actions">
+            <button className="dh-order" onClick={() => roofContracts.build(building.egid, simClock.getSimTimeMs())}>
+              Build {quote ? `${quote.capacityKw.toFixed(0)} kWp for ${formatCHF(quote.costRp)}` : "the array"}
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -116,7 +121,6 @@ export function RoofContractCard({ building, now }: { building: Building; now: n
                 {formatCHF(Math.abs(quote.netRp))} a year
               </span>
             </div>
-            {quote.batteryKwh !== null && <p className="dh-note">The grid here is full at summer middays: the array needs a {quote.batteryKwh} kWh grid-friendly battery (included).</p>}
             <div className="dh-actions">
               <button className="dh-order" onClick={() => roofContracts.offer(building, simClock.getSimTimeMs())}>
                 Offer {formatCHF(quote.rentRp)} a year for the roof
@@ -257,11 +261,15 @@ export function RoofSolarPanel({ buildings, onSelectBuilding }: { buildings: Bui
                 <div className="dh-note">
                   {q ? `${q.capacityKw.toFixed(0)} kWp · ` : ""}build by {monthYear(c.buildByMs ?? now)}
                 </div>
-                <div className="dh-actions">
-                  <button className="dh-order" onClick={() => roofContracts.build(c.egid, simClock.getSimTimeMs())}>
-                    Build{q ? ` for ${formatCHF(q.costRp)}` : ""}
-                  </button>
-                </div>
+                {q?.gridFull ? (
+                  <div className="dh-note grid-full">Waits for the grid: the area is full at summer middays — reinforce it first (Grid tool).</div>
+                ) : (
+                  <div className="dh-actions">
+                    <button className="dh-order" onClick={() => roofContracts.build(c.egid, simClock.getSimTimeMs())}>
+                      Build{q ? ` for ${formatCHF(q.costRp)}` : ""}
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
