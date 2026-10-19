@@ -1,4 +1,6 @@
 import { useMemo, useSyncExternalStore } from "react";
+import { ToolListGroup, ToolListRow } from "./ToolList";
+import { FARM_PLOT_COLORS } from "../map/colorModes";
 import { AGRI_PV_BUILD_MONTHS, AGRI_PV_LEAD_MONTHS, AGRI_PV_PERMIT_MONTHS, AGRI_PV_SYSTEMS } from "../config/agriPv";
 import { mapFocus } from "../map/mapFocus";
 import { AGRI_PV_DEVELOPER_LABEL, AGRI_PV_PHASE_LABEL, agriPv, partnerName, type AgriPvDesignation, type AgriPvDeveloper, type AgriPvProject } from "../sim/agriPv";
@@ -186,20 +188,33 @@ export function AgriPvFieldCard() {
   );
 }
 
-const DEVELOPER_SHORT: Record<AgriPvDeveloper, string> = { business: "Business", cooperative: "Cooperative", municipality: "Yours" };
+const DEVELOPER_SHORT: Record<AgriPvDeveloper, string> = { business: "A business (PPA)", cooperative: "An energy cooperative", municipality: "Yours" };
 
-function ProjectRow({ p, selectedId }: { p: AgriPvProject; selectedId: string | null }) {
+/** A field taken up, in the list: its colour on the map, its size, who develops it and where it stands. */
+function projectRow(p: AgriPvProject, now: number, selectedId: string | null) {
+  const state = agriPv.stateAt(p.plotId, now);
+  // What the group's heading doesn't say: who, and the date that matters at this stage.
+  const resting = agriPv.restingUntil(p);
+  const stage =
+    p.phase === "operating"
+      ? ""
+      : p.phase === "building"
+        ? ` · ready ${monthYear(p.installedAtMs ?? now)}`
+        : p.phase === "struckDown"
+          ? resting
+            ? ` · can be taken up again from ${monthYear(resting)}`
+            : ""
+          : ` · ${AGRI_PV_PHASE_LABEL[p.phase].toLowerCase()}${p.phaseUntilMs ? ` until ${monthYear(p.phaseUntilMs)}` : ""}`;
   return (
-    <button
-      className={`ev-list-row${p.plotId === selectedId ? " selected" : ""}`}
-      title={`${AGRI_PV_DEVELOPER_LABEL[p.developer]} · ${mw(p.capacityKw)}`}
+    <ToolListRow
+      key={p.id}
+      color={p.phase === "struckDown" ? FARM_PLOT_COLORS.refused : FARM_PLOT_COLORS[state === "farmland" || state === "planned" ? "zoned" : state]}
+      title={agriPv.fieldName(p)}
+      figure={mw(p.capacityKw)}
+      detail={`${DEVELOPER_SHORT[p.developer]}${stage}`}
+      selected={p.plotId === selectedId}
       onClick={() => pick(p.plotId)}
-    >
-      <span className="ev-list-name">{agriPv.fieldName(p)}</span>
-      <span className="info-value">
-        {DEVELOPER_SHORT[p.developer]} · {AGRI_PV_PHASE_LABEL[p.phase]}
-      </span>
-    </button>
+    />
   );
 }
 
@@ -296,15 +311,13 @@ export function AgriPvPanel() {
         </>
       )}
 
-      {summary.projects.length > 0 && (
-        <>
-          <h4 className="dh-subtitle">Fields taken up</h4>
-          {summary.projects.map((p) => (
-            <ProjectRow key={p.id} p={p} selectedId={selectedId} />
-          ))}
-          <p className="dh-note tool-list-hint">Click a field here or on the map: its card shows where it stands.</p>
-        </>
-      )}
+      {summary.projects.length > 0 && <p className="dh-note tool-list-hint">Click a field here or on the map: its card shows where it stands.</p>}
+      <ToolListGroup title="In service">{summary.projects.filter((p) => p.phase === "operating").map((p) => projectRow(p, now, selectedId))}</ToolListGroup>
+      <ToolListGroup title="Being built">{summary.projects.filter((p) => p.phase === "building").map((p) => projectRow(p, now, selectedId))}</ToolListGroup>
+      <ToolListGroup title="Permit, or in the courts">
+        {summary.projects.filter((p) => p.phase === "permitting" || p.phase === "appeal" || p.phase === "permitted").map((p) => projectRow(p, now, selectedId))}
+      </ToolListGroup>
+      <ToolListGroup title="Struck down in court">{summary.projects.filter((p) => p.phase === "struckDown").map((p) => projectRow(p, now, selectedId))}</ToolListGroup>
     </>
   );
 
@@ -343,22 +356,26 @@ export function AgriPvPanel() {
         </div>
       )}
 
-      <h4 className="dh-subtitle">Zoned fields no one has taken up</h4>
       {summary.free.length === 0 ? (
-        <p className="dh-note">None at the moment.</p>
+        <>
+          <h4 className="dh-subtitle">Zoned fields no one has taken up</h4>
+          <p className="dh-note">None at the moment.</p>
+        </>
       ) : (
         <>
-          {summary.free.map((p) => {
-            const e = agriPv.installationFor(p.id);
-            return (
-              <button key={p.id} className={`ev-list-row${p.id === selectedId ? " selected" : ""}`} onClick={() => pick(p.id)}>
-                <span className="ev-list-name">{p.name ?? "Field"}</span>
-                <span className="info-value">
-                  {mw(e.capacityKw)} · {agriPv.farmerAnswer(p.id, now)?.yes ? "farmer agreed" : "farmer not asked"}
-                </span>
-              </button>
-            );
-          })}
+          <ToolListGroup title="Zoned, no one has taken them up" limit={8}>
+            {summary.free.map((p) => (
+              <ToolListRow
+                key={p.id}
+                color={FARM_PLOT_COLORS.zoned}
+                title={p.name ?? "Field"}
+                figure={mw(agriPv.installationFor(p.id).capacityKw)}
+                detail={`${hectares(p.areaM2)} · ${agriPv.farmerAnswer(p.id, now)?.yes ? "the farmer has agreed" : "the farmer hasn't been asked"}`}
+                selected={p.id === selectedId}
+                onClick={() => pick(p.id)}
+              />
+            ))}
+          </ToolListGroup>
           <p className="dh-note tool-list-hint">Pick a field: its card asks the farmer, and has the permit, to develop it yourself.</p>
         </>
       )}

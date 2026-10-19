@@ -54,6 +54,99 @@
   margin: 2px 0 6px;
 }
 
+/* A tool's list (ToolList.tsx): groups under a heading with their count, each row a dot in its map
+ * colour, the name in full with one labelled figure, and where it stands on a quieter second line. */
+.tool-list-group {
+  margin-top: 12px;
+}
+
+.tool-list-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0 0 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-family: var(--font);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.tool-list-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.tool-list-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  column-gap: 8px;
+  row-gap: 1px;
+  align-items: baseline;
+  width: 100%;
+  margin: 0 -6px;
+  padding: 5px 6px;
+  border: none;
+  border-radius: var(--r-1);
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  box-sizing: content-box;
+}
+
+.tool-list-row:hover {
+  background: var(--fill);
+}
+
+.tool-list-row.selected {
+  background: var(--fill);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.tool-list-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  align-self: center;
+  grid-row: 1;
+}
+
+.tool-list-title {
+  grid-column: 2;
+  overflow-wrap: anywhere;
+}
+
+.tool-list-figure {
+  grid-column: 3;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.tool-list-detail {
+  grid-column: 2 / 4;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.tool-list-more {
+  margin: 2px 0 0;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--accent);
+  cursor: pointer;
+}
+
 /* The card for one picked thing (InspectCard.tsx), where a building's panel stands. */
 .inspect-card {
   padding: 16px;

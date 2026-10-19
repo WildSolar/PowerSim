@@ -1,4 +1,6 @@
 import { useSyncExternalStore } from "react";
+import { ToolListGroup, ToolListRow } from "./ToolList";
+import { CAR_PARK_LEGEND } from "../map/colorModes";
 import { CAR_PARK_BUILD_MONTHS } from "../config/carParks";
 import { mapFocus } from "../map/mapFocus";
 import { formatDate } from "../sim/calendar";
@@ -30,10 +32,14 @@ function lotName(lot: CarPark): string {
   return host?.address ? `Car park at ${host.address}` : "Car park";
 }
 
-function stateLabel(lot: CarPark, now: number): string {
-  const c = carParks.canopyOn(lot.id);
-  if (c) return c.installedAtMs <= now ? "Solar canopy" : `Canopy from ${monthYear(c.installedAtMs)}`;
-  return lot.owner === "municipal" ? "The town's" : "Private";
+/** A car park in a list: where it is — the street of the building it goes with, or its own name. */
+function lotTitle(lot: CarPark): string {
+  return lot.name ?? carParks.host(lot)?.address ?? "Car park";
+}
+
+/** The map's colour for a car park's state (colorModes.ts). */
+function legendColor(bucket: string): string {
+  return CAR_PARK_LEGEND.find((l) => l.bucket === bucket)?.color ?? "#8f8b80";
 }
 
 /** The card for the car park picked on the map or in the list: its size, whose it is, what a
@@ -138,19 +144,36 @@ export function CarParksPanel() {
   const selectedId = carParks.getSelectedId();
   const built = carParks.capacityAtKw(now);
   const potential = carParks.potentialKw();
-  const mine = lots.filter((l) => l.owner === "municipal");
+  const covered = lots.filter((l) => carParks.canopyOn(l.id));
+  const mine = lots.filter((l) => l.owner === "municipal" && !carParks.canopyOn(l.id));
+  const theirs = lots.filter((l) => l.owner !== "municipal" && !carParks.canopyOn(l.id));
   const pick = (lot: CarPark) => {
     carParks.select(lot.id);
     mapFocus.request({ lon: lot.lon, lat: lot.lat, minZoom: 16 });
   };
-  const row = (lot: CarPark) => (
-    <button key={lot.id} className={`ev-list-row${lot.id === selectedId ? " selected" : ""}`} onClick={() => pick(lot)}>
-      <span className="ev-list-name">{lotName(lot)}</span>
-      <span className="info-value">
-        {lot.spaces} · {stateLabel(lot, now)}
-      </span>
-    </button>
-  );
+  const row = (lot: CarPark) => {
+    const c = carParks.canopyOn(lot.id);
+    const kwp = `${Math.round(c?.capacityKw ?? lot.canopyKw)} kWp`;
+    return (
+      <ToolListRow
+        key={lot.id}
+        color={legendColor(c ? (c.installedAtMs <= now ? "canopy" : "building") : lot.owner === "municipal" ? "municipal" : "private")}
+        title={lotTitle(lot)}
+        figure={`${lot.spaces} spaces`}
+        detail={
+          c
+            ? c.installedAtMs <= now
+              ? `Solar canopy, ${kwp} · ${lot.owner === "municipal" ? "the town's" : "its owner's"}`
+              : `Canopy being built, ${kwp} · ready ${monthYear(c.installedAtMs)}`
+            : lot.owner === "municipal"
+              ? `No canopy yet · would carry about ${kwp}`
+              : `Private, no canopy · would carry about ${kwp}`
+        }
+        selected={lot.id === selectedId}
+        onClick={() => pick(lot)}
+      />
+    );
+  };
 
   const overview = (
     <>
@@ -170,9 +193,14 @@ export function CarParksPanel() {
           {(built / 1000).toFixed(1)} of {(potential / 1000).toFixed(1)} MWp
         </span>
       </div>
-      {lots.length === 0 && <p className="dh-note">No open-air car park here is big enough for a canopy.</p>}
-      {lots.map(row)}
-      {lots.length > 0 && <p className="dh-note tool-list-hint">Click a car park here or on the map: its card shows what a canopy would make and cost.</p>}
+      {lots.length === 0 ? (
+        <p className="dh-note">No open-air car park here is big enough for a canopy.</p>
+      ) : (
+        <p className="dh-note tool-list-hint">Click a car park here or on the map: its card shows what a canopy would make and cost.</p>
+      )}
+      <ToolListGroup title="With a canopy">{covered.map(row)}</ToolListGroup>
+      <ToolListGroup title="The town's, no canopy yet">{mine.map(row)}</ToolListGroup>
+      <ToolListGroup title="Private, no canopy">{theirs.map(row)}</ToolListGroup>
     </>
   );
 
@@ -182,7 +210,13 @@ export function CarParksPanel() {
         The town's own car parks — by its schools, halls and sports grounds, and the public ones — you can cover directly, or a few a year with the measure ‘Solar over the
         town's car parks’. Private ones are their owners' to decide; the car park solar subsidy and the solar duty for large car parks (Town hall → Measures) move them.
       </p>
-      {mine.length === 0 ? <p className="dh-note">The town has no car park of its own big enough for a canopy.</p> : mine.map(row)}
+      {mine.length === 0 ? (
+        <p className="dh-note">The town has no car park of its own left without a canopy.</p>
+      ) : (
+        <ToolListGroup title="The town's, no canopy yet" limit={12}>
+          {mine.map(row)}
+        </ToolListGroup>
+      )}
     </>
   );
 

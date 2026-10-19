@@ -5,7 +5,9 @@ import { approval, votePct } from "../sim/approval";
 import { formatDate } from "../sim/calendar";
 import { simClock } from "../sim/engine";
 import { useSimDay } from "../sim/store";
-import { wind, WIND_PHASE_LABEL, type WindSite } from "../sim/wind";
+import { wind, WIND_PHASE_LABEL, type WindPhase, type WindSite } from "../sim/wind";
+import { WIND_SITE_COLORS } from "../map/colorModes";
+import { ToolListGroup, ToolListRow } from "./ToolList";
 import { formatCHF } from "./format";
 import "./districtHeatPanel.css";
 import "./zoningPanel.css";
@@ -133,6 +135,15 @@ function SiteCard({ site, now }: { site: WindSite; now: number }) {
   );
 }
 
+/** A site's colour on the map, by how far it has come (as MapView.tsx draws its turbines). */
+function phaseBucket(phase: WindPhase): keyof typeof WIND_SITE_COLORS {
+  if (phase === "operating") return "turning";
+  if (phase === "permitted" || phase === "building") return "ready";
+  if (phase === "rejected" || phase === "struckDown") return "stopped";
+  if (phase === "found") return "planned";
+  return "underWay";
+}
+
 /** The wind layer's panel: the study, then each site the study found, step by step. */
 export function WindPanel() {
   useSyncExternalStore(
@@ -148,6 +159,23 @@ export function WindPanel() {
   const pick = (site: WindSite) => {
     wind.select(site.id);
     mapFocus.request({ lon: site.lon, lat: site.lat, minZoom: 14.5 });
+  };
+  const siteRow = (site: WindSite) => {
+    const p = wind.project(site.id);
+    const phase = wind.phaseOf(site.id);
+    const n = p?.turbines ?? site.turbines.length;
+    const until = p?.phaseUntilMs && phase !== "operating" ? ` · until ${monthYear(p.phaseUntilMs)}` : "";
+    return (
+      <ToolListRow
+        key={site.id}
+        color={WIND_SITE_COLORS[phaseBucket(phase)]}
+        title={site.name ?? site.id}
+        figure={`${n} turbine${n === 1 ? "" : "s"} · ${(wind.yearlyKWh(site, n) / 1e6).toFixed(0)} GWh a year`}
+        detail={`${WIND_PHASE_LABEL[phase]}${until}`}
+        selected={site.id === selectedId}
+        onClick={() => pick(site)}
+      />
+    );
   };
 
   const overview = (
@@ -168,13 +196,7 @@ export function WindPanel() {
       {study === "done" && sites.length === 0 && <p className="dh-note">The study found nowhere a turbine could stand: too close to homes everywhere, or too little wind.</p>}
       {study === "done" && sites.length > 0 && (
         <>
-          <h4 className="dh-subtitle">Sites the study found</h4>
-          {sites.map((s) => (
-            <button key={s.id} className={`ev-list-row${s.id === selectedId ? " selected" : ""}`} onClick={() => pick(s)}>
-              <span className="ev-list-name">{s.name ?? s.id}</span>
-              <span className="info-value">{WIND_PHASE_LABEL[wind.phaseOf(s.id)]}</span>
-            </button>
-          ))}
+          <ToolListGroup title="Sites the study found">{sites.map(siteRow)}</ToolListGroup>
           <p className="dh-note tool-list-hint">Click a site here or a turbine on the map: its card shows the next step.</p>
         </>
       )}
@@ -198,12 +220,7 @@ export function WindPanel() {
       {study === "done" && sites.length > 0 && (
         <>
           <p className="dh-note">Each site goes its own way — a zoning plan the voters decide on, a permit, the build. Pick a site to take its next step:</p>
-          {sites.map((s) => (
-            <button key={s.id} className={`ev-list-row${s.id === selectedId ? " selected" : ""}`} onClick={() => pick(s)}>
-              <span className="ev-list-name">{s.name ?? s.id}</span>
-              <span className="info-value">{WIND_PHASE_LABEL[wind.phaseOf(s.id)]}</span>
-            </button>
-          ))}
+          <ToolListGroup title="Sites">{sites.map(siteRow)}</ToolListGroup>
         </>
       )}
     </>
