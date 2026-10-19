@@ -552,6 +552,28 @@ class DistrictHeatNetwork {
     return this.builtAtMs.has(segmentId);
   }
 
+  /** What ordering exactly these segments would take at `atMs` (an advisor's pick), leaving the
+   * extension being planned on the map as it is. Segments already piped are left out. */
+  quoteSegments(segmentIds: number[], atMs: number): SelectionQuote {
+    const saved = this.selection;
+    this.selection = new Set(segmentIds.filter((id) => !this.builtAtMs.has(id) && streets.get(id)));
+    try {
+      return this.quote(atMs);
+    } finally {
+      this.selection = saved;
+    }
+  }
+
+  /** Orders exactly these segments (an advisor's pick), leaving the plan on the map as it was. */
+  orderSegments(segmentIds: number[], atMs: number): NetworkOrder | null {
+    const saved = this.selection;
+    this.selection = new Set(segmentIds.filter((id) => !this.builtAtMs.has(id) && streets.get(id)));
+    const order = this.order(atMs);
+    this.selection = new Set([...saved].filter((id) => !this.builtAtMs.has(id)));
+    this.notify();
+    return order;
+  }
+
   /** Plans exactly these segments as the extension (the district heating advisor's pick). */
   selectOnly(segmentIds: number[]): void {
     this.selection = new Set(segmentIds.filter((id) => !this.builtAtMs.has(id) && streets.get(id)));

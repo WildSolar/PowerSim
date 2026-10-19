@@ -6,6 +6,8 @@ import { FeedbackDialog } from "./ui/FeedbackDialog";
 import { CrashBoundary, CrashScreen } from "./ui/CrashScreen";
 import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
+import { openAdvisorPage } from "./ui/AdvisorsTab";
+import { showPickOnMap } from "./ui/openPick";
 import { TownHall, type TownHallSection } from "./ui/TownHall";
 import { clearInspected, InspectSlot, useInspected } from "./ui/InspectSlot";
 import { RefusedPurchaseToast } from "./ui/RefusedPurchaseToast";
@@ -449,7 +451,17 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         <EndScreen municipality={dataset.name} over={null} onMainMenu={returnToMenu} onKeepPlaying={() => setFinished(false)} />
       ) : null}
       {townHall && (
-        <TownHall dataset={liveDataset ?? dataset} transparency={transparency} section={townHall} onSection={setTownHall} onClose={() => setTownHall(null)} />
+        <TownHall
+          dataset={liveDataset ?? dataset}
+          transparency={transparency}
+          section={townHall}
+          onSection={setTownHall}
+          onClose={() => setTownHall(null)}
+          onShowPick={(pick) => {
+            setTownHall(null);
+            showPickOnMap(pick, (tool) => setColorMode(tool), selectBuilding);
+          }}
+        />
       )}
       <RefusedPurchaseToast onOpenTreasury={() => setTownHall("treasury")} />
       {showWiki && <WikiPanel onClose={() => setShowWiki(false)} />}
@@ -470,6 +482,11 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
           onClose={() => setInboxSelection(null)}
           onSelectBuilding={selectBuilding}
           onOpenTool={(tool) => setColorMode(tool)}
+          onOpenAdvisor={(id) => {
+            setInboxSelection(null);
+            openAdvisorPage(id);
+            setTownHall("advisors");
+          }}
         />
       )}
       {showFeedback && <FeedbackDialog onClose={() => setShowFeedback(false)} />}

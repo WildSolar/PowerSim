@@ -5,7 +5,9 @@ import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { useSimDay, useSimSpeed, useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
 import { PAUSE_SPEED } from "../sim/timeControls";
+import { AdvisorsTab } from "./AdvisorsTab";
 import { ChartsTab } from "./ChartsTab";
+import type { LetterPick } from "../sim/inbox";
 import { CityStatsTab } from "./CityStatsTab";
 import { DecisionLogTab } from "./DecisionLogTab";
 import { HistoricalEnergySection } from "./HistoricalEnergySection";
@@ -17,11 +19,12 @@ import { TechnologyPrices } from "./TechnologyPrices";
 import { usePauseWhileOpen } from "./usePauseWhileOpen";
 import "./townHall.css";
 
-export type TownHallSection = "overview" | "measures" | "treasury" | "prices" | "stats" | "charts" | "log";
+export type TownHallSection = "overview" | "measures" | "advisors" | "treasury" | "prices" | "stats" | "charts" | "log";
 
 const SECTIONS: { id: TownHallSection; title: string; blurb: string }[] = [
   { id: "overview", title: "Overview", blurb: "Where the town stands, what the canton and the Confederation have in store, and what was decided lately." },
   { id: "measures", title: "Measures", blurb: "Subsidies, infrastructure, information and laws: what the municipality can enact, and what it has." },
+  { id: "advisors", title: "Advisors", blurb: "Consultants you retain for a yearly fee: each reports once a year with what to do next, and you can act on it from here." },
   { id: "treasury", title: "Treasury", blurb: "The department's accounts, year by year, and its borrowing." },
   { id: "prices", title: "Prices", blurb: "What the municipal utility charges, and where technology prices are heading." },
   { id: "stats", title: "Statistics", blurb: "Where the town's energy goes, now and over time." },
@@ -36,12 +39,14 @@ export interface TownHallProps {
   section: TownHallSection;
   onSection: (section: TownHallSection) => void;
   onClose: () => void;
+  /** Shows an advisor's pick on the map (the Town hall closes). */
+  onShowPick: (pick: LetterPick) => void;
 }
 
 /** The town hall: everything that isn't on the map — measures, the accounts, prices and the
  * statistics — full screen below the top bar. The simulation pauses while it's open and
  * picks up again at the same speed when it closes (unless the player changed it meanwhile). */
-export function TownHall({ dataset, transparency, section, onSection, onClose }: TownHallProps) {
+export function TownHall({ dataset, transparency, section, onSection, onClose, onShowPick }: TownHallProps) {
   const sections = SECTIONS.filter((s) => s.id !== "log" || transparency);
   const current = sections.find((s) => s.id === section) ?? sections[0];
   const tariff = useTariff();
@@ -88,6 +93,7 @@ export function TownHall({ dataset, transparency, section, onSection, onClose }:
           )}
           {current.id === "overview" && <OverviewTab dataset={dataset} onOpen={onSection} />}
           {current.id === "measures" && <MeasuresTab />}
+          {current.id === "advisors" && <AdvisorsTab onShowOnMap={onShowPick} onOpenPrices={() => onSection("prices")} />}
           {current.id === "treasury" && <TreasuryTab dataset={dataset} />}
           {current.id === "stats" && (
             <div className="th-stats">

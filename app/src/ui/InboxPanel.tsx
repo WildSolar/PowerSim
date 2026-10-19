@@ -1,9 +1,10 @@
-import { CheckCheck, Mail, MapPin, Newspaper, Pin, X } from "lucide-react";
+import { CheckCheck, ClipboardList, Mail, MapPin, Newspaper, Pin, X } from "lucide-react";
+import type { AdvisorId } from "../sim/advisors";
+import { showPickOnMap } from "./openPick";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { mapFocus } from "../map/mapFocus";
 import { formatDate } from "../sim/calendar";
 import { simClock } from "../sim/engine";
-import { districtHeat } from "../sim/districtHeat";
 import { inbox, type Edition, type Letter, type LetterPick } from "../sim/inbox";
 import { letters, type LetterRequest } from "../sim/letters";
 import { useSimDay } from "../sim/store";
@@ -34,11 +35,14 @@ export function InboxPanel({
   onClose,
   onSelectBuilding,
   onOpenTool,
+  onOpenAdvisor,
 }: {
   initial: InboxSelection;
   onClose: () => void;
   onSelectBuilding: (egid: string) => void;
   onOpenTool: (tool: LetterPick["tool"]) => void;
+  /** An advisor's letter: open its report in the Town hall. */
+  onOpenAdvisor: (id: AdvisorId) => void;
 }) {
   useSyncExternalStore(
     (l) => inbox.subscribe(l),
@@ -80,15 +84,7 @@ export function InboxPanel({
   // streets planned as a district heating extension.
   const openPick = (pick: LetterPick) => {
     onClose();
-    onOpenTool(pick.tool);
-    const building = pick.egid ? stock.lookup(pick.egid) : undefined;
-    if (pick.tool === "districtHeat" && pick.segments) districtHeat.selectOnly(pick.segments);
-    if (building) {
-      onSelectBuilding(building.egid);
-      mapFocus.focusBuilding(building, 17);
-    } else {
-      mapFocus.request({ lon: pick.lon, lat: pick.lat, minZoom: 16.5 });
-    }
+    showPickOnMap(pick, onOpenTool, onSelectBuilding);
   };
 
   const openRequests = requests.filter((r) => r.status === "open").length;
@@ -184,7 +180,7 @@ export function InboxPanel({
                 <p className="inbox-empty">No edition yet.</p>
               )
             ) : selectedLetter ? (
-              <LetterView letter={selectedLetter} onShowOnMap={showOnMap} onOpenPick={openPick} />
+              <LetterView letter={selectedLetter} onShowOnMap={showOnMap} onOpenPick={openPick} onOpenAdvisor={onOpenAdvisor} />
             ) : (
               <p className="inbox-empty">Pick a letter from the list.</p>
             )}
@@ -199,10 +195,12 @@ function LetterView({
   letter,
   onShowOnMap,
   onOpenPick,
+  onOpenAdvisor,
 }: {
   letter: Letter;
   onShowOnMap: (focus: { lon: number; lat: number; egid?: string }) => void;
   onOpenPick: (pick: LetterPick) => void;
+  onOpenAdvisor: (id: AdvisorId) => void;
 }) {
   const request = letter.requestId ? letters.getRequest(letter.requestId) : undefined;
   return (
@@ -233,6 +231,11 @@ function LetterView({
         </ol>
       )}
       <p className="letter-sign">— {letter.from}</p>
+      {letter.advisor && (
+        <button className="letter-map" onClick={() => onOpenAdvisor(letter.advisor as AdvisorId)}>
+          <ClipboardList size={15} strokeWidth={1.75} aria-hidden /> Open the report in the Town hall
+        </button>
+      )}
       {request && letter.kind === "request" && (
         <div className={`letter-request request-${request.status}`}>
           <div className="letter-request-label">

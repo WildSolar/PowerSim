@@ -100,7 +100,7 @@ function normalCdf(z: number): number {
 class RoofContracts {
   private contracts: RoofContract[] = [];
   private rent = ROOF_RENT_DEFAULT_CHF_PER_M2;
-  private autoBuild = true;
+  private autoBuild = false;
   private seed = "";
   private realPlants: PowerPlant[] = [];
   private buildingsProvider: () => Building[] = () => [];
@@ -115,7 +115,7 @@ class RoofContracts {
     this.unsubscribeClock?.();
     this.contracts = [];
     this.rent = ROOF_RENT_DEFAULT_CHF_PER_M2;
-    this.autoBuild = true;
+    this.autoBuild = false;
     this.seed = seed;
     this.realPlants = dataset.powerPlants;
     this.buildingsProvider = buildingsProvider;
@@ -235,17 +235,10 @@ class RoofContracts {
     return true;
   }
 
-  /** Offers every eligible roof a contract at the current rent; how many were asked. */
-  offerAll(atMs: number): number {
-    let n = 0;
-    for (const b of this.eligibleRoofs(atMs)) if (this.offer(b, atMs)) n++;
-    return n;
-  }
-
   /** What offering every eligible roof at the current rent would likely bring: how many owners would
    * accept (the share whose ask the rent meets, less those who build their own), the arrays' size
    * and what building them would cost. An expectation, not a promise. */
-  offerAllEstimate(atMs: number): { roofs: number; accepting: number; capacityKw: number; costRp: number } {
+  acceptanceEstimate(atMs: number): { roofs: number; accepting: number; capacityKw: number; costRp: number } {
     const share = (1 - OWNER_PROMPTED_SHARE / 2) * normalCdf(Math.log(this.rent / OWNER_ASK_MEDIAN_CHF_PER_M2) / OWNER_ASK_LOG_SPREAD);
     let capacityKw = 0;
     let costRp = 0;

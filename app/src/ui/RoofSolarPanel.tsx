@@ -133,8 +133,9 @@ function nameOf(b: Building | undefined, egid: string): string {
   return b?.address ?? `Building ${egid}`;
 }
 
-/** The Roof solar layer's panel: the rent the utility offers, offering it to every large roof at
- * once, the roofs whose owners accepted (to build), and the utility's arrays. */
+/** The Roof solar layer's panel: the rent the utility offers, the roofs whose owners accepted (to
+ * build), and the utility's arrays. Roofs are offered one by one, from their cards (or from the roof
+ * solar advisor's report). */
 export function RoofSolarPanel({ buildings, onSelectBuilding }: { buildings: Building[]; onSelectBuilding: (egid: string) => void }) {
   const version = useRoofContracts();
   const now = useSimDay();
@@ -158,7 +159,7 @@ export function RoofSolarPanel({ buildings, onSelectBuilding }: { buildings: Bui
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now, version, buildings]);
-  const estimate = useMemo(() => roofContracts.offerAllEstimate(now), [now, version]); // eslint-disable-line react-hooks/exhaustive-deps
+  const estimate = useMemo(() => roofContracts.acceptanceEstimate(now), [now, version]); // eslint-disable-line react-hooks/exhaustive-deps
   const kwp = (cs: RoofContract[]) => cs.reduce((sum, c) => sum + (c.capacityKw ?? 0), 0);
   const select = (egid: string) => {
     onSelectBuilding(egid);
@@ -234,16 +235,13 @@ export function RoofSolarPanel({ buildings, onSelectBuilding }: { buildings: Bui
       </div>
       {stats.eligible.length > 0 && (
         <p className="dh-note">
-          At this rent, about {estimate.accepting} owners would likely accept: around {Math.round(estimate.capacityKw)} kWp, costing{" "}
-          {formatCHF(estimate.costRp)} to build{roofContracts.getAutoBuild() ? " — paid as they accept" : ""}.
+          At this rent, about {estimate.roofs > 0 ? Math.round((estimate.accepting / estimate.roofs) * 10) : 0} owners in 10 would accept an offer.
         </p>
       )}
-      <div className="dh-actions">
-        <button className="dh-order" disabled={stats.eligible.length === 0} onClick={() => roofContracts.offerAll(simClock.getSimTimeMs())}>
-          Offer all {stats.eligible.length} a contract
-        </button>
-      </div>
-      <p className="dh-note">Or click a roof on the map to see what an array there would mean, and offer just that one.</p>
+      <p className="dh-note">
+        Click a roof on the map to see what an array there would mean, and offer its owner the contract. The roof solar advisor (Town hall → Advisors) ranks the roofs
+        that would return the most.
+      </p>
 
       {stats.accepted.length > 0 && (
         <>

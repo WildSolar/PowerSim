@@ -1,8 +1,10 @@
 /**
- * Advisors: consultants the department retains for a yearly fee (a measure each), who write once a
- * year with what they found — the roof solar advisor, the mobility advisor, the district heating
- * advisor and the finance advisor. Each report is a letter (inbox.ts) whose picks open the matching
- * planning tool at the place they name.
+ * Advisors: consultants the department retains for a yearly fee (a measure each, retained and let go
+ * on the Town hall's Advisors page), who report once a year with what they found — the roof solar
+ * advisor, the mobility advisor, the district heating advisor and the finance advisor. The latest
+ * report of each is kept for that page, where the player can act on its picks directly (offer the
+ * roof, order the chargers, order the pipes) or look at them on the map; a letter (inbox.ts) says it
+ * has come.
  *
  * They know what a consultant would: the prices, the bills and the town's own record — never what
  * the game has in store. Where they look ahead (whose heating is likely to wear out, what next
@@ -38,14 +40,27 @@ const YEAR_MS = 365.25 * DAY_MS;
 
 export type AdvisorId = "roofSolar" | "mobility" | "districtHeat" | "finance";
 
-/** Who signs, and the month of the year each writes (0 = January): before the solar season, after
- * the operators' new year round, before the building season, and before the tariff deadline. */
-const ADVISORS: Record<AdvisorId, { from: string; month: number }> = {
-  mobility: { from: "Your mobility advisor", month: 1 },
-  roofSolar: { from: "Your roof solar advisor", month: 2 },
-  districtHeat: { from: "Your district heating advisor", month: 3 },
-  finance: { from: "Your finance advisor", month: 5 },
+/** Who they are, the measure that retains each, who signs, and the month of the year each reports
+ * (0 = January): before the solar season, after the operators' new year round, before the building
+ * season, and before the tariff deadline. */
+export const ADVISORS: Record<AdvisorId, { title: string; measureId: string; from: string; month: number }> = {
+  roofSolar: { title: "Roof solar", measureId: "advisor-roof-solar", from: "Your roof solar advisor", month: 2 },
+  mobility: { title: "Mobility", measureId: "advisor-mobility", from: "Your mobility advisor", month: 1 },
+  districtHeat: { title: "District heating", measureId: "advisor-district-heat", from: "Your district heating advisor", month: 3 },
+  finance: { title: "Finance", measureId: "advisor-finance", from: "Your finance advisor", month: 5 },
 };
+export const ADVISOR_ORDER: AdvisorId[] = ["roofSolar", "mobility", "districtHeat", "finance"];
+
+/** An advisor's report: what it found, and the places it proposes. */
+export interface AdvisorReport {
+  atMs: number;
+  subject: string;
+  paragraphs: string[];
+  picks?: LetterPick[];
+}
+
+/** What the letter adds to a report with picks: where to find them. */
+const LETTER_POINTER = "My report, with what you can do about each of them, is in the Town hall under Advisors.";
 
 /** How far the district heating advisor looks ahead, and how long a run of street it suggests. */
 const DH_HORIZON_YEARS = 5;
@@ -67,6 +82,9 @@ const mwh = (kWh: number) => `${Math.round(kWh / 1000).toLocaleString("de-CH")} 
 
 class Advisors {
   private lastReportMonth: Partial<Record<AdvisorId, number>> = {};
+  private reports: Partial<Record<AdvisorId, AdvisorReport>> = {};
+  private readonly listeners = new Set<() => void>();
+  private version = 0;
   private lastMonth = 0;
   private buildingsProvider: () => Building[] = () => [];
   private seed = "";
@@ -77,6 +95,7 @@ class Advisors {
     this.buildingsProvider = buildingsProvider;
     this.seed = seed;
     this.lastReportMonth = {};
+    this.reports = {};
     this.lastMonth = monthIndex(simClock.getSimTimeMs());
     this.unsubscribeClock = simClock.subscribe(() => this.advance(simClock.getSimTimeMs()));
   }
@@ -89,7 +108,8 @@ class Advisors {
     this.monthly(month);
   }
 
-  private retained(id: AdvisorId): boolean {
+  /** Whether an advisor is retained (in force, not just enacted). */
+  retained(id: AdvisorId): boolean {
     const p = policyStore.get();
     return (id === "roofSolar" ? p.advisorRoofSolar : id === "mobility" ? p.advisorMobility : id === "districtHeat" ? p.advisorDistrictHeat : p.advisorFinance) > 0;
   }
@@ -108,8 +128,39 @@ class Advisors {
       this.lastReportMonth[id] = month;
       const atMs = toSimTimeMs(Date.UTC(Math.floor(month / 12), month % 12, 1)) + 2 * DAY_MS;
       const report = this.reportAt(id, atMs);
-      inbox.addLetter({ id: `advisor-${id}-${month}`, atMs, kind: "report", bloc: null, from: ADVISORS[id].from, role: "consultant to the energy department", ...report });
+      this.reports[id] = { atMs, ...report };
+      this.notify();
+      inbox.addLetter({
+        id: `advisor-${id}-${month}`,
+        atMs,
+        kind: "report",
+        bloc: null,
+        from: ADVISORS[id].from,
+        role: "consultant to the energy department",
+        subject: report.subject,
+        paragraphs: report.picks && report.picks.length > 0 ? [...report.paragraphs, LETTER_POINTER] : report.paragraphs,
+        advisor: id,
+      });
     }
+  }
+
+  /** An advisor's latest report, if it has written one. */
+  getReport(id: AdvisorId): AdvisorReport | undefined {
+    return this.reports[id];
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  getVersion(): number {
+    return this.version;
+  }
+
+  private notify(): void {
+    this.version++;
+    this.listeners.forEach((l) => l());
   }
 
   /** What an advisor would write at `atMs` (also for the dev console). */
@@ -133,7 +184,7 @@ class Advisors {
       .filter((x) => x.q && x.yearlyRp > 0)
       .sort((a, b) => b.ret - a.ret)
       .slice(0, 10);
-    const estimate = roofContracts.offerAllEstimate(atMs);
+    const estimate = roofContracts.acceptanceEstimate(atMs);
     const accepting = estimate.roofs > 0 ? Math.round((estimate.accepting / estimate.roofs) * 10) : 0;
     if (ranked.length === 0)
       return {
@@ -147,7 +198,7 @@ class Advisors {
       subject: `The ${ranked.length} best roofs for the utility's solar`,
       paragraphs: [
         `I went through every large roof the utility could rent and costed an array on each: the panels (less the federal payment), your rent of CHF ${roofContracts.getRent().toLocaleString("de-CH")}/m² and the upkeep, against what its power saves buying at the market's underlying price, on a typical year's sun for the way each roof faces. These ${ranked.length} return the most for what they cost.`,
-        `At your current rent, about ${accepting} owners in 10 would accept an offer. Each pick opens the roof's card in the Roof solar tool, where you can offer the contract.`,
+        `At your current rent, about ${accepting} owners in 10 would accept an offer. You can offer each owner the contract straight from the list, or look at the roof on the map first.`,
       ],
       picks: ranked.map(({ b, q, yearlyRp }) => ({
         label: b.address ?? `Building ${b.egid}`,
@@ -175,7 +226,7 @@ class Advisors {
     else
       paragraphs.push(
         `Over the past year, households across town looked into an electric car and gave up for want of a charger with room nearby. Where most of them live, a new on-street charging site would do most good — the chargers opened or ordered since are already counted. ${spots.length === 1 ? "This is the spot" : `These are the ${spots.length} spots, best first`}.`,
-        "Each pick opens the EV charging tool there, where you can place a site.",
+        "You can order the chargers for each spot straight from the list, or look at the street on the map first.",
       );
     if (fleet && fleet.vehicles >= 3)
       paragraphs.push(
@@ -187,8 +238,10 @@ class Advisors {
       lon: s.lon,
       lat: s.lat,
       tool: "evCharging" as const,
+      charger: "ac" as const,
     }));
-    if (fleet && fleet.vehicles >= 3) picks.push({ label: "A hub for vans and lorries", detail: `about ${about(fleet.vehicles)} vehicles would use it`, lon: fleet.lon, lat: fleet.lat, tool: "evCharging" });
+    if (fleet && fleet.vehicles >= 3)
+      picks.push({ label: "A hub for vans and lorries", detail: `about ${about(fleet.vehicles)} vehicles would use it`, lon: fleet.lon, lat: fleet.lat, tool: "evCharging", charger: "hub" });
     return { subject: spots.length > 0 ? "Where the next chargers should go" : "Charging: no gaps this year", paragraphs, picks: picks.length > 0 ? picks : undefined };
   }
 
@@ -302,7 +355,7 @@ class Advisors {
       subject: `District heating: ${picked.length} streets to extend to`,
       paragraphs: [
         `I looked at every street next to your network and asked how much heat it would likely bring within ${DH_HORIZON_YEARS} years: the buildings along it heating with oil, gas or wood, how likely their heating is to need replacing in that time — from when it was put in, where that is known, else from how long such systems usually last — and how many owners choose district heat when it is on their street: about ${Math.round(uptake * 100)}% ${cases >= 10 ? `here, from ${cases} cases in the last ${DH_HORIZON_YEARS} years` : "— a general figure, as there are too few cases in town yet"}.`,
-        "These are the best per metre of pipe. An estimate, not a promise: owners decide for themselves. Each pick opens the District heating tool with the streets planned, so you see the extension's cost and can order it.",
+        "These are the best per metre of pipe. An estimate, not a promise: owners decide for themselves. You can order each extension straight from the list, or see it planned on the map first.",
       ],
       picks: picked.map((r) => ({
         label: `${r.name ?? "A street"} — ${Math.round(r.lengthM)} m`,
@@ -366,12 +419,14 @@ class Advisors {
   // --- saving (saveGame.ts) ---
 
   snapshot() {
-    return { lastReportMonth: this.lastReportMonth, lastMonth: this.lastMonth };
+    return { lastReportMonth: this.lastReportMonth, lastMonth: this.lastMonth, reports: this.reports };
   }
 
   restore(s: ReturnType<Advisors["snapshot"]>): void {
     this.lastReportMonth = { ...s.lastReportMonth };
     this.lastMonth = s.lastMonth;
+    this.reports = { ...s.reports };
+    this.notify();
   }
 }
 

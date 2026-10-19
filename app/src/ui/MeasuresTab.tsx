@@ -3,7 +3,7 @@ import { cachedEmissionsForYear, removalPriceChfPerT } from "../sim/emissions";
 import { REMOVAL_CAP_SHARE } from "../config/removals";
 import { X } from "lucide-react";
 import { BASELINE_YEAR, formatDate, toDateMs } from "../sim/calendar";
-import { MEASURE_CATALOG } from "../sim/measureCatalog";
+import { MEASURE_CATALOG as ALL_MEASURES } from "../sim/measureCatalog";
 import {
   defaultParams,
   MEASURE_CATEGORY_LABEL,
@@ -29,6 +29,10 @@ import { formatCHF, formatCHFCompact } from "./format";
 import "./measures.css";
 import "./measuresPage.css";
 import { SupervisionNotice } from "./SupervisionNotice";
+
+// The advisors are retained and let go on their own page (Town hall → Advisors).
+const MEASURE_CATALOG = ALL_MEASURES.filter((d) => d.topic !== "advisors");
+const TOPICS = MEASURE_TOPIC_ORDER.filter((t) => t !== "advisors");
 
 const CATEGORY_ORDER: MeasureCategory[] = ["subsidy", "infrastructure", "information", "law"];
 const DAY_MS = 24 * 60 * 60_000;
@@ -337,7 +341,7 @@ export function MeasuresTab() {
   const visible = MEASURE_CATALOG.filter((def) => kindOk(def) && (topic === "all" || (topic === "enacted" ? enacted(def) : def.topic === topic)));
   const groups: { key: string; title: string | null; defs: MeasureDef[] }[] =
     topic === "all"
-      ? MEASURE_TOPIC_ORDER.map((t) => ({ key: t, title: MEASURE_TOPIC_LABEL[t], defs: visible.filter((d) => d.topic === t) })).filter((g) => g.defs.length > 0)
+      ? TOPICS.map((t) => ({ key: t, title: MEASURE_TOPIC_LABEL[t], defs: visible.filter((d) => d.topic === t) })).filter((g) => g.defs.length > 0)
       : [{ key: topic, title: null, defs: visible }];
 
   const budgetRp = approval.spendingAllowanceRp(nowMs);
@@ -368,7 +372,7 @@ export function MeasuresTab() {
           <h3>Topic</h3>
           <ul>
             {topicRow("all", "All measures", MEASURE_CATALOG)}
-            {MEASURE_TOPIC_ORDER.map((t) =>
+            {TOPICS.map((t) =>
               topicRow(
                 t,
                 MEASURE_TOPIC_LABEL[t],

@@ -22,6 +22,16 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.8.0",
+    date: null,
+    added: [
+      "Advisors have their own page in the Town hall, one sub-page each — greyed out while not retained, and retained or let go right there. The latest report stays on the advisor's page, and you can act on it directly: offer a roof's owner the contract (and build once they accept), order the chargers the mobility advisor proposes, order the pipes the district heating advisor proposes — or look at each on the map first. Each proposal shows what has become of it since. An advisor's letter now just says the report has come, with a link to it.",
+    ],
+    changed: [
+      "Roof solar: roofs are offered one at a time — the offer to every large roof at once is gone. And the utility no longer builds the moment an owner accepts unless you tick the box: accepted roofs wait in the drawer for you to build them.",
+    ],
+  },
+  {
     version: "0.7.0",
     date: "2026-10-18",
     title: "Prices, fields and who drives",

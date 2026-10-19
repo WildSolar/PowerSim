@@ -7,6 +7,7 @@
 import type { Bloc } from "../config/approval";
 import { simClock } from "./engine";
 
+import type { AdvisorId } from "./advisors";
 export type LetterKind = "welcome" | "reaction" | "campaign" | "mood" | "report" | "request" | "followUp" | "voteResult" | "offer";
 
 export interface Letter {
@@ -21,8 +22,10 @@ export interface Letter {
   paragraphs: string[];
   /** A place the letter is about, to show on the map — a building, when it is about one. */
   focus?: { lon: number; lat: number; egid?: string };
-  /** Places a report ranks (an advisor's picks, advisors.ts): each opens its planning tool there. */
+  /** Places a report ranks: each opens its planning tool there. */
   picks?: LetterPick[];
+  /** An advisor's report (advisors.ts): the letter points to it in the Town hall. */
+  advisor?: AdvisorId;
   requestId?: string;
 }
 
@@ -37,6 +40,8 @@ export interface LetterPick {
   tool: "roofSolar" | "evCharging" | "districtHeat";
   /** District heating: the street segments to plan as an extension. */
   segments?: number[];
+  /** EV charging: an on-street site, or a hub for vans and lorries. */
+  charger?: "ac" | "hub";
 }
 
 export interface NewsStory {
