@@ -43,8 +43,8 @@ function note(freq: number, startIn: number, decay: number, level: number, rever
   }
 }
 
-/** A very short, soft tick (filtered triangle). */
-function blip(freq: number, decay: number, level: number): void {
+/** A very short, soft tick (a triangle, darkened by a low-pass at `cutoff`). */
+function blip(freq: number, decay: number, level: number, cutoff = 1400): void {
   const graph = sound.ensure();
   if (!graph || !sound.effectsOn()) return;
   const { ctx } = graph;
@@ -55,7 +55,7 @@ function blip(freq: number, decay: number, level: number): void {
   osc.frequency.exponentialRampToValueAtTime(freq * 0.7, t + decay);
   const filter = ctx.createBiquadFilter();
   filter.type = "lowpass";
-  filter.frequency.value = 3200;
+  filter.frequency.value = cutoff;
   const g = ctx.createGain();
   g.gain.setValueAtTime(0, t);
   g.gain.linearRampToValueAtTime(level, t + 0.002);
@@ -72,14 +72,14 @@ let lastTick = 0;
 export const sfx = {
   /** A button, a tab, a link. */
   click(): void {
-    blip(1250 + Math.random() * 120, 0.045, 0.22);
+    blip(560 + Math.random() * 40, 0.05, 0.16);
   },
   /** A slider step or a switch: quieter, and not too often while dragging. */
   tick(): void {
     const now = performance.now();
     if (now - lastTick < 70) return;
     lastTick = now;
-    blip(2100, 0.02, 0.1);
+    blip(900, 0.025, 0.07, 1800);
   },
   /** A letter that wants attention: two soft, rising notes. */
   ping(): void {
