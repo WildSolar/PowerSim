@@ -1,4 +1,5 @@
-# Builds the game and publishes it on GitHub Pages (https://<owner>.github.io/<repository>/).
+# Builds the game and publishes it on GitHub Pages, under its own domain (https://commune-zero.ch;
+# Settings → Pages → Custom domain — the github.io address forwards there).
 # Run by hand: Actions → "Deploy to GitHub Pages" → Run workflow. Needs Pages enabled once, with
 # "GitHub Actions" as its source (Settings → Pages). Only the municipalities listed in
 # app/public/data/index.json ship (vite.config.ts). The Feedback button's address comes from the
@@ -34,7 +35,9 @@ jobs:
       - run: npm ci
       - run: npm run build
         env:
-          BASE_PATH: /${{ github.event.repository.name }}/
+          # The game lives at the domain's root. (Without a custom domain it would be
+          # /${{ github.event.repository.name }}/, under https://<owner>.github.io.)
+          BASE_PATH: /
           # Where the Feedback button's email goes: the repository variable FEEDBACK_EMAIL
           # (Settings → Secrets and variables → Actions → Variables). Without it, players copy the report.
           VITE_FEEDBACK_EMAIL: ${{ vars.FEEDBACK_EMAIL }}

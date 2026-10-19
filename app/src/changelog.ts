@@ -31,6 +31,7 @@ export const CHANGELOG: Release[] = [
       "The installed capacity chart shows, as a dashed line, how much of the town's solar and wind its utility and the town own: their turbines, the arrays on public buildings and rented roofs, the car-park canopies and Agri-PV fields.",
     ],
     changed: [
+      "The game has moved to its own address: commune-zero.ch. Saves and settings are kept by the browser per address, so a run saved on the old one (wildsolar.github.io) doesn't show here — sorry, and thank you for playing the beta.",
       "Agri-PV permits are no formality any more: the canton refuses about one in eight outright, nearly half of those granted are appealed, and the courts strike about a third of those down.",
       "The district heating advisor proposes longer runs of connected streets — about a fifth longer.",
       "The Treasury's Accounts, Ledger and Borrowing are listed down the side, as on the Measures and Advisors pages.",

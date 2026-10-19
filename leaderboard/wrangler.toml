@@ -3,10 +3,10 @@ name = "commune-zero-leaderboard"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
-# The game's address (GitHub Pages) and the dev server — the only pages allowed to call.
-# Replace <owner> with your GitHub user name.
+# The game's addresses (its domain, and GitHub Pages' own, which forwards there) and the dev
+# server — the only pages allowed to call.
 [vars]
-ALLOWED_ORIGINS = "https://wildsolar.github.io,http://localhost:5173"
+ALLOWED_ORIGINS = "https://commune-zero.ch,https://www.commune-zero.ch,https://wildsolar.github.io,http://localhost:5173"
 
 [[d1_databases]]
 binding = "DB"

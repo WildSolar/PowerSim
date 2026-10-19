@@ -46,8 +46,8 @@ function onlyListedMunicipalities(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  // Where the game is served from: the site's root by default; a GitHub Pages project site sets
-  // BASE_PATH=/<repository>/ (.github/workflows/deploy.yml).
+  // Where the game is served from: the site's root by default (as on commune-zero.ch); a GitHub
+  // Pages project site without its own domain would set BASE_PATH=/<repository>/ (deploy.yml).
   base: process.env.BASE_PATH ?? '/',
   plugins: [react(), onlyListedMunicipalities()],
   // MapLibre's worker is an ES module (src/map/MapView.tsx).
