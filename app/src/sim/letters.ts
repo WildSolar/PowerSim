@@ -48,7 +48,7 @@ import { approval, type ApprovalEvent, type Stances } from "./approval";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { debt } from "./debt";
 import { districtHeat } from "./districtHeat";
-import { candidateName, districtHeatSources } from "./districtHeatSources";
+import { districtHeatSources } from "./districtHeatSources";
 import { simClock } from "./engine";
 import { grid } from "./grid";
 import { gridDrawBlockedAt } from "./gridLimits";
@@ -68,7 +68,7 @@ import {
   requestText,
   resolvedByOthersText,
   voteResultText,
-  datacenterHeatOfferText, heatOfferText,
+  datacenterHeatOfferText,
   welcomeText,
   type LetterText,
   type Mood,
@@ -288,39 +288,26 @@ class Letters {
 
   // --- offers ---
 
-  /** A factory offering its waste heat for district heating (districtHeatSources.ts), dated the day
-   * the offer was made. */
+  /** The data centre offering its waste heat for district heating (datacenter.ts), dated the day the
+   * offer was made. (A factory's waste heat is found by the district heating advisor, advisors.ts.) */
   private heatOffers(month: number): void {
     const from = monthStartMs(month);
     const to = monthStartMs(month + 1);
     for (const c of districtHeat.getCandidates()) {
-      if (c.kind !== "industry" && c.kind !== "datacenter") continue;
+      if (c.kind !== "datacenter") continue;
       const atMs = districtHeatSources.offerAtMs(c);
       if (atMs < from || atMs >= to) continue;
       const b = c.egid ? this.buildingsProvider().find((x) => x.egid === c.egid) : undefined;
       const quote = districtHeatSources.candidateQuote(c, atMs);
       const where = b?.address ?? "our site";
-      const name = candidateName(c);
-      if (c.kind === "datacenter") {
-        this.post({
-          atMs,
-          kind: "offer",
-          bloc: "business",
-          from: `The data centre, ${where}`,
-          role: "",
-          focus: { lon: c.lon, lat: c.lat, egid: c.egid },
-          ...datacenterHeatOfferText(quote.sizeMw, quote.yearlyRp, quote.capexRp, districtHeat.servesAt(b?.streetSegments, atMs)),
-        });
-        continue;
-      }
       this.post({
         atMs,
         kind: "offer",
         bloc: "business",
-        from: `${name}, ${where}`,
+        from: `The data centre, ${where}`,
         role: "",
         focus: { lon: c.lon, lat: c.lat, egid: c.egid },
-        ...heatOfferText(name, Math.round(c.potentialMwh ?? 0), quote.sizeMw, quote.yearlyRp, quote.capexRp, districtHeat.servesAt(b?.streetSegments, atMs)),
+        ...datacenterHeatOfferText(quote.sizeMw, quote.yearlyRp, quote.capexRp, districtHeat.servesAt(b?.streetSegments, atMs)),
       });
     }
   }

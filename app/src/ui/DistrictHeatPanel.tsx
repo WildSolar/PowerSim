@@ -524,6 +524,9 @@ export function DistrictHeatPanel() {
               ))}
             </>
           )}
+          {!candidates.some((c) => c.kind === "industry") && (
+            <p className="dh-note">Firms with waste heat to sell are found by the district heating advisor (Town hall → Advisors).</p>
+          )}
           <p className="dh-note">{candidates.length > 0 ? "Or build a plant of your own, placed on the map:" : "Build a plant of your own, placed on the map:"}</p>
           {PLACED.map(({ kind, note }) => {
             const disabled = placedDisabled(kind);

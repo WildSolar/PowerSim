@@ -1087,7 +1087,8 @@ class PublicCharging {
    * fractional rate rounds by chance), each at the public building without chargers that has the
    * most unmet demand around it last year (households that wanted an electric car but found no
    * charger), then the biggest. Not next to a site still being built or placed earlier in the
-   * round: what it will serve is no longer counted, and the buildings around it wait their turn. */
+   * round: what it will serve is no longer counted, and the buildings around it wait their turn.
+   * Only the mobility advisor knows where the demand is: without one, the sites go wherever comes up. */
   private publicBuildingRound(year: number): boolean {
     const channels = policyStore.get();
     const perYear = channels.publicBuildingChargerSitesPerYear;
@@ -1103,11 +1104,18 @@ class PublicCharging {
       const [x, y] = this.projection.toXY(b.lon, b.lat);
       return { b, x, y };
     });
+    const ranked = channels.advisorMobility > 0;
     let placed = 0;
     while (placed < count) {
       let best: { b: Building; x: number; y: number; near: number } | null = null;
       for (const c of candidates) {
         if (nearComing(c.x, c.y) || this.onChargedCampus(c.b)) continue;
+        if (!ranked) {
+          // In no particular order: a seeded draw per building and round.
+          const draw = -hashSeed("public-building-charger-pick", c.b.egid, String(year), String(placed));
+          if (!best || draw > best.near) best = { ...c, near: draw };
+          continue;
+        }
         const near = demand.filter((d) => Math.hypot(d.x - c.x, d.y - c.y) <= DEMAND_RADIUS_M.ac).length;
         if (!best || near > best.near || (near === best.near && (c.b.footprintAreaM2 ?? 0) > (best.b.footprintAreaM2 ?? 0))) best = { ...c, near };
       }

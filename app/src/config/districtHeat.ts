@@ -155,7 +155,8 @@ export const DH_INDUSTRY_SITE_NAMES: Record<number, string> = {
   63: "Data centre",
   86: "Hospital",
 };
-// Offers arrive one by one over these years (a firm reviewing its energy, a new owner).
+// A firm becomes ready to sell its waste heat in one of these years (reviewing its energy, a new
+// owner) — found, from then on, by the district heating advisor (advisors.ts).
 export const DH_INDUSTRY_OFFER_YEARS: [number, number] = [2027, 2040];
 // A potential (MWh a year) as a plant size: incinerators and factories give heat most of the year,
 // a treatment plant's effluent is drawn on hardest in winter.

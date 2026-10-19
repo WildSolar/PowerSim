@@ -18,6 +18,7 @@ import type { Building } from "../data/types";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { debt } from "./debt";
 import { districtHeat, segmentCostRp } from "./districtHeat";
+import { candidateName, districtHeatSources } from "./districtHeatSources";
 import { networkStatusAt } from "./districtHeatStats";
 import { simClock } from "./engine";
 import { townTakeRp, utilityProfitRp } from "./finances";
@@ -83,6 +84,8 @@ const mwh = (kWh: number) => `${Math.round(kWh / 1000).toLocaleString("de-CH")} 
 class Advisors {
   private lastReportMonth: Partial<Record<AdvisorId, number>> = {};
   private reports: Partial<Record<AdvisorId, AdvisorReport>> = {};
+  /** The factories' waste heat the district heating advisor has found, and when. */
+  private foundIndustry = new Map<string, number>();
   private readonly listeners = new Set<() => void>();
   private version = 0;
   private lastMonth = 0;
@@ -96,6 +99,8 @@ class Advisors {
     this.seed = seed;
     this.lastReportMonth = {};
     this.reports = {};
+    this.foundIndustry = new Map();
+    districtHeatSources.setIndustryFinder((id) => this.foundIndustry.get(id));
     this.lastMonth = monthIndex(simClock.getSimTimeMs());
     this.unsubscribeClock = simClock.subscribe(() => this.advance(simClock.getSimTimeMs()));
   }
@@ -275,7 +280,41 @@ class Advisors {
     return 1 - Math.exp(Math.pow(age / scale, k) - Math.pow((age + DH_HORIZON_YEARS) / scale, k));
   }
 
+  /** The district heating advisor's report: the streets to extend to, and the factories with waste
+   * heat to sell — found by asking around (each once it is ready to), on offer from then on. */
   private districtHeatReport(atMs: number): { subject: string; paragraphs: string[]; picks?: LetterPick[] } {
+    const streets = this.streetReport(atMs);
+    let newly = 0;
+    for (const c of districtHeat.getCandidates()) {
+      if (c.kind !== "industry" || this.foundIndustry.has(c.id) || districtHeatSources.industryReadyAtMs(c) > atMs) continue;
+      this.foundIndustry.set(c.id, atMs);
+      newly++;
+    }
+    const open = districtHeatSources.availableCandidates(atMs).filter((c) => c.kind === "industry");
+    const paragraphs = [...streets.paragraphs];
+    if (open.length === 0) {
+      paragraphs.push("I also asked around the town's industry for heat it throws away — cooling water, exhaust. No firm has any to sell the utility this year; some may, once they review their energy.");
+      return { ...streets, paragraphs };
+    }
+    paragraphs.push(
+      `I also asked around the town's industry for heat it throws away — cooling water, exhaust.${newly > 0 ? ` I found ${newly === 1 ? "one" : newly}${newly < open.length ? " more" : ""} firm${newly === 1 ? "" : "s"} ready to sell theirs this year.` : ""} ${open.length === 1 ? "One firm would" : `${open.length} firms would`} sell it to the utility for a fixed sum a year; the utility builds the heat exchanger and the connection. Take it up straight from the list, or look at it on the map first — the pipes have to reach it.`,
+    );
+    const picks: LetterPick[] = open.map((c) => {
+      const q = districtHeatSources.candidateQuote(c, atMs);
+      return {
+        label: `${candidateName(c)} — waste heat`,
+        detail: `${q.sizeMw.toFixed(1)} MW · connection about ${chf(q.capexRp)}${q.trunkM > 0 ? ` (with ${Math.round(q.trunkM)} m of trunk line)` : ""}, then ${chf(q.yearlyRp)} a year`,
+        lon: c.lon,
+        lat: c.lat,
+        tool: "districtHeat" as const,
+        candidateId: c.id,
+      };
+    });
+    const subject = streets.picks && streets.picks.length > 0 ? `${streets.subject}, and waste heat to buy` : `District heating: waste heat to buy from ${open.length === 1 ? "a firm" : `${open.length} firms`}`;
+    return { subject, paragraphs, picks: [...(streets.picks ?? []), ...picks] };
+  }
+
+  private streetReport(atMs: number): { subject: string; paragraphs: string[]; picks?: LetterPick[] } {
     if (districtHeat.getSources().length === 0)
       return {
         subject: "District heating: no network to extend yet",
@@ -419,13 +458,14 @@ class Advisors {
   // --- saving (saveGame.ts) ---
 
   snapshot() {
-    return { lastReportMonth: this.lastReportMonth, lastMonth: this.lastMonth, reports: this.reports };
+    return { lastReportMonth: this.lastReportMonth, lastMonth: this.lastMonth, reports: this.reports, foundIndustry: this.foundIndustry };
   }
 
   restore(s: ReturnType<Advisors["snapshot"]>): void {
     this.lastReportMonth = { ...s.lastReportMonth };
     this.lastMonth = s.lastMonth;
     this.reports = { ...s.reports };
+    this.foundIndustry = new Map(s.foundIndustry);
     this.notify();
   }
 }

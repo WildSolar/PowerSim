@@ -42,6 +42,8 @@ export interface LetterPick {
   segments?: number[];
   /** EV charging: an on-street site, or a hub for vans and lorries. */
   charger?: "ac" | "hub";
+  /** District heating: a factory's waste heat on offer (its candidate). */
+  candidateId?: string;
 }
 
 export interface NewsStory {

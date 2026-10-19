@@ -754,16 +754,19 @@ function municipalSolarReturn(building: Building, year: number, tariff: Tariff):
 
 /** The municipality puts solar on some of its own (public) buildings this year — a measure, not an
  * owner's decision: full usable roof, paid for by the treasury (less the federal payment every
- * installation gets), generating from the install date. The roofs that pay back best go first. */
+ * installation gets), generating from the install date. The roofs that pay back best go first if the
+ * roof solar advisor has ranked them; otherwise in no particular order. */
 function installMunicipalSolar(buildings: Building[], realPlants: PowerPlant[], year: number, yearStartMs: number, tariff: Tariff): void {
   const perMonth = policyStore.get().municipalSolarBuildingsPerYear / 12;
   if (perMonth <= 0) return;
   const whole = Math.floor(perMonth);
   const count = whole + (mulberry32(hashSeed("municipal-solar-count", String(yearStartMs)))() < perMonth - whole ? 1 : 0);
   if (count === 0) return;
+  // With the roof solar advisor, the roofs that pay back best go first; without, whichever comes up.
+  const ranked = policyStore.get().advisorRoofSolar > 0;
   const candidates = municipalSolarCandidates(buildings, realPlants, yearStartMs).sort(
     (a, b) =>
-      municipalSolarReturn(b, year, tariff) - municipalSolarReturn(a, year, tariff) ||
+      (ranked ? municipalSolarReturn(b, year, tariff) - municipalSolarReturn(a, year, tariff) : 0) ||
       hashSeed(a.egid, "municipal-solar", String(yearStartMs)) - hashSeed(b.egid, "municipal-solar", String(yearStartMs)),
   );
   for (const building of candidates.slice(0, count)) {

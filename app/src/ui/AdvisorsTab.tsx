@@ -3,6 +3,7 @@ import { useState, useSyncExternalStore } from "react";
 import { ADVISOR_ORDER, ADVISORS, advisors, type AdvisorId, type AdvisorReport } from "../sim/advisors";
 import { formatDate } from "../sim/calendar";
 import { districtHeat } from "../sim/districtHeat";
+import { districtHeatSources } from "../sim/districtHeatSources";
 import { simClock } from "../sim/engine";
 import { cannotPay } from "../sim/fiscalRules";
 import type { LetterPick } from "../sim/inbox";
@@ -28,7 +29,7 @@ export function openAdvisorPage(id: AdvisorId): void {
 
 /** Re-renders when anything a pick's state depends on changes. */
 function useAdvisorState(): void {
-  for (const store of [measures, advisors, roofContracts, publicCharging, districtHeat]) {
+  for (const store of [measures, advisors, roofContracts, publicCharging, districtHeat, districtHeatSources]) {
     // eslint-disable-next-line react-hooks/rules-of-hooks -- a fixed list, called in the same order every render
     useSyncExternalStore(
       (l) => store.subscribe(l),
@@ -148,6 +149,25 @@ function PipeAction({ pick, now }: { pick: LetterPick; now: number }) {
   );
 }
 
+/** What can be done about a factory's waste heat the district heating advisor found: taken up since,
+ * or taking it — the heat exchanger and the connection, then the yearly payment. */
+function FactoryAction({ pick, now }: { pick: LetterPick; now: number }) {
+  const c = districtHeat.getCandidates().find((x) => x.id === pick.candidateId);
+  if (!c) return <Chip tone="off">No longer on offer</Chip>;
+  if (!districtHeatSources.availableCandidates(now).some((x) => x.id === c.id)) return <Chip tone="good">Heat exchanger ordered</Chip>;
+  const q = districtHeatSources.candidateQuote(c, now);
+  if (q.problem) return <Chip tone="off">{q.problem}</Chip>;
+  const take = () => {
+    districtHeatSources.startDraft(c.kind, c.id);
+    if (!districtHeatSources.orderDraft(simClock.getSimTimeMs())) districtHeatSources.cancelDraft();
+  };
+  return (
+    <ActionButton costRp={q.capexRp} now={now} onClick={take}>
+      Take {q.sizeMw.toFixed(1)} MW — {formatCHF(q.capexRp)}, then {formatCHF(q.yearlyRp)} a year
+    </ActionButton>
+  );
+}
+
 function PickRow({ pick, report, now, onShowOnMap }: { pick: LetterPick; report: AdvisorReport; now: number; onShowOnMap: (pick: LetterPick) => void }) {
   return (
     <li className="advisor-pick">
@@ -158,7 +178,7 @@ function PickRow({ pick, report, now, onShowOnMap }: { pick: LetterPick; report:
       <div className="advisor-pick-actions">
         {pick.tool === "roofSolar" && <RoofAction pick={pick} now={now} />}
         {pick.tool === "evCharging" && <ChargerAction pick={pick} report={report} now={now} />}
-        {pick.tool === "districtHeat" && <PipeAction pick={pick} now={now} />}
+        {pick.tool === "districtHeat" && (pick.candidateId ? <FactoryAction pick={pick} now={now} /> : <PipeAction pick={pick} now={now} />)}
         <button className="advisor-map" onClick={() => onShowOnMap(pick)}>
           <MapPin size={13} strokeWidth={1.75} aria-hidden /> Show on the map
         </button>

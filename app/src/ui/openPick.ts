@@ -1,5 +1,7 @@
 import { mapFocus } from "../map/mapFocus";
 import { districtHeat } from "../sim/districtHeat";
+import { districtHeatSources } from "../sim/districtHeatSources";
+import { simClock } from "../sim/engine";
 import type { LetterPick } from "../sim/inbox";
 import { stock } from "../sim/stock";
 
@@ -9,6 +11,9 @@ export function showPickOnMap(pick: LetterPick, onOpenTool: (tool: LetterPick["t
   onOpenTool(pick.tool);
   const building = pick.egid ? stock.lookup(pick.egid) : undefined;
   if (pick.tool === "districtHeat" && pick.segments) districtHeat.selectOnly(pick.segments);
+  // A factory's waste heat: its plant planned, so the tool shows what it would take.
+  const candidate = pick.candidateId ? districtHeat.getCandidates().find((c) => c.id === pick.candidateId) : undefined;
+  if (candidate && districtHeatSources.availableCandidates(simClock.getSimTimeMs()).some((c) => c.id === candidate.id)) districtHeatSources.startDraft(candidate.kind, candidate.id);
   if (building) {
     onSelectBuilding(building.egid);
     mapFocus.focusBuilding(building, 17);

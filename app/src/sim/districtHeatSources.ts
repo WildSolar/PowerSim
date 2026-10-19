@@ -2,8 +2,8 @@
  * New heat for district heating: where it can come from, what a plant of a given size costs, and
  * ordering it (districtHeat.ts keeps the sources).
  *
- *  - Waste heat bought from a plant within reach: an incinerator (per kWh), a factory that offers its
- *    waste heat (a fixed yearly payment; the offers arrive one by one over the years) — or a data
+ *  - Waste heat bought from a plant within reach: an incinerator (per kWh), a factory with waste heat
+ *    to sell (a fixed yearly payment; found by the district heating advisor, advisors.ts) — or a data
  *    centre's, if one comes to town (datacenter.ts) — and a waste
  *    water treatment plant, which is public — the town pays only for the heat pump on its effluent.
  *    Their size is set by what the plant can give; a plant outside the town needs a trunk line.
@@ -156,6 +156,7 @@ class DistrictHeatSources {
   private nuisanceCache: { key: string; share: number } | null = null;
   private hints = new Map<PlacedKind, { lon: number; lat: number } | null>();
   private waterZone: [number, number][][][] | null = null;
+  private industryFound: (candidateId: string) => number | undefined = () => undefined;
 
   init(dataset: MunicipalityDataset, buildingsProvider: () => Building[]): void {
     const first = dataset.buildings[0];
@@ -175,11 +176,23 @@ class DistrictHeatSources {
 
   // --- what is within reach ---
 
-  /** When a candidate becomes available: incinerators and treatment plants from the start, a
-   * factory once its offer arrives. */
+  /** When a candidate becomes available: incinerators and treatment plants from the start, a data
+   * centre's heat when it offers it, a factory's once the district heating advisor has found it
+   * (advisors.ts) — never, without one. */
   offerAtMs(c: DhCandidateData): number {
     if (c.kind === "datacenter") return datacenter.offerAtMs();
     if (c.kind !== "industry") return Number.NEGATIVE_INFINITY;
+    return this.industryFound(c.id) ?? Number.POSITIVE_INFINITY;
+  }
+
+  /** advisors.ts: when the district heating advisor found each factory's waste heat. */
+  setIndustryFinder(found: (candidateId: string) => number | undefined): void {
+    this.industryFound = found;
+  }
+
+  /** When a factory would be ready to sell its waste heat, if asked (a firm reviewing its energy, a
+   * new owner): drawn once, over the years. */
+  industryReadyAtMs(c: DhCandidateData): number {
     const rng = mulberry32(hashSeed(this.seed, c.id));
     const [from, to] = DH_INDUSTRY_OFFER_YEARS;
     const year = from + Math.floor(rng() * (to - from + 1));
