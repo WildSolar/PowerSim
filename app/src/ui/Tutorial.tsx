@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { BASELINE_YEAR } from "../sim/calendar";
+import { NET_ZERO_TARGET_YEAR } from "../sim/score";
 import { track } from "../analytics";
 import { simClock } from "../sim/engine";
 import { TUTORIAL_STEPS, type TutorialState } from "./tutorialSteps";
@@ -24,7 +26,11 @@ interface Box {
 }
 
 function fill(text: string, s: TutorialState): string {
-  return text.replace(/\{town\}/g, s.town).replace(/\{election\}/g, s.nextElection ?? "not yet set");
+  const years = NET_ZERO_TARGET_YEAR - BASELINE_YEAR;
+  return text
+    .replace(/\{town\}/g, s.town)
+    .replace(/\{election\}/g, s.nextElection ?? "not yet set")
+    .replace(/\{years\}/g, years === 24 ? "Twenty-four" : String(years));
 }
 
 /** The tutorial: Nadia's card, the step's task, and a spotlight on what to use. It sits above

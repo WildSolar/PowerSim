@@ -52,6 +52,7 @@ export const CHANGELOG: Release[] = [
     fixed: [
       "The treasury at year end shown in the Year in Review now matches the top bar: December's allocation, interest and instalments count in the year they belong to.",
       "The advisors' pages no longer say the treasury can't pay for a proposal you haven't acted on.",
+      "Texts brought up to date throughout — measures, advisors, the tutorial and the wiki: what the advisors also do, the grid's hold on your own large arrays, carbon removal measured against your first year rather than 2026, and a few leftovers from earlier versions.",
       "Residents no longer ask for a measure the voters have just turned down, which couldn't be enacted again in time; and when a vote is called off because its measure was wound up, the town clerk now says so.",
     ],
   },

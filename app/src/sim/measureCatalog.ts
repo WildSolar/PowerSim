@@ -193,7 +193,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "buildings",
     title: "Solar on public buildings",
     summary:
-      "The municipality puts solar on its own schools, halls and other public buildings, a few each year — the roofs that pay back best first, if the roof solar advisor has ranked them; otherwise in no particular order. The panels cost the treasury their price (less the federal payment) and generate from then on.",
+      "The municipality puts solar on its own schools, halls and other public buildings, a few each year — the roofs that pay back best first, if the roof solar advisor has ranked them; otherwise in no particular order. The panels cost the treasury their price (less the federal payment) and generate from then on. Where the grid is full at summer middays, a large roof waits until the area is reinforced.",
     params: [{ kind: "slider", key: "perYear", label: "Buildings per year", min: 0, max: 20, step: 1, unit: "per year", default: 3 }],
     leadTimeMonths: 6,
     effects: (p) => ({ municipalSolarBuildingsPerYear: num(p, "perYear") }),
@@ -205,7 +205,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "buildings",
     title: "Solar over the town's car parks",
     summary:
-      "The municipality puts solar canopies over its own car parks — by its schools, halls and sports grounds, and the public ones — a few each year, those that pay back best first. The treasury pays the price less the federal payment; what the panels save the building next door and earn feeding in is credited to you.",
+      "The municipality puts solar canopies over its own car parks — by its schools, halls and sports grounds, and the public ones — a few each year, those that pay back best first. The treasury pays the price less the federal payment; what the panels save the building next door and earn feeding in is credited to you. Where the grid is full at summer middays, a car park waits until the area is reinforced.",
     params: [{ kind: "slider", key: "perYear", label: "Car parks per year", min: 0, max: 6, step: 1, unit: "per year", default: 2 }],
     leadTimeMonths: 6,
     effects: (p) => ({ carParkSolarMunicipalPerYear: num(p, "perYear") }),
@@ -442,7 +442,8 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "mobility",
     subsidyCategory: "vehicle",
     title: "Scrappage bonus for petrol and diesel cars",
-    summary: "An extra grant when a household replaces a petrol or diesel car with an electric one — on top of the ordinary electric car grant. It aims at exactly the switch you want, though it also pays households that would have gone electric anyway.",
+    summary:
+      "An extra grant when a household replaces a petrol or diesel car with an electric one, on top of the electric car grant. It pays for exactly the switch that cuts emissions — and, like any grant, also for households that would have gone electric anyway.",
     params: [{ kind: "slider", key: "amount", label: "Bonus", min: 0, max: 10000, step: 500, unit: "CHF each", default: 2000 }],
     leadTimeMonths: 2,
     effects: (p) => ({ iceScrappageBonusRp: num(p, "amount") * CHF }),
@@ -534,7 +535,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "grid",
     title: "Green electricity as the default",
     summary:
-      "The utility supplies certified renewable power by default. Emissions attributed to grid electricity fall with the share; the certificates cost the utility a premium on every kWh it buys, which comes out of the treasury, not the households' bills.",
+      "The utility supplies certified renewable power by default. Emissions attributed to grid electricity fall with the share; the certificates cost the utility a premium on every kWh it buys, which comes out of its result — and so your department's share of it — unless you pass it on in your prices.",
     params: [{ kind: "slider", key: "share", label: "Share of supply", min: 0, max: 100, step: 10, unit: "%", default: 50 }],
     leadTimeMonths: 6,
     effects: (p) => ({ greenPowerShare: num(p, "share") }),
@@ -546,7 +547,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "advice",
     title: "Agri-PV dialogue",
     summary:
-      "Field visits, farmers who already harvest under panels, round tables with the farmers' association and the landscape groups. Year by year, people come to accept solar over farmland — which softens the opposition to Agri-PV zones, those put forward and those already in force. A running cost.",
+      "Field visits, farmers who already harvest under panels, round tables with the farmers' association and the landscape groups. Year by year, people come to accept solar over farmland: more farmers agree to panels over their fields, and the opposition to Agri-PV zones softens — those put forward and those already in force. A running cost.",
     params: [],
     leadTimeMonths: 2,
     effects: () => ({ agriPvDialogue: 1 }),
@@ -573,7 +574,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "advisors",
     title: "Roof solar advisor",
     summary:
-      "A consultant who goes through every large roof the utility could rent and writes each March with the ten that would return the most on an array — at your rent, today's panel prices and the market — and how many owners would likely accept.",
+      "A consultant who goes through every large roof the utility could rent and writes each March with the ten that would return the most on an array — at your rent, today's panel prices and the market — and how many owners would likely accept. With one retained, ‘Solar on public buildings’ takes the roofs that pay back best first.",
     params: [],
     leadTimeMonths: 3,
     effects: () => ({ advisorRoofSolar: 1 }),
@@ -586,7 +587,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "advisors",
     title: "Mobility advisor",
     summary:
-      "A consultant who writes each February with where a new public charging site would do most good — where most households who wanted an electric car went without a charger over the past year — and whether vans and lorries need a hub.",
+      "A consultant who writes each February with where a new public charging site would do most good — where most households who wanted an electric car went without a charger over the past year — and whether vans and lorries need a hub. With one retained, ‘Chargers at public buildings’ goes where the need is greatest first.",
     params: [],
     leadTimeMonths: 3,
     effects: () => ({ advisorMobility: 1 }),
@@ -599,7 +600,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "advisors",
     title: "District heating advisor",
     summary:
-      "A consultant who writes each April with the streets next to your network that would likely bring the most heat per metre of pipe within five years — buildings on oil, gas or wood whose heating is due for replacement, and how many owners here choose district heat.",
+      "A consultant who writes each April with the firms ready to sell their waste heat — the only way to find them — and the streets next to your network that would likely bring the most heat per metre of pipe within five years: buildings on oil, gas or wood whose heating is due for replacement, and how many owners here choose district heat.",
     params: [],
     leadTimeMonths: 3,
     effects: () => ({ advisorDistrictHeat: 1 }),
@@ -625,8 +626,8 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "removal",
     title: "Carbon removal contracts",
     summary:
-      "The municipality pays for CO2 to be taken out of the air — biochar, direct air capture, capture at a waste-to-energy plant — to balance the emissions it can't avoid. Removals count only for the hard-to-avoid rest: once the town's own emissions are down to a fifth of 2026's. From the year after it gets there, they are bought month by month for what is left, up to the share set here, at the price of the day — around CHF 450 a tonne today, getting cheaper — and paid each month. Until then the contract costs nothing.",
-    params: [{ kind: "slider", key: "share", label: "Cover up to", min: 1, max: 20, step: 1, unit: "% of 2026's emissions", default: 10 }],
+      "The municipality pays for CO2 to be taken out of the air — biochar, direct air capture, capture at a waste-to-energy plant — to balance the emissions it can't avoid. Removals count only for the hard-to-avoid rest: once the town's own emissions are down to a fifth of the first year's. From the year after it gets there, they are bought month by month for what is left, up to the share set here, at the price of the day — around CHF 450 a tonne today, getting cheaper — and paid each month. Until then the contract costs nothing.",
+    params: [{ kind: "slider", key: "share", label: "Cover up to", min: 1, max: 20, step: 1, unit: "% of the first year's emissions", default: 10 }],
     leadTimeMonths: 6,
     effects: (p) => ({ removalShareOfBaseline: num(p, "share") }),
     costCategory: "removals",

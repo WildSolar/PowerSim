@@ -53,7 +53,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Overview",
     blocks: [
       p(
-        "In Commune Zéro you run the energy department of a real Swiss municipality: its electricity utility, its district heating, and its say over buildings, zoning and transport. The goal is net zero by 2050 — without losing the voters or emptying the treasury on the way.",
+        "In Commune Zéro you run the energy department of a real Swiss municipality: its electricity utility, its district heating, and its say over buildings, transport and new energy projects. The goal is net zero by 2050 — without losing the voters or emptying the treasury on the way.",
       ),
       p(
         "The town on the map is the real one. Every building comes from the federal building register, with its real address, age, size, homes and heating; so are the solar panels, the public chargers, the share of electric cars and the businesses' vans and lorries at the start. From there the town lives on: people heat, cook, charge and commute, systems wear out and get replaced, new buildings go up. You can't decide for anyone — but your measures, prices and building projects change what people choose.",
@@ -68,7 +68,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "A new game opens with a short briefing — the goal, how you stay in office, what you control — and a checklist of first steps in the corner, each with a button that takes you there. Close it once you know your way around; the game menu brings it back.",
       ),
       p(
-        "The bar across the top shows the date and the speed, and the three numbers that matter most: the treasury, public approval, and last year's emissions against the first year's. On the left of the map are its layers (see \"Map layers\"). Everything that isn't on the map — measures, the accounts, prices and statistics — is in the Town hall, top right. The game pauses while the Town hall or this wiki is open, and carries on at the same speed when you close them.",
+        "The bar across the top shows the date and the speed, and the numbers that matter most: the treasury, public approval, last year's emissions and your score. On the left of the map are its layers (see \"Map layers\"). Everything that isn't on the map — measures, the accounts, prices and statistics — is in the Town hall, top right. The game pauses while the Town hall or this wiki is open, and carries on at the same speed when you close them.",
       ),
       note(
         "Where there is no real data — who owns an electric car, when someone runs the dishwasher — the game fills in plausible households. They aren't the people who really live there, but together they behave the way a town does.",
@@ -369,13 +369,13 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Municipal finances",
     blocks: [
       p(
-        "The energy department has one treasury, shown in the top bar; click it for the accounts. Money comes in from three places: a yearly allocation from the municipality's general budget (paid a twelfth on the last day of each month, sized by the population), the department's share of what its electricity utility earns, and smaller items — sales at its own public chargers, the zoning levy, and money it borrows (see \"Borrowing & debt\").",
+        "The energy department has one treasury, shown in the top bar; click it for the accounts. Money comes in from three places: a yearly allocation from the municipality's general budget (paid a twelfth on the last day of each month, sized by the population), the department's share of what its electricity utility earns, and smaller items — sales at its own public chargers, Swissgrid's compensation for new solar (see \"The electricity grid\"), and money it borrows (see \"Borrowing & debt\").",
       ),
       p(
         "Money goes out only when something actually happens: the day a household installs a subsidised heat pump, buys a subsidised electric car, insulates or puts up panels, the municipal grant is paid. A grant nobody takes up costs nothing — but it is also paid to everyone who would have done the same anyway. Finding the level that tips the undecided without overpaying the rest is the art of subsidy planning.",
       ),
       p(
-        "Building things — district heating pipes, public chargers, grid reinforcement, a zoning change — is paid the day it is ordered. Campaigns and programmes cost a little every month.",
+        "Building things — district heating pipes, public chargers, grid reinforcement, an Agri-PV zone or a wind park's zoning plan — is paid the day it is ordered. Campaigns and programmes cost a little every month.",
       ),
       p(
         "The utility settles each month once it is over: what customers paid for electricity and district heat, less the power it bought (the district heating heat pumps' included), the cost of making district heat (fuel, heat bought from incinerators), the solar it paid for, and the upkeep of the grid, the pipes, the heat plants and the chargers. Like Swiss municipal utilities, it pays the town a concession fee on every kWh it sells — set when you took office, at what the town took the year before (three quarters of that year's profit). Everything beyond the fee is your department's, a loss too: so what you build pays you back in full — a wind turbine's power, a battery's savings, the customers a new pipe brings. Solar on public buildings counts as well: what the panels save the buildings and earn feeding in is credited to you. Each month's result reaches the treasury a few days after the month ends; the year's accounts are closed on 31 December. You set the utility's prices in Town hall → Prices, once a year; what it pays for power follows the market (see \"Tariffs & energy prices\").",
@@ -384,7 +384,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Town hall → Treasury → Ledger lists every franc in and out, newest first: each month's allocation and the utility's month, every subsidy paid (with the building), every order, levy, loan and interest payment. Filter it by kind and by year; its total is what that selection did to the balance.",
       ),
       note(
-        "Federal and cantonal grants — the ones every heat pump, solar system and renovation already gets — aren't municipal money; only your own top-up is. Gas, oil and petrol are bought from outside suppliers, never through the utility. The department's share of the utility profit (about CHF 1.4 million a year at the starting prices) and the allocation (about CHF 3.3 million) are small next to a serious subsidy programme, so what you fund matters.",
+        "Federal and cantonal grants — the ones every heat pump, solar system and renovation already gets — aren't municipal money; only your own top-up is. Gas, oil and petrol are bought from outside suppliers, never through the utility. The department's share of the utility's profit and the allocation — a few million francs a year in a mid-sized town — are small next to a serious subsidy programme, so what you fund matters.",
       ),
     ],
   },
@@ -603,7 +603,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "The municipality owns buildings of its own — schools, sports halls and the like — and can lead by example on them. The Public buildings tool shows them all, coloured by what they carry: solar, chargers, both or neither. Its drawer lists them; click one, there or on the map, to see it and order for it. A public building's own panel has the same orders.",
       ),
       list([
-        "Solar: the full usable roof, ordered directly, paid by the treasury (less the federal payment every installation gets) and generating a few months later. Or automatically, a few buildings a year, with the ‘Solar on public buildings’ measure — with the roof solar advisor, the roofs that pay back best first (those where the panels would save and earn the most a year for what they cost, much as an owner would weigh it); without one, in no particular order.",
+        "Solar: the full usable roof, ordered directly, paid by the treasury (less the federal payment every installation gets) and generating a few months later — unless the grid there is full at summer middays, when a large roof waits until the area is reinforced (see \"The electricity grid\"). Or automatically, a few buildings a year, with the ‘Solar on public buildings’ measure — with the roof solar advisor, the roofs that pay back best first (those where the panels would save and earn the most a year for what they cost, much as an owner would weigh it); without one, in no particular order.",
         "Chargers: a public charging site in the building's car park, with 4, 8 or 12 points, ordered directly. Or automatically with the ‘Chargers at public buildings’ measure: with the mobility advisor, it starts where most households nearby are missing a charger; without one, it goes wherever comes up. Once it has placed a site, the households around it count as served, so the next one goes where the need is next greatest — never within about 300 m of a site still being built. Either way they are municipal chargers like any other (see \"Public charging\").",
         "Once every public building has what a programme provides, the measure has nothing left to do: it is greyed out, and one already in force winds up by itself — without the approval cost of a repeal, and any vote on it is called off.",
       ]),
@@ -707,7 +707,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "A town starts with the networks it really has — their plants, what they run on and how big they are, as their operators report them. Some run on wood or waste heat with an oil boiler for the coldest days; some on oil or gas alone. Whatever pipes hang together form one network: when two meet, they share their heat sources. The municipal utility runs them all: it sells the heat at the district heating price (Town hall → Prices), pays for making it and for the upkeep of the pipes and plants, so a network full of customers earns money while a long pipe past few buildings costs it.",
       ),
       p(
-        "Every network has boilers for whatever its clean sources can't deliver, so a network never runs out of heat — only out of clean heat. On a cold day the clean sources run flat out and the boilers make up the rest, burning oil (or gas). Each network's card in the District heating tool shows its clean sources against its winter peak. A source sized at half the peak already covers most of the year's heat, since the coldest days are few; covering the whole peak keeps the boilers cold. See \"Heat for district heating\" for adding sources. A network's card (click it on the map) adds its clean sources up against its winter peak: the room left before the boilers start, or — if they have to — how much of the peak they make and how much heat they burn a year, projected from the weather.",
+        "Every network has boilers for whatever its clean sources can't deliver, so a network never runs out of heat — only out of clean heat. On a cold day the clean sources run flat out and the boilers make up the rest, burning oil (or gas). A source sized at half the peak already covers most of the year's heat, since the coldest days are few; covering the whole peak keeps the boilers cold. A network's card in the District heating tool (click it on the map) adds its clean sources up against its winter peak: the room left before the boilers start, or — if they have to — how much of the peak they make and how much heat they burn a year, projected from the weather. See \"Heat for district heating\" for adding sources.",
       ),
       p(
         "To extend the pipes, open the District heating tool and click streets: each click picks one stretch between two junctions (click again to drop it; footpaths among the buildings count as streets), and the buildings it would newly reach light up in orange. An extension must connect to the network or a heat source, directly or through the other streets you picked; a picked street that doesn't shows in red until the gap is closed. Every street the network could run along is shaded grey. The drawer shows the extension's length, cost and build time, and how much heat the buildings it reaches use a year — in total and per metre of pipe, the figure planners judge an extension by. Ordering pays the whole cost at once; the pipes are laid over the following months, and buildings along them can connect as soon as they are done.",
@@ -778,7 +778,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "New buildings are always connected.",
       ]),
       p(
-        "Nobody reinforces the grid but you, paid from the treasury — though Swissgrid shares out what solar costs the grids nationally: for every kW of new solar on the town's grid (rooftops and car-park canopies), it pays CHF 59 each spring for the year before, whether you reinforce or not. Reinforcements for heat pumps and chargers get nothing; what you invest beyond the compensation comes back slowly through the network fee (see \"Tariffs & energy prices\"). Reinforcing an area, or adding a neighbourhood battery (250 kW, 500 kW or 1 MW, storing two hours; ready after six months, and cheaper over the years). A battery takes the top off the area's peaks, the winter evening draw and the summer midday feed-in alike — at most its power, and only as much as its storage lasts: the evening peak builds over several hours, so a small battery shaves less than its power, and a big one against a small area far less than its power.",
+        "Nobody reinforces the grid but you, paid from the treasury — though Swissgrid shares out what solar costs the grids nationally: for every kW of new solar on the town's grid (rooftops and car-park canopies), it pays CHF 59 each spring for the year before, whether you reinforce or not. Reinforcements for heat pumps and chargers get nothing; what you invest beyond the compensation comes back slowly through the network fee (see \"Tariffs & energy prices\"). For an overloaded area, open the Grid tool: reinforce its station, or add a neighbourhood battery (250 kW, 500 kW or 1 MW, storing two hours; ready after six months, and cheaper over the years). A battery takes the top off the area's peaks, the winter evening draw and the summer midday feed-in alike — at most its power, and only as much as its storage lasts: the evening peak builds over several hours, so a small battery shaves less than its power, and a big one against a small area far less than its power.",
       ),
       p(
         "Reinforcing puts in a new station of the size you choose, cables included, ready after nine months. A new station replaces the old one whatever its size, so going straight to the size you will need costs less than getting there in steps — but the money is spent now. One order per station at a time.",
@@ -1065,7 +1065,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Cooking — short bursts around breakfast, lunch and above all dinner.",
         "Washing and drying — on about one day in three, a load of 1.5–2.5 hours sometime in the day.",
       ]),
-      note("Washing machines don't wait for the night rate; only electric cars do."),
+      note("On the time-of-use tariff, washing machines don't wait for the night rate — only electric cars do. On the dynamic tariff, some loads are started in the day's cheapest hour (see \"The dynamic tariff\")."),
     ],
   },
   {

@@ -146,7 +146,7 @@ export function AgriPvFieldCard() {
           </div>
           <p className="dh-note">
             Businesses and energy cooperatives may take this field up on their own. To develop it yourself, ask the farmer first — a no stands for a few years — then apply for
-            the permit ({AGRI_PV_PERMIT_MONTHS} months, sometimes appealed); the panels are paid when you order them, in service {AGRI_PV_BUILD_MONTHS} months on.
+            the permit ({AGRI_PV_PERMIT_MONTHS} months; sometimes refused, often appealed); the panels are paid when you order them, in service {AGRI_PV_BUILD_MONTHS} months on.
           </p>
           <div className="dh-actions">
             {answer?.yes ? (

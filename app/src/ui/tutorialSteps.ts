@@ -21,7 +21,7 @@ export interface TutorialState {
 export interface TutorialStep {
   id: string;
   chapter: string;
-  /** What Nadia says: paragraphs, with {town} and {election} filled in. */
+  /** What Nadia says: paragraphs, with {town}, {election} and {years} (until 2050) filled in. */
   say: string[];
   /** What the player is asked to do, if anything (the step waits for `done`). */
   task?: string;
@@ -69,7 +69,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     target: "clock",
     say: [
       "The calendar. Time stands still while we talk. You run it with the buttons here — slow, medium, fast — or with the keys 1, 2 and 3; the space bar pauses.",
-      "A year passes in a few minutes at full speed. Twenty-four of them until 2050.",
+      "A year passes in a few minutes at full speed. {years} of them until 2050.",
     ],
   },
   {
@@ -77,7 +77,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     chapter: "The numbers that matter",
     target: "treasury",
     say: [
-      "Your department's money. It comes in as the canton's allocation and a share of what the municipal utility earns selling electricity and heat. It goes out on subsidies, programmes and anything you build.",
+      "Your department's money. It comes in as a yearly allocation from the municipality's budget and a share of what the municipal utility earns selling electricity and heat. It goes out on subsidies, programmes and anything you build.",
       "You can borrow for building things. Spend far more than you take in on running costs, though, and the taxpayers will notice.",
     ],
   },
@@ -140,7 +140,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     chapter: "The whole town",
     target: "legend",
     say: [
-      "Orange is oil and gas — the biggest share of what we emit. Purple is district heating, green heat pumps.",
+      "Red and orange are oil and gas — the biggest share of what we emit. Purple is district heating, green and blue are heat pumps.",
       "Every orange building is a decision someone will make in the next twenty years. How many of them choose green is largely up to you.",
     ],
   },
@@ -254,7 +254,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     target: "th-prices",
     task: "Go to Prices.",
     done: (s) => s.townHall === "prices",
-    say: ["Done — it takes effect in a few months. One more thing in here."],
+    say: ["Done — it takes effect next month. One more thing in here."],
   },
   {
     id: "pricesExplained",
@@ -348,7 +348,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     chapter: "Your term",
     noDim: true,
     say: [
-      "That's the job, Mayor. Twenty-four years, one town, every building in it.",
+      "That's the job, Mayor. {years} years, one town, every building in it.",
       "A word of advice: start early — what's built this decade is still standing in 2050. Watch your approval as closely as your CO₂. And read your mail.",
       "Whenever you're ready, a term of your own awaits — in {town} or one of the other towns. I'll be in my office.",
     ],
