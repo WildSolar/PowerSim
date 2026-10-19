@@ -37,7 +37,11 @@ export function LeaderboardPanel({ initial, onClose }: { initial: BoardKey | nul
     fetchBoards()
       .then((r) => {
         setBoards(r.boards);
-        setBoard((b) => b ?? r.boards[0] ?? null);
+        // Opened from the start screen: the newest version's board on Normal with the most runs.
+        const newest = r.boards[0]?.version;
+        const pool = r.boards.filter((x) => x.version === newest);
+        const first = [...pool].sort((x, y) => Number(y.difficulty === "normal") - Number(x.difficulty === "normal") || y.entries - x.entries)[0];
+        setBoard((b) => b ?? (first ? { version: first.version, slug: first.slug, difficulty: first.difficulty, startYear: first.startYear } : null));
       })
       .catch((e: Error) => setError(e.message));
     loadMunicipalityIndex()
