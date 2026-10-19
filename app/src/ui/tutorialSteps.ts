@@ -313,8 +313,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     chapter: "The town talks back",
     noDim: true,
     say: [
-      "Letters from residents and groups react to what you do. Some ask for something concrete by a deadline — a charger in their street, district heating — marked with a pin. Answer in time and they'll remember it — and they'll remember if you don't.",
-      "And once a month, the local paper.",
+      "Votes come first: what goes to the ballot, and how it went. Requests ask for something concrete by a deadline — a charger in their street, district heating. Answer in time and they'll remember it — and they'll remember if you don't. Your advisors and your projects report under their own tab.",
+      "Everything else — reactions, moods, complaints — waits under Letters. It never calls for you; read it when you like.",
     ],
   },
   {

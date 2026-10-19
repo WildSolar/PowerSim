@@ -399,7 +399,7 @@ class Wind {
   }
 
   private letter(atMs: number, subject: string, paragraphs: string[], from = `The Town Clerk of ${this.town}`): void {
-    inbox.addLetter({ id: `wind-${Math.floor(atMs)}-${subject.length}`, atMs, kind: "report", bloc: null, from, role: "", subject, paragraphs });
+    inbox.addLetter({ id: `wind-${Math.floor(atMs)}-${subject.length}`, atMs, kind: "project", bloc: null, from, role: "", subject, paragraphs });
   }
 
   // --- the turbines ---

@@ -1,5 +1,5 @@
-// Letters from residents and groups, and the local paper (sim/letters.ts, sim/newspaper.ts): who
-// writes, how often, and what answering a request is worth. Placeholders to balance.
+// Letters from residents and groups (sim/letters.ts): who writes, how often, and what answering a
+// request is worth. Placeholders to balance.
 
 import type { Bloc } from "./approval";
 
@@ -25,10 +25,10 @@ export const REACTION_MIN_STANCE = 0.25;
 export const REACTION_CHANCE = 0.85;
 export const REACTION_DELAY_DAYS: [number, number] = [2, 9];
 
-// Letters about what happened in town: at most this many a month, and the same complaint at most
-// once in this many months.
-export const REPORT_LETTERS_PER_MONTH = 2;
-export const REPORT_COOLDOWN_MONTHS = { refused: 2, exceptions: 3, noCharger: 4 } as const;
+// Letters about what went wrong in town: at most this many a month, and the same complaint at most
+// once in this many months — counting everyone it concerned since.
+export const REPORT_LETTERS_PER_MONTH = 1;
+export const REPORT_COOLDOWN_MONTHS = { refused: 6, exceptions: 6, noCharger: 6 } as const;
 
 // --- Requests ---
 

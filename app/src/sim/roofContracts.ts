@@ -393,7 +393,7 @@ class RoofContracts {
     inbox.addLetter({
       id: `roof-contracts-${month}`,
       atMs: to,
-      kind: "report",
+      kind: "project",
       bloc: null,
       from: "The utility's solar team",
       role: "",

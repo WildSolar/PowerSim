@@ -9,8 +9,8 @@
  *  - Green bonds, offered to the town's own residents: they accept a little less than the market for
  *    a local green cause, and subscribe as much as they want to (more when the climate-minded are
  *    content), after a subscription period. Repaid in one go at the end, interest yearly meanwhile.
- *    The money is earmarked: as much has to go into green investment within two years — or the paper
- *    calls it greenwashing.
+ *    The money is earmarked: as much has to go into green investment within two years — or it is
+ *    called greenwashing.
  *  - Federal decarbonisation loans: cheap and long, but only against decarbonisation investments
  *    already made (up to half of the last twelve months'), and only so much a year.
  *

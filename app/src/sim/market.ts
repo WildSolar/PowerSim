@@ -129,7 +129,7 @@ class Market {
     return sum / 12;
   }
 
-  /** Shocks that began in `[fromMs, toMs)` — for the paper. */
+  /** Shocks that began in `[fromMs, toMs)` — for the utility's letter (letters.ts). */
   shocksBetween(fromMs: number, toMs: number): MarketShock[] {
     return this.shocks.filter((s) => s.startMs >= fromMs && s.startMs < toMs);
   }

@@ -80,10 +80,11 @@ export interface GameOver {
   text: string;
 }
 
-/** What the public side of politics did — for the newspaper and the letters. */
+/** What the public side of politics did — for the letters. */
 export type ApprovalEvent =
   | { kind: "voteScheduled"; key: string; title: string; atMs: number; voteAtMs: number; stances: Stances }
   | { kind: "voteHeld"; key: string; title: string; atMs: number; accepted: boolean; yesShare: number; stances: Stances }
+  | { kind: "voteCalledOff"; key: string; title: string; atMs: number; reason: string }
   | { kind: "election"; atMs: number; reelected: boolean; approval: number }
   | { kind: "warning"; atMs: number; approval: number };
 
@@ -449,7 +450,10 @@ class ApprovalEngine {
       this.votes.delete(event.id);
     } else if (event.kind === "retired") {
       // It finished its work: no reaction either way, and nothing left to vote on.
-      if (this.votes.delete(event.id)) this.addLog(event.atMs, `The vote on ${event.def.title} is called off: the measure has been wound up.`);
+      if (this.votes.delete(event.id)) {
+        this.addLog(event.atMs, `The vote on ${event.def.title} is called off: the measure has been wound up.`);
+        this.emit({ kind: "voteCalledOff", key: event.id, title: event.def.title, atMs: event.atMs, reason: event.reason });
+      }
     }
     this.bump();
   }

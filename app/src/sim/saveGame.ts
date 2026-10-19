@@ -30,7 +30,6 @@ import { letters } from "./letters";
 import { measures } from "./measures";
 import { resetMobilityHandles, slotFromRef, slotRefOf, type SlotRef } from "./mobility";
 import { restoreModeChains, snapshotModeChains } from "./modeRenewal";
-import { newspaper } from "./newspaper";
 import { publicCharging } from "./publicCharging";
 import { restoreRenewalChains, snapshotRenewalChains } from "./renewal";
 import { restoreScore, snapshotScore } from "./score";
@@ -105,7 +104,6 @@ interface SaveState {
   studies: ReturnType<typeof studies.snapshot>;
   letters: ReturnType<typeof letters.snapshot>;
   inbox: ReturnType<typeof inbox.snapshot>;
-  newspaper: ReturnType<typeof newspaper.snapshot>;
   additionality: ReturnType<typeof snapshotAdditionality>;
   decisionLog: ReturnType<typeof snapshotDecisionLog> | null;
   emissions: ReturnType<typeof snapshotEmissions>;
@@ -184,7 +182,6 @@ export function captureState(transparency: boolean): Omit<SaveState, "yearReport
     studies: studies.snapshot(),
     letters: letters.snapshot(),
     inbox: inbox.snapshot(),
-    newspaper: newspaper.snapshot(),
     additionality: snapshotAdditionality(),
     // The decision log is only ever shown in transparency mode, and it is large.
     decisionLog: transparency ? snapshotDecisionLog() : null,
@@ -288,7 +285,6 @@ export function applySave(file: SaveFile): void {
   studies.restore(s.studies);
   letters.restore(s.letters);
   inbox.restore(s.inbox);
-  newspaper.restore(s.newspaper);
   restoreAdditionality(s.additionality);
   restoreDecisionLog(s.decisionLog);
   restoreEmissions(s.emissions);

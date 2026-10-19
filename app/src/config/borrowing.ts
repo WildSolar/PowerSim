@@ -73,8 +73,8 @@ export const GREEN_BOND_HOLDINGS_CHF_PER_RESIDENT = 300;
 export const GREEN_BOND_DEMAND_RANGE: [number, number] = [0.5, 1.3];
 export const GREEN_BOND_SUBSCRIPTION_MONTHS = 2;
 export const GREEN_BOND_MIN_MONTHS_APART = 12;
-// The money is earmarked: as much must go into green investment within this long, or the paper
-// calls it greenwashing and the climate-minded turn away.
+// The money is earmarked: as much must go into green investment within this long, or it is called
+// greenwashing and the climate-minded turn away.
 export const GREEN_BOND_EARMARK_MONTHS = 24;
 export const GREEN_BOND_ISSUE_GOODWILL = { climate: 3, tenants: 1 } as const;
 export const GREEN_BOND_GREENWASHING_POINTS = -5;

@@ -128,6 +128,13 @@
   color: var(--ink-2);
 }
 
+/* Letters: counted, but quietly — they never call for attention. */
+.inbox-count.quiet {
+  background: none;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
 .inbox-tabs button.active .inbox-count {
   background: var(--accent);
   color: var(--on-accent);
@@ -240,9 +247,54 @@
   font-weight: 600;
 }
 
-.inbox-item-subject.paper-font {
-  font-family: var(--font-paper);
-  font-size: 14px;
+/* Votes ahead, at the top of the Votes tab: not letters, so not clickable. */
+.inbox-ahead {
+  padding: 10px 16px 10px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--fill);
+}
+
+.inbox-ahead-title {
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.inbox-ahead-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.inbox-ahead-row > span:last-child {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+.inbox-ahead-row .good {
+  color: var(--good);
+}
+
+.inbox-ahead-row .bad {
+  color: var(--bad);
+}
+
+.request-due-soon {
+  color: var(--bad);
+  font-weight: 600;
+}
+
+.letter-reply {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--line-strong);
 }
 
 .request-status {
@@ -449,94 +501,6 @@
   padding-left: 19px;
   font-size: 12px;
   color: var(--ink-2);
-}
-
-/* The local paper */
-
-.paper {
-  font-family: var(--font-paper);
-}
-
-.paper-masthead {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding-bottom: 8px;
-  margin-bottom: 16px;
-  border-bottom: 3px double var(--ink);
-}
-
-.paper-title {
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-
-.paper-date {
-  font-family: var(--font);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-
-.paper-lead {
-  margin: 0 0 10px;
-  font-family: var(--font-paper);
-  font-size: 30px;
-  line-height: 1.12;
-  letter-spacing: -0.01em;
-}
-
-.paper-lead-body {
-  margin: 0 0 18px;
-  font-size: 16px;
-  line-height: 1.55;
-}
-
-.paper-stories {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 14px 22px;
-  padding-top: 14px;
-  border-top: 1px solid var(--ink);
-}
-
-.paper-story h3 {
-  margin: 0 0 4px;
-  font-family: var(--font-paper);
-  font-size: 16px;
-  line-height: 1.25;
-  letter-spacing: 0;
-}
-
-.paper-story p {
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--ink-2);
-}
-
-.paper-editorial {
-  margin-top: 20px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line-strong);
-  font-size: 14px;
-  font-style: italic;
-  line-height: 1.55;
-}
-
-.paper-editorial-label {
-  display: block;
-  margin-bottom: 4px;
-  font-family: var(--font);
-  font-size: 10.5px;
-  font-style: normal;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-3);
 }
 
 /* --- The top bar badge and the arrival notice -------------------------------------------- */

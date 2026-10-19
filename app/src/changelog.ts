@@ -34,6 +34,8 @@ export const CHANGELOG: Release[] = [
       "The Treasury's Accounts, Ledger and Borrowing are listed down the side, as on the Measures and Advisors pages.",
       "The Town hall, the inbox and the wiki replace each other: opening one closes whichever was open.",
       "The government's allocation is paid on the last day of each month, rather than the first.",
+      "The inbox has four tabs: Votes (what is going to the ballot, the polls and the next election, the results), Requests (with the time each has left), Advisors & projects (reports, your projects' permits and answers, the canton's and the utility's notices) and Letters. Only the first three pop up and count on the inbox button; reactions, moods and complaints wait quietly under Letters. The local paper is gone — what only it reported now comes by letter — and the Year in Review lists the year's votes instead of its headlines.",
+      "Fewer complaints: the same complaint comes at most every six months, saying how many households it concerned.",
       "Statistics and Charts are one page: Town hall → Statistics opens on the town at a glance — its power over the last 24 hours, the town then and now with a link to each chart, and its energy over the last month or year, heat included, with how much its own solar and wind covered — and lists the charts below. It opens at once, instead of working out the town's history again each time.",
       "Debt is measured against the department's income averaged over the last three years, so one poor year for the utility no longer cuts what you may borrow at once.",
       "Air conditioning matters now: homes cool on hot days, offices, shops, hotels and hospitals whenever it is warm and they are open, and each hot summer makes it more common — about a third of homes by 2050. A building on a ground-source heat pump cools through its probes for next to nothing. Cooling takes two or three percent of the town's power by the 2040s, mostly at sunny middays.",
@@ -42,6 +44,7 @@ export const CHANGELOG: Release[] = [
     fixed: [
       "The treasury at year end shown in the Year in Review now matches the top bar: December's allocation, interest and instalments count in the year they belong to.",
       "The advisors' pages no longer say the treasury can't pay for a proposal you haven't acted on.",
+      "Residents no longer ask for a measure the voters have just turned down, which couldn't be enacted again in time; and when a vote is called off because its measure was wound up, the town clerk now says so.",
     ],
   },
   {

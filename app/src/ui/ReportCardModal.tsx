@@ -2,7 +2,7 @@ import { approval } from "../sim/approval";
 import { measures } from "../sim/measures";
 import { ENERGY_CLASS_CATALOG } from "../sim/energyClass";
 import { existsAt } from "../sim/lifetime";
-import { toSimTimeMs } from "../sim/calendar";
+import { MONTH_NAMES, toDateMs, toSimTimeMs } from "../sim/calendar";
 import { stock } from "../sim/stock";
 import type { MunicipalityDataset } from "../data/types";
 import { EMISSIONS_SOURCE_COLOR } from "../sim/emissions";
@@ -102,8 +102,11 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
   const approvalChange = approval.atYearStart(year + 1) - approval.atYearStart(year);
   const retrofits = computeRetrofitTally(dataset.buildings, year);
   const solarTally = solarAdoptionTallyForYear(dataset.buildings, dataset.powerPlants, year);
-  // The local paper's lead story of each month of the year.
-  const headlines = inbox.getEditions(Number.POSITIVE_INFINITY).filter((e) => Math.floor(e.month / 12) === year).reverse();
+  // The year at the ballot box: the votes' and the election's results, from the town clerk's letters.
+  const ballots = inbox
+    .getLetters(Number.POSITIVE_INFINITY)
+    .filter((l) => (l.kind === "voteResult" || l.kind === "election") && new Date(toDateMs(l.atMs)).getUTCFullYear() === year)
+    .reverse();
 
   const { data: overallEnergy, loading: overallLoading } = useYearCategoryEnergy(dataset, year);
   const overallSlices: PieSlice[] = overallEnergy
@@ -341,14 +344,14 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
               )}
             </section>
 
-            {headlines.length > 0 && (
-              <section className="yr-card yr-paper">
-                <h2>The year in headlines</h2>
+            {ballots.length > 0 && (
+              <section className="yr-card">
+                <h2>At the ballot box</h2>
                 <ul className="yr-headlines">
-                  {headlines.map((e) => (
-                    <li key={e.id}>
-                      <span className="yr-headline-month">{e.dateLabel.split(" ")[0]}</span>
-                      <span>{e.lead.headline}</span>
+                  {ballots.map((l) => (
+                    <li key={l.id}>
+                      <span className="yr-headline-month">{MONTH_NAMES[new Date(toDateMs(l.atMs)).getUTCMonth()]}</span>
+                      <span>{l.subject.replace(/^(Vote|Election) result: /, "")}</span>
                     </li>
                   ))}
                 </ul>

@@ -11,6 +11,10 @@
  *    heating along one, a reinforced transformer station, solar on a public building, a measure — by
  *    a deadline. Answer it in time and the group that asked remembers (goodwill); leave it and it
  *    remembers that too. A request someone else sorts out (a private charging operator) earns nothing.
+ *  - Inform. The town clerk writes when a measure goes to the ballot, with its result and an
+ *    election's, and when approval runs low; the canton when it takes over the finances; the utility
+ *    when energy prices soar, or when the green bond is subscribed and its promise kept or not; and
+ *    news from town, like a data centre on its way.
  */
 
 import { BLOC_ORDER, type Bloc } from "../config/approval";
@@ -46,7 +50,9 @@ import {
 import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
 import { approval, type ApprovalEvent, type Stances } from "./approval";
 import { toDateMs, toSimTimeMs } from "./calendar";
-import { debt } from "./debt";
+import { debt, type DebtEvent } from "./debt";
+import { datacenter } from "./datacenter";
+import { market } from "./market";
 import { districtHeat } from "./districtHeat";
 import { districtHeatSources } from "./districtHeatSources";
 import { simClock } from "./engine";
@@ -70,6 +76,15 @@ import {
   voteResultText,
   datacenterHeatOfferText,
   welcomeText,
+  approvalWarningText,
+  bondSubscribedText,
+  datacenterComingText,
+  earmarkText,
+  electionText,
+  priceShockText,
+  supervisionText,
+  voteCalledText,
+  voteCalledOffText,
   type LetterText,
   type Mood,
   type MoodCause,
@@ -164,6 +179,7 @@ class Letters {
       simClock.subscribe(() => this.advance(simClock.getSimTimeMs())),
       measures.onEvent((e) => this.onMeasureEvent(e)),
       approval.onEvent((e) => this.onApprovalEvent(e)),
+      debt.onEvent((e) => this.onDebtEvent(e)),
     ];
     const welcome = welcomeText(this.town);
     this.post({ atMs: now, kind: "welcome", bloc: null, from: `The Town Clerk of ${this.town}`, role: "", ...welcome });
@@ -180,11 +196,6 @@ class Letters {
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
-  }
-
-  /** Requests answered, lapsed or sorted out by others in `[fromMs, toMs)` — for the paper. */
-  resolvedIn(fromMs: number, toMs: number): LetterRequest[] {
-    return this.requests.filter((r) => r.resolvedAtMs !== undefined && r.resolvedAtMs >= fromMs && r.resolvedAtMs < toMs);
   }
 
   // --- time ---
@@ -210,6 +221,7 @@ class Letters {
     const rng = mulberry32(hashSeed(this.seed, "month", String(month)));
     this.reports(month - 1, start, rng);
     this.heatOffers(month - 1);
+    this.news(month - 1);
     this.moods(month, start, rng);
     if (rng() < REQUEST_CHANCE_PER_MONTH) this.maybeRequest(start, rng);
   }
@@ -224,7 +236,23 @@ class Letters {
     this.react(stances, sign, e.def.title, e.kind, e.atMs, e.id);
   }
 
+  private clerk(): { bloc: null; from: string; role: string } {
+    return { bloc: null, from: `The Town Clerk of ${this.town}`, role: "" };
+  }
+
   private onApprovalEvent(e: ApprovalEvent): void {
+    if (e.kind === "election") {
+      this.post({ atMs: e.atMs, kind: "election", ...this.clerk(), ...electionText(e.reelected, e.approval) });
+      return;
+    }
+    if (e.kind === "warning") {
+      this.post({ atMs: e.atMs, kind: "warning", ...this.clerk(), ...approvalWarningText(e.approval) });
+      return;
+    }
+    if (e.kind === "voteCalledOff") {
+      this.post({ atMs: e.atMs, kind: "voteCalled", ...this.clerk(), ...voteCalledOffText(e.title, e.reason) });
+      return;
+    }
     if (e.kind === "voteHeld") {
       const until = measures.moratoriumUntilMs(e.key, e.atMs + 1);
       this.post({ atMs: e.atMs, kind: "voteResult", bloc: null, from: `The Town Clerk of ${this.town}`, role: "", ...voteResultText(e.title, e.accepted, e.yesShare, until !== null ? monthYearLabel(until) : null) });
@@ -233,6 +261,7 @@ class Letters {
     if (e.kind !== "voteScheduled") return;
     const ranked = BLOC_ORDER.map((b) => ({ b, s: e.stances[b] ?? 0 })).sort((x, y) => x.s - y.s);
     const when = monthYearLabel(e.voteAtMs);
+    this.post({ atMs: e.atMs, kind: "voteCalled", ...this.clerk(), ...voteCalledText(e.title, when) });
     const rng = mulberry32(hashSeed(this.seed, "campaign", e.key, String(e.atMs | 0)));
     const against = ranked[0];
     const forIt = ranked[ranked.length - 1];
@@ -286,6 +315,38 @@ class Letters {
     }
   }
 
+  // --- the administration, and news ---
+
+  private onDebtEvent(e: DebtEvent): void {
+    const chf = (rp: number) => `CHF ${(rp / 100 / 1e6).toLocaleString("en-GB", { maximumFractionDigits: 2 })} million`;
+    if (e.kind === "supervision") {
+      this.post({ atMs: e.atMs, kind: "notice", bloc: null, from: "The canton's office for municipalities", role: "", ...supervisionText(e.on) });
+    } else if (e.kind === "bondSubscribed" && !e.loan.refinances) {
+      const full = e.loan.principalRp >= e.loan.requestedRp * 0.999;
+      this.post({ atMs: e.atMs, kind: "notice", ...this.clerk(), ...bondSubscribedText(chf(e.loan.principalRp), chf(e.loan.requestedRp), full, e.loan.ratePct) });
+    } else if (e.kind === "earmark") {
+      this.post({ atMs: e.atMs, kind: "notice", ...this.clerk(), ...earmarkText(e.met) });
+    }
+  }
+
+  /** What happened last month that the department should hear of: a price shock, a data centre. */
+  private news(month: number): void {
+    const from = monthStartMs(month);
+    const to = monthStartMs(month + 1);
+    for (const shock of market.shocksBetween(from, to)) this.post({ atMs: shock.startMs, kind: "notice", bloc: null, from: "The utility's trading desk", role: "", ...priceShockText() });
+    const dc = datacenter.building();
+    if (dc?.datacenterItKw !== undefined && dc.constructionStartMs !== undefined && dc.constructionStartMs >= from && dc.constructionStartMs < to) {
+      const where = dc.address ? ` on ${dc.address.replace(/ \d.*$/, "")}` : " in the industrial zone";
+      this.post({
+        atMs: dc.constructionStartMs,
+        kind: "announcement",
+        ...this.clerk(),
+        focus: { lon: dc.lon, lat: dc.lat, egid: dc.egid },
+        ...datacenterComingText(where, Math.round(dc.datacenterItKw / 100) / 10),
+      });
+    }
+  }
+
   // --- offers ---
 
   /** The data centre offering its waste heat for district heating (datacenter.ts), dated the day the
@@ -323,13 +384,21 @@ class Letters {
     const due = (kind: keyof typeof REPORT_COOLDOWN_MONTHS) => month - (this.lastReport.get(kind) ?? -Infinity) >= REPORT_COOLDOWN_MONTHS[kind];
     const mark = (kind: keyof typeof REPORT_COOLDOWN_MONTHS) => this.lastReport.set(kind, month);
 
-    // Heat pumps refused, and boilers allowed despite a ban.
+    // Heat pumps refused, and boilers allowed despite a ban: one owner writes about last month, and
+    // counts everyone it happened to since the last letter about it.
     const refused: { b: Building; record: ReturnType<typeof heatingRenewalsInRange>[number] }[] = [];
+    let refusedSince = 0;
     let exceptions = 0;
-    for (const b of buildings) {
-      for (const record of heatingRenewalsInRange(b, from, to)) {
-        if (record.exception) exceptions++;
-        if (record.preferred && (record.preferred === "airHeatPump" || record.preferred === "groundHeatPump") && record.system !== record.preferred) refused.push({ b, record });
+    if (due("refused") || due("exceptions")) {
+      const sinceMs = monthStartMs(month + 1 - Math.max(REPORT_COOLDOWN_MONTHS.refused, REPORT_COOLDOWN_MONTHS.exceptions));
+      for (const b of buildings) {
+        for (const record of heatingRenewalsInRange(b, sinceMs, to)) {
+          if (record.exception) exceptions++;
+          if (record.preferred && (record.preferred === "airHeatPump" || record.preferred === "groundHeatPump") && record.system !== record.preferred) {
+            refusedSince++;
+            if (record.installedAtMs >= from) refused.push({ b, record });
+          }
+        }
       }
     }
     if (refused.length > 0 && due("refused")) {
@@ -358,7 +427,7 @@ class Letters {
           from: this.personName(rng),
           role: `owner, ${b.address ?? "in town"}`,
           focus: { lon: b.lon, lat: b.lat, egid: b.egid },
-          ...refusedHeatPumpText(kind, detail, got, b.address ?? "our house"),
+          ...refusedHeatPumpText(kind, detail, got, b.address ?? "our house", refusedSince),
         });
       });
     }
@@ -479,7 +548,8 @@ class Letters {
     const levels = approval.getBlocLevels();
     for (const bloc of [...BLOC_ORDER].sort((a, b) => levels[a] - levels[b])) {
       const wanted = MEASURE_CATALOG.filter((def) => (def.approval?.(defaultParams(def))[bloc] ?? 0) >= 0.4)
-        .filter((def) => !measures.getState(def.id) && measureUnavailableReason(def.id, atMs) === null && !taken((t) => t.kind === "measure" && t.measureId === def.id))
+        // Not one the voters turned down lately: it couldn't be enacted in time.
+        .filter((def) => !measures.getState(def.id) && measureUnavailableReason(def.id, atMs) === null && measures.moratoriumUntilMs(def.id, atMs) === null && !taken((t) => t.kind === "measure" && t.measureId === def.id))
         .sort((a, b) => (b.approval?.(defaultParams(b))[bloc] ?? 0) - (a.approval?.(defaultParams(a))[bloc] ?? 0));
       if (wanted.length > 0) {
         options.push({ bloc, target: { kind: "measure", measureId: wanted[0].id, title: wanted[0].title }, ask: `"${wanted[0].title}"` });

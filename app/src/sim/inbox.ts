@@ -1,5 +1,7 @@
 /**
- * The player's inbox: letters (letters.ts) and the monthly local paper (newspaper.ts). Items can be
+ * The player's inbox: letters (letters.ts, and the advisors', the projects' and the canton's), in
+ * four groups — votes, requests, advisors and projects, and everything else. Only the first three
+ * call for attention (a toast, the badge); the rest wait quietly under Letters. Items can be
  * written ahead of time — a letter dated a few days after the decision it answers — and only show
  * once the clock reaches them. What has been read is remembered for the session.
  */
@@ -8,7 +10,51 @@ import type { Bloc } from "../config/approval";
 import { simClock } from "./engine";
 
 import type { AdvisorId } from "./advisors";
-export type LetterKind = "welcome" | "reaction" | "campaign" | "mood" | "report" | "request" | "followUp" | "voteResult" | "offer";
+export type LetterKind =
+  | "welcome"
+  | "reaction"
+  | "campaign"
+  | "mood"
+  | "report" // residents' complaints, or an advisor's report (`advisor` set)
+  | "request"
+  | "followUp" // a request's outcome
+  | "voteCalled"
+  | "voteResult"
+  | "election"
+  | "warning" // approval low
+  | "offer" // a firm offering its waste heat
+  | "project" // the town's own projects: permits, court rulings, roof-contract answers
+  | "notice" // from the administration: the canton's supervision, the green bond, a price shock
+  | "announcement"; // news from town, for information
+
+export type InboxGroup = "votes" | "requests" | "advisors" | "letters";
+
+/** The inbox's tabs, in order. */
+export const INBOX_GROUPS: InboxGroup[] = ["votes", "requests", "advisors", "letters"];
+
+/** The groups that call for attention: a toast as a letter arrives, and the badge. */
+export const NOTIFYING_GROUPS: ReadonlySet<InboxGroup> = new Set(["votes", "requests", "advisors"]);
+
+export function letterGroup(l: Letter): InboxGroup {
+  switch (l.kind) {
+    case "voteCalled":
+    case "voteResult":
+    case "campaign":
+    case "election":
+    case "warning":
+      return "votes";
+    case "request":
+      return "requests";
+    case "offer":
+    case "project":
+    case "notice":
+      return "advisors";
+    case "report":
+      return l.advisor ? "advisors" : "letters";
+    default:
+      return "letters";
+  }
+}
 
 export interface Letter {
   id: string;
@@ -46,37 +92,18 @@ export interface LetterPick {
   candidateId?: string;
 }
 
-export interface NewsStory {
-  headline: string;
-  body: string;
-}
-
-export interface Edition {
-  id: string;
-  atMs: number;
-  /** The month it reports on (year * 12 + month). */
-  month: number;
-  title: string; // the paper's name
-  dateLabel: string; // "October 2026"
-  lead: NewsStory;
-  stories: NewsStory[];
-  editorial: string;
-}
-
 class Inbox {
   private letters: Letter[] = [];
-  private editions: Edition[] = [];
   private read = new Set<string>();
   private shownUpTo = -Infinity; // items at or before this are visible
   private version = 0;
   private readonly listeners = new Set<() => void>();
-  private readonly arrivalListeners = new Set<(item: Letter | Edition) => void>();
+  private readonly arrivalListeners = new Set<(item: Letter) => void>();
   private unsubscribeClock: (() => void) | null = null;
 
   init(): void {
     this.unsubscribeClock?.();
     this.letters = [];
-    this.editions = [];
     this.read = new Set();
     this.shownUpTo = simClock.getSimTimeMs();
     this.unsubscribeClock = simClock.subscribe(() => this.reveal(simClock.getSimTimeMs()));
@@ -89,12 +116,6 @@ class Inbox {
     this.revealIfDue(letter);
   }
 
-  addEdition(edition: Edition): void {
-    this.editions.push(edition);
-    this.editions.sort((a, b) => a.atMs - b.atMs);
-    this.revealIfDue(edition);
-  }
-
   /** Letters that have arrived, newest first. */
   getLetters(nowMs: number): Letter[] {
     return this.letters.filter((l) => l.atMs <= nowMs).reverse();
@@ -102,11 +123,6 @@ class Inbox {
 
   getLetter(id: string): Letter | undefined {
     return this.letters.find((l) => l.id === id);
-  }
-
-  /** Editions published so far, newest first. */
-  getEditions(nowMs: number): Edition[] {
-    return this.editions.filter((e) => e.atMs <= nowMs).reverse();
   }
 
   isRead(id: string): boolean {
@@ -119,17 +135,23 @@ class Inbox {
     this.bump();
   }
 
-  /** Marks every letter and edition that has arrived by `nowMs` as read. */
-  markAllRead(nowMs: number): void {
-    for (const item of [...this.letters, ...this.editions]) if (item.atMs <= nowMs) this.read.add(item.id);
+  /** Marks every letter that has arrived by `nowMs` as read (of one group, if given). */
+  markAllRead(nowMs: number, group?: InboxGroup): void {
+    for (const l of this.letters) if (l.atMs <= nowMs && (!group || letterGroup(l) === group)) this.read.add(l.id);
     this.bump();
   }
 
-  unreadCount(nowMs: number): { letters: number; editions: number } {
-    return {
-      letters: this.letters.filter((l) => l.atMs <= nowMs && !this.read.has(l.id)).length,
-      editions: this.editions.filter((e) => e.atMs <= nowMs && !this.read.has(e.id)).length,
-    };
+  /** Unread letters, by group. */
+  unreadCount(nowMs: number): Record<InboxGroup, number> {
+    const count: Record<InboxGroup, number> = { votes: 0, requests: 0, advisors: 0, letters: 0 };
+    for (const l of this.letters) if (l.atMs <= nowMs && !this.read.has(l.id)) count[letterGroup(l)]++;
+    return count;
+  }
+
+  /** Unread letters that call for attention (the badge). */
+  unreadNotifying(nowMs: number): number {
+    const c = this.unreadCount(nowMs);
+    return c.votes + c.requests + c.advisors;
   }
 
   getVersion(): number {
@@ -142,12 +164,12 @@ class Inbox {
   }
 
   /** Called as each item arrives (for a toast). */
-  onArrival(listener: (item: Letter | Edition) => void): () => void {
+  onArrival(listener: (item: Letter) => void): () => void {
     this.arrivalListeners.add(listener);
     return () => this.arrivalListeners.delete(listener);
   }
 
-  private revealIfDue(item: Letter | Edition): void {
+  private revealIfDue(item: Letter): void {
     if (item.atMs <= this.shownUpTo) {
       this.arrivalListeners.forEach((l) => l(item));
       this.bump();
@@ -156,7 +178,7 @@ class Inbox {
 
   private reveal(nowMs: number): void {
     if (nowMs <= this.shownUpTo) return;
-    const arrived = [...this.letters, ...this.editions].filter((i) => i.atMs > this.shownUpTo && i.atMs <= nowMs);
+    const arrived = this.letters.filter((i) => i.atMs > this.shownUpTo && i.atMs <= nowMs);
     this.shownUpTo = nowMs;
     if (arrived.length === 0) return;
     for (const item of arrived.sort((a, b) => a.atMs - b.atMs)) this.arrivalListeners.forEach((l) => l(item));
@@ -171,12 +193,11 @@ class Inbox {
   // --- saving (saveGame.ts) ---
 
   snapshot() {
-    return { letters: this.letters, editions: this.editions, read: this.read, shownUpTo: this.shownUpTo };
+    return { letters: this.letters, read: this.read, shownUpTo: this.shownUpTo };
   }
 
   restore(s: ReturnType<Inbox["snapshot"]>): void {
     this.letters = s.letters;
-    this.editions = s.editions;
     this.read = s.read;
     this.shownUpTo = s.shownUpTo;
     this.bump();

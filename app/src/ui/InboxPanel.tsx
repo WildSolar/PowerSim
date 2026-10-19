@@ -1,22 +1,29 @@
-import { CheckCheck, ClipboardList, Mail, MapPin, Newspaper, Pin, X } from "lucide-react";
+import { CheckCheck, ClipboardList, Mail, MapPin, Pin, Vote, X } from "lucide-react";
 import type { AdvisorId } from "../sim/advisors";
 import { showPickOnMap } from "./openPick";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { mapFocus } from "../map/mapFocus";
+import { approval, votePct } from "../sim/approval";
 import { formatDate } from "../sim/calendar";
 import { simClock } from "../sim/engine";
-import { inbox, type Edition, type Letter, type LetterPick } from "../sim/inbox";
+import { INBOX_GROUPS, NOTIFYING_GROUPS, inbox, letterGroup, type InboxGroup, type Letter, type LetterPick } from "../sim/inbox";
 import { letters, type LetterRequest } from "../sim/letters";
+import { MEASURE_CATALOG } from "../sim/measureCatalog";
 import { useSimDay } from "../sim/store";
 import { stock } from "../sim/stock";
 import "./inbox.css";
 
-type Tab = "letters" | "requests" | "paper";
-
 export interface InboxSelection {
-  tab: Tab;
+  tab: InboxGroup;
   id: string | null;
 }
+
+const TAB_LABEL: Record<InboxGroup, string> = {
+  votes: "Votes",
+  requests: "Requests",
+  advisors: "Advisors & projects",
+  letters: "Letters",
+};
 
 const STATUS_LABEL: Record<LetterRequest["status"], string> = {
   open: "Open",
@@ -25,11 +32,60 @@ const STATUS_LABEL: Record<LetterRequest["status"], string> = {
   lapsed: "Lapsed",
 };
 
+const MONTH_MS = (365.25 * 24 * 3_600_000) / 12;
+// A request this close to its deadline is marked.
+const DUE_SOON_MONTHS = 3;
+
 function monthYear(atMs: number): string {
   return formatDate(atMs).replace(/^\d+ /, "");
 }
 
-/** Letters from residents and groups, the requests among them, and the local paper. */
+/** Where the inbox opens: the first tab with something unread that calls for attention, else Votes. */
+export function defaultInboxTab(nowMs: number): InboxGroup {
+  const unread = inbox.unreadCount(nowMs);
+  return INBOX_GROUPS.find((g) => NOTIFYING_GROUPS.has(g) && unread[g] > 0) ?? "votes";
+}
+
+/** How long a request has left, in words. */
+function timeLeft(r: LetterRequest, nowMs: number): string {
+  const months = Math.floor((r.deadlineMs - nowMs) / MONTH_MS);
+  return months <= 0 ? "under a month left" : `${months} month${months === 1 ? "" : "s"} left`;
+}
+
+/** Votes ahead and the next election, with today's poll and approval. */
+function Ahead({ nowMs }: { nowMs: number }) {
+  const votes = MEASURE_CATALOG.flatMap((d) => {
+    const v = approval.getVoteInfo(d.id, d, nowMs);
+    return v ? [{ id: d.id, title: d.title, ...v }] : [];
+  }).sort((a, b) => a.atMs - b.atMs);
+  const election = approval.nextElectionMs();
+  const standing = Math.round(approval.getApproval());
+  return (
+    <li className="inbox-ahead">
+      <div className="inbox-ahead-title">Ahead</div>
+      {votes.map((v) => (
+        <div className="inbox-ahead-row" key={v.id}>
+          <span>{v.title}</span>
+          <span>
+            {monthYear(v.atMs)} · <span className={v.pollYes >= 50 ? "good" : "bad"}>{votePct(v.pollYes)}% yes</span>
+          </span>
+        </div>
+      ))}
+      {election !== null && (
+        <div className="inbox-ahead-row">
+          <span>Election</span>
+          <span>
+            {monthYear(election)} · <span className={standing >= 50 ? "good" : "bad"}>approval {standing}%</span>
+          </span>
+        </div>
+      )}
+      {votes.length === 0 && election === null && <div className="inbox-ahead-row">No vote or election ahead.</div>}
+    </li>
+  );
+}
+
+/** The inbox: votes, requests, the advisors' and the projects' letters (these three call for
+ * attention), and every other letter. */
 export function InboxPanel({
   initial,
   onClose,
@@ -50,22 +106,24 @@ export function InboxPanel({
   );
   const day = useSimDay(); // requests are checked daily
   const now = simClock.getSimTimeMs();
-  const [tab, setTab] = useState<Tab>(initial.tab);
+  const [tab, setTab] = useState<InboxGroup>(initial.tab);
   const [selectedId, setSelectedId] = useState<string | null>(initial.id);
 
   const allLetters = inbox.getLetters(now);
-  const editions = inbox.getEditions(now);
-  const requests = [...letters.getRequests()].filter((r) => r.atMs <= now).sort((a, b) => (a.status === "open" ? 0 : 1) - (b.status === "open" ? 0 : 1) || b.atMs - a.atMs);
+  const inTab = allLetters.filter((l) => letterGroup(l) === tab);
+  const requests = [...letters.getRequests()].filter((r) => r.atMs <= now).sort((a, b) => (a.status === "open" ? 0 : 1) - (b.status === "open" ? 0 : 1) || a.deadlineMs - b.deadlineMs || b.atMs - a.atMs);
   const unread = inbox.unreadCount(now);
 
-  // Opening an item marks it read; a tab with nothing chosen opens its newest item.
-  const chosenLetter = tab !== "paper" ? (allLetters.find((l) => l.id === selectedId) ?? null) : null;
-  const selectedLetter = chosenLetter ?? (tab === "letters" ? (allLetters[0] ?? null) : null);
-  const selectedEdition = tab === "paper" ? (editions.find((e) => e.id === selectedId) ?? editions[0] ?? null) : null;
+  // Opening a letter marks it read; a tab with nothing chosen opens its newest letter.
+  const chosen = allLetters.find((l) => l.id === selectedId && (tab === "requests" ? l.kind === "request" : letterGroup(l) === tab)) ?? null;
+  const firstRequestLetter = requests.length > 0 ? (inbox.getLetter(requests[0].letterId) ?? null) : null;
+  const selectedLetter = chosen ?? (tab === "requests" ? firstRequestLetter : (inTab[0] ?? null));
+  // A request's answer: the follow-up its senders wrote once it was settled.
+  const reply = selectedLetter?.kind === "request" ? (allLetters.find((l) => l.kind === "followUp" && l.requestId === selectedLetter.requestId) ?? null) : null;
   useEffect(() => {
     if (selectedLetter) inbox.markRead(selectedLetter.id);
-    if (selectedEdition) inbox.markRead(selectedEdition.id);
-  }, [selectedLetter, selectedEdition]);
+    if (reply) inbox.markRead(reply.id);
+  }, [selectedLetter, reply]);
   void day;
 
   // A letter about a building selects it (its panel opens) and centres it; one about a place centres that.
@@ -88,11 +146,7 @@ export function InboxPanel({
   };
 
   const openRequests = requests.filter((r) => r.status === "open").length;
-  const tabs: { id: Tab; label: string; count: number }[] = [
-    { id: "letters", label: "Letters", count: unread.letters },
-    { id: "requests", label: "Requests", count: openRequests },
-    { id: "paper", label: "Paper", count: unread.editions },
-  ];
+  const anyUnread = INBOX_GROUPS.some((g) => unread[g] > 0);
 
   return (
     <div className="inbox-layer">
@@ -104,19 +158,26 @@ export function InboxPanel({
             <span className="inbox-running">The game keeps running</span>
           </div>
           <nav className="inbox-tabs" aria-label="Inbox sections">
-            {tabs.map((t) => (
-              <button key={t.id} className={tab === t.id ? "active" : ""} aria-current={tab === t.id ? "page" : undefined} onClick={() => setTab(t.id)}>
-                {t.label}
-                {t.count > 0 && <span className="inbox-count">{t.count}</span>}
-              </button>
-            ))}
+            {INBOX_GROUPS.map((g) => {
+              const count = g === "requests" ? openRequests : unread[g];
+              return (
+                <button
+                  key={g}
+                  className={tab === g ? "active" : ""}
+                  aria-current={tab === g ? "page" : undefined}
+                  onClick={() => {
+                    setTab(g);
+                    setSelectedId(null);
+                  }}
+                  title={g === "letters" ? "Everything else: reactions, moods, complaints and news. These never call for your attention." : undefined}
+                >
+                  {TAB_LABEL[g]}
+                  {count > 0 && <span className={`inbox-count${NOTIFYING_GROUPS.has(g) ? "" : " quiet"}`}>{count}</span>}
+                </button>
+              );
+            })}
           </nav>
-          <button
-            className="inbox-mark-read"
-            disabled={unread.letters + unread.editions === 0}
-            onClick={() => inbox.markAllRead(simClock.getSimTimeMs())}
-            title="Mark every letter and paper as read"
-          >
+          <button className="inbox-mark-read" disabled={!anyUnread} onClick={() => inbox.markAllRead(simClock.getSimTimeMs())} title="Mark every letter as read">
             <CheckCheck size={15} strokeWidth={1.75} aria-hidden />
             <span>Mark all read</span>
           </button>
@@ -126,61 +187,55 @@ export function InboxPanel({
         </header>
         <div className="inbox-body">
           <ul className="inbox-list">
-            {tab === "letters" &&
-              allLetters.map((l) => (
-                <li key={l.id}>
-                  <button className={`inbox-item${l.id === selectedLetter?.id ? " active" : ""}${inbox.isRead(l.id) ? "" : " unread"}`} onClick={() => setSelectedId(l.id)}>
-                    <span className="inbox-item-meta">
-                      <span>{l.from}</span>
-                      <span>{formatDate(l.atMs)}</span>
-                    </span>
-                    <span className="inbox-item-subject">
-                      {l.requestId && l.kind === "request" && <Pin size={12} strokeWidth={2} aria-label="Request" />}
-                      {l.subject}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            {tab === "requests" &&
-              requests.map((r) => {
-                const letter = inbox.getLetter(r.letterId);
-                return (
-                  <li key={r.id}>
-                    <button className={`inbox-item${letter && letter.id === selectedLetter?.id ? " active" : ""}`} onClick={() => setSelectedId(r.letterId)}>
+            {tab === "votes" && <Ahead nowMs={now} />}
+            {tab === "requests"
+              ? requests.map((r) => {
+                  const letter = inbox.getLetter(r.letterId);
+                  const soon = r.status === "open" && r.deadlineMs - now < DUE_SOON_MONTHS * MONTH_MS;
+                  return (
+                    <li key={r.id}>
+                      <button
+                        className={`inbox-item${letter && letter.id === selectedLetter?.id ? " active" : ""}${letter && !inbox.isRead(letter.id) ? " unread" : ""}`}
+                        onClick={() => setSelectedId(r.letterId)}
+                      >
+                        <span className="inbox-item-meta">
+                          <span className={`request-status request-${r.status}`}>{STATUS_LABEL[r.status]}</span>
+                          <span className={soon ? "request-due-soon" : undefined}>{r.status === "open" ? `by ${monthYear(r.deadlineMs)} · ${timeLeft(r, now)}` : formatDate(r.resolvedAtMs ?? r.atMs)}</span>
+                        </span>
+                        <span className="inbox-item-subject">{r.ask.charAt(0).toUpperCase() + r.ask.slice(1)}</span>
+                      </button>
+                    </li>
+                  );
+                })
+              : inTab.map((l) => (
+                  <li key={l.id}>
+                    <button className={`inbox-item${l.id === selectedLetter?.id ? " active" : ""}${inbox.isRead(l.id) ? "" : " unread"}`} onClick={() => setSelectedId(l.id)}>
                       <span className="inbox-item-meta">
-                        <span className={`request-status request-${r.status}`}>{STATUS_LABEL[r.status]}</span>
-                        <span>{r.status === "open" ? `by ${monthYear(r.deadlineMs)}` : formatDate(r.atMs)}</span>
+                        <span>{l.from}</span>
+                        <span>{formatDate(l.atMs)}</span>
                       </span>
-                      <span className="inbox-item-subject">{r.ask.charAt(0).toUpperCase() + r.ask.slice(1)}</span>
+                      <span className="inbox-item-subject">
+                        {(l.kind === "voteResult" || l.kind === "voteCalled" || l.kind === "election") && <Vote size={12} strokeWidth={2} aria-hidden />}
+                        {l.subject}
+                      </span>
                     </button>
                   </li>
-                );
-              })}
-            {tab === "paper" &&
-              editions.map((e) => (
-                <li key={e.id}>
-                  <button className={`inbox-item${e.id === selectedEdition?.id ? " active" : ""}${inbox.isRead(e.id) ? "" : " unread"}`} onClick={() => setSelectedId(e.id)}>
-                    <span className="inbox-item-meta">
-                      <span>{e.title}</span>
-                      <span>{e.dateLabel}</span>
-                    </span>
-                    <span className="inbox-item-subject paper-font">{e.lead.headline}</span>
-                  </button>
-                </li>
-              ))}
-            {tab === "letters" && allLetters.length === 0 && <li className="inbox-empty">No letters yet.</li>}
+                ))}
             {tab === "requests" && requests.length === 0 && <li className="inbox-empty">No one has asked for anything yet.</li>}
-            {tab === "paper" && editions.length === 0 && <li className="inbox-empty">The first edition comes out at the start of next month.</li>}
+            {tab === "votes" && inTab.length === 0 && <li className="inbox-empty">When a measure goes to the ballot, the town clerk writes here — and again with the result.</li>}
+            {tab === "advisors" && inTab.length === 0 && <li className="inbox-empty">Reports from the advisors you retain, news of your projects and notices from the canton come here.</li>}
+            {tab === "letters" && inTab.length === 0 && <li className="inbox-empty">No letters yet.</li>}
           </ul>
           <div className="inbox-reader">
-            {tab === "paper" ? (
-              selectedEdition ? (
-                <EditionView edition={selectedEdition} />
-              ) : (
-                <p className="inbox-empty">No edition yet.</p>
-              )
-            ) : selectedLetter ? (
-              <LetterView letter={selectedLetter} onShowOnMap={showOnMap} onOpenPick={openPick} onOpenAdvisor={onOpenAdvisor} />
+            {selectedLetter ? (
+              <>
+                <LetterView letter={selectedLetter} onShowOnMap={showOnMap} onOpenPick={openPick} onOpenAdvisor={onOpenAdvisor} />
+                {reply && (
+                  <div className="letter-reply">
+                    <LetterView letter={reply} onShowOnMap={showOnMap} onOpenPick={openPick} onOpenAdvisor={onOpenAdvisor} />
+                  </div>
+                )}
+              </>
             ) : (
               <p className="inbox-empty">Pick a letter from the list.</p>
             )}
@@ -258,40 +313,17 @@ function LetterView({
   );
 }
 
-function EditionView({ edition }: { edition: Edition }) {
-  return (
-    <article className="paper">
-      <div className="paper-masthead">
-        <span className="paper-title">{edition.title}</span>
-        <span className="paper-date">{edition.dateLabel}</span>
-      </div>
-      <h1 className="paper-lead">{edition.lead.headline}</h1>
-      <p className="paper-lead-body">{edition.lead.body}</p>
-      <div className="paper-stories">
-        {edition.stories.map((s, i) => (
-          <section key={i} className="paper-story">
-            <h3>{s.headline}</h3>
-            <p>{s.body}</p>
-          </section>
-        ))}
-      </div>
-      <div className="paper-editorial">
-        <span className="paper-editorial-label">From the editor</span>
-        {edition.editorial}
-      </div>
-    </article>
-  );
-}
-
-/** A short notice when a letter or an edition arrives; clicking it opens the inbox there. */
+/** A short notice as a letter arrives — only for the groups that call for attention (votes,
+ * requests, advisors and projects). */
 export function InboxToast({ onOpen }: { onOpen: (selection: InboxSelection) => void }) {
-  const [item, setItem] = useState<Letter | Edition | null>(null);
+  const [item, setItem] = useState<Letter | null>(null);
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     let showingImportant = false;
     const unsubscribe = inbox.onArrival((arrived) => {
-      const important = "kind" in arrived && arrived.kind === "voteResult";
-      if (showingImportant && !important) return; // a vote result isn't pushed aside by the paper
+      if (!NOTIFYING_GROUPS.has(letterGroup(arrived))) return;
+      const important = arrived.kind === "voteResult" || arrived.kind === "election" || arrived.kind === "warning";
+      if (showingImportant && !important) return; // a vote result isn't pushed aside by the next letter
       showingImportant = important;
       setItem(arrived);
       if (timer) clearTimeout(timer);
@@ -306,34 +338,33 @@ export function InboxToast({ onOpen }: { onOpen: (selection: InboxSelection) => 
     };
   }, []);
   if (!item) return null;
-  const isEdition = "lead" in item;
+  const important = item.kind === "voteResult" || item.kind === "election" || item.kind === "warning";
   return (
     <button
-      className={`inbox-toast${!isEdition && item.kind === "voteResult" ? " important" : ""}`}
+      className={`inbox-toast${important ? " important" : ""}`}
       onClick={() => {
-        onOpen({ tab: isEdition ? "paper" : "letters", id: item.id });
+        onOpen({ tab: letterGroup(item), id: item.id });
         setItem(null);
       }}
     >
-      {isEdition ? <Newspaper size={15} strokeWidth={1.75} aria-hidden /> : <Mail size={15} strokeWidth={1.75} aria-hidden />}
+      {important ? <Vote size={15} strokeWidth={1.75} aria-hidden /> : <Mail size={15} strokeWidth={1.75} aria-hidden />}
       <span className="inbox-toast-text">
-        <strong>{isEdition ? item.title : item.from}</strong> {isEdition ? item.lead.headline : item.subject}
+        <strong>{item.from}</strong> {item.subject}
       </span>
     </button>
   );
 }
 
-/** The inbox button, with how much is unread. */
+/** The inbox button, with how much is unread among what calls for attention. */
 export function InboxButton({ onOpen }: { onOpen: () => void }) {
   useSyncExternalStore(
     (l) => inbox.subscribe(l),
     () => inbox.getVersion(),
   );
   useSimDay();
-  const unread = inbox.unreadCount(simClock.getSimTimeMs());
-  const total = unread.letters + unread.editions;
+  const total = inbox.unreadNotifying(simClock.getSimTimeMs());
   return (
-    <button className="tb-icon-button" onClick={onOpen} title="Letters and the local paper" data-tour="inbox">
+    <button className="tb-icon-button" onClick={onOpen} title="Inbox: votes, requests, advisors and projects, and letters" data-tour="inbox">
       <Mail size={17} strokeWidth={1.75} aria-hidden />
       <span>Inbox</span>
       {total > 0 ? <span className="inbox-badge">{total}</span> : null}

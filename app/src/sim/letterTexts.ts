@@ -193,12 +193,12 @@ export function moodText(bloc: Bloc, mood: Mood, cause: MoodCause, u: number): L
 
 // --- What happened in town ---
 
-export function refusedHeatPumpText(kind: "ground" | "air" | "grid", detail: string, got: string, address: string): LetterText {
+export function refusedHeatPumpText(kind: "ground" | "air" | "grid", detail: string, got: string, address: string, households: number): LetterText {
   const what = kind === "ground" ? "a ground-source heat pump" : kind === "air" ? "an air heat pump" : "a heat pump";
   return {
     subject: kind === "grid" ? "No heat pump because the grid is full?" : "Our heat pump was refused",
     paragraphs: [
-      `Our heating at ${address} gave up this month. We wanted to replace it with ${what}, but ${detail}.`,
+      `Our heating at ${address} gave up this month. We wanted to replace it with ${what}, but ${detail}.${households > 1 ? ` And we are far from the only ones: ${households} households in town wanted a heat pump and didn't get one in the last six months.` : ""}`,
       `So we have had to put in ${got} instead, which will be with us for the next twenty years. We do not understand how the town can talk about net zero when people who want to do the right thing are turned away.`,
     ],
   };
@@ -208,7 +208,7 @@ export function fossilExceptionsText(count: number): LetterText {
   return {
     subject: "New boilers despite the ban",
     paragraphs: [
-      `We have learned that ${count} building${count === 1 ? "" : "s"} were allowed to install a new gas or oil boiler last month, as exceptions to the fossil heating ban — because no heat pump could go in and no district heating reaches them.`,
+      `We have learned that ${count} building${count === 1 ? "" : "s"} were allowed to install a new gas or oil boiler in the last six months, as exceptions to the fossil heating ban — because no heat pump could go in and no district heating reaches them.`,
       "Every one of those boilers will run for twenty years. We ask the council to remove what stands in the way: reinforce the grid, extend district heating.",
     ],
   };
@@ -289,7 +289,107 @@ export function welcomeText(town: string): LetterText {
     paragraphs: [
       "Welcome to your new office. Residents, local groups and businesses will write to you here: when you decide something they care about, when something goes wrong in town, and when they want something done. Their letters are a fair hint of how people feel — though for a precise picture, you would commission a survey.",
       "Some letters ask for something concrete — a charger, a pipe, a reinforced grid. Answer them in time and the people who asked will remember it.",
-      `And every month, the local paper reports on the town. Good luck.`,
+      "The inbox keeps them apart: votes, requests, and what your advisors and your projects report come first, and only those call for your attention; everything else waits under Letters. Good luck.",
+    ],
+  };
+}
+
+// --- votes, and notices from the administration ---
+
+export function voteCalledText(title: string, when: string): LetterText {
+  return {
+    subject: `To the ballot: ${title}`,
+    paragraphs: [
+      `Opponents of “${title}” have gathered enough signatures to force a public vote. It will be held in ${when}.`,
+      "Until then the decision stands. If the voters reject it, it is struck down at once. The polls in the Inbox (Votes) show where opinion stands; what you decide meanwhile can still sway it.",
+    ],
+  };
+}
+
+export function voteCalledOffText(title: string, reason: string): LetterText {
+  return {
+    subject: `Vote called off: ${title}`,
+    paragraphs: [`The vote on “${title}” will not be held: the measure has done its work and been wound up. ${reason}`],
+  };
+}
+
+export function electionText(reelected: boolean, approval: number): LetterText {
+  const pct = Math.round(approval);
+  return reelected
+    ? {
+        subject: "Election result: confirmed in office",
+        paragraphs: [`With approval at ${pct}%, the voters have given the energy department another four years.`],
+      }
+    : {
+        subject: "Election result: voted out",
+        paragraphs: [`Approval stood at just ${pct}% on election day, and the voters have chosen someone else to run the energy department.`],
+      };
+}
+
+export function approvalWarningText(approval: number): LetterText {
+  return {
+    subject: "Patience is wearing thin",
+    paragraphs: [
+      `Approval of the energy department has fallen to ${Math.round(approval)}%. In the council and in the cafés, some are already talking about a recall.`,
+      "Below half on election day, and you are out. Answering what residents ask for (Inbox → Requests) and easing off what people resent are the quickest ways back.",
+    ],
+  };
+}
+
+export function supervisionText(on: boolean): LetterText {
+  return on
+    ? {
+        subject: "The energy department is under supervision",
+        paragraphs: [
+          "The department's debt has passed the limit the canton allows. Until it falls back, the canton supervises its finances: no new borrowing, no new spending measures and no new orders.",
+          "Measures already in force run on, and the prices and laws stay yours. See Town hall → Treasury → Borrowing.",
+        ],
+      }
+    : {
+        subject: "Supervision lifted",
+        paragraphs: ["The department's debt is back within limits. The canton lifts its supervision: you may borrow, spend and order again."],
+      };
+}
+
+export function bondSubscribedText(raisedChf: string, offeredChf: string, full: boolean, ratePct: number): LetterText {
+  return {
+    subject: full ? "Green bond fully subscribed" : "Green bond: less than offered",
+    paragraphs: [
+      full
+        ? `Residents have subscribed the whole green bond: ${raisedChf} at ${ratePct.toFixed(2)}%. The money is in the treasury.`
+        : `Residents subscribed ${raisedChf} of the ${offeredChf} on offer, at ${ratePct.toFixed(2)}%. The money is in the treasury.`,
+      "It is earmarked: within two years, as much has to go into green investment.",
+    ],
+  };
+}
+
+export function earmarkText(met: boolean): LetterText {
+  return met
+    ? { subject: "Green bond: promise kept", paragraphs: ["The money residents lent through the green bond has gone into green investment, as promised."] }
+    : {
+        subject: "Green bond: greenwashing?",
+        paragraphs: [
+          "Two years on, the town has invested less in green projects than residents lent it through the green bond. The climate-minded take it as greenwashing, and it shows in their mood.",
+        ],
+      };
+}
+
+export function priceShockText(): LetterText {
+  return {
+    subject: "Energy prices are soaring",
+    paragraphs: [
+      "A supply crisis has lifted the price of gas, heating oil and wholesale electricity. What the utility still buys month by month costs it more, and those still burning fuel feel it first; it may take a year or two to ease.",
+      "Worth a look before you set next year's prices (Town hall → Prices).",
+    ],
+  };
+}
+
+export function datacenterComingText(where: string, mw: number): LetterText {
+  return {
+    subject: "A data centre is coming to town",
+    paragraphs: [
+      `Work has started on a data centre${where}: ${mw} MW of servers once it is full, drawing as much power as thousands of homes, day and night. It buys renewable power on the open market and has its own substation.`,
+      "It will have heat to spare — its operator says it will offer it for district heating once it runs.",
     ],
   };
 }

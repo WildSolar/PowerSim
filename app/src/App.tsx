@@ -71,8 +71,7 @@ import { grid } from "./sim/grid";
 import { inbox } from "./sim/inbox";
 import { debt } from "./sim/debt";
 import { letters } from "./sim/letters";
-import { newspaper } from "./sim/newspaper";
-import { InboxPanel, InboxToast, type InboxSelection } from "./ui/InboxPanel";
+import { defaultInboxTab, InboxPanel, InboxToast, type InboxSelection } from "./ui/InboxPanel";
 import { heatPumpSiting } from "./sim/heatPumpSiting";
 import { sizeUnreportedSources } from "./sim/districtHeatStats";
 import { setMeasureAvailability } from "./sim/measureAvailability";
@@ -107,7 +106,7 @@ function returnToMenu() {
 // Dev-only handle for inspecting the simulation from the browser console.
 if (import.meta.env.DEV) import("./dev/scenario").then((m) => Object.assign(window, { __scenario: m.runScenario }));
 if (import.meta.env.DEV) import("./dev/perf").then((m) => Object.assign(window, { __perf: m.runPerf, __perfYearEnd: m.timeYearEndReport, __perfNewYear: m.timeNewYearPieces, __perfMapTick: m.timeMapPowerTick, __perfRolling: m.timeRollingChart, __perfMonth: m.timeMonthTurn }));
-if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore, tariffStore, market, inbox, dynamicTariff, grid, districtHeat, districtHeatSources, districtHeatLines, roofContracts, agriPv, carParks, datacenter, advisors, networkTariff, marketAccess, wind, publicCharging, fleets, letters, newspaper, debt, studies, finances: financesModule } });
+if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore, tariffStore, market, inbox, dynamicTariff, grid, districtHeat, districtHeatSources, districtHeatLines, roofContracts, agriPv, carParks, datacenter, advisors, networkTariff, marketAccess, wind, publicCharging, fleets, letters, debt, studies, finances: financesModule } });
 if (import.meta.env.DEV) import("./sim/saveGame").then((m) => Object.assign(window, { __save: m }));
 if (import.meta.env.DEV) import("./sim/history").then((m) => Object.assign(window, { __history: m }));
 if (import.meta.env.DEV) import("./dev/par").then((m) => Object.assign(window, { __computePar: m.computePar }));
@@ -304,11 +303,10 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         grid.init(loaded, () => stock.getAll()); // last: it reads every building's draw, public chargers included
         sizeUnreportedSources(stock.getAll(), 0); // the starting networks that didn't report their capacity
         debt.init(() => stock.getAll(), `rates:${loaded.bfsNumber}`);
-        // Letters and the paper last: they read everything above.
+        // The letters last: they read everything above.
         inbox.init();
         monthRecords.init();
         letters.init(loaded, () => stock.getAll(), `letters:${loaded.bfsNumber}`);
-        newspaper.init(loaded, () => stock.getAll(), `paper:${loaded.bfsNumber}`);
         if (restore) {
           applySave(restore);
           // Dev check: the state right after loading, to compare with the save (see saveGame.ts).
@@ -413,7 +411,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         dataset={liveDataset ?? dataset}
         onOpenTreasury={() => setTownHall("treasury")}
         onOpenTownHall={() => setTownHall((open) => (open ? null : "overview"))}
-        onOpenInbox={() => setInboxSelection((open) => (open ? null : { tab: "letters", id: null }))}
+        onOpenInbox={() => setInboxSelection((open) => (open ? null : { tab: defaultInboxTab(simClock.getSimTimeMs()), id: null }))}
         onOpenWiki={() => setShowWiki((open) => !open)}
         onMenu={() => setShowMenu((open) => !open)}
         onFeedback={() => setShowFeedback(true)}

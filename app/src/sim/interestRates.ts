@@ -46,7 +46,7 @@ class InterestRates {
     return Math.min(RATE_MAX_PCT, Math.max(RATE_MIN_PCT, this.base[i] + this.shock[i]));
   }
 
-  /** The rate a year ago, for the paper and the panel. */
+  /** The rate a year ago, for the panel. */
   history(atMs: number, months: number): { atMs: number; pct: number }[] {
     const out: { atMs: number; pct: number }[] = [];
     const monthMs = (365.25 * 24 * 3600e3) / 12;

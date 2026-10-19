@@ -93,7 +93,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "If something in the game breaks, it pauses and offers to save your run — in this browser as “Before the crash”, and as a file — so you can reload and carry on from there. The Feedback button (top right, and in the game menu) sends a report: a few words of yours, where you were in the game, and, if you like, your save, so the problem can be seen exactly as you saw it.",
       ),
       p(
-        "A loaded game picks up exactly where it was saved, paused: the same town, the same households and their pending decisions, the same accounts, votes, letters and paper.",
+        "A loaded game picks up exactly where it was saved, paused: the same town, the same households and their pending decisions, the same accounts, votes and letters.",
       ),
       note(
         "For now a save only loads into the version of the game that made it (the version is shown in the game menu and on the start screen). A save from another version is listed but can't be loaded.",
@@ -178,7 +178,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Emissions: the year's CO₂ by source, against the first year (see \"Emissions & net zero\").",
         "Money: the year's accounts — income and spending line by line, largest first, and the net result (see \"Municipal finances\").",
-        "Headlines: the local paper's lead story of each month.",
+        "At the ballot box: the year's votes and election, with their results.",
         "Electricity used: what the town used it for.",
         "Heat delivered: how much heat each kind of system delivered, for space heating and hot water.",
         "What changed: every heating replacement of the year — “14× Oil boiler → Ground heat pump”, marked ‘like for like’ where nothing changed — insulation upgrades, new solar and batteries, and buildings completed or torn down.",
@@ -229,7 +229,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Then opinion settles: while a measure is in force, each group drifts toward a level set by everything in force. Popular measures add up less and less, and people take what they like for granted — goodwill fades to about half over the years, while resentment stays. With nothing contentious in force, every group rests at a modest 55.",
         "Votes: the big bans always go to a public vote, and other laws do when they are contested. Beforehand, polls show where support stands (polls can be wrong). On the day, the town clerk writes to you with the result, and the measure shows it. If the voters reject a measure, it is struck down — money already spent stays spent — approval takes a hit, and you can't put it forward again for two years. If they back you, it gets a small boost.",
         "Spending: taxpayers accept about what the energy department takes in each year — the government's allocation, plus its share of the utility's profit last year (running spending only; investments don't count). Spend well beyond it and every group grows resentful, taxpayers and businesses most. Grants that mostly pay people who would have acted anyway are the usual way to overspend.",
-        "Consequences: approval below 25% for six months gets you recalled, and every four years (the first in 2030) there is an election: below 50% on election day, the voters choose someone else. Either ends the game. Elections are announced: the Overview shows when the next one is, and the paper follows the mood. Approval also nudges the government's yearly allocation up or down a little.",
+        "Consequences: approval below 25% for six months gets you recalled, and every four years (the first in 2030) there is an election: below 50% on election day, the voters choose someone else. Either ends the game. Elections are announced: the Overview and the inbox (Votes) show when the next one is, and the town clerk warns you when approval runs low. Approval also nudges the government's yearly allocation up or down a little.",
       ]),
       note(
         "Approval reacts to what you decide, not to how things turn out: nobody thanks you for falling emissions. Prices are the exception — people judge the tariff you publish, and keep judging it while it is in force (see \"Tariffs & energy prices\"). Measures imposed by the canton or the Confederation cost you nothing. The difficulty sets how strongly opinion moves.",
@@ -273,18 +273,17 @@ export const WIKI_SECTIONS: WikiSection[] = [
   },
   {
     id: "letters",
-    title: "Letters & the local paper",
+    title: "The inbox: votes, requests, advisors and letters",
     blocks: [
-      p("The town writes to you. Letters arrive in the inbox (top right); a short notice pops up when one comes in, and the game keeps running."),
-      list([
-        "Reactions: a decision a group feels strongly about brings a letter within days — thanks or objections — and a measure going to a public vote brings letters from both camps.",
-        "Moods: now and then a group writes about how it feels, more often the further it is from content, naming what weighs on it most (a measure, or the department's spending). The tone is a fair hint at its mood; an opinion survey is the precise tool.",
-        "Reports: what goes wrong in town reaches the town hall — a heat pump refused (by the grid, the ground or the neighbours' quiet), new boilers allowed despite a fossil ban, households with nowhere to charge. Reports inform; they don't move approval themselves.",
-        "Requests (📌): now and then someone asks for something concrete, by a deadline — public chargers near a street, district heating along a street next to the network, a reinforced transformer station, solar on a public building, or a measure their group wants. Answer in time and the group gains goodwill (a few approval points, fading over time); let it lapse and it loses a little. If someone else solves it — a private charging operator, an owner's own panels — the problem is gone but nobody thanks you. The Requests tab lists them all with their deadlines; letters about a place can show it on the map.",
-      ]),
       p(
-        "At the start of every month, the local paper reports on the month before: a lead story and a handful of headlines — votes and elections first, then decisions, the grid's readings, what was built, installed or refused, requests answered or ignored, milestones. It leans with the public mood: supportive when approval is high, critical when it is low. The Year in Review lists the year's lead stories.",
+        "The town writes to you, and the inbox (top right) keeps it in four tabs. Votes, Requests and Advisors & projects call for your attention: a short notice pops up as one arrives, and the inbox button counts what you haven't read. Everything else waits quietly under Letters — counted on its tab, never announced. The game keeps running while the inbox is open, and it opens on the first tab with something new.",
       ),
+      list([
+        "Votes: votes and the election ahead, with today's poll and approval, at the top. The town clerk writes when opponents force a measure to the ballot and again with the result, and with the election's; both camps campaign before a vote; and the clerk warns you when approval runs dangerously low.",
+        "Requests (📌): now and then someone asks for something concrete, by a deadline — public chargers near a street, district heating along a street next to the network, a reinforced transformer station, solar on a public building, or a measure their group wants. The tab lists them, the open ones first with the time they have left, marked once it is short. Answer in time and the group gains goodwill (a few approval points, fading over time); let it lapse and it loses a little. If someone else solves it — a private charging operator, an owner's own panels — the problem is gone but nobody thanks you. Their answer, once it is settled, is shown under the request.",
+        "Advisors & projects: the reports of the advisors you retain (see \"Advisors\"); news of your own projects — a wind park's or an Agri-PV field's permit and any court ruling, the owners' answers to roof contracts, a firm offering its waste heat; and notices — the canton taking over the department's finances when debt passes the limit (and handing them back), the green bond subscribed and whether its promise was kept, energy prices soaring on world markets.",
+        "Letters: reactions to what you decide — thanks or objections, within days — groups writing about their mood, naming what weighs on them most (a fair hint; an opinion survey is the precise tool), complaints about what goes wrong in town — heat pumps refused, new boilers despite a ban, nowhere to charge, each at most every six months and counting everyone it concerned — and news from town, like a data centre on its way.",
+      ]),
       note("The senders and organisations are invented; they stand for the kinds of people and groups a town hears from."),
     ],
   },
@@ -368,7 +367,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Bank loans: an amount and a term of 5, 10 or 20 years, repaid in equal monthly instalments (Town hall → Treasury → Borrowing). The rate is the market rate plus a margin for the department's credit rating, fixed for the life of the loan; longer loans cost a little more. Loans can be repaid early.",
         "The overdraft: if the balance falls below zero, it is covered automatically — at a steep premium, charged every month. Only what you don't order yourself can take it there — the subsidies households claim, the running costs of what's in force: an order the treasury can't pay is refused. Borrow first.",
-        "Green bonds: sold to the town's own residents for ten years, with interest every year and the money repaid at the end. Residents accept a little less interest for a local green cause, and buy as much as they want — a couple of hundred francs each at most, more when the climate-minded are content, so a bond may raise less than offered. They only hold so much of the town's green bonds at once: until earlier ones are repaid, each new one raises less. Offering one goes down well. The money is earmarked: within two years as much has to go into green investment, or the paper calls it greenwashing and the climate-minded turn away. At most one a year. When one falls due, the finance advisor (see \"Advisors\") can roll it over: a new ten-year bond at the day's rate, subscribed as the old one is repaid — as much as residents will take, the treasury repaying the rest. It is the same money lent again, so it adds no debt, carries no earmark, and doesn't count as the year's new bond.",
+        "Green bonds: sold to the town's own residents for ten years, with interest every year and the money repaid at the end. Residents accept a little less interest for a local green cause, and buy as much as they want — a couple of hundred francs each at most, more when the climate-minded are content, so a bond may raise less than offered. They only hold so much of the town's green bonds at once: until earlier ones are repaid, each new one raises less. Offering one goes down well. The money is earmarked: within two years as much has to go into green investment, or it is called greenwashing and the climate-minded turn away. At most one a year. When one falls due, the finance advisor (see \"Advisors\") can roll it over: a new ten-year bond at the day's rate, subscribed as the old one is repaid — as much as residents will take, the treasury repaying the rest. It is the same money lent again, so it adds no debt, carries no earmark, and doesn't count as the year's new bond.",
         "Federal decarbonisation loans: 0.25% over 20 years, but only against decarbonisation investments already made — up to half of the last twelve months' — and only so much a year; the money arrives after three months.",
       ]),
       p(
@@ -588,7 +587,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Shops, offices, schools, churches, sports halls, hospitals and factories use energy on their own rhythm — office hours, long shop hours, a church quiet except on Sunday morning, a hospital around the clock — in proportion to their floor area. Business use is usually the biggest share of the town's electricity.",
       ),
       p(
-        "Now and then a data centre comes to a town with open land in a work zone — in some towns never, in others once, years into your term. The local paper announces it; it takes two years to build and a few more to fill. It is big: several megawatts of servers and the cooling on top, day and night, as much power as thousands of homes. It buys its energy on the open market, certified renewable, so its power adds nothing to the town's emissions, and it has its own substation, so it loads no neighbourhood's transformer. It pays the network fee like any business, and its concession fee straight to the town. What it means for you is its heat: a year after it opens, it offers its waste heat to the utility for next to nothing (see \"Heat for district heating\").",
+        "Now and then a data centre comes to a town with open land in a work zone — in some towns never, in others once, years into your term. The town clerk writes when work starts; it takes two years to build and a few more to fill. It is big: several megawatts of servers and the cooling on top, day and night, as much power as thousands of homes. It buys its energy on the open market, certified renewable, so its power adds nothing to the town's emissions, and it has its own substation, so it loads no neighbourhood's transformer. It pays the network fee like any business, and its concession fee straight to the town. What it means for you is its heat: a year after it opens, it offers its waste heat to the utility for next to nothing (see \"Heat for district heating\").",
       ),
       note(
         "Factories are the least predictable: their real shifts aren't public, so they run long hours with some days busier than others. Garages, storage, farm buildings and buildings the register doesn't describe use no business energy at all. Whether and when a data centre comes, and how big, is the game's draw for each municipality.",
@@ -857,7 +856,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Energy cooperatives — residents pooling their savings — look into each free zoned field now and then. They sell all its power to the utility at the feed-in price, and take a field up if that pays for it with a little to spare. They can raise up to about CHF 3 million, so the largest fields are beyond them. Your feed-in bonus is what moves them (see \"Tariffs & energy prices\").",
         "The municipality: pick a zoned field no one has taken up — on the map, or in the tool's Build tab — ask its farmer from the card, and with a yes apply for the permit; once the permit stands, order the panels. Both are paid from the treasury. The field is the utility's own: it pays no feed-in for the power and buys that much less at the wholesale price, while the upkeep and the farmer's rent show in its accounts.",
       ]),
-      p("A business or a cooperative builds as soon as its permit stands; you decide when to build yours. The local paper reports each field taken up and each that goes into service, and for your own fields the town clerk writes how the permit fares."),
+      p("A business or a cooperative builds as soon as its permit stands; you decide when to build yours. For your own fields the town clerk writes how the permit fares (Inbox → Advisors & projects)."),
       p("Each field suits one of three kinds of installation, which sets how much it holds and when in the day it makes the most:"),
       list([
         "Vertical rows — bifacial panels standing between the crops in north–south rows, one face to the east, the other to the west, with wide gaps for the machines: about 0.3 MWp per hectare, making most in the morning and the late afternoon.",

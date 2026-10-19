@@ -1352,7 +1352,7 @@ export function isMunicipalSolar(egid: string): boolean {
   return adoptionByEgid.get(egid)?.origin === "municipal";
 }
 
-/** Installations dated in `[fromMs, toMs)` — the newspaper's monthly count. Only months already
+/** Installations dated in `[fromMs, toMs)`. Only months already
  * decided are known; ask after the range has passed. */
 export function solarInstallsInRange(fromMs: number, toMs: number): { count: number; capacityKw: number; batteries: number } {
   let count = 0;
