@@ -68,9 +68,9 @@ Par (`app/src/sim/par.ts`) is the do-nothing run, shipped per municipality in
 that started in the same year (`baselineYear`).
 
 **When a change alters the simulation's outcome** (balance, a mechanic, new
-data), **recompute par** for the shipped municipalities: from the start
-screen's console, one difficulty per page load,
-`window.__x = null; __computePar("schlieren", "normal").then((r) => (window.__x = r))`
-(it runs for minutes; poll `window.__x`), then write the three results into the
-par file. Par also has to be recomputed when the calendar year changes, since
-a game always starts in the current year.
+data), **recompute par** for the shipped municipalities: from `app/`,
+`npm run par -- <slug> …` (or `--all`; `--difficulties`, `--jobs`) runs every
+difficulty in parallel in Node and writes `public/data/par/<slug>.json` itself
+(scripts/par.mjs; a few minutes for a small town, longer for big ones — run it
+in the background). Par also has to be recomputed when the calendar year
+changes, since a game always starts in the current year.
