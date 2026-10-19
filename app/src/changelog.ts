@@ -34,6 +34,9 @@ export const CHANGELOG: Release[] = [
       "The Treasury's Accounts, Ledger and Borrowing are listed down the side, as on the Measures and Advisors pages.",
       "The Town hall, the inbox and the wiki replace each other: opening one closes whichever was open.",
       "The government's allocation is paid on the last day of each month, rather than the first.",
+      "Debt is measured against the department's income averaged over the last three years, so one poor year for the utility no longer cuts what you may borrow at once.",
+      "Air conditioning matters now: homes cool on hot days, offices, shops, hotels and hospitals whenever it is warm and they are open, and each hot summer makes it more common — about a third of homes by 2050. A building on a ground-source heat pump cools through its probes for next to nothing. Cooling takes two or three percent of the town's power by the 2040s, mostly at sunny middays.",
+      "The climate warms over the years — about a third of a degree a decade, summers faster — and summers bring heatwaves, more often and hotter as time goes on. Winters need a little less heating.",
     ],
     fixed: [
       "The treasury at year end shown in the Year in Review now matches the top bar: December's allocation, interest and instalments count in the year they belong to.",

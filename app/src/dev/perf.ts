@@ -44,7 +44,7 @@ import { hashSeed } from "../sim/rng";
 import { existsAt } from "../sim/lifetime";
 import { dwellingWaterHeaterProfile, hasElectricWaterHeating, waterHeaterPowerW } from "../sim/waterHeating";
 import { heatPumpPowerWWithWeather } from "../sim/heatPump";
-import { acPowerWWithWeather } from "../sim/ac";
+import { acPowerWWithWeather, coolingWeatherAt } from "../sim/ac";
 import { dailyMeanTempC, weatherAt } from "../sim/weather";
 
 async function timed(fn: () => unknown): Promise<number> {
@@ -293,9 +293,8 @@ export async function runPerf(year?: number): Promise<Record<string, number>> {
     buildings.forEach((b) => heatPumpPowerWWithWeather(b, dm, o, t));
   });
   out.ms_ac = await perSample((t) => {
-    const dm = dailyMeanTempC(t);
-    const o = weatherAt(t).tempC;
-    buildings.forEach((b) => acPowerWWithWeather(b, dm, o));
+    const w = coolingWeatherAt(t);
+    buildings.forEach((b) => acPowerWWithWeather(b, w, t));
   });  let heating = 0;
   let net = 0;
   let fuel = 0;

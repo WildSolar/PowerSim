@@ -6,7 +6,7 @@ import { buildingThermalProfile } from "../sim/spaceHeating";
 import { existsAt } from "../sim/lifetime";
 import { lifecycleNotes } from "./lifecycleNotes";
 import type { Building, PowerPlant } from "../data/types";
-import { hasAC, acPowerW } from "../sim/ac";
+import { acPowerW, cooledAreaM2, coolingKind } from "../sim/ac";
 import { buildingEnvelopeAreaM2 } from "../sim/buildingGeometry";
 import { commercialCategory, commercialPowerW, totalFloorAreaM2 } from "../sim/commercial";
 import { simClock } from "../sim/engine";
@@ -66,9 +66,10 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
   const heatPumpW = hasHp ? heatPumpPowerW(building, simTimeMs) : 0;
   const heatingSystemId = currentHeatingSystemId(building, simTimeMs);
   const heatingLog = heatingRenewalLog(building, simTimeMs);
-  const hasAirCon = hasAC(building);
-  const acW = hasAirCon ? acPowerW(building, simTimeMs) : 0;
-  const envelopeAreaM2 = hasHp || hasAirCon ? buildingEnvelopeAreaM2(building) : null;
+  const cooling = coolingKind(building, simTimeMs);
+  const acW = cooling ? acPowerW(building, simTimeMs) : 0;
+  const coolingAreaM2 = cooling ? cooledAreaM2(building, simTimeMs) : 0;
+  const envelopeAreaM2 = hasHp ? buildingEnvelopeAreaM2(building) : null;
   const hasElectricWater = hasElectricWaterHeating(building, simTimeMs);
   const waterHeatingW = hasElectricWater ? waterHeatingPowerW(building, simTimeMs) : 0;
   const commCategory = commercialCategory(building);
@@ -193,12 +194,12 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
           </span>
         )}
       </div>
-      <div className={`device-row${hasAirCon ? "" : " inactive"}`}>
+      <div className={`device-row${cooling ? "" : " inactive"}`}>
         <span className="device-name">
-          ❄️ Air conditioning
-          {envelopeAreaM2 && hasAirCon && <span className="ev-badge">{Math.round(envelopeAreaM2)} m² envelope</span>}
+          ❄️ {cooling === "ground" ? "Cooling through the ground probes" : "Air conditioning"}
+          {cooling && coolingAreaM2 > 0 && <span className="ev-badge">{Math.round(coolingAreaM2)} m² cooled</span>}
         </span>
-        {hasAirCon ? (
+        {cooling ? (
           <span className={`device-watts${acW === 0 ? " off" : ""}`}>{formatWatts(acW)}</span>
         ) : (
           <span className="device-status">Not installed</span>

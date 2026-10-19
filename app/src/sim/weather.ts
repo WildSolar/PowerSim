@@ -12,9 +12,14 @@
  *
  * Drives the live weather indicator and heat pump load (heatPump.ts); PV generation
  * (also depending on temperature/cloudiness) is a natural next consumer.
+ *
+ * The climate isn't fixed: it warms slowly over the years (about twice the global pace, as
+ * Switzerland does), and in summer, now and then, a heatwave builds — a week or two of clear,
+ * hot days, more often as the years go on. Summer afternoons also swing further from the night
+ * than winter's do. Air conditioning (ac.ts) follows the heat.
  */
 
-import { toDateMs, dayOfYear } from "./calendar";
+import { toDateMs, toSimTimeMs, dayOfYear } from "./calendar";
 import { valueNoise } from "./valueNoise";
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -26,6 +31,25 @@ const SEASONAL_PEAK_DAY_OF_YEAR = 202; // ~21 Jul: thermal lag past the solstice
 const DIURNAL_AMPLITUDE_C = 4;
 const DIURNAL_PEAK_HOUR = 15;
 
+// Summer days swing wider between night and afternoon than winter's (clear skies, long sun).
+const SUMMER_EXTRA_DIURNAL_C = 3;
+
+// Warming: from this year, about +0.35 °C a decade — roughly twice the global pace, as in Switzerland.
+const WARMING_FROM_YEAR = 2026;
+const WARMING_C_PER_YEAR = 0.035;
+const SUMMER_WARMING_C_PER_YEAR = 0.05; // summers warm faster still
+
+// Heatwaves: a slow summer channel that, where it peaks above the threshold, adds a spell of clear,
+// hot days. The threshold falls as the climate warms, so spells come more often.
+const HEATWAVE_PERIOD_MS = 8 * DAY_MS;
+const HEATWAVE_MAX_C = 8;
+const HEATWAVE_THRESHOLD = 0.45;
+const HEATWAVE_THRESHOLD_DROP_PER_YEAR = 0.012;
+const HEATWAVE_GROWTH_C_PER_YEAR = 0.08; // and they get hotter
+const HEATWAVE_CLEARING = 0.4; // how much a full heatwave clears the sky
+// A day hotter than this in the afternoon is a "hot day" (Hitzetag), as MeteoSwiss counts them.
+export const HOT_DAY_C = 30;
+
 const WEATHER_SYSTEM_PERIOD_MS = 5 * DAY_MS; // a passing high/low pressure system
 const DAILY_WOBBLE_PERIOD_MS = 1.3 * DAY_MS;
 const PRECIP_ROLL_PERIOD_MS = 6 * HOUR_MS;
@@ -35,15 +59,37 @@ function seasonalTempC(dateMs: number): number {
   return MEAN_ANNUAL_TEMP_C + SEASONAL_AMPLITUDE_C * Math.cos(phase);
 }
 
+/** How deep into summer a date is: 1 at the warmest point of the year, 0 from the equinoxes through winter. */
+function summerWeight(dateMs: number): number {
+  const c = Math.cos((2 * Math.PI * (dayOfYear(dateMs) - SEASONAL_PEAK_DAY_OF_YEAR)) / 365.25);
+  return c > 0 ? c * c : 0;
+}
+
 function diurnalTempC(dateMs: number): number {
   const hourOfDay = (dateMs % DAY_MS) / HOUR_MS; // dateMs is always a large positive real epoch ms, `%` is safe
-  return DIURNAL_AMPLITUDE_C * Math.cos((2 * Math.PI * (hourOfDay - DIURNAL_PEAK_HOUR)) / 24);
+  const amplitude = DIURNAL_AMPLITUDE_C + SUMMER_EXTRA_DIURNAL_C * summerWeight(dateMs);
+  return amplitude * Math.cos((2 * Math.PI * (hourOfDay - DIURNAL_PEAK_HOUR)) / 24);
+}
+
+/** Years of warming at `dateMs` (none before WARMING_FROM_YEAR). */
+function warmingYears(dateMs: number): number {
+  return Math.max(0, (dateMs - Date.UTC(WARMING_FROM_YEAR, 0, 1)) / (365.25 * DAY_MS));
+}
+
+/** How strong a heatwave is at `dateMs`: 0 (none) to 1 (its peak). */
+function heatwaveStrength(dateMs: number): number {
+  const weight = summerWeight(dateMs);
+  if (weight === 0) return 0;
+  const threshold = HEATWAVE_THRESHOLD - HEATWAVE_THRESHOLD_DROP_PER_YEAR * warmingYears(dateMs);
+  const n = valueNoise("heatwave", dateMs, HEATWAVE_PERIOD_MS);
+  return n > threshold ? ((n - threshold) / (1 - threshold)) * weight : 0;
 }
 
 function tempAnomalyC(dateMs: number): number {
   const systemNoise = valueNoise("temp-system", dateMs, WEATHER_SYSTEM_PERIOD_MS);
   const dailyNoise = valueNoise("temp-daily", dateMs, DAILY_WOBBLE_PERIOD_MS);
-  return systemNoise * 5 + dailyNoise * 2;
+  const years = warmingYears(dateMs);
+  return systemNoise * 5 + dailyNoise * 2 + (WARMING_C_PER_YEAR + SUMMER_WARMING_C_PER_YEAR * summerWeight(dateMs)) * years + (HEATWAVE_MAX_C + HEATWAVE_GROWTH_C_PER_YEAR * years) * heatwaveStrength(dateMs);
 }
 
 // The same days are asked about building after building (a year ahead, from the same moment):
@@ -90,7 +136,8 @@ export function weatherAt(simTimeMs: number): Weather {
   const cloudSystemNoise = valueNoise("cloud-system", dateMs, WEATHER_SYSTEM_PERIOD_MS);
   const cloudDailyNoise = valueNoise("cloud-daily", dateMs, DAILY_WOBBLE_PERIOD_MS * 0.6);
   const rawCloudiness = (cloudSystemNoise * 0.85 + cloudDailyNoise * 0.15 + 1) / 2;
-  const stretched = 0.5 + (rawCloudiness - 0.5) * 1.4 + 0.08;
+  // A heatwave is a settled high: clear skies.
+  const stretched = 0.5 + (rawCloudiness - 0.5) * 1.4 + 0.08 - HEATWAVE_CLEARING * heatwaveStrength(dateMs);
   const cloudiness = Math.min(1, Math.max(0, stretched));
 
   const tempC = base - cloudiness * 2; // overcast days run a little cooler
@@ -110,4 +157,17 @@ export function weatherAt(simTimeMs: number): Weather {
   }
 
   return { tempC, cloudiness, condition };
+}
+
+const hotDaysCache = new Map<number, number>();
+
+/** The hot days of a year: days whose afternoon (15:00) is at HOT_DAY_C or above. */
+export function hotDaysInYear(year: number): number {
+  let n = hotDaysCache.get(year);
+  if (n === undefined) {
+    n = 0;
+    for (let d = Date.UTC(year, 0, 1); d < Date.UTC(year + 1, 0, 1); d += DAY_MS) if (weatherAt(toSimTimeMs(d + DIURNAL_PEAK_HOUR * HOUR_MS)).tempC >= HOT_DAY_C) n++;
+    hotDaysCache.set(year, n);
+  }
+  return n;
 }

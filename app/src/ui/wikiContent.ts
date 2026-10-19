@@ -159,8 +159,12 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "The sun follows its real path for the town's latitude, through the day and the seasons. The weather follows the season, with warm, cold, cloudy, rainy or snowy spells that last a few days. Hover over the weather in the top bar for whether it is day or night and how strong the sunshine is.",
       ),
       p(
-        "The weather matters: cold days drive up heating, and with it the evening peak on the grid; sunshine drives the solar panels; snow on panels stops them until it melts.",
+        "The weather matters: cold days drive up heating, and with it the evening peak on the grid; sunshine drives the solar panels; snow on panels stops them until it melts; hot days switch on the air conditioning.",
       ),
+      p(
+        "The climate warms as the years go on — about a third of a degree a decade, summers faster — and now and then a summer brings a heatwave: a week or two of clear skies and afternoons well above 30 °C. They come more often, and hotter, the later it gets. Winters need a little less heating; summers more cooling.",
+      ),
+      note("The weather is the same in every game, year by year, and the same in every town: it doesn't follow the real forecast. The warming is a steady trend; real climate varies far more from one decade to the next."),
       note("When a new year begins, the clock pauses by itself and the Year in Review opens, so a long fast-forward never skips past it."),
     ],
   },
@@ -368,7 +372,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Federal decarbonisation loans: 0.25% over 20 years, but only against decarbonisation investments already made — up to half of the last twelve months' — and only so much a year; the money arrives after three months.",
       ]),
       p(
-        "The market rate starts near today's (about 1.2%) and drifts over the years, with the occasional jump nobody sees coming. Borrowing when money is cheap pays off. Debt is measured in years of income: the more years it would take to repay, the lower the rating and the dearer new money. Lenders are quick to downgrade and slow to forgive: the rating falls as soon as debt rises, but climbs back only a notch at a time, each once debt has stayed low enough for a year. From about a year and a half of income, homeowners and businesses start to worry. Beyond five years, the canton puts the department under supervision: no new borrowing, no new spending measures and no new orders until debt is back under four years — measures already in force run on, and laws and prices stay yours.",
+        "The market rate starts near today's (about 1.2%) and drifts over the years, with the occasional jump nobody sees coming. Borrowing when money is cheap pays off. Debt is measured in years of income — what the department took in before its own spending, averaged over the last three years, so one poor year for the utility doesn't shrink what you may borrow at once: the more years it would take to repay, the lower the rating and the dearer new money. Lenders are quick to downgrade and slow to forgive: the rating falls as soon as debt rises, but climbs back only a notch at a time, each once debt has stayed low enough for a year. From about a year and a half of income, homeowners and businesses start to worry. Beyond five years, the canton puts the department under supervision: no new borrowing, no new spending measures and no new orders until debt is back under four years — measures already in force run on, and laws and prices stay yours.",
       ),
       note(
         "The federal loan programme is invented for the game; the real federal climate programmes are mostly grants. The treasury shows cash: what you build isn't written down in value over the years.",
@@ -604,8 +608,15 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "What delivers the heat matters. A heat pump runs on electricity, and needs less of it the milder the weather: an air heat pump works hardest on the coldest days, while a ground-source one hardly notices, as the ground stays around 10°C all year. Oil and gas boilers burn fuel; district heat arrives ready to use. What heats each building at the start is what the register records; it changes as systems are replaced (see \"When things wear out\").",
       ),
       p(
-        "Air conditioning is still rare in Switzerland but growing; newer and larger buildings are likelier to have it. Heating and cooling follow the day's average temperature, so one cold hour in a mild week doesn't switch the heating on.",
+        "Heating follows the day's average temperature, so one cold hour in a mild week doesn't switch the heating on.",
       ),
+      p(
+        "Cooling: air conditioning is still rare in Swiss homes — a few in a hundred, more in new and large buildings — but common in offices, shops, hotels and hospitals. Every hot summer makes it more common: by 2050, about a third of homes cool. A flat needs it on a hot day, once it is warm outside; an office, with its people, computers and the sun on its windows, from a sunny 20 °C, while it is open. A unit cools the rooms people use, and works less efficiently the hotter it gets. It runs when the sun shines, so your solar covers much of it, but it adds to the summer middays on the grid.",
+      ),
+      p(
+        "A ground-source heat pump cools for next to nothing: in summer, water from the probes runs through the floors, and only the pump draws power. Most homes on one use it, and no longer need an air conditioner — gently: it takes the edge off the hottest days.",
+      ),
+      note("Who has air conditioning isn't on any register, so the game draws it, building by building. Cantonal rules on new air conditioning, and fans, blinds and night-time airing — how most Swiss homes keep cool — aren't in the game."),
     ],
   },
   {

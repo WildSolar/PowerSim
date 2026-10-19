@@ -18,7 +18,7 @@
  * borrowing is for; they don't count as running spending (treasury.ts). Interest does.
  *
  * Debt is measured against the department's income (its operating income before discretionary
- * spending, from the last booked year). The more indebted, the worse the rating and the dearer new
+ * spending, averaged over the last three booked years). The more indebted, the worse the rating and the dearer new
  * money; taxpayers start to worry (approval); and beyond the limit the canton puts the department
  * under supervision — no new borrowing, no new spending measures or orders — until debt is back down.
  */
@@ -26,6 +26,7 @@
 import {
   BANK_LOAN_TERMS_YEARS,
   BANK_TERM_PREMIUM_PCT,
+  DEBT_INCOME_YEARS,
   DEBT_LIMIT_YEARS,
   RATING_UPGRADE_MONTHS,
   DEBT_MAX_PENALTY_POINTS,
@@ -55,7 +56,7 @@ import type { Building } from "../data/types";
 import { allocationApprovalFactor, approval, setDebtPenalty, setUtilityShare } from "./approval";
 import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { simClock } from "./engine";
-import { departmentUtilityShareRp, latestBookedFinances, liveBalanceRp, operatingIncomeRp, setLoansOutstanding } from "./finances";
+import { bookedFinances, departmentUtilityShareRp, latestBookedFinances, liveBalanceRp, operatingIncomeRp, setLoansOutstanding } from "./finances";
 import { setBalanceCheck, setSpendingFreeze } from "./fiscalRules";
 import { interestRates } from "./interestRates";
 import { existsAt } from "./lifetime";
@@ -183,11 +184,11 @@ class Debt {
     return interestRates.marketPct(atMs);
   }
 
-  /** Income debt is measured against: the last booked year's operating income, or before the
-   * first year is booked, a multiple of the government's allocation. */
+  /** Income debt is measured against: the operating income of the latest booked years, averaged
+   * (DEBT_INCOME_YEARS), or before the first year is booked, a multiple of the government's allocation. */
   incomeRp(atMs: number): number {
-    const booked = latestBookedFinances();
-    if (booked) return Math.max(1, operatingIncomeRp(booked));
+    const recent = bookedFinances().slice(-DEBT_INCOME_YEARS);
+    if (recent.length > 0) return Math.max(1, recent.reduce((sum, f) => sum + operatingIncomeRp(f), 0) / recent.length);
     return Math.max(1, this.allocationRp(atMs) * PROVISIONAL_INCOME_ALLOCATIONS);
   }
 

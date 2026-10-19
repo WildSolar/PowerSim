@@ -174,6 +174,11 @@ export function makeCommercialProfile(building: Building): CommercialProfile | n
   };
 }
 
+/** How occupied a building of `category` is at that hour and weekday: 0 (closed) to 1 (open). */
+export function commercialOccupancy(category: CommercialCategory, hourOfDay: number, dow: number): number {
+  return PROFILES[category].shape(hourOfDay, dow);
+}
+
 export function commercialPowerWFromProfile(profile: CommercialProfile, simTimeMs: number): number {
   if (profile.category === "datacenter") return datacenterPowerW(profile.itKw ?? 0, profile.openedAtMs ?? 0, simTimeMs);
   const p = PROFILES[profile.category];

@@ -29,7 +29,7 @@ import {
   type LightingProfile,
   type PlugLoadProfile,
 } from "./devices";
-import { acPowerWWithWeather } from "./ac";
+import { coolingPowerSplitW, coolingWeatherAt } from "./ac";
 import { commercialPowerWFromProfile, makeCommercialProfile, type CommercialProfile } from "./commercial";
 import { heatPumpPowerWWithWeather } from "./heatPump";
 import { mobilityChargingPowerW } from "./mobility";
@@ -158,27 +158,34 @@ function dwellingCategoryTotals(profileSets: DwellingProfiles[], times: number[]
   return { fridgeW, lightingW, cookingW, laundryW, plugLoadW, evW };
 }
 
-/** Heat pump and AC split apart but still evaluated together, since both are gated
+/** Heat pump and cooling split apart but still evaluated together, since both are gated
  * by the same daily/instantaneous temperature reading — weather is the same for
  * every building at a given instant, so it's evaluated once per timestep here
- * rather than once per building (or once per device) per timestep. */
-function climateControlCategorySeries(buildings: Building[], times: number[]): { heatPumpW: number[]; acW: number[] } {
+ * rather than once per building (or once per device) per timestep. Cooling comes in two
+ * parts: the homes' (`acW`) and the businesses' (`businessCoolingW`). */
+function climateControlCategorySeries(buildings: Building[], times: number[]): { heatPumpW: number[]; acW: number[]; businessCoolingW: number[] } {
   const heatPumpW: number[] = [];
   const acW: number[] = [];
+  const businessCoolingW: number[] = [];
   for (const t of times) {
     const dailyMeanC = dailyMeanTempC(t);
     const outsideTempC = weatherAt(t).tempC;
+    const cooling = coolingWeatherAt(t, dailyMeanC, outsideTempC);
     let heatPump = 0;
-    let ac = 0;
+    let homes = 0;
+    let business = 0;
     for (const building of buildings) {
       if (!existsAt(building, t)) continue;
       heatPump += heatPumpPowerWWithWeather(building, dailyMeanC, outsideTempC, t);
-      ac += acPowerWWithWeather(building, dailyMeanC, outsideTempC);
+      const split = coolingPowerSplitW(building, cooling, t);
+      homes += split.homesW;
+      business += split.businessW;
     }
     heatPumpW.push(heatPump);
-    acW.push(ac);
+    acW.push(homes);
+    businessCoolingW.push(business);
   }
-  return { heatPumpW, acW };
+  return { heatPumpW, acW, businessCoolingW };
 }
 
 /** Electric water heating for every dwelling in a currently-electrically-water-
@@ -300,9 +307,10 @@ export interface CategorySeries {
 export function sampleBuildingCategorySeries(building: Building, times: number[], tariff: Tariff, plants: PowerPlant[]): CategorySeries {
   const profileSets = building.dwellings.map((d) => getDwellingProfiles(building, d));
   const dwellingTotals = dwellingCategoryTotals(profileSets, times, tariff);
-  const { heatPumpW, acW } = climateControlCategorySeries([building], times);
+  // A business's cooling is its own use, billed to it (billing.ts shares only the homes' among the flats).
+  const { heatPumpW, acW, businessCoolingW } = climateControlCategorySeries([building], times);
   const waterHeatingW = waterHeatingCategorySeries([building], times);
-  const commercialW = commercialCategorySeries([building], times);
+  const commercialW = commercialCategorySeries([building], times).map((w, i) => w + businessCoolingW[i]);
   dwellingTotals.evW = dwellingTotals.evW.map((w, i) => w + fleets.depotPowerW(building, times[i])); // its businesses' vans and lorries
   const solarW = pvSeries(
     plants.filter((p) => p.egid === building.egid),
@@ -339,7 +347,10 @@ export function sampleMunicipalityCategorySeries(
   // Vehicles charged at public chargers draw there, not at home, and businesses' at their depots —
   // all of it the town's EV charging.
   dwellingTotals.evW = dwellingTotals.evW.map((w, i) => w + publicCharging.totalLoadW(times[i]) + fleets.totalDepotPowerW(buildings, times[i]));
-  const { heatPumpW, acW } = climateControlCategorySeries(buildings, times);
+  // The town's cooling counts together, homes' and businesses'.
+  const climate = climateControlCategorySeries(buildings, times);
+  const acW = climate.acW.map((w, i) => w + climate.businessCoolingW[i]);
+  const heatPumpW = climate.heatPumpW;
   const waterHeatingW = waterHeatingCategorySeries(buildings, times);
   const commercialW = commercialCategorySeries(buildings, times);
   const solarW = pvSeries(plants, times).map((w) => -w);

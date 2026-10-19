@@ -35,6 +35,9 @@ export const RATING_UPGRADE_MONTHS = 12;
 // Debt beyond this many years of income puts the department under cantonal supervision: no new
 // borrowing, no new spending measures or orders. It lifts once debt is back under this share of it.
 export const DEBT_LIMIT_YEARS = 5;
+// Debt is measured against the operating income averaged over this many of the latest booked years
+// (fewer early on), so one poor year for the utility doesn't cut the borrowing room at once.
+export const DEBT_INCOME_YEARS = 3;
 // Finishing a run early at net zero (sim/handover.ts) needs debt at most this many years of income —
 // what earns an A rating or better.
 export const HANDOVER_MAX_DEBT_YEARS = 3;

@@ -1,6 +1,7 @@
 import { useState, useSyncExternalStore } from "react";
 import {
   BANK_LOAN_TERMS_YEARS,
+  DEBT_INCOME_YEARS,
   DEBT_LIMIT_YEARS,
   FEDERAL_LOAN_PROCESSING_MONTHS,
   FEDERAL_LOAN_TERM_YEARS,
@@ -82,7 +83,7 @@ export function BorrowingTab() {
         <div style={{ width: `${Math.min(100, (debtRp / Math.max(1, limitRp)) * 100)}%`, background: years >= DEBT_LIMIT_YEARS ? "var(--bad)" : years >= 3 ? "#e0a030" : "var(--ink-3)" }} />
       </div>
       <div className="borrow-note" style={{ marginBottom: 8 }}>
-        Limit {formatCHF(limitRp)} ({DEBT_LIMIT_YEARS} years of income: {formatCHF(debt.incomeRp(now))} a year).
+        Limit {formatCHF(limitRp)} ({DEBT_LIMIT_YEARS} years of income: {formatCHF(debt.incomeRp(now))} a year, averaged over the last {DEBT_INCOME_YEARS} years).
         {balance !== null && balance < 0 ? ` The balance is ${formatCHF(balance)}: the overdraft costs ${pct(debt.overdraftRatePct(now))} a year.` : ""}
       </div>
       {debt.isSupervised() && (
