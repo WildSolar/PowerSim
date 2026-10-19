@@ -24,6 +24,10 @@ export interface Channels {
   carParkSolarSubsidyRpPerKwp: number; // municipal subsidy per kWp for a private car park canopy
   carParkSolarDutyMinSpaces: number; // car parks of this many spaces and up must get a canopy (0: no duty)
   carParkSolarDutyYears: number; // within this many years of the duty coming into force
+  solarCheck: boolean; // a free Solar check: owners who find solar pays go ahead more often (solarAdoption.ts)
+  pvLoanMaxRp: number; // PV loans: the most an owner may borrow for the part of the price they can't put up (0: none)
+  solarCoopSupport: boolean; // a solar cooperative is at work (solarAdoption.ts)
+  solarCoopGrantRpPerKwp: number; // ...and the municipality's grant per kWp it builds
 
   // Heating, mobility, retrofits
   heatPumpSubsidyRp: number; // flat municipal grant per heat pump installed
@@ -82,6 +86,10 @@ export const CHANNEL_DEFAULTS: Channels = {
   municipalSolarBuildingsPerYear: 0,
   carParkSolarMunicipalPerYear: 0,
   carParkSolarSubsidyRpPerKwp: 0,
+  solarCheck: false,
+  pvLoanMaxRp: 0,
+  solarCoopSupport: false,
+  solarCoopGrantRpPerKwp: 0,
   carParkSolarDutyMinSpaces: 0,
   carParkSolarDutyYears: 5,
   heatPumpSubsidyRp: 0,
@@ -144,6 +152,10 @@ const COMBINERS: { [K in keyof Channels]: Combiner<Channels[K]> } = {
   carParkSolarSubsidyRpPerKwp: sum,
   carParkSolarDutyMinSpaces: max,
   carParkSolarDutyYears: max,
+  solarCheck: any,
+  pvLoanMaxRp: max,
+  solarCoopSupport: any,
+  solarCoopGrantRpPerKwp: max,
   heatPumpSubsidyRp: sum,
   dhConnectionSubsidyRp: sum,
   heatPumpGrantEarlyOnly: any,

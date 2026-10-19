@@ -775,7 +775,17 @@ export const WIKI_SECTIONS: WikiSection[] = [
       p(
         "An owner who considers it compares a system covering the usable part of the roof with going without: its price (cheaper per kWp the bigger it is), less the federal payment every installation gets and any municipal subsidy, against the electricity it would save and what it earns feeding the rest into the grid at the feed-in price. Panels get more efficient over the years, so the same roof holds more later. A municipal subsidy is paid from the treasury the day a building installs.",
       ),
-      note("A building puts up panels once; they last about as long as the game. Panels on a building that is torn down go with it. Which roofs are unsuited is the game's draw, not a survey of the real roofs."),
+      p(
+        "Finding that panels pay isn't the same as putting them up. Nothing forces the question the way a broken boiler does, and an array is a sizeable sum, paid up front — the federal payment and any subsidy only come months later. So an owner who finds solar pays still has to clear two hurdles, and an owner who doesn't may look again a year or two later:",
+      ),
+      list([
+        "Now, or later: most put it off — only about a third go ahead there and then. At a natural moment far more do: in the years after the heating was replaced, or with a roof contract offer on the table. A Solar check (an information measure: a free visit, quote in hand) brings it to about half.",
+        "The money: a house's owner pays from their savings, which differ from owner to owner; many can't put up a large array's price at once. PV loans (a subsidy measure) lend the difference, up to the amount you set, and the treasury buys down the interest — about 8% of each loan, paid when it is taken. An apartment building's owners have more to spend, but they have to agree — condominium owners among themselves, a landlord who pays while the tenants save — and often don't. A business has the money, but builds only if the array pays back quickly enough for it, typically within 6 to 12 years.",
+      ]),
+      p(
+        "Owners who wanted solar but held back aren't lost. Supporting a solar cooperative (a subsidy measure: a start-up grant, and a grant per kWp) puts residents' savings to work on their roofs: the cooperative asks each such owner once, while their interest is fresh, and builds at no cost to them where the power, sold to the building at a discount, pays back the panels with a little to spare — a handful of roofs a year. They are also the owners most open to the utility renting their roof (see \"Roof contracts\"). A building's panel says why its owner held back, and when.",
+      ),
+      note("A building puts up panels once; they last about as long as the game. Panels on a building that is torn down go with it. Which roofs are unsuited, and what each owner could pay or would wait for, are the game's draws, not a survey of the real owners."),
     ],
   },
   {
@@ -787,7 +797,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       ),
       list([
         "Offering: click a roof to see what an array there would mean — its size, what it costs to build, what a year of its output saves, the rent and the upkeep — and offer its owner the contract. Roofs are offered one at a time; the drawer says how many owners in ten would say yes at your rent, and the roof solar advisor (see \"Advisors\") ranks the roofs that would return the most.",
-        "The answer comes within weeks. Some owners take your letter as a prompt to look into solar themselves, and put up their own if it pays. The rest weigh your rent against what they want for their roof — which differs from owner to owner, most somewhere around CHF 1–4 per m². Offer more and more say yes; but every franc of rent comes out of what the array earns. A no means you can't ask again for three years.",
+        "The answer comes within weeks. Some owners take your letter as a prompt to look into solar themselves, and put up their own if it pays. The rest weigh your rent against what they want for their roof — which differs from owner to owner, most somewhere around CHF 1–4 per m². Offer more and more say yes; but every franc of rent comes out of what the array earns. Owners who wanted solar of their own but held back — kept putting it off, couldn't raise the money, couldn't agree — ask much less: for them, the contract is the way to panels. A no means you can't ask again for three years.",
         "Building: once an owner accepts, you have a year to build — the drawer lists the roofs waiting, or tick its box to build as soon as an owner accepts. You pay what the owner would have paid, less the federal payment every installation gets, as an investment you may borrow for. The panels are in service about four months later; in a full grid area a large array comes with a grid-friendly battery.",
         "Earning: the arrays are the utility's. It pays no feed-in for what they make; their power saves buying from the wider grid at the wholesale price — or, at a sunny midday when the town already makes more than it uses, sells at the spot price. Against that it pays the rent and the arrays' upkeep, every year. Big roofs pay well; small ones barely cover their costs.",
       ]),

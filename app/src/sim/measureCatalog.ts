@@ -48,6 +48,31 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     approval: () => ({ business: 0.5, climate: 0.4, homeowners: -0.05 }),
   },
   {
+    id: "pv-loans",
+    category: "subsidy",
+    topic: "buildings",
+    title: "PV loans",
+    summary:
+      "Low-interest loans, with a local bank, for owners who find solar pays but can't put up the price: an array is paid up front, and the federal payment only comes months later. An owner borrows what they can't pay themselves, up to the amount set; the treasury buys down the interest — about 8% of each loan, paid when it is taken.",
+    params: [{ kind: "slider", key: "max", label: "Most per building", min: 10_000, max: 150_000, step: 5_000, unit: "CHF", default: 40_000 }],
+    leadTimeMonths: 3,
+    effects: (p) => ({ pvLoanMaxRp: num(p, "max") * CHF }),
+    approval: () => ({ homeowners: 0.3, climate: 0.3, business: 0.05 }),
+  },
+  {
+    id: "solar-cooperatives",
+    category: "subsidy",
+    topic: "buildings",
+    title: "Solar cooperative support",
+    summary:
+      "A start-up grant for a local solar cooperative, and a grant for each kWp it builds. Residents put in their savings; the cooperative approaches owners who wanted solar but didn't build — who kept putting it off, couldn't raise the money or couldn't agree — and puts panels on their roof at no cost to them, selling the power to the building at a discount. It takes on a roof that pays back with a little to spare, a handful a year.",
+    params: [{ kind: "slider", key: "perKwp", label: "Grant per kWp", min: 0, max: 800, step: 50, unit: "CHF/kWp", default: 200 }],
+    leadTimeMonths: 6,
+    effects: (p) => ({ solarCoopSupport: true, solarCoopGrantRpPerKwp: num(p, "perKwp") * CHF }),
+    oneOffCostRp: () => 50_000 * CHF,
+    approval: () => ({ climate: 0.3, tenants: 0.15, homeowners: 0.1 }),
+  },
+  {
     id: "car-park-solar-subsidy",
     category: "subsidy",
     topic: "buildings",
@@ -255,6 +280,19 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     effects: (p) => ({ solarOutreachLevel: num(p, "level") }),
     annualCostRp: (p, ctx) => (num(p, "level") / 100) * ctx.residents * 6 * CHF,
     approval: () => ({ climate: 0.3, homeowners: 0.1 }),
+  },
+  {
+    id: "solar-check",
+    category: "information",
+    topic: "buildings",
+    title: "Solar check",
+    summary:
+      "A free on-site visit for any owner looking into solar: an independent installer's look at the roof, and a quote in hand. Nothing forces an owner to act on solar the way a broken boiler does — most who find it pays put it off. With the check, about half go ahead there and then, against a third.",
+    params: [],
+    leadTimeMonths: 3,
+    effects: () => ({ solarCheck: true }),
+    annualCostRp: (_p, ctx) => ctx.residents * 1.5 * CHF,
+    approval: () => ({ homeowners: 0.15, climate: 0.15 }),
   },
   {
     id: "energy-consulting",

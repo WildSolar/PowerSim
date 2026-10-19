@@ -23,6 +23,12 @@
  *    installation's own (install cost - subsidies)/lifetime minus the
  *    avoided electricity cost + export revenue it would actually earn this
  *    building, same shape as every other stock-renewal decision.
+ *  - And whether the owner who finds it pays actually goes ahead (solarHold): with no urgency,
+ *    often not now — more often at a natural moment, or after a Solar check; then the money,
+ *    which is paid up front (a house owner's savings, PV loans on top; an apartment building's
+ *    owners have to agree; a business wants a short payback). An owner who wanted solar but held
+ *    back is kept (shelvedByEgid): the building panel says why, a solar cooperative may take the
+ *    roof on, and the utility's roof contract appeals to them more (roofContracts.ts).
  *
  * Architecture: dataset.powerPlants is real, static, loaded data and is
  * never mutated (same principle billing.ts/pv.ts already document for heat
@@ -61,6 +67,21 @@ import {
   UNSUITED_ROOF_SHARE,
   UNSUITED_ROOF_SHARE_OLD,
   BASE_ANNUAL_HAZARD,
+  PV_LOAN_BUYDOWN_SHARE,
+  SOLAR_ACT_NOW_SHARE,
+  SOLAR_ACT_NOW_SHARE_AT_MOMENT,
+  SOLAR_ACT_NOW_SHARE_WITH_CHECK,
+  SOLAR_APARTMENTS_AGREE_SHARE,
+  SOLAR_APARTMENTS_CAPITAL_MEDIAN_CHF,
+  SOLAR_BUSINESS_PAYBACK_YEARS,
+  SOLAR_CAPITAL_LOG_SPREAD,
+  SOLAR_COOP_INTEREST_YEARS,
+  SOLAR_COOP_LOOKS_PER_YEAR,
+  SOLAR_COOP_MIN_RETURN,
+  SOLAR_COOP_OWNER_AGREES,
+  SOLAR_COOP_ROOFS_PER_YEAR,
+  SOLAR_COOP_SALE_SHARE,
+  SOLAR_HOUSE_CAPITAL_MEDIAN_CHF,
   SOLAR_PRICE_HAZARD_ELASTICITY,
   MAX_ANNUAL_HAZARD,
   NEIGHBOR_BOOST_CAP,
@@ -76,7 +97,7 @@ import { consumptionSeriesW, hourOfDayAt } from "./billing";
 import { BASELINE_YEAR, toDateMs, toSimTimeMs } from "./calendar";
 import { logCandidateDecision } from "./decisionLog";
 import { LocalProjection, PointGrid } from "./localGeo";
-import { isMunicipalBuilding } from "./buildingGroup";
+import { buildingGroup, isMunicipalBuilding } from "./buildingGroup";
 import { existsAt } from "./lifetime";
 import type { ConstructionRules } from "./constructionRules";
 import { heatingRenewalsInRange } from "./heatingRenewal";
@@ -132,11 +153,30 @@ export interface SolarAdoptionRecord {
   municipalSubsidyRp: number;
   annualSavingsRp: number;
   /** A new building's array, fixed at permit time by the construction rules rather than an owner's
-   * choice; the municipality's own; or the utility's on a rented roof (roofContracts.ts). */
-  origin?: "mandate" | "voluntary" | "municipal" | "contract";
+   * choice; the municipality's own; the utility's on a rented roof (roofContracts.ts); or a solar
+   * cooperative's. */
+  origin?: "mandate" | "voluntary" | "municipal" | "contract" | "cooperative";
+  /** A PV loan the owner took for what they couldn't pay up front. */
+  pvLoanRp?: number;
 }
 
 const adoptionByEgid = new Map<string, SolarAdoptionRecord>();
+
+/** Why an owner who found solar pays held back: put it off, couldn't raise the money, the owners
+ * couldn't agree, or (a business) it pays back too slowly. */
+export type SolarHoldReason = "later" | "money" | "consent" | "payback";
+
+/** An owner who wanted solar and held back — the latest time they did. */
+export interface SolarShelved {
+  atMs: number;
+  reason: SolarHoldReason;
+  /** What the array would have cost up front. */
+  upfrontRp: number;
+  /** A solar cooperative has asked them already. */
+  coopAsked?: boolean;
+}
+
+const shelvedByEgid = new Map<string, SolarShelved>();
 
 /** A home battery bought (or added) by a building's owner, or put in by the municipality — the
  * registered systems' seeded batteries aren't in here (registeredBattery). */
@@ -412,6 +452,50 @@ interface HazardContext {
   draw: number;
   neighborAdopters: number;
   renewalBoosted: boolean;
+  /** An offer on the table (a roof contract): a natural moment to decide. */
+  moment?: boolean;
+}
+
+/** What an owner can put up for solar (Rp), drawn once per building: a house's owner, or an apartment
+ * building's owners or landlord. */
+export function solarCapitalRp(building: Building): number {
+  const median = buildingGroup(building) === "houseSingle" ? SOLAR_HOUSE_CAPITAL_MEDIAN_CHF : SOLAR_APARTMENTS_CAPITAL_MEDIAN_CHF;
+  const rng = mulberry32(hashSeed(building.egid, "solar-capital"));
+  const z = Math.sqrt(-2 * Math.log(Math.max(1e-9, rng()))) * Math.cos(2 * Math.PI * rng());
+  return median * 100 * Math.exp(SOLAR_CAPITAL_LOG_SPREAD * z);
+}
+
+/** Whether an owner who finds solar pays goes ahead now, and how much they borrow: no urgency, so
+ * often not now; then the money — paid up front — or, for a business, the payback. */
+function solarHold(
+  building: Building,
+  yearStartMs: number,
+  policy: Policy,
+  moment: boolean,
+  upfrontRp: number,
+  netCostRp: number,
+  annualValue: number,
+): { reason: SolarHoldReason | null; loanRp: number } {
+  const rng = mulberry32(hashSeed(building.egid, "solar-hold", String(yearStartMs)));
+  const actNow = moment ? SOLAR_ACT_NOW_SHARE_AT_MOMENT : policy.solarCheck ? SOLAR_ACT_NOW_SHARE_WITH_CHECK : SOLAR_ACT_NOW_SHARE;
+  if (rng() >= actNow) return { reason: "later", loanRp: 0 };
+  const group = buildingGroup(building);
+  if (group === "commercial" || group === "industrial") {
+    const [lo, hi] = SOLAR_BUSINESS_PAYBACK_YEARS;
+    const limit = lo + mulberry32(hashSeed(building.egid, "solar-payback-limit"))() * (hi - lo);
+    return { reason: annualValue > 0 && netCostRp / annualValue <= limit ? null : "payback", loanRp: 0 };
+  }
+  if (group === "apartments" && rng() >= SOLAR_APARTMENTS_AGREE_SHARE) return { reason: "consent", loanRp: 0 };
+  const gapRp = Math.max(0, upfrontRp - solarCapitalRp(building));
+  if (gapRp > policy.pvLoanMaxRp) return { reason: "money", loanRp: 0 };
+  return { reason: null, loanRp: gapRp };
+}
+
+/** An owner who wanted solar and held back within the last few years (and hasn't built since). */
+export function solarShelved(egid: string, atMs: number): SolarShelved | undefined {
+  const s = shelvedByEgid.get(egid);
+  if (!s || adoptionByEgid.has(egid) || s.atMs > atMs || atMs - s.atMs > SOLAR_COOP_INTEREST_YEARS * YEAR_MS) return undefined;
+  return s;
 }
 
 function evaluateAdoption(
@@ -467,6 +551,20 @@ function evaluateAdoption(
   const choose = (cs: RenewalCandidate<Choice>[]) => chooseNext(cs, "none", uncertainty, biasRp + policy.progressiveNudgeRp).chosen;
   const chosen = choose(candidates);
   const chosenBatterySubsidyRp = chosen === "battery" || chosen === "batteryGrid" ? batterySubsidy[chosen] : 0;
+  // It pays — but does the owner go ahead now, and can they pay for it up front?
+  const upfrontRp = installCostRp + (chosen === "battery" || chosen === "batteryGrid" ? batteryCostRp : 0);
+  const hold =
+    chosen === "none"
+      ? null
+      : solarHold(
+          building,
+          yearStartMs,
+          policy,
+          hazardContext.renewalBoosted || !!hazardContext.moment,
+          upfrontRp,
+          upfrontRp - federalRp - municipalRp - chosenBatterySubsidyRp,
+          annualValueRp(economics, chosen, battery.kwh),
+        );
   // The ground truth for evaluation studies: the same decision without each municipal payment.
   const additional =
     chosen !== "none" && municipalRp > 0
@@ -507,13 +605,23 @@ function evaluateAdoption(
       batteryCostRp,
       batteryPreferenceRp: preferenceRp,
       gridBlocked,
+      heldBack: hold?.reason ?? "",
+      upfrontRp,
+      pvLoanRp: hold?.loanRp ?? 0,
     },
   });
 
   if (chosen === "none") return null;
+  if (hold?.reason) {
+    shelvedByEgid.set(building.egid, { atMs: yearStartMs, reason: hold.reason, upfrontRp });
+    return null;
+  }
+  shelvedByEgid.delete(building.egid);
+  const loanRp = hold?.loanRp ?? 0;
 
   const installedAtMs = dayInMonth(hashSeed(building.egid, "solar-install-day", String(yearStartMs)), yearStartMs);
   if (municipalRp > 0) recordSubsidisedDecision({ atMs: installedAtMs, category: "solar", subsidyRp: municipalRp, additional });
+  if (loanRp > 0) treasury.recordPayout("solar", installedAtMs, Math.round(loanRp * PV_LOAN_BUYDOWN_SHARE), `pv-loan:${building.egid}`);
   if (chosen !== "solar") {
     batteryByEgid.set(building.egid, {
       installedAtMs,
@@ -535,6 +643,7 @@ function evaluateAdoption(
     federalSubsidyRp: federalRp,
     municipalSubsidyRp: municipalRp,
     annualSavingsRp: annualValueRp(economics, chosen, battery.kwh),
+    ...(loanRp > 0 ? { pvLoanRp: loanRp } : {}),
   };
 }
 
@@ -795,6 +904,7 @@ export function considerOwnSolarNow(building: Building, realPlants: PowerPlant[]
     draw: 0,
     neighborAdopters: 0,
     renewalBoosted: false,
+    moment: true,
   });
   if (!decision) return false;
   const installedAtMs = Math.max(decision.installedAtMs, atMs + 2 * (YEAR_MS / 12));
@@ -856,6 +966,48 @@ export function solarStatusOf(building: Building, realPlants: PowerPlant[]): { c
   return record ? { capacityKw: record.capacityKw, installedAtMs: record.installedAtMs } : null;
 }
 
+/** A solar cooperative at work (a measure): it looks into the roofs of owners who wanted solar but
+ * held back, asks each owner once, and puts panels up where the power, sold to the building at a
+ * discount, pays back the panels (less the federal payment and the municipality's grant) with a little
+ * to spare — no more than a handful of roofs a year. */
+function cooperativeRound(buildings: Building[], realPlants: PowerPlant[], year: number, month: number, monthStartMs: number, tariff: Tariff, policy: Policy): void {
+  const yearStart = toSimTimeMs(Date.UTC(year, 0, 1));
+  let built = 0;
+  for (const r of adoptionByEgid.values()) if (r.origin === "cooperative" && r.installedAtMs >= yearStart) built++;
+  if (built >= SOLAR_COOP_ROOFS_PER_YEAR) return;
+  const lookup = buildingLookup(buildings);
+  const chance = monthlyChance(SOLAR_COOP_LOOKS_PER_YEAR);
+  let sunlight: YearSunlight | undefined;
+  for (const [egid, s] of shelvedByEgid) {
+    if (s.coopAsked || !solarShelved(egid, monthStartMs) || ownerHold(egid, monthStartMs)) continue;
+    if (mulberry32(hashSeed(egid, "solar-coop-look", String(year), String(month)))() >= chance) continue;
+    s.coopAsked = true;
+    if (mulberry32(hashSeed(egid, "solar-coop-agree"))() >= SOLAR_COOP_OWNER_AGREES) continue;
+    const b = lookup.get(egid);
+    if (!b || !isEligible(b, realPlants, year, monthStartMs)) continue;
+    const array = roofArray(b, monthStartMs);
+    if (!array || array.battery) continue; // a full grid area: the cooperative can't connect plainly
+    const grantRp = Math.min(array.capacityKw * policy.solarCoopGrantRpPerKwp, Math.max(0, array.installCostRp - array.federalRp));
+    sunlight ??= yearSunlight(year);
+    const valueRp = annualValueRp(candidateEconomics(b, array.capacityKw, sunlight, tariff), "solar", 0) * SOLAR_COOP_SALE_SHARE;
+    const costRp = (array.installCostRp - array.federalRp - grantRp) / PANEL_LIFETIME_MEAN_YEARS;
+    if (valueRp < costRp * (1 + SOLAR_COOP_MIN_RETURN)) continue;
+    const installedAtMs = dayInMonth(hashSeed(egid, "solar-coop-day", String(monthStartMs)), monthStartMs) + 3 * (YEAR_MS / 12);
+    adoptionByEgid.set(egid, {
+      installedAtMs,
+      capacityKw: array.capacityKw,
+      installCostRp: array.installCostRp,
+      federalSubsidyRp: array.federalRp,
+      municipalSubsidyRp: grantRp,
+      annualSavingsRp: valueRp,
+      origin: "cooperative",
+    });
+    if (grantRp > 0) treasury.recordPayout("solar", installedAtMs, grantRp, egid);
+    shelvedByEgid.delete(egid);
+    if (++built >= SOLAR_COOP_ROOFS_PER_YEAR) return;
+  }
+}
+
 /** One month's decisions, under the measures and prices in force as it begins: the municipal
  * programme's share of its yearly count, owners who look into solar (an annual chance taken a month
  * at a time), and owners of a system without a battery who look into adding one. */
@@ -866,6 +1018,7 @@ function processMonth(buildings: Building[], realPlants: PowerPlant[], year: num
   installMunicipalSolar(buildings, realPlants, year, yearStartMs, tariff);
 
   let sunlight: YearSunlight | undefined;
+  if (policy.solarCoopSupport) cooperativeRound(buildings, realPlants, year, month, yearStartMs, tariff, policy);
   const priceMultiplier = Math.pow(1 / priceFactorInYear("solar", year), SOLAR_PRICE_HAZARD_ELASTICITY);
   // The highest chance any building could have this month: most draws miss it, and skip the
   // neighbour count and heating history.
@@ -1103,6 +1256,8 @@ export interface SolarAdoptionLogEntry {
  * a panel's ~28yr life is close to the whole game horizon). */
 export function solarAdoptionLog(building: Building, simTimeMs: number): SolarAdoptionLogEntry[] {
   const entries = solarOnlyLog(building, simTimeMs);
+  const shelved = shelvedByEgid.get(building.egid);
+  if (entries.length === 0 && shelved && shelved.atMs <= simTimeMs) entries.push({ installedAtMs: shelved.atMs, note: shelvedNote(shelved) });
   const battery = batteryByEgid.get(building.egid);
   if (battery && battery.installedAtMs <= simTimeMs) entries.push({ installedAtMs: battery.installedAtMs, note: batteryNote(battery) });
   return entries.sort((a, b) => a.installedAtMs - b.installedAtMs);
@@ -1119,11 +1274,33 @@ function batteryNote(b: BatteryRecord): string {
   return `A ${size} battery came with the panels${run}${subsidy}.`;
 }
 
+function shelvedNote(s: SolarShelved): string {
+  const chf = `CHF ${Math.round(s.upfrontRp / 100 / 1000) * 1000}`.replace(/\B(?=(\d{3})+(?!\d))/g, "'");
+  switch (s.reason) {
+    case "later":
+      return "The owner looked into solar: it would pay, but they put it off for now.";
+    case "money":
+      return `The owner looked into solar: it would pay, but they couldn't put up the ${chf} it costs before the subsidies come.`;
+    case "consent":
+      return "The owners looked into solar: it would pay, but they couldn't agree on it.";
+    case "payback":
+      return "The business looked into solar: it would pay in the long run, but not soon enough for it.";
+  }
+}
+
 function solarOnlyLog(building: Building, simTimeMs: number): SolarAdoptionLogEntry[] {
   const record = adoptionByEgid.get(building.egid);
   if (!record || record.installedAtMs > simTimeMs) return [];
   if (record.origin === "municipal") {
     return [{ installedAtMs: record.installedAtMs, note: `The municipality put solar panels on this public building: ${record.capacityKw.toFixed(1)} kWp, paid from the treasury.` }];
+  }
+  if (record.origin === "cooperative") {
+    return [
+      {
+        installedAtMs: record.installedAtMs,
+        note: `A solar cooperative put panels on this roof: ${record.capacityKw.toFixed(1)} kWp. The owner pays nothing, and the building buys the power at a discount.`,
+      },
+    ];
   }
   if (record.origin === "contract") {
     return [{ installedAtMs: record.installedAtMs, note: `The utility rents this roof and put its own solar panels on it: ${record.capacityKw.toFixed(1)} kWp.` }];
@@ -1134,7 +1311,8 @@ function solarOnlyLog(building: Building, simTimeMs: number): SolarAdoptionLogEn
   }
   const totalSubsidyRp = record.federalSubsidyRp + record.municipalSubsidyRp;
   const subsidyNote = totalSubsidyRp > 0 ? ` after ${subsidyNoteFragment(record)}` : "";
-  const note = `Solar panels were installed on the roof — ${record.capacityKw.toFixed(1)} kWp, a decision that penciled out against the electricity it would save and export${subsidyNote}.`;
+  const loanNote = record.pvLoanRp ? `, with a PV loan of CHF ${Math.round(record.pvLoanRp / 100).toLocaleString("de-CH")}` : "";
+  const note = `Solar panels were installed on the roof — ${record.capacityKw.toFixed(1)} kWp, a decision that penciled out against the electricity it would save and export${subsidyNote}${loanNote}.`;
   return [{ installedAtMs: record.installedAtMs, note }];
 }
 
@@ -1202,11 +1380,12 @@ export function solarInstallsInRange(fromMs: number, toMs: number): { count: num
 export interface SolarSnapshot {
   adoptions: Map<string, SolarAdoptionRecord>;
   batteries: Map<string, BatteryRecord>;
+  shelved: Map<string, SolarShelved>;
   watermarkMonth: number | null;
 }
 
 export function snapshotSolar(): SolarSnapshot {
-  return { adoptions: adoptionByEgid, batteries: batteryByEgid, watermarkMonth };
+  return { adoptions: adoptionByEgid, batteries: batteryByEgid, shelved: shelvedByEgid, watermarkMonth };
 }
 
 export function restoreSolar(saved: SolarSnapshot): void {
@@ -1214,6 +1393,8 @@ export function restoreSolar(saved: SolarSnapshot): void {
   for (const [egid, record] of saved.adoptions) adoptionByEgid.set(egid, record);
   batteryByEgid.clear();
   for (const [egid, record] of saved.batteries) batteryByEgid.set(egid, record);
+  shelvedByEgid.clear();
+  for (const [egid, record] of saved.shelved) shelvedByEgid.set(egid, record);
   watermarkMonth = saved.watermarkMonth;
   neighborIndex = null;
 }

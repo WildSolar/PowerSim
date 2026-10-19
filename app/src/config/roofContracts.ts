@@ -4,6 +4,9 @@
 // Roofs worth asking about: a building footprint at least this big (m²), not a public building (the
 // municipality's own roofs need no contract).
 export const ROOF_CONTRACT_MIN_FOOTPRINT_M2 = 360;
+// An owner who wanted solar of their own but didn't build — kept putting it off, couldn't raise the
+// money, couldn't agree among themselves — asks this much of the rent they would otherwise want.
+export const ROOF_ASK_FACTOR_WANTED_SOLAR = 0.6;
 // The rent the utility offers, per m² of roof the panels cover, a year (CHF): its default, and the
 // range the player can set. Swiss roof rents run at roughly CHF 1-3 per m² a year.
 export const ROOF_RENT_DEFAULT_CHF_PER_M2 = 2;

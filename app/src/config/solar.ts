@@ -90,7 +90,7 @@ export const AGE_EXCLUSION_YEARS = 200; // heritage-protection stand-in — see 
 
 // --- solarAdoption.ts: the "when" hazard-rate engine ---
 
-export const BASE_ANNUAL_HAZARD = 0.02; // 2%/year spontaneous "have I thought about this" baseline
+export const BASE_ANNUAL_HAZARD = 0.045; // 4.5%/year spontaneous "have I thought about this" baseline — most who find it pays still hold back (SOLAR_ACT_NOW_SHARE, the money)
 export const MAX_ANNUAL_HAZARD = 0.95; // clamp — never a near-certainty even with every boost stacked
 // Cheaper panels bring more owners to look into solar at all (a shorter payback travels by word of
 // mouth and installers' marketing): the yearly chance scales with (today's price / the price then)
@@ -106,3 +106,41 @@ export const NEIGHBOR_BOOST_CAP = 2.5; // neighbor effect alone can at most 2.5x
 
 export const SOLAR_UNCERTAINTY_FRACTION = 0.12; // flat, no size proxy — same judgment call as mobility's vehicle-type choice
 export const SOLAR_BIAS_MAGNITUDE_RP_PER_YEAR = 40_000; // CHF 400/yr at full lean
+
+// --- solarAdoption.ts: whether an owner who finds solar pays goes ahead ---
+
+// Nothing forces the question, as a worn-out boiler does: an owner who likes the numbers goes ahead
+// this time with this chance, and otherwise shelves it until they next look into it. At a natural
+// moment — a heating replacement, the house in the builders' hands anyway, or an offer on the table —
+// far more often. A Solar check (a free on-site visit, quote in hand) raises the everyday chance.
+export const SOLAR_ACT_NOW_SHARE = 0.35;
+export const SOLAR_ACT_NOW_SHARE_WITH_CHECK = 0.55;
+export const SOLAR_ACT_NOW_SHARE_AT_MOMENT = 0.8;
+// The money: an array is paid up front (the federal payment comes months later, the municipality's
+// with it). What an owner can put up is drawn once per building (log-normal): a house's owner from
+// savings; an apartment building's owners or landlord more, but they have to agree — condominium
+// owners together, a landlord who pays while the tenants save — which they manage this often when it
+// comes up. A business has the money, but builds only if the array pays back within its own limit,
+// drawn per building.
+export const SOLAR_HOUSE_CAPITAL_MEDIAN_CHF = 25_000;
+export const SOLAR_APARTMENTS_CAPITAL_MEDIAN_CHF = 80_000;
+export const SOLAR_CAPITAL_LOG_SPREAD = 0.8;
+export const SOLAR_APARTMENTS_AGREE_SHARE = 0.6;
+export const SOLAR_BUSINESS_PAYBACK_YEARS: [number, number] = [6, 12];
+
+// PV loans (a measure): the treasury buys down the interest on a loan an owner takes for the part of
+// the price they can't put up themselves — this share of the loan, paid when it is taken.
+export const PV_LOAN_BUYDOWN_SHARE = 0.08;
+
+// Solar cooperatives (a measure): residents' savings, put into panels on the roofs of owners who
+// wanted solar but didn't build. The cooperative looks into such a roof this often a year while the
+// owner's interest is fresh (it was within the last few years), the owner agrees this often, and it
+// sells the power to the building at a discount — this share of what the power is worth there. It
+// takes a roof on if that pays back the panels (less the federal payment and the municipal grant)
+// with a little to spare, and no more than a handful of roofs a year.
+export const SOLAR_COOP_INTEREST_YEARS = 5;
+export const SOLAR_COOP_LOOKS_PER_YEAR = 0.5;
+export const SOLAR_COOP_OWNER_AGREES = 0.6;
+export const SOLAR_COOP_SALE_SHARE = 0.85;
+export const SOLAR_COOP_MIN_RETURN = 0.1;
+export const SOLAR_COOP_ROOFS_PER_YEAR = 8;

@@ -26,6 +26,7 @@ import {
   ROOF_ANSWER_DAYS,
   ROOF_BUILD_WITHIN_MONTHS,
   ROOF_CONTRACT_MIN_FOOTPRINT_M2,
+  ROOF_ASK_FACTOR_WANTED_SOLAR,
   ROOF_DECLINE_COOLDOWN_YEARS,
   ROOF_INSTALL_MONTHS,
   ROOF_RENT_DEFAULT_CHF_PER_M2,
@@ -40,7 +41,7 @@ import { existsAt } from "./lifetime";
 import { market } from "./market";
 import { isPublicBuilding } from "./publicBuildings";
 import { hashSeed, mulberry32 } from "./rng";
-import { considerOwnSolarNow, contractArrays, installContractSolar, roofArray, setOwnerSolarHold, solarStatusOf, typicalYieldKWhPerKwp, usableRoofFraction } from "./solarAdoption";
+import { solarShelved, considerOwnSolarNow, contractArrays, installContractSolar, roofArray, setOwnerSolarHold, solarStatusOf, typicalYieldKWhPerKwp, usableRoofFraction } from "./solarAdoption";
 
 const DAY_MS = 24 * 60 * 60_000;
 const MONTH_MS = (365.25 * DAY_MS) / 12;
@@ -345,7 +346,9 @@ class RoofContracts {
       return;
     }
     const mood = 1 + OWNER_ASK_OFFER_NOISE * (2 * mulberry32(hashSeed(this.seed, "offer-mood", String(c.id)))() - 1);
-    if (c.rentChfPerM2 >= this.ownerAsk(c.egid) * mood) {
+    // An owner who wanted solar of their own but held back is glad of someone else doing it.
+    const wanted = solarShelved(c.egid, atMs) ? ROOF_ASK_FACTOR_WANTED_SOLAR : 1;
+    if (c.rentChfPerM2 >= this.ownerAsk(c.egid) * wanted * mood) {
       c.status = "accepted";
       c.buildByMs = atMs + ROOF_BUILD_WITHIN_MONTHS * MONTH_MS;
       if (this.autoBuild) this.build(c.egid, atMs);
