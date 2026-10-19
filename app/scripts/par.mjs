@@ -6,7 +6,9 @@
  *   npm run par -- schlieren uster          the towns named
  *   npm run par -- --all                    every town in public/data/index.json
  *   npm run par -- schlieren --difficulties normal,hard
- *   npm run par -- --all --jobs 8           at most 8 at a time (default: cores − 2)
+ *   npm run par -- --all --jobs 8           at most 8 at a time (default: half the logical cores —
+ *                                           more only slows each run down: they share the CPU's
+ *                                           cores and memory)
  *
  * Each run is a child process of its own (the game's modules keep state, so one run per process),
  * loading the game's code through Vite exactly as the browser does — the results are the same as
@@ -77,7 +79,7 @@ function usage(message) {
 async function parent(args) {
   let all = false;
   let difficulties = ALL_DIFFICULTIES;
-  let jobs = Math.max(1, os.cpus().length - 2);
+  let jobs = Math.max(1, Math.floor(os.cpus().length / 2));
   const slugs = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
