@@ -6,6 +6,48 @@
     "buildingCount": 1467
   },
   {
+    "slug": "bulach",
+    "name": "Bülach",
+    "bfsNumber": 53,
+    "buildingCount": 3431
+  },
+  {
+    "slug": "dietikon",
+    "name": "Dietikon",
+    "bfsNumber": 243,
+    "buildingCount": 3554
+  },
+  {
+    "slug": "dubendorf",
+    "name": "Dübendorf",
+    "bfsNumber": 191,
+    "buildingCount": 5060
+  },
+  {
+    "slug": "hinwil",
+    "name": "Hinwil",
+    "bfsNumber": 117,
+    "buildingCount": 3821
+  },
+  {
+    "slug": "kloten",
+    "name": "Kloten",
+    "bfsNumber": 62,
+    "buildingCount": 3012
+  },
+  {
+    "slug": "kusnacht-zh",
+    "name": "Küsnacht (ZH)",
+    "bfsNumber": 154,
+    "buildingCount": 3997
+  },
+  {
+    "slug": "opfikon",
+    "name": "Opfikon",
+    "bfsNumber": 66,
+    "buildingCount": 2359
+  },
+  {
     "slug": "regensdorf",
     "name": "Regensdorf",
     "bfsNumber": 96,
@@ -18,16 +60,34 @@
     "buildingCount": 2076
   },
   {
+    "slug": "stammheim",
+    "name": "Stammheim",
+    "bfsNumber": 292,
+    "buildingCount": 1859
+  },
+  {
     "slug": "uster",
     "name": "Uster",
     "bfsNumber": 198,
     "buildingCount": 7375
   },
   {
+    "slug": "wald-zh",
+    "name": "Wald (ZH)",
+    "bfsNumber": 120,
+    "buildingCount": 3548
+  },
+  {
     "slug": "wetzikon-zh",
     "name": "Wetzikon (ZH)",
     "bfsNumber": 121,
     "buildingCount": 5069
+  },
+  {
+    "slug": "winterthur",
+    "name": "Winterthur",
+    "bfsNumber": 230,
+    "buildingCount": 22189
   },
   {
     "slug": "wadenswil",

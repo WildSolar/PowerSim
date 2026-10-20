@@ -34,6 +34,16 @@ app/public/data/*
 !app/public/data/uster.json
 !app/public/data/wadenswil.json
 !app/public/data/wetzikon-zh.json
+!app/public/data/winterthur.json
+!app/public/data/dietikon.json
+!app/public/data/dubendorf.json
+!app/public/data/opfikon.json
+!app/public/data/kloten.json
+!app/public/data/bulach.json
+!app/public/data/kusnacht-zh.json
+!app/public/data/hinwil.json
+!app/public/data/wald-zh.json
+!app/public/data/stammheim.json
 # Par (sim/par.ts): computed with the game, not the pipeline — committed.
 !app/public/data/par/
 pipeline/.cache/

@@ -24,6 +24,9 @@ export const CHANGELOG: Release[] = [
   {
     version: "0.9.1",
     date: null,
+    added: [
+      "Ten more towns in the canton of Zürich: Winterthur, Dietikon, Dübendorf, Opfikon, Kloten, Bülach, Küsnacht, Hinwil, Wald and Stammheim — from a city of over a hundred thousand to a handful of wine-growing villages. Winterthur is big: it takes longer to load.",
+    ],
     fixed: [
       "The decision log no longer looks as if owners install gas or oil despite the ban: when an owner weighs replacing a working boiler early and decides to keep it, that option now reads ‘Keep the current oil boiler’, and the outcome ‘kept — weighed switching early’. A gas or oil heating installed under the ban's exception (no heat pump possible, no district heating) shows why.",
     ],
