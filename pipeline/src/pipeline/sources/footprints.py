@@ -36,6 +36,8 @@ from __future__ import annotations
 from collections import defaultdict
 
 import requests
+
+from .. import http
 from shapely.geometry import shape
 from shapely.ops import unary_union
 
@@ -69,7 +71,7 @@ def fetch_land_cover(
         "bbox": f"{min_e},{min_n},{max_e},{max_n},EPSG:2056",
         "outputFormat": "application/json",
     }
-    response = requests.get(WFS_URL, params=params, timeout=60)
+    response = http.get(WFS_URL, params=params, timeout=60)
     response.raise_for_status()
     features = response.json()["features"]
 

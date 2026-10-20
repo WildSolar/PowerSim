@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import requests
 
+from .. import http
+
 TABLE_URL = "https://www.pxweb.bfs.admin.ch/api/v1/de/px-x-1103020100_111/px-x-1103020100_111.px"
 CARS = "1"
 GOODS = "3"
@@ -23,7 +25,7 @@ ELECTRIC = "500"
 
 def fetch_register(bfs_number: int) -> dict | None:
     try:
-        meta = requests.get(TABLE_URL, timeout=60).json()
+        meta = http.get(TABLE_URL, timeout=60).json()
         years = next(v["values"] for v in meta["variables"] if v["code"] == "Jahr")
         year = max(years)
         query = {

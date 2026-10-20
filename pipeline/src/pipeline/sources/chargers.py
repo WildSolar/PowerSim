@@ -13,7 +13,7 @@ from __future__ import annotations
 import requests
 from shapely.geometry import Point, Polygon
 
-from .. import coords
+from .. import coords, http
 
 REGISTER_URL = "https://data.geo.admin.ch/ch.bfe.ladestellen-elektromobilitaet/data/oicp/ch.bfe.ladestellen-elektromobilitaet.json"
 SITE_MERGE_M = 25.0
@@ -23,7 +23,7 @@ DC_MIN_KW = 50.0
 
 
 def fetch_sites(boundary_lv95: list[Polygon]) -> list[dict]:
-    data = requests.get(REGISTER_URL, timeout=180).json()
+    data = http.get(REGISTER_URL, timeout=180).json()
     points = []
     for operator in data.get("EVSEData", []):
         for record in operator.get("EVSEDataRecord", []):

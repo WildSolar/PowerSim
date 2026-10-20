@@ -30,7 +30,7 @@ import requests
 from shapely.geometry import Point, Polygon, shape
 from shapely.ops import unary_union
 
-from .. import coords
+from .. import coords, http
 from ..cache import cached_json
 
 STAC = "https://data.geo.admin.ch"
@@ -128,7 +128,7 @@ _csv_cache: dict[str, dict[str, list[dict]]] = {}
 
 def _zip_csvs(url: str) -> dict[str, list[dict]]:
     if url not in _csv_cache:
-        response = requests.get(url, timeout=120)
+        response = http.get(url, timeout=120)
         response.raise_for_status()
         tables: dict[str, list[dict]] = {}
         with zipfile.ZipFile(io.BytesIO(response.content)) as z:
@@ -253,7 +253,7 @@ def _identify_cells(bbox: tuple[float, float, float, float]) -> list[dict]:
         "geometryFormat": "geojson",
         "limit": 200,
     }
-    response = requests.get(IDENTIFY_URL, params=params, timeout=60)
+    response = http.get(IDENTIFY_URL, params=params, timeout=60)
     response.raise_for_status()
     results = response.json().get("results", [])
     if len(results) < 200 or max_e - min_e < 500:
@@ -350,7 +350,7 @@ def fetch_land(boundary: list[Polygon]) -> tuple[float, list]:
 def _get_features(params: dict) -> list[dict]:
     for attempt in range(3):
         try:
-            response = requests.get(LAND_COVER_WFS, params=params, timeout=120)
+            response = http.get(LAND_COVER_WFS, params=params, timeout=120)
             response.raise_for_status()
             # Only what fetch_land reads: forest and water.
             return [f for f in response.json()["features"] if f["properties"].get("art") in ("geschlossener Wald", "fliessendes Gewässer", "stehendes Gewässer")]

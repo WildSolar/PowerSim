@@ -14,7 +14,7 @@ from shapely import make_valid
 from shapely.geometry import Polygon, shape
 from shapely.ops import unary_union
 
-from .. import coords
+from .. import coords, http
 
 ZONING_URL = "https://api3.geo.admin.ch/rest/services/api/MapServer/find"
 
@@ -35,7 +35,7 @@ MAX_SITES = 600
 def fetch_zone_features(bfs_number: int) -> list[tuple[str, str, object]]:
     """Every building-zone polygon of the municipality the game knows a zone for, as
     (feature id, game zone, shapely geometry in LV95)."""
-    response = requests.get(
+    response = http.get(
         ZONING_URL,
         params={
             "layer": "ch.are.bauzonen",

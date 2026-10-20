@@ -12,7 +12,7 @@ whether that means boreholes or groundwater wells:
   F  outside usable groundwater (boreholes allowed)
 
 plus areas with special conditions for boreholes (depth limits, casing) and the tunnels and
-galleries boreholes must keep clear of. Zones B-F come with a "zonen" attribute in the OGD layer
+galleries boreholes must keep clear of. Zones come with a "wna_zone" attribute in the OGD layer ("zonen" before October 2026)
 (a "_Sperr" variant bans boreholes outright); zone A has its own layer. Canton Zurich only: for a
 municipality elsewhere this returns None and the game applies no restriction."""
 
@@ -23,18 +23,18 @@ from shapely import make_valid
 from shapely.geometry import shape
 from shapely.ops import unary_union
 
-from .. import coords
+from .. import coords, http
 
 OGD_WFS = "https://maps.zh.ch/wfs/OGDZHWFS"
 ATLAS_WFS = "https://maps.zh.ch/wfs/AwelGSWaermewwwZHWFS"
-ZONES_LAYER = "ms:ogd-0316_giszhpub_gs_waermenutzungsatlas_f"
+ZONES_LAYER = "ms:ogd-0316_giszhpub_gs_wna_zone_f"  # "…_waermenutzungsatlas_f" until October 2026
 SIMPLIFY_M = 2.0
 MARGIN_M = 5.0  # just past the border, so a building on it still falls in its zone
 TUNNEL_MARGIN_M = 60.0  # tunnels: as far out as the clearance boreholes keep from them (app config), and some
 
 
 def _get_features(url: str, layer: str, bbox: tuple[float, float, float, float]) -> list[dict]:
-    response = requests.get(
+    response = http.get(
         url,
         params={
             "SERVICE": "WFS",
@@ -80,7 +80,8 @@ def fetch_heat_use(boundary_lv95: list) -> dict | None:
 
     by_zone: dict[str, list] = {}
     for f in zone_features:
-        code = str((f.get("properties") or {}).get("zonen") or "").strip()
+        properties = f.get("properties") or {}
+        code = str(properties.get("wna_zone") or properties.get("zonen") or "").strip()
         if code:
             by_zone.setdefault(code, []).append(make_valid(shape(f["geometry"])))
     if a_features:

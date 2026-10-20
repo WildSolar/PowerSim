@@ -15,7 +15,7 @@ from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
-from .. import coords
+from .. import coords, http
 from ..cache import cached_json
 
 IDENTIFY_URL = "https://api3.geo.admin.ch/rest/services/api/MapServer/identify"
@@ -32,7 +32,7 @@ def _tile(min_e: float, min_n: float, max_e: float, max_n: float) -> list[dict]:
     def fetch():
         for attempt in range(3):
             try:
-                response = requests.get(
+                response = http.get(
                     IDENTIFY_URL,
                     params={
                         "geometry": envelope,

@@ -18,7 +18,7 @@ import requests
 from shapely.geometry import shape
 from shapely.ops import unary_union
 
-from .. import coords
+from .. import coords, http
 from ..cache import cached_json
 
 AV_WFS = "https://maps.zh.ch/wfs/AVZHWFS"
@@ -50,7 +50,7 @@ def _tiled(url: str, layer: str, bounds: tuple[float, float, float, float], keep
             def fetch(params=params):
                 for attempt in range(3):
                     try:
-                        response = requests.get(url, params=params, timeout=120)
+                        response = http.get(url, params=params, timeout=120)
                         response.raise_for_status()
                         return [f for f in response.json()["features"] if keep(f["properties"])]
                     except requests.RequestException:
@@ -68,7 +68,7 @@ def _tiled(url: str, layer: str, bounds: tuple[float, float, float, float], keep
 
 def _building_zones(bfs_number: int):
     def fetch():
-        response = requests.get(
+        response = http.get(
             ZONES_URL,
             params={
                 "layer": "ch.are.bauzonen",

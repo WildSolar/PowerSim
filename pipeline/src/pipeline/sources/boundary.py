@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import requests
 
+from .. import http
+
 URL_TEMPLATE = (
     "https://api3.geo.admin.ch/rest/services/api/MapServer/"
     "ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill/{bfs_number}"
@@ -16,7 +18,7 @@ Boundary = list[list[list[list[float]]]]
 
 
 def fetch_boundary(bfs_number: int) -> Boundary:
-    response = requests.get(
+    response = http.get(
         URL_TEMPLATE.format(bfs_number=bfs_number),
         params={"geometryFormat": "geojson", "sr": 4326},
         timeout=60,

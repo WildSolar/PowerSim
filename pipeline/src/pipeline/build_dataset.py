@@ -123,7 +123,7 @@ def _district_heat(bfs_number: int, buildings_df, segments, boundary_lv95, posit
     return network
 
 
-REFRESHABLE = ("streets", "district-heat", "farm", "wind", "car-parks", "transit")
+REFRESHABLE = ("streets", "district-heat", "farm", "wind", "car-parks", "transit", "heat-use")
 
 
 def refresh(bfs_number: int, parts: list[str]) -> Path:
@@ -135,7 +135,8 @@ def refresh(bfs_number: int, parts: list[str]) -> Path:
       heat sources, the land cover;
     - "farm": the farmland plots;
     - "car-parks": the open-air car parks (OpenStreetMap);
-    - "transit": the public transport quality classes (ARE)."""
+    - "transit": the public transport quality classes (ARE);
+    - "heat-use": canton Zurich's heat-use atlas (where the ground's heat may be used)."""
     path = next(
         (p for p in OUTPUT_DIR.glob("*.json") if p.name != INDEX_FILENAME and json.loads(p.read_text(encoding="utf-8")).get("bfsNumber") == bfs_number),
         None,
@@ -162,6 +163,13 @@ def refresh(bfs_number: int, parts: list[str]) -> Path:
         print(f"Refreshing public transport classes in {path.name}...")
         data["transitClasses"] = _to_camel(transit_source.fetch_transit_classes(boundary_lv95))
         print(f"  {len(data['transitClasses'])} areas ({', '.join(sorted({t['class'] for t in data['transitClasses']}))})")
+    if "heat-use" in parts:
+        print(f"Refreshing the heat-use atlas in {path.name}...")
+        heat_use = heat_use_source.fetch_heat_use(boundary_lv95)
+        if heat_use is None:
+            raise SystemExit("The heat-use atlas couldn't be fetched; the dataset is left as it was.")
+        data["heatUse"] = _to_camel(heat_use)
+        print(f"  {len(heat_use['zones'])} zones ({', '.join(z['zone'] for z in heat_use['zones'])}), {len(heat_use['conditions'])} condition areas, {len(heat_use['tunnels'])} tunnels")
     if "streets" in parts:
         _refresh_streets(bfs_number, data, boundary_lv95)
     if "district-heat" in parts or "streets" in parts:

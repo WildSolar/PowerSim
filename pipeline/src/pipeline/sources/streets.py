@@ -38,6 +38,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 import requests
+
+from .. import http
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import substring, unary_union
 from shapely.strtree import STRtree
@@ -141,7 +143,7 @@ def _identify_request(params: dict) -> list:
     empty — an empty tile would be cached, and its roads silently missing."""
     for attempt in range(4):
         try:
-            response = requests.get(IDENTIFY_URL, params=params, timeout=90)
+            response = http.get(IDENTIFY_URL, params=params, timeout=90)
             response.raise_for_status()
             data = response.json()
             if "results" in data:

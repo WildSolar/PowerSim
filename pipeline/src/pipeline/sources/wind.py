@@ -15,12 +15,13 @@ game's; this only finds the places.
 from __future__ import annotations
 
 import math
+import time
 
 import requests
 from shapely.geometry import Point, shape
 from shapely.ops import unary_union
 
-from .. import coords
+from .. import coords, http
 from ..cache import cached_json
 from . import farm
 
@@ -48,9 +49,9 @@ def _wind_at(x: float, y: float) -> dict | None:
             "imageDisplay": "1000,1000,96",
             "returnGeometry": "false",
         }
-        for attempt in range(3):
+        for attempt in range(5):
             try:
-                response = requests.get(IDENTIFY_URL, params=params, timeout=60)
+                response = http.get(IDENTIFY_URL, params=params, timeout=60)
                 response.raise_for_status()
                 results = response.json().get("results", [])
                 if not results:
@@ -58,8 +59,9 @@ def _wind_at(x: float, y: float) -> dict | None:
                 p = results[0].get("properties") or results[0].get("attributes") or {}
                 return {"v_mean": p.get("v_mean"), "a": p.get("wei_a"), "k": p.get("wei_k")}
             except requests.RequestException:
-                if attempt == 2:
+                if attempt == 4:
                     raise
+                time.sleep(5 * (attempt + 1))  # a busy server (503) usually answers a little later
         return None
 
     return cached_json("wind-h125", f"{x:.0f},{y:.0f}", fetch)

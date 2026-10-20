@@ -30,6 +30,8 @@ import zipfile
 import pandas as pd
 import requests
 
+from .. import http
+
 ZIP_URL_TEMPLATE = "https://public.madd.bfs.admin.ch/{bfs_number}.zip"
 AUTHORITIES_URL = "https://public.madd.bfs.admin.ch/authorities.json"
 
@@ -85,7 +87,7 @@ def _download_zip(bfs_number: int) -> zipfile.ZipFile:
     and would otherwise re-download the same ~2MB archive three times."""
     content = _zip_cache.get(bfs_number)
     if content is None:
-        response = requests.get(ZIP_URL_TEMPLATE.format(bfs_number=bfs_number), timeout=120)
+        response = http.get(ZIP_URL_TEMPLATE.format(bfs_number=bfs_number), timeout=120)
         response.raise_for_status()
         content = response.content
         _zip_cache[bfs_number] = content
@@ -116,7 +118,7 @@ def _decode_column(series: pd.Series, field: str, decoder: dict[tuple[str, int],
 
 def canton_municipalities(canton: str) -> list[tuple[int, str]]:
     """(BFS number, name) of every municipality in the given canton."""
-    response = requests.get(AUTHORITIES_URL, timeout=60)
+    response = http.get(AUTHORITIES_URL, timeout=60)
     response.raise_for_status()
     found = [
         (int(e["id"]), e["name"])
@@ -130,7 +132,7 @@ def municipality_canton(bfs_number: int) -> str | None:
     """This municipality's 2-letter canton abbreviation (e.g. 'ZH') — footprints.py
     uses this to pick its own per-canton source. Looked up from the same
     authorities.json the municipality-search box on gwr.admin.ch itself uses."""
-    response = requests.get(AUTHORITIES_URL, timeout=60)
+    response = http.get(AUTHORITIES_URL, timeout=60)
     response.raise_for_status()
     for entry in response.json():
         if entry.get("type") == "municipality" and entry.get("id") == str(bfs_number):
