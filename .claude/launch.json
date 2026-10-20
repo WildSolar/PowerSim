@@ -10,7 +10,7 @@
     {
       "name": "app-build",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "preview", "--prefix", "app", "--", "--port", "4173", "--base", "/PowerSim/"],
+      "runtimeArgs": ["run", "preview", "--prefix", "app", "--", "--port", "4173"],
       "port": 4173
     }
   ]

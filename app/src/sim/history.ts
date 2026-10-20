@@ -158,6 +158,40 @@ function dwellingCategoryTotals(profileSets: DwellingProfiles[], times: number[]
   return { fridgeW, lightingW, cookingW, laundryW, plugLoadW, evW };
 }
 
+// Homes per piece when one instant's household totals are worked out in pieces.
+const DWELLINGS_PER_RUN = 10_000;
+
+/** dwellingCategoryTotals at one instant, in runs of DWELLINGS_PER_RUN homes: each run carries on
+ * the same sums, in the same order, so the totals come out exactly the same as in one go. */
+function dwellingCategoryTotalsInRuns(profileSets: DwellingProfiles[], t: number, tariff: Tariff): { steps: (() => void)[]; result: () => DwellingCategoryTotals } {
+  const sum = { fridge: 0, lighting: 0, cooking: 0, laundry: 0, plugLoad: 0, ev: 0 };
+  const steps: (() => void)[] = [];
+  for (let from = 0; from < Math.max(1, profileSets.length); from += DWELLINGS_PER_RUN) {
+    steps.push(() => {
+      const to = Math.min(profileSets.length, from + DWELLINGS_PER_RUN);
+      for (let i = from; i < to; i++) {
+        const p = profileSets[i];
+        if (!existsAt(p.building, t)) continue;
+        sum.fridge += fridgePowerW(p.fridge, t);
+        sum.lighting += lightingPowerW(p.lighting, t);
+        sum.cooking += cookingPowerW(p.cooking, t);
+        sum.laundry += laundryPowerWFrom(p.laundrySeed, t, dynamicTariff.onDynamicKey(p.key, t));
+        sum.plugLoad += plugLoadPowerW(p.plugLoad, t);
+        sum.ev += mobilityChargingPowerW(p.egid, p.dwelling, t, tariff);
+      }
+    });
+  }
+  const result = (): DwellingCategoryTotals => ({
+    fridgeW: [sum.fridge],
+    lightingW: [sum.lighting],
+    cookingW: [sum.cooking],
+    laundryW: [sum.laundry],
+    plugLoadW: [sum.plugLoad],
+    evW: [sum.ev],
+  });
+  return { steps, result };
+}
+
 /** Heat pump and cooling split apart but still evaluated together, since both are gated
  * by the same daily/instantaneous temperature reading — weather is the same for
  * every building at a given instant, so it's evaluated once per timestep here
@@ -343,18 +377,44 @@ export function sampleMunicipalityCategorySeries(
   tariff: Tariff,
   plants: PowerPlant[],
 ): CategorySeries {
-  const dwellingTotals = dwellingCategoryTotals(dwellingProfileSets(buildings), times, tariff);
-  // Vehicles charged at public chargers draw there, not at home, and businesses' at their depots —
-  // all of it the town's EV charging.
-  dwellingTotals.evW = dwellingTotals.evW.map((w, i) => w + publicCharging.totalLoadW(times[i]) + fleets.totalDepotPowerW(buildings, times[i]));
-  // The town's cooling counts together, homes' and businesses'.
-  const climate = climateControlCategorySeries(buildings, times);
-  const acW = climate.acW.map((w, i) => w + climate.businessCoolingW[i]);
-  const heatPumpW = climate.heatPumpW;
-  const waterHeatingW = waterHeatingCategorySeries(buildings, times);
-  const commercialW = commercialCategorySeries(buildings, times);
-  const solarW = pvSeries(plants, times).map((w) => -w);
-  return { ...dwellingTotals, heatPumpW, acW, waterHeatingW, commercialW, solarW };
+  const { steps, result } = municipalityCategorySteps(buildings, times, tariff, plants);
+  for (const step of steps) step();
+  return result();
+}
+
+/** sampleMunicipalityCategorySeries as separate passes over the town — the homes, the vehicles
+ * charging away from home, heating and cooling, water heating, the businesses, solar — run in this
+ * order, so a caller can pause between them: in a large town one sample of everything is a tenth
+ * of a second of work, too long to do between two frames. The result is the same either way. */
+export function municipalityCategorySteps(
+  buildings: Building[],
+  times: number[],
+  tariff: Tariff,
+  plants: PowerPlant[],
+): { steps: (() => void)[]; result: () => CategorySeries } {
+  let dwellingTotals: DwellingCategoryTotals;
+  let climate: ReturnType<typeof climateControlCategorySeries>;
+  let waterHeatingW: number[];
+  let commercialW: number[];
+  let solarW: number[];
+  // One instant (a sample): the homes in runs, a piece each; several: in one go.
+  const homes = times.length === 1 ? dwellingCategoryTotalsInRuns(dwellingProfileSets(buildings), times[0], tariff) : null;
+  const steps = [
+    ...(homes ? [...homes.steps, () => (dwellingTotals = homes.result())] : [() => (dwellingTotals = dwellingCategoryTotals(dwellingProfileSets(buildings), times, tariff))]),
+    // Vehicles charged at public chargers draw there, not at home, and businesses' at their depots —
+    // all of it the town's EV charging.
+    () => (dwellingTotals.evW = dwellingTotals.evW.map((w, i) => w + publicCharging.totalLoadW(times[i]) + fleets.totalDepotPowerW(buildings, times[i]))),
+    () => (climate = climateControlCategorySeries(buildings, times)),
+    () => (waterHeatingW = waterHeatingCategorySeries(buildings, times)),
+    () => (commercialW = commercialCategorySeries(buildings, times)),
+    () => (solarW = pvSeries(plants, times).map((w) => -w)),
+  ];
+  const result = (): CategorySeries => {
+    // The town's cooling counts together, homes' and businesses'.
+    const acW = climate.acW.map((w, i) => w + climate.businessCoolingW[i]);
+    return { ...dwellingTotals, heatPumpW: climate.heatPumpW, acW, waterHeatingW, commercialW, solarW };
+  };
+  return { steps, result };
 }
 
 /** Net power draw from a category breakdown: every consumption category summed,

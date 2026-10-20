@@ -223,14 +223,6 @@ function solarCapacityByEgid(plants: PowerPlant[]): Map<string, number> {
 
 const CONSTRUCTION_SITE_HEIGHT_M = 4;
 
-/** Every building visible at `simTimeMs`: standing ones, plus construction sites drawn
- * as low amber blocks (they draw no power and house nobody yet). Rebuilt from scratch
- * whenever the stock changes, so every layer's value is filled in as it stands at
- * `simTimeMs` (installed heating system, energy class) — not the register's original
- * snapshot — or the layers would flash back to it until their next periodic repaint,
- * which at high speed, with the stock changing every few seconds, reads as flicker.
- * Power draw isn't recomputed here (the power layer's own tick does that); each
- * building keeps its last reading from `previousPowerW` meanwhile. */
 /** Each building's grid colour: its area's load, or dimmed when another area is selected. */
 function gridStatusFn(simTimeMs: number): (b: Building) => string {
   const buckets = grid.getAreas().map((a) => grid.bucket(a, simTimeMs));
@@ -250,20 +242,44 @@ function buildingsToGeoJSON(...args: Parameters<typeof buildingsToGeoJSONUntimed
   return timed("map: buildings rebuilt", () => buildingsToGeoJSONUntimed(...args));
 }
 
+/** Every building visible at `simTimeMs`: standing ones, plus construction sites drawn as low amber
+ * blocks (they draw no power and house nobody yet). A building already on the map (`previous`) keeps
+ * its values — each layer's own refresh keeps the one it shows current — and only has its
+ * construction state and height brought up to date; a new one gets every value as it stands at
+ * `simTimeMs` (installed heating system, energy class), not the register's original snapshot. So a
+ * change to the stock costs what changed, not the whole town (Winterthur has 22,000 buildings). */
 function buildingsToGeoJSONUntimed(
   allBuildings: Building[],
-  plants: PowerPlant[],
+  plantsAt: () => PowerPlant[],
   simTimeMs: number,
-  previousPowerW?: Map<string, number>,
+  previous?: Map<string, BuildingFeature>,
 ): { polygons: BuildingFeatureCollection; points: BuildingFeatureCollection } {
-  const solarByEgid = solarCapacityByEgid(plants);
   const buildings = allBuildings.filter((b) => visibleAt(b, simTimeMs));
-  const chargingAccess = publicCharging.householdAccess(buildings, simTimeMs);
-  // Set here too, not only by the grid layer's refresh: a rebuild (the stock changed) must not
-  // flash every building back to "room to spare" until the next refresh.
-  const gridStatusOf = gridStatusFn(simTimeMs);
+  const added = previous ? buildings.filter((b) => !previous.has(b.egid)) : buildings;
+  // What only a new building's values need — worked out only if there is one.
+  let lookups: { plants: PowerPlant[]; solarByEgid: Map<string, number>; chargingAccess: ReturnType<typeof publicCharging.householdAccess>; gridStatusOf: (b: Building) => string } | null = null;
+  const forNew = () => {
+    if (!lookups) {
+      const plants = plantsAt();
+      lookups = { plants, solarByEgid: solarCapacityByEgid(plants), chargingAccess: publicCharging.householdAccess(added, simTimeMs), gridStatusOf: gridStatusFn(simTimeMs) };
+    }
+    return lookups;
+  };
 
-  const properties = (b: Building): BuildingProperties => ({
+  const properties = (b: Building): BuildingProperties => {
+    const was = previous?.get(b.egid);
+    if (was) return { ...was.properties, constructing: underConstructionAt(b, simTimeMs) ? 1 : 0 };
+    const { plants, solarByEgid, chargingAccess, gridStatusOf } = forNew();
+    return newProperties(b, plants, solarByEgid, chargingAccess, gridStatusOf);
+  };
+
+  const newProperties = (
+    b: Building,
+    plants: PowerPlant[],
+    solarByEgid: Map<string, number>,
+    chargingAccess: ReturnType<typeof publicCharging.householdAccess>,
+    gridStatusOf: (b: Building) => string,
+  ): BuildingProperties => ({
     egid: b.egid,
     category: buildingCategoryBucket(b),
     age: buildingAgeBucket(b),
@@ -276,7 +292,7 @@ function buildingsToGeoJSONUntimed(
     roofStatus: roofContracts.bucket(b, simTimeMs),
     groundStatus: heatPumpSiting.groundBucket(b, simTimeMs),
     gridStatus: gridStatusOf(b),
-    powerW: previousPowerW?.get(b.egid) ?? 0,
+    powerW: 0,
     solarCapacityKw: solarByEgid.get(b.egid) ?? 0,
   });
 
@@ -288,7 +304,7 @@ function buildingsToGeoJSONUntimed(
         ...properties(b),
         heightM: underConstructionAt(b, simTimeMs) ? CONSTRUCTION_SITE_HEIGHT_M : buildingHeightM(b),
       },
-      geometry: {
+      geometry: (previous?.get(b.egid)?.geometry as BuildingFeature["geometry"] & { type: "Polygon" }) ?? {
         type: "Polygon" as const,
         coordinates: [closedRing(b.footprint as [number, number][])],
       },
@@ -690,6 +706,95 @@ function muteBasemapColors(map: MlMap): void {
   }
 }
 
+/** The values the building layers are coloured by. They change during play, so the map gets them as
+ * feature state — only for the buildings whose value changed — rather than as a fresh copy of every
+ * building: re-sending a large town's buildings (Winterthur's 22,000) stalls the screen for most of
+ * a second. A building's property keeps the value it was added with; its state, once set, the
+ * current one. */
+const LIVE_KEYS = [
+  "category",
+  "age",
+  "energyClass",
+  "constructing",
+  "heating",
+  "network",
+  "charging",
+  "publicStatus",
+  "roofStatus",
+  "groundStatus",
+  "gridStatus",
+  "powerW",
+  "solarCapacityKw",
+] as const;
+type LiveKey = (typeof LIVE_KEYS)[number];
+const LIVE_KEY_SET = new Set<string>(LIVE_KEYS);
+
+/** `expr` reading each live value from the building's feature state, or its property until one is set. */
+function withLiveState(expr: MapExpr): MapExpr {
+  if (expr[0] === "get" && typeof expr[1] === "string" && LIVE_KEY_SET.has(expr[1])) return ["coalesce", ["feature-state", expr[1]], expr];
+  return expr.map((part) => (Array.isArray(part) ? withLiveState(part) : part));
+}
+
+/** Sets one live value on every building the map shows, telling the map only about the buildings
+ * whose value changed. */
+function setLiveValues<K extends LiveKey>(
+  map: MlMap,
+  collections: [string, BuildingFeatureCollection | null][],
+  key: K,
+  valueOf: (building: Building) => BuildingProperties[K],
+): void {
+  for (const [source, data] of collections) {
+    if (!data || !map.getSource(source)) continue;
+    for (const f of data.features) {
+      const building = stock.lookup(f.properties.egid);
+      if (!building) continue;
+      const value = valueOf(building);
+      if (f.properties[key] === value) continue;
+      f.properties[key] = value;
+      map.setFeatureState({ source, id: f.properties.egid }, { [key]: value });
+    }
+  }
+}
+
+/** Brings a building source from `before` to `after` (the stock changed): buildings that went are
+ * removed, new ones added, a finished construction site raised to its height — only those, so the
+ * map re-tiles only where something changed — and every other changed value set as feature state. */
+function syncBuildingSource(map: MlMap, source: string, before: BuildingFeatureCollection | null, after: BuildingFeatureCollection): void {
+  const geo = map.getSource(source) as GeoJSONSource | undefined;
+  if (!geo) return;
+  if (!before) {
+    geo.setData(after);
+    return;
+  }
+  const old = new Map(before.features.map((f) => [f.properties.egid, f]));
+  const remove: string[] = [];
+  const add: BuildingFeature[] = [];
+  const update: { id: string; addOrUpdateProperties: { key: string; value: unknown }[] }[] = [];
+  for (const f of after.features) {
+    const egid = f.properties.egid;
+    const was = old.get(egid);
+    old.delete(egid);
+    if (!was) {
+      add.push(f);
+      continue;
+    }
+    if (f.properties.heightM !== was.properties.heightM) update.push({ id: egid, addOrUpdateProperties: [{ key: "heightM", value: f.properties.heightM }] });
+    const changed: Partial<Record<LiveKey, unknown>> = {};
+    let any = false;
+    for (const key of LIVE_KEYS) {
+      if (f.properties[key] === was.properties[key]) continue;
+      changed[key] = f.properties[key];
+      any = true;
+    }
+    if (any) map.setFeatureState({ source, id: egid }, changed);
+  }
+  for (const egid of old.keys()) {
+    remove.push(egid);
+    map.removeFeatureState({ source, id: egid });
+  }
+  if (remove.length > 0 || add.length > 0 || update.length > 0) void geo.updateData({ remove, add: add as GeoJSON.Feature[], update });
+}
+
 interface ColorScales {
   powerMinW: number;
   powerMaxW: number;
@@ -718,14 +823,14 @@ function colorExpression(mode: ColorMode, selectedEgid: string | null, scales: C
     solar: () => solarColorExpression(scales.maxSolarCapacityKw),
   };
   const base = byMode[mode]();
-  return [
+  return withLiveState([
     "case",
     ["==", ["get", "egid"], selectedEgid ?? "__none__"],
     SELECTED_COLOR,
     ["==", ["get", "constructing"], 1],
     CONSTRUCTION_COLOR,
     base,
-  ];
+  ]);
 }
 
 /** maplibre-gl's own expression-spec types are a deep literal-tuple union that a
@@ -788,7 +893,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     if (import.meta.env.DEV) Object.assign(window, { __map: map });
     map.addControl(new NavigationControl({ visualizePitch: true }), "bottom-left");
 
-    const geojson = buildingsToGeoJSON(stock.getAll(), effectivePowerPlantsAt(stock.getAll(), dataset.powerPlants, simClock.getSimTimeMs()), simClock.getSimTimeMs());
+    const geojson = buildingsToGeoJSON(stock.getAll(), () => effectivePowerPlantsAt(stock.getAll(), dataset.powerPlants, simClock.getSimTimeMs()), simClock.getSimTimeMs());
     polygonsRef.current = geojson.polygons;
     pointsRef.current = geojson.points;
     maxSolarCapacityKwRef.current = Math.max(
@@ -1149,7 +1254,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         });
       }
 
-      map.addSource(POLY_SOURCE_ID, { type: "geojson", data: geojson.polygons });
+      map.addSource(POLY_SOURCE_ID, { type: "geojson", data: geojson.polygons, promoteId: "egid" });
       map.addLayer({
         id: POLY_LAYER_ID,
         type: "fill-extrusion",
@@ -1164,7 +1269,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         },
       });
 
-      map.addSource(POINT_SOURCE_ID, { type: "geojson", data: geojson.points });
+      map.addSource(POINT_SOURCE_ID, { type: "geojson", data: geojson.points, promoteId: "egid" });
       map.addLayer({
         id: POINT_LAYER_ID,
         type: "circle",
@@ -1454,8 +1559,8 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset]);
 
-  // The stock changed (something was permitted, started, finished or demolished): redraw the
-  // building set from scratch. Cheap next to how rarely it happens.
+  // The stock changed (something was permitted, started, finished or demolished): work the building
+  // set out afresh, and send the map only the buildings that differ.
   useEffect(() => {
     return stock.subscribe(() => {
       const map = mapRef.current;
@@ -1463,10 +1568,11 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       const pointSource = map?.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
       if (!polySource || !pointSource) return;
       const simTimeMs = simClock.getSimTimeMs();
-      const plants = effectivePowerPlantsAt(stock.getAll(), dataset.powerPlants, simTimeMs);
-      const previousPowerW = new Map<string, number>();
-      for (const f of [...(polygonsRef.current?.features ?? []), ...(pointsRef.current?.features ?? [])]) previousPowerW.set(f.properties.egid, f.properties.powerW);
-      const fresh = buildingsToGeoJSON(stock.getAll(), plants, simTimeMs, previousPowerW);
+      const previous = new Map<string, BuildingFeature>();
+      for (const f of [...(polygonsRef.current?.features ?? []), ...(pointsRef.current?.features ?? [])]) previous.set(f.properties.egid, f);
+      const fresh = buildingsToGeoJSON(stock.getAll(), () => effectivePowerPlantsAt(stock.getAll(), dataset.powerPlants, simTimeMs), simTimeMs, previous);
+      syncBuildingSource(map!, POLY_SOURCE_ID, polygonsRef.current, fresh.polygons);
+      syncBuildingSource(map!, POINT_SOURCE_ID, pointsRef.current, fresh.points);
       polygonsRef.current = fresh.polygons;
       pointsRef.current = fresh.points;
       maxSolarCapacityKwRef.current = Math.max(
@@ -1474,8 +1580,6 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         ...fresh.polygons.features.map((f) => f.properties.solarCapacityKw),
         ...fresh.points.features.map((f) => f.properties.solarCapacityKw),
       );
-      polySource.setData(fresh.polygons);
-      pointSource.setData(fresh.points);
     });
   }, [dataset]);
 
@@ -1499,18 +1603,15 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       const plants = effectivePowerPlantsAt(stock.getAll(), dataset.powerPlants, simTimeMs);
       let minW = 0;
       let maxW = 0;
+      setLiveValues(map, [[POLY_SOURCE_ID, polyData], [POINT_SOURCE_ID, pointData]], "powerW", (building) => buildingPowerW(building, simTimeMs, plants, snowCoverCm));
       for (const feature of [...polyData.features, ...pointData.features]) {
-        const building = stock.lookup(feature.properties.egid);
-        const power = building ? buildingPowerW(building, simTimeMs, plants, snowCoverCm) : 0;
-        feature.properties.powerW = power;
+        const power = feature.properties.powerW;
         if (power > maxW) maxW = power;
         if (power < minW) minW = power;
       }
       lastPowerMinWRef.current = minW;
       lastPowerMaxWRef.current = maxW;
 
-      polySource.setData(polyData);
-      pointSource.setData(pointData);
       const expr = ml(
         colorExpression("power", selectedEgidRef.current, {
           powerMinW: minW,
@@ -1544,13 +1645,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       if (!polySource || !pointSource || !polyData || !pointData) return;
 
       const simTimeMs = simClock.getSimTimeMs();
-      for (const feature of [...polyData.features, ...pointData.features]) {
-        const building = stock.lookup(feature.properties.egid);
-        if (building) feature.properties.heating = buildingHeatingBucketAt(building, simTimeMs);
-      }
-
-      polySource.setData(polyData);
-      pointSource.setData(pointData);
+      setLiveValues(map, [[POLY_SOURCE_ID, polyData], [POINT_SOURCE_ID, pointData]], "heating", (building) => buildingHeatingBucketAt(building, simTimeMs));
     };
 
     tick();
@@ -1571,12 +1666,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       if (!polySource || !pointSource || !polyData || !pointData) return;
 
       const simTimeMs = simClock.getSimTimeMs();
-      for (const feature of [...polyData.features, ...pointData.features]) {
-        const building = stock.lookup(feature.properties.egid);
-        if (building) feature.properties.energyClass = energyClassAt(building, simTimeMs);
-      }
-      polySource.setData(polyData);
-      pointSource.setData(pointData);
+      setLiveValues(map, [[POLY_SOURCE_ID, polyData], [POINT_SOURCE_ID, pointData]], "energyClass", (building) => energyClassAt(building, simTimeMs));
     };
 
     tick();
@@ -1605,16 +1695,10 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       const plants = effectivePowerPlantsAt(stock.getAll(), dataset.powerPlants, simTimeMs);
       const solarByEgid = solarCapacityByEgid(plants);
       let maxKw = 0;
-      for (const feature of [...polyData.features, ...pointData.features]) {
-        const building = stock.lookup(feature.properties.egid);
-        const kw = building ? (solarByEgid.get(building.egid) ?? 0) : 0;
-        feature.properties.solarCapacityKw = kw;
-        if (kw > maxKw) maxKw = kw;
-      }
+      setLiveValues(map, [[POLY_SOURCE_ID, polyData], [POINT_SOURCE_ID, pointData]], "solarCapacityKw", (building) => solarByEgid.get(building.egid) ?? 0);
+      for (const feature of [...polyData.features, ...pointData.features]) maxKw = Math.max(maxKw, feature.properties.solarCapacityKw);
       maxSolarCapacityKwRef.current = maxKw;
 
-      polySource.setData(polyData);
-      pointSource.setData(pointData);
       const expr = ml(colorExpression("solar", selectedEgidRef.current, { powerMinW: 0, powerMaxW: 0, maxSolarCapacityKw: maxKw }));
       map.setPaintProperty(POLY_LAYER_ID, "fill-extrusion-color", expr);
       map.setPaintProperty(POINT_LAYER_ID, "circle-color", expr);
@@ -1698,12 +1782,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       const pointData = pointsRef.current;
       if (!polySource || !pointSource || !polyData || !pointData) return;
       const simTimeMs = simClock.getSimTimeMs();
-      for (const feature of [...polyData.features, ...pointData.features]) {
-        const building = stock.lookup(feature.properties.egid);
-        if (building) feature.properties.network = mapNetworkBucketAt(building, simTimeMs);
-      }
-      polySource.setData(polyData);
-      pointSource.setData(pointData);
+      setLiveValues(map, [[POLY_SOURCE_ID, polyData], [POINT_SOURCE_ID, pointData]], "network", (building) => mapNetworkBucketAt(building, simTimeMs));
     };
 
     tick();
@@ -1754,12 +1833,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       const polyData = polygonsRef.current;
       const pointData = pointsRef.current;
       if (!polySource || !pointSource || !polyData || !pointData) return;
-      for (const f of [...polyData.features, ...pointData.features]) {
-        const b = stock.lookup(f.properties.egid);
-        if (b) f.properties.publicStatus = publicBuildingBucket(b, dataset.powerPlants);
-      }
-      polySource.setData(polyData);
-      pointSource.setData(pointData);
+      setLiveValues(map, [[POLY_SOURCE_ID, polyData], [POINT_SOURCE_ID, pointData]], "publicStatus", (b) => publicBuildingBucket(b, dataset.powerPlants));
     };
     tick();
     const interval = setInterval(tick, SOLAR_TICK_MS);
@@ -1782,12 +1856,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       const pointData = pointsRef.current;
       if (!polySource || !pointSource || !polyData || !pointData) return;
       const now = simClock.getSimTimeMs();
-      for (const f of [...polyData.features, ...pointData.features]) {
-        const b = stock.lookup(f.properties.egid);
-        if (b) f.properties.roofStatus = roofContracts.bucket(b, now);
-      }
-      polySource.setData(polyData);
-      pointSource.setData(pointData);
+      setLiveValues(map, [[POLY_SOURCE_ID, polyData], [POINT_SOURCE_ID, pointData]], "roofStatus", (b) => roofContracts.bucket(b, now));
     };
     tick();
     const interval = setInterval(tick, SOLAR_TICK_MS);
@@ -1860,6 +1929,20 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
     for (const id of [HEAT_USE_FILL_LAYER_ID, HEAT_USE_LINE_LAYER_ID, TUNNEL_LAYER_ID]) map.setLayoutProperty(id, "visibility", visible);
   }, [colorMode]);
 
+  // ...and each building by what a new ground-source heat pump there would draw on, kept current
+  // like the other layers (the grid, or the canton's rules, can change it).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || colorMode !== "groundHeat") return;
+    const tick = () =>
+      setLiveValues(map, [[POLY_SOURCE_ID, polygonsRef.current], [POINT_SOURCE_ID, pointsRef.current]], "groundStatus", (b) =>
+        heatPumpSiting.groundBucket(b, simClock.getSimTimeMs()),
+      );
+    tick();
+    const interval = setInterval(tick, HEATING_TICK_MS);
+    return () => clearInterval(interval);
+  }, [colorMode, dataset]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.getLayer(STATION_LAYER_ID)) return;
@@ -1884,12 +1967,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       const pointData = pointsRef.current;
       if (!polySource || !pointSource || !polyData || !pointData) return;
       const gridStatusOf = gridStatusFn(simTimeMs);
-      for (const f of [...polyData.features, ...pointData.features]) {
-        const b = stock.lookup(f.properties.egid);
-        if (b) f.properties.gridStatus = gridStatusOf(b);
-      }
-      polySource.setData(polyData);
-      pointSource.setData(pointData);
+      setLiveValues(map, [[POLY_SOURCE_ID, polyData], [POINT_SOURCE_ID, pointData]], "gridStatus", gridStatusOf);
     };
     tick();
     const interval = setInterval(tick, SOLAR_TICK_MS);
@@ -2052,9 +2130,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
         if (b) shown.push(b);
       }
       const access = publicCharging.householdAccess(shown, simTimeMs);
-      for (const f of features) f.properties.charging = evChargingBucket(access.get(f.properties.egid));
-      polySource.setData(polyData);
-      pointSource.setData(pointData);
+      setLiveValues(map, [[POLY_SOURCE_ID, polyData], [POINT_SOURCE_ID, pointData]], "charging", (b) => evChargingBucket(access.get(b.egid)));
     };
 
     // While placing: the reach of a site at the street nearest the cursor.

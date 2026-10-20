@@ -35,7 +35,7 @@ import { toDateMs, toSimTimeMs } from "./calendar";
 import { categoryEnergyFromSeries, energyKWh, ZERO_CATEGORY_ENERGY_KWH, type CategoryEnergyKWh } from "./energy";
 import { currentHeatingSystemId, heatingRenewalsInRange } from "./heatingRenewal";
 import type { HeatingSystemId } from "./heatingSystems";
-import { historyTimeSteps, sampleDynamicConsumptionW, sampleMunicipalityCategorySeries, type CategorySeries } from "./history";
+import { historyTimeSteps, municipalityCategorySteps, sampleDynamicConsumptionW, type CategorySeries } from "./history";
 import { ANNUAL_CAR_KM, ICE_CAR_L_PER_100KM } from "./mobilitySystems";
 import { slotsWithVehicleAt } from "./mobility";
 import { fleets } from "./fleet";
@@ -56,7 +56,9 @@ import { powerFlows } from "./spotMarket";
 import { grid } from "./grid";
 import { consumptionSeriesW } from "./billing";
 
-const SAMPLES_PER_MONTH = 24; // matches historyLong.ts's own per-period density
+const SAMPLES_PER_MONTH = 24;
+// How much work a month pass does between two yields to the event loop (ms).
+const YIELD_AFTER_MS = 25; // matches historyLong.ts's own per-period density
 const COARSE_SAMPLES_PER_MONTH = 8; // for quantities that don't need weather-grade resolution — see computeMobilityFuelLiters
 
 // A message rather than a timer: browsers throttle timers in a background tab (to one a minute,
@@ -150,23 +152,37 @@ function slotsOf<T>(cache: Map<number, (T | null)[]>, key: number, count: number
   return slots;
 }
 
-function electricitySampleAt(buildings: Building[], realPlants: PowerPlant[], year: number, month: number, i: number): ElectricitySample {
+/** An electricity sample being taken a pass at a time (municipalityCategorySteps), by month and
+ * instant: in a large town the whole sample is too much for the gap between two frames. */
+const electricityInProgress = new Map<string, { steps: (() => void)[]; done: number; finish: () => ElectricitySample }>();
+
+/** Takes the next pass of a sample: false once it's complete (and stored). */
+function electricitySamplePass(buildings: Building[], realPlants: PowerPlant[], year: number, month: number, i: number): boolean {
   const slots = slotsOf(electricitySamples, year * 12 + month, SAMPLES_PER_MONTH);
-  let sample = slots[i];
-  if (!sample) {
+  if (slots[i]) return false;
+  const id = `${year * 12 + month}:${i}`;
+  let job = electricityInProgress.get(id);
+  if (!job) {
     const t = monthTimes(year, month, SAMPLES_PER_MONTH)[i];
     const tariff: Tariff = tariffStore.at(toSimTimeMs(Date.UTC(year, month, 15)));
     // The plants in service at the instant — never later ones: asking for those would settle solar
     // decisions early, under whatever measures are in force now.
     const plants = effectivePowerPlantsAt(buildings, realPlants, t);
-    sample = {
-      series: sampleMunicipalityCategorySeries(buildings, [t], tariff, plants),
-      dynamicW: sampleDynamicConsumptionW(buildings, [t], tariff)[0],
-      marketW: marketAccess.marketPowerW(buildings, t),
+    const town = municipalityCategorySteps(buildings, [t], tariff, plants);
+    let dynamicW = 0;
+    let marketW = 0;
+    job = {
+      steps: [...town.steps, () => (dynamicW = sampleDynamicConsumptionW(buildings, [t], tariff)[0]), () => (marketW = marketAccess.marketPowerW(buildings, t))],
+      done: 0,
+      finish: () => ({ series: town.result(), dynamicW, marketW }),
     };
-    slots[i] = sample;
+    electricityInProgress.set(id, job);
   }
-  return sample;
+  job.steps[job.done++]();
+  if (job.done < job.steps.length) return true;
+  slots[i] = job.finish();
+  electricityInProgress.delete(id);
+  return true;
 }
 
 function heatingSampleAt(buildings: Building[], year: number, month: number, i: number): TechnologySeriesW {
@@ -259,7 +275,8 @@ function joinTechnologySeries(parts: TechnologySeriesW[]): TechnologySeriesW {
 }
 
 /** Takes one sample of the month in progress whose instant is past and that isn't taken yet — the
- * background's share of next month-end's work (yearPassPrefetch.ts). True if it took one. */
+ * background's share of next month-end's work (yearPassPrefetch.ts) — or, for electricity, one pass
+ * of it. True if it did something. */
 export function prefillMonthSample(buildings: Building[], realPlants: PowerPlant[], nowMs: number): boolean {
   const d = new Date(toDateMs(nowMs));
   const year = d.getUTCFullYear();
@@ -271,7 +288,7 @@ export function prefillMonthSample(buildings: Building[], realPlants: PowerPlant
   const times = monthTimes(year, month, SAMPLES_PER_MONTH);
   for (let i = 0; i < times.length && due(times[i]); i++) {
     if (!electricitySamples.get(key)?.[i]) {
-      timed("prefill: electricity", () => electricitySampleAt(buildings, realPlants, year, month, i));
+      timed("prefill: electricity", () => electricitySamplePass(buildings, realPlants, year, month, i));
       return true;
     }
     if (!heatingSamples.get(key)?.[i]) {
@@ -297,16 +314,27 @@ export function monthElectricity(buildings: Building[], realPlants: PowerPlant[]
   return sharedMonth(electricityByMonth, year, month, async () => {
     const key = year * 12 + month;
     const times = monthTimes(year, month, SAMPLES_PER_MONTH);
-    const samples = await eachSample(electricitySamples, key, SAMPLES_PER_MONTH, (i) => electricitySampleAt(buildings, realPlants, year, month, i), "month electricity: sample");
+    // A pass at a time, yielding to the event loop whenever a few of them add up to a slice of a
+    // frame — after every pass would make counting a large town's year noticeably slower.
+    let sliceStart = performance.now();
+    for (let i = 0; i < SAMPLES_PER_MONTH; i++) {
+      while (timed("month electricity: pass", () => electricitySamplePass(buildings, realPlants, year, month, i))) {
+        if (performance.now() - sliceStart < YIELD_AFTER_MS) continue;
+        await yieldToEventLoop();
+        sliceStart = performance.now();
+      }
+    }
+    const samples = slotsOf(electricitySamples, key, SAMPLES_PER_MONTH) as ElectricitySample[];
+    electricitySamples.delete(key);
     const series = joinCategorySeries(samples.map((s) => s.series));
     const monthEndMs = toSimTimeMs(Date.UTC(year, month + 1, 1));
     const plants = effectivePowerPlantsAt(buildings, realPlants, monthEndMs - 1);
     // The district heating heat pumps' draw, instant by instant, from the month's heat pass (the
     // same instants).
     const dhHeatPumpW = (await monthHeatingTechnology(buildings, year, month)).dhHeatPumpW ?? times.map(() => 0);
-    timed("month electricity: record", () => recordMonthElectricity(buildings, year, month, times, series, dhHeatPumpW, plants, monthEndMs - 1));
+    await recordMonthElectricity(buildings, year, month, times, series, dhHeatPumpW, plants, monthEndMs - 1);
     await yieldToEventLoop();
-    timed("month assets: record", () => recordMonthAssets(buildings, year, month, plants, monthEndMs - 1));
+    await recordMonthAssets(buildings, year, month, plants, monthEndMs - 1);
     return { times, series, dynamicW: samples.map((s) => s.dynamicW), dhHeatPumpW, marketW: samples.map((s) => s.marketW ?? 0) };
   }, "month electricity");
 }
@@ -543,7 +571,9 @@ export function monthHeatingTechnology(buildings: Building[], year: number, mont
 /** Keeps a month's electricity in the record the charts read (monthRecords.ts): use by category,
  * what wind made of the local generation, rooftop solar against its potential, and the modal split
  * at the month's end. */
-function recordMonthElectricity(buildings: Building[], year: number, month: number, times: number[], series: CategorySeries, dhHeatPumpW: number[], plants: PowerPlant[], endMs: number): void {
+/** Keeps a month's electricity in the record — a count at a time, yielding between them (each is a
+ * pass over the whole town). */
+async function recordMonthElectricity(buildings: Building[], year: number, month: number, times: number[], series: CategorySeries, dhHeatPumpW: number[], plants: PowerPlant[], endMs: number): Promise<void> {
   const energy = categoryEnergyFromSeries(times, series);
   const turbines = plants.filter((p) => p.technology === "Wind");
   const windKWh = turbines.length > 0 ? energyKWh(times, times.map((t) => turbines.reduce((sum, p) => sum + windPowerW(p, t), 0))) : 0;
@@ -557,9 +587,11 @@ function recordMonthElectricity(buildings: Building[], year: number, month: numb
   // A roof with panels counts at least what's on it (a real array on a roof the game rates unsuited).
   let potentialKw = 0;
   for (const b of buildings) if (existsAt(b, endMs)) potentialKw += Math.max(roofPotentialKw(b, year), builtByEgid.get(b.egid) ?? 0);
+  await yieldToEventLoop();
   // At the month's last sample, which the pass above has already asked about: counting never
   // settles a household's choice sooner than the game would have.
   const census = mobilityCensus(buildings, times[times.length - 1]);
+  await yieldToEventLoop();
   const flows = powerFlows(
     times,
     consumptionSeriesW(series).map((w, i) => w + dhHeatPumpW[i]),
@@ -582,11 +614,12 @@ function recordMonthElectricity(buildings: Building[], year: number, month: numb
 
 /** Keeps what the town had at a month's end in the record (the charts' equipment): generation,
  * batteries, district heating's pipes and reach, public charging and how good it is. */
-function recordMonthAssets(buildings: Building[], year: number, month: number, plants: PowerPlant[], endMs: number): void {
+async function recordMonthAssets(buildings: Building[], year: number, month: number, plants: PowerPlant[], endMs: number): Promise<void> {
   const standing = buildings.filter((b) => existsAt(b, endMs));
   let homeBatteryKwh = 0;
   for (const p of plants) if (p.battery && (p.activeToMs === undefined || p.activeToMs > endMs)) homeBatteryKwh += p.battery.kwh;
   const coverage = networkCoverage(standing, endMs);
+  await yieldToEventLoop();
   const share = (c: { total: number; connected: number; withinReach: number }, which: "connected" | "withinReach") => (c.total > 0 ? c[which] / c.total : 0);
   // Who charges where is only known from the start on: the months before it take the start's.
   const chargingMs = Math.max(endMs, 0);
@@ -601,7 +634,9 @@ function recordMonthAssets(buildings: Building[], year: number, month: number, p
     without += a.households - a.atHome;
     qosSum += (a.households - a.atHome) * a.qos;
   }
+  await yieldToEventLoop();
   const fleet = fleets.census(standing, endMs);
+  await yieldToEventLoop();
   // Heated buildings (not garages, sheds, or electric or unrecorded heating): by system, by insulation.
   const heatingSystems: Record<string, { buildings: number; floor: number }> = {};
   const insulation: Record<string, { buildings: number; floor: number }> = {};

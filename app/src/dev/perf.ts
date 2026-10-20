@@ -401,6 +401,62 @@ export async function timeMonthTurn(wrap: [Record<string, unknown>, string][] = 
   }
 }
 
+/** Plays the live game at `speed` for `seconds` of real time — frames, map and background work as a
+ * player gets them — and reports how far the clock got, every main-thread block over 50 ms (what a
+ * player sees as stutter), each clock listener's share, and where the CPU went. Needs the browser
+ * pane visible (a hidden one runs no animation frames). Leaves the game paused. */
+export async function timeLivePlay(seconds = 20, speed = 86400): Promise<Record<string, unknown>> {
+  const clock = simClock as unknown as { listeners: Set<() => void>; notify: () => void };
+  const realNotify = clock.notify;
+  const listenerMs = new Map<string, number>();
+  let notifies = 0;
+  clock.notify = function () {
+    notifies++;
+    let index = 0;
+    for (const listener of clock.listeners) {
+      const t0 = performance.now();
+      listener();
+      const key = `${index++}: ${listener.toString().replace(/\s+/g, " ").slice(0, 60)}`;
+      listenerMs.set(key, (listenerMs.get(key) ?? 0) + performance.now() - t0);
+    }
+  };
+  const longTasks: number[] = [];
+  const observer = new PerformanceObserver((list) => list.getEntries().forEach((e) => longTasks.push(Math.round(e.duration))));
+  try {
+    observer.observe({ type: "longtask", buffered: false });
+  } catch {
+    /* not supported */
+  }
+  const startSim = simClock.getSimTimeMs();
+  const profiler = startProfiler();
+  const t0 = performance.now();
+  simClock.setSpeed(speed);
+  try {
+    while (performance.now() - t0 < seconds * 1000) {
+      await new Promise((r) => setTimeout(r, 250));
+      if (tariffDeadline.get()) tariffDeadline.keepPrices();
+      if (simClock.getSpeed() === 0) simClock.setSpeed(speed); // past a year-end or a letter's pause
+    }
+  } finally {
+    simClock.setSpeed(0);
+    clock.notify = realNotify;
+    observer.disconnect();
+  }
+  const wallMs = performance.now() - t0;
+  const round = (m: Map<string, number>) => Object.fromEntries([...m].filter(([, v]) => v >= 5).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, Math.round(v)]));
+  return {
+    simDays: Math.round(((simClock.getSimTimeMs() - startSim) / 86_400_000) * 10) / 10,
+    targetSimDays: Math.round(((wallMs * speed) / 86_400_000) * 10) / 10,
+    frames: notifies,
+    fps: Math.round((notifies / wallMs) * 1000),
+    longTasks: longTasks.length,
+    longTaskMs: longTasks.reduce((a, b) => a + b, 0),
+    worstMs: Math.max(0, ...longTasks),
+    listeners: round(listenerMs),
+    profile: await summarizeProfile(profiler),
+  };
+}
+
 // --- sampling call stacks (the JS Self-Profiling API; the dev server sends the header it needs) ---
 
 interface ProfilerTrace {
