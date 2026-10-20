@@ -52,7 +52,11 @@ function EntryRow({ entry, address }: { entry: DecisionLogEntry; address: string
         ? "kept"
         : entry.reasonKind === "forcedByAvailability"
           ? "forced"
-          : "chosen";
+          : entry.reasonKind === "keptEarly"
+            ? "kept — weighed switching early"
+            : entry.reasonKind === "early"
+              ? "switched early"
+              : "chosen";
 
   return (
     <div className="decision-log-entry">

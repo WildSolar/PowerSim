@@ -22,6 +22,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.9.1",
+    date: null,
+    fixed: [
+      "The decision log no longer looks as if owners install gas or oil despite the ban: when an owner weighs replacing a working boiler early and decides to keep it, that option now reads ‘Keep the current oil boiler’, and the outcome ‘kept — weighed switching early’. A gas or oil heating installed under the ban's exception (no heat pump possible, no district heating) shows why.",
+    ],
+  },
+  {
     version: "0.9.0",
     date: "2026-10-19",
     title: "The open beta",

@@ -499,7 +499,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Each building's panel keeps its heating history — what wore out, what replaced it and why, including when the obvious choice wasn't possible — and each home's panel the same for its cars and bikes.",
       ),
       note(
-        "Laws act at this moment: a ban on new fossil heating changes only the next replacement, not the boilers already running. To speed things up, see \"Switching early\".",
+        "Laws act at this moment: a ban on new fossil heating changes only the next replacement, not the boilers already running. To speed things up, see \"Switching early\". The ban has one exception, as in canton Zurich's energy law: where no heat pump may go and no district heating reaches the building, its owner may install gas or oil again — the building's panel says why.",
       ),
     ],
   },
@@ -516,7 +516,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Energy advice (the information measures) also gets more owners looking.",
         "Cars rarely switch early: a paid-off car only costs its fuel, so it takes a large scrappage bonus — and a charger within reach.",
       ]),
-      note("Every early switch is shown on the building's or home's panel, like any replacement."),
+      note("Every early switch is shown on the building's or home's panel, like any replacement. In the decision log (transparency mode), an owner who weighed it and kept their boiler or car shows as ‘Keep the current …’ — keeping what is there, not installing a new one, so a fossil heating ban doesn't rule it out."),
     ],
   },
   {

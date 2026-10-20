@@ -245,9 +245,13 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, up
       incumbent,
       chosen,
       reasonKind: early ? (chosen !== incumbent ? "early" : "keptEarly") : reasonKind,
-      candidates: candidateLogEntries(candidates, params.biasStrengthRp, params.labelFor),
+      // Weighing an early switch, the incumbent stands for keeping what's there — not installing it again.
+      candidates: candidateLogEntries(candidates, params.biasStrengthRp, (id) =>
+        early && id === incumbent ? `Keep the current ${params.labelFor(id).toLowerCase()}` : params.labelFor(id),
+      ),
       uncertaintyFraction: params.uncertaintyFraction,
       biasStrengthRp: params.biasStrengthRp,
+      ...(winner?.exception ? { extra: { exception: winner.exception } } : {}),
     });
     if (early && chosen === incumbent) return chosen; // considered it, kept it: no event
     const event: RenewalEvent<T> = {
