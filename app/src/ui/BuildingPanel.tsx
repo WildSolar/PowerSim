@@ -26,7 +26,7 @@ import { buildingLoadW } from "../sim/buildingPower";
 import { solarAndBatteryAt } from "../sim/homeBattery";
 import { solarAdoptionLog } from "../sim/solarAdoption";
 import { snowDepthCm } from "../sim/snow";
-import { useSimTime, useTariff } from "../sim/store";
+import { useLiveSimTime, useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
 import { hasElectricWaterHeating, waterHeatingPowerW } from "../sim/waterHeating";
 import { BillSection } from "./BillSection";
@@ -58,7 +58,7 @@ export interface BuildingPanelProps {
 }
 
 export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwelling, onClose }: BuildingPanelProps) {
-  const simTimeMs = useSimTime();
+  const simTimeMs = useLiveSimTime();
   const tariff = useTariff();
   const [, setOrders] = useState(0); // re-read after ordering solar or chargers here
   const plants = useLivePowerPlants(allBuildings, realPlants, simTimeMs);

@@ -5,7 +5,7 @@
  * only an open dwelling panel showing live device readouts does).
  */
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { simClock } from "./engine";
 import { policyStore } from "./policy";
 import type { Policy } from "./policy";
@@ -18,6 +18,37 @@ export function useSimTime(): number {
     (callback) => simClock.subscribe(callback),
     () => simClock.getSimTimeMs(),
   );
+}
+
+/** How often a live readout of the time (the top bar's clock, an open building's devices) redraws. */
+const LIVE_REFRESH_MS = 100;
+
+/** The simulated time, redrawn at most every LIVE_REFRESH_MS of real time rather than on every
+ * animation frame — ten times a second is as live as a reader can follow, and redrawing on every
+ * frame costs a large town smoothness at high speed. When the clock stops (pause, year end), the
+ * last time it stopped at still shows. */
+export function useLiveSimTime(): number {
+  const [simTimeMs, setSimTimeMs] = useState(() => simClock.getSimTimeMs());
+  useEffect(() => {
+    let lastMs = -Infinity;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const show = () => {
+      timer = null;
+      lastMs = performance.now();
+      setSimTimeMs(simClock.getSimTimeMs());
+    };
+    const unsubscribe = simClock.subscribe(() => {
+      if (timer !== null) return;
+      const waitMs = LIVE_REFRESH_MS - (performance.now() - lastMs);
+      if (waitMs <= 0) show();
+      else timer = setTimeout(show, waitMs);
+    });
+    return () => {
+      unsubscribe();
+      if (timer !== null) clearTimeout(timer);
+    };
+  }, []);
+  return simTimeMs;
 }
 
 const DAY_MS = 24 * 60 * 60_000;

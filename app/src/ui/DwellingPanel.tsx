@@ -11,7 +11,7 @@ import {
   HISTORY_SAMPLE_COUNT,
   HISTORY_REFRESH_MS,
 } from "../sim/history";
-import { useSimTime, useTariff } from "../sim/store";
+import { useLiveSimTime, useTariff } from "../sim/store";
 import { transit } from "../sim/transit";
 import type { TransitClass } from "../config/mobility";
 import { simClock } from "../sim/engine";
@@ -85,7 +85,7 @@ function ChargingNote({ charging }: { charging: SlotCharging }) {
 }
 
 export function DwellingPanel({ building, dwelling, allBuildings, realPlants, onBack, onClose }: DwellingPanelProps) {
-  const simTimeMs = useSimTime();
+  const simTimeMs = useLiveSimTime();
   const tariff = useTariff();
   const plants = useLivePowerPlants(allBuildings, realPlants, simTimeMs);
   const billSummary = useDwellingBillSummary(building, dwelling, plants, tariff);

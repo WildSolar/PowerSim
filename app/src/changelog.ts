@@ -28,7 +28,7 @@ export const CHANGELOG: Release[] = [
       "Ten more towns in the canton of Zürich: Winterthur, Dietikon, Dübendorf, Opfikon, Kloten, Bülach, Küsnacht, Hinwil, Wald and Stammheim — from a city of over a hundred thousand to a handful of wine-growing villages. Winterthur is big: it takes longer to load.",
     ],
     fixed: [
-      "Large towns no longer stutter at top speed: the map now updates only the buildings that changed instead of redrawing the whole town, and the month's statistics are counted in smaller pieces between frames. Winterthur plays smoothly; every town gains a little.",
+      "Large towns no longer stutter at top speed: the map now updates only the buildings that changed instead of redrawing the whole town, the month's statistics are counted in smaller pieces between frames, and the clock in the top bar redraws ten times a second rather than on every frame. Winterthur plays smoothly; every town gains a little.",
       "The decision log no longer looks as if owners install gas or oil despite the ban: when an owner weighs replacing a working boiler early and decides to keep it, that option now reads ‘Keep the current oil boiler’, and the outcome ‘kept — weighed switching early’. A gas or oil heating installed under the ban's exception (no heat pump possible, no district heating) shows why.",
     ],
   },

@@ -15,7 +15,7 @@ import {
 import type { MunicipalityDataset } from "../data/types";
 import { PAUSE_LABEL, PAUSE_SPEED, RUNNING_SPEEDS, setSpeed } from "../sim/timeControls";
 import { ghiWm2 } from "../sim/pv";
-import { useReportCardYear, useSimDay, useSimSpeed, useSimTime } from "../sim/store";
+import { useLiveSimTime, useReportCardYear, useSimDay, useSimSpeed } from "../sim/store";
 import { formatDate, formatTime, formatWeekday, toDateMs } from "../sim/calendar";
 import { weatherAt, type WeatherCondition } from "../sim/weather";
 import { approval } from "../sim/approval";
@@ -79,7 +79,7 @@ function Kpi({ label, value, sub, tone, title, onClick, tour }: { label: string;
 }
 
 function Clock() {
-  const simTimeMs = useSimTime();
+  const simTimeMs = useLiveSimTime();
   const speed = useSimSpeed();
   const weather = weatherAt(simTimeMs);
   const dayNight = dayNightStatus(simTimeMs);
@@ -187,7 +187,7 @@ function ApprovalKpi() {
 /** Last full year's emissions against the first year's — read from the Year in Review's
  * results, so it shows once a year has been counted. */
 function EmissionsKpi() {
-  const simTimeMs = useSimTime();
+  const simTimeMs = useSimDay(); // only the year matters
   useReportCardYear(); // re-read once the Year in Review has counted the year
   const lastYear = new Date(toDateMs(simTimeMs)).getUTCFullYear() - 1;
   const current = lastYear >= BASELINE_YEAR ? cachedEmissionsForYear(lastYear) : null;
