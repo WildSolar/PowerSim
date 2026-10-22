@@ -119,7 +119,9 @@ export const WORK_CHARGING_PRICE_RP_PER_KWH = 25;
 
 // How many cars relying on public charging one charge point can serve. A van or truck takes up
 // room by the energy it needs a day, in cars' worth (a van about two cars, a truck about twenty).
-export const CARS_PER_POINT: Record<ChargingKind, number> = { ac: 3, dc: 30, fleet: 100 }; // a lorry-park bay: about four lorries
+// A full fast-charging point delivers about 300 kWh a day, busy about a fifth of the day — like a
+// busy real station (Danish DC points average 13.6% of the time, the busiest about 26%: Virta).
+export const CARS_PER_POINT: Record<ChargingKind, number> = { ac: 3, dc: 50, fleet: 100 }; // a lorry-park bay: about four lorries
 
 // What private operators charge (the municipality's own prices are in the tariff), Rp/kWh.
 export const PRIVATE_PRICE_RP_PER_KWH: Record<ChargingKind, number> = { ac: 45, dc: 55, fleet: 45 }; // fleet: only what a lorry would expect to pay (no private lorry parks)
@@ -131,9 +133,10 @@ export const SESSION_DAY_SHARE: Record<ChargingVehicle, Record<ChargingKind, num
   van: { ac: 0.6, dc: 0.4, fleet: 0.4 },
   truck: { ac: 0.9, dc: 0.9, fleet: 0.9 },
 };
-// What a vehicle actually draws while charging, kW (a fast charger's rated power is rarely reached).
+// What a vehicle actually draws while charging, on average, kW: a fast charger's rated power is
+// rarely reached, and a car slows down as its battery fills (about 60 kW over a session).
 export const SESSION_POWER_KW: Record<ChargingVehicle, Record<ChargingKind, number>> = {
-  car: { ac: 11, dc: 100, fleet: 100 },
+  car: { ac: 11, dc: 60, fleet: 100 },
   van: { ac: 11, dc: 80, fleet: 80 },
   truck: { ac: 22, dc: 150, fleet: 300 },
 };

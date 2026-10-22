@@ -239,7 +239,7 @@ function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
           <div
             className="info-row"
             style={{ marginTop: 6 }}
-            title="Vehicles at a charge point right now. Those relying on a charger don't charge there every day: on the street a car plugs in in the evening and stays until morning, at a hub it stops for a quarter of an hour. So even a charger with no room left stands empty much of the day."
+            title="Vehicles at a charge point right now. Those relying on a charger don't charge there every day: on the street a car plugs in in the evening and stays until morning, at a hub it stops for about half an hour. So even a charger with no room left stands empty much of the day."
           >
             <span>Plugged in right now</span>
             <span className="info-value">

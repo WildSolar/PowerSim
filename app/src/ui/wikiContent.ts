@@ -992,7 +992,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "A busy charger is less use. Once an on-street charger is more than about 60% full, finding a free spot gets harder, and when full it is worth less than half as much; a hub hardly suffers until it is nearly full. A quarter over its room, a charger takes nobody new.",
       ),
       p(
-        "How full a charger is counts everyone who relies on it, not who is there at the moment. Nobody charges in public every day: on the street a car plugs in two or three evenings a week and stays until morning, at a hub it stops for a quarter of an hour once a week or so. So a charger with no room left still stands empty much of the day — on the street during the day, at a hub at night. A charger's card shows both: the room taken, and who is plugged in right now.",
+        "How full a charger is counts everyone who relies on it, not who is there at the moment. Nobody charges in public every day: on the street a car plugs in two or three evenings a week and stays until morning, at a hub it stops for about half an hour once a week or so. So a charger with no room left still stands empty much of the day — on the street during the day, at a hub at night. A charger's card shows both: the room taken, and who is plugged in right now.",
       ),
       p(
         "Different kinds of charging add up, each covering part of what the others leave: an on-street charger next door (90%) and charging at work (45%) make 95%. Two of the same kind don't: two hubs do the same job, so only the better one counts.",
@@ -1007,7 +1007,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "On-street chargers are cheap to build and to charge at, but serve only the streets around them, and fill up quickly.",
         "Fast-charging hubs cost ten times as much and charge more per kWh, but serve a wide area, hold far more vehicles per point, and being busy hardly matters. A hub alone makes an electric car a close call for many; with on-street chargers or charging at work besides, it tips the balance. Your own hubs charge what you set: cheap, they win over many households — and fill up.",
         "Lorry charging parks are for businesses' lorries and vans only: four or eight high-power bays with room for about four lorries each, serving the whole town. Only the municipality builds them. Around 30 Rp/kWh, they fill up; at 40, only lorries without a depot use them.",
-        "Room: an on-street point serves about 3 cars that rely on it fully, a fast-charging point about 30 — a car doing half its charging there takes half the room. A van takes about two cars' room, a lorry about twenty.",
+        "Room: an on-street point serves about 3 cars that rely on it fully, a fast-charging point about 50 — a car doing half its charging there takes half the room. A van takes about two cars' room, a lorry about twenty.",
       ]),
       p(
         "The town starts with its real public chargers, run privately. Private operators react every New Year: where people would have gone electric with an empty on-street charger next door but didn't, they add points to busy sites or open new on-street ones — and where enough such people are left around a large shop, they equip its car park (two a year at most). They charge 45 Rp/kWh on-street and 55 Rp/kWh at fast chargers, and leave hubs to you.",
