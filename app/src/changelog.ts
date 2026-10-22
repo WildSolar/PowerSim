@@ -27,6 +27,10 @@ export const CHANGELOG: Release[] = [
     added: [
       "Ten more towns in the canton of Zürich: Winterthur, Dietikon, Dübendorf, Opfikon, Kloten, Bülach, Küsnacht, Hinwil, Wald and Stammheim — from a city of over a hundred thousand to a handful of wine-growing villages. Winterthur is big: it takes longer to load.",
     ],
+    changed: [
+      "Electric lorries no longer stall in 2031. As Parliament decided in October 2026, they pay the heavy vehicle fee (LSVA) from 2031 at a discount that steps down — 70%, 50, 30, 20, 10% — and in full only from 2036, instead of all of it at once.",
+      "Not every lorry can go electric yet: its route has to suit an electric one — about one in seven today, most by the mid-2030s, nearly all by 2045. Electric lorries now catch on more slowly at first, and then steadily.",
+    ],
     fixed: [
       "Large towns no longer stutter at top speed: the map now updates only the buildings that changed instead of redrawing the whole town, the month's statistics are counted in smaller pieces between frames, and the clock in the top bar redraws ten times a second rather than on every frame. Winterthur plays smoothly; every town gains a little.",
       "The decision log no longer looks as if owners install gas or oil despite the ban: when an owner weighs replacing a working boiler early and decides to keep it, that option now reads ‘Keep the current oil boiler’, and the outcome ‘kept — weighed switching early’. A gas or oil heating installed under the ban's exception (no heat pump possible, no district heating) shows why.",

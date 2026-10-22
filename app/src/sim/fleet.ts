@@ -39,15 +39,18 @@ import {
   FLEET_UNCERTAINTY_FRACTION,
   FLEET_WEIBULL_SHAPE,
   INITIAL_TRUCK_EV_SHARE,
+  LSVA_EV_DISCOUNT_BY_YEAR,
   LSVA_EV_EXEMPT_THROUGH_YEAR,
   LSVA_RP_PER_KM,
   MIXED_USE_CATEGORIES,
+  TRUCK_EV_ROUTE_SHARE,
   TRUCK_SHARE_BY_CLASS,
   TRUCK_SHARE_OTHER,
   type FleetVehicleClass,
   type FleetVehicleId,
 } from "../config/fleet";
 import { SWITCH_MIN_GAIN_CHF, type ChargingKind } from "../config/charging";
+import { interpolateCurve } from "../config/curve";
 import { toDateMs } from "./calendar";
 import { totalFloorAreaM2 } from "./commercial";
 import { existsAt } from "./lifetime";
@@ -128,6 +131,12 @@ function yearOf(simTimeMs: number): number {
   return new Date(toDateMs(simTimeMs)).getUTCFullYear();
 }
 
+/** The share of the heavy vehicle fee an electric lorry is let off in `year`: all of it through
+ * 2030, then less each year, none from 2036. */
+function lsvaEvDiscount(year: number): number {
+  return year <= LSVA_EV_EXEMPT_THROUGH_YEAR ? 1 : (LSVA_EV_DISCOUNT_BY_YEAR[year] ?? 0);
+}
+
 function depotRunningRp(kWhPerYear: number, chargerRp: number, lifetimeYears: number, tariff: Tariff): number {
   return kWhPerYear * tariff.offPeakPriceRpKWh + chargerRp / lifetimeYears;
 }
@@ -138,11 +147,13 @@ function candidatesFor(
   access: FleetAccess,
   atMs: number,
   onElectricChosen: (atMs: number) => void,
+  routeSuits = true,
 ): RenewalCandidate<FleetVehicleId>[] {
-  // Without charging good enough to rely on, electric is out — its cost is still worked out as if a
-  // charger were next door, so the decision records whether it was wanted.
+  // Without charging good enough to rely on, or (a lorry) on a route an electric one can't do yet,
+  // electric is out — its cost is still worked out as if a charger were next door, so the decision
+  // records whether it was wanted.
   const hypothetical = publicCharging.hypotheticalOption(vehicleClass, vehicleClass === "van" ? "ac" : "fleet");
-  const lsvaApplies = (electric: boolean) => vehicleClass === "truck" && (!electric || yearOf(atMs) > LSVA_EV_EXEMPT_THROUGH_YEAR);
+  const lsvaShare = (electric: boolean) => (vehicleClass !== "truck" ? 0 : electric ? 1 - lsvaEvDiscount(yearOf(atMs)) : 1);
   return FLEET_CHOICES[vehicleClass].map((id) => {
     const spec = FLEET_CATALOG[id];
     const kWh = (spec.annualKm / 100) * spec.kWhPer100Km;
@@ -153,8 +164,8 @@ function candidatesFor(
       const option = access.kind === "public" ? access.option : hypothetical;
       runningRp = kWh * option.priceRpPerKWh + option.hassleRp;
     }
-    if (lsvaApplies(spec.electric)) runningRp += spec.annualKm * LSVA_RP_PER_KM;
-    const available = spec.electric ? access.kind !== "none" : vehicleClass === "truck" || !policyStore.get().iceCarPurchaseBanned;
+    runningRp += spec.annualKm * LSVA_RP_PER_KM * lsvaShare(spec.electric);
+    const available = spec.electric ? access.kind !== "none" && routeSuits : vehicleClass === "truck" || !policyStore.get().iceCarPurchaseBanned;
     // The municipality's grant for an electric one: never more than it costs.
     const purchaseRp = spec.purchaseCostRp * priceFactor(id, atMs);
     const subsidyRp = Math.min(purchaseRp, municipalFleetSubsidyRp(id));
@@ -235,6 +246,15 @@ class Fleets {
     return u < share ? electricOf(v.vehicleClass) : FLEET_CHOICES[v.vehicleClass][1];
   }
 
+  /** Whether an electric lorry can do this vehicle's work at `atMs` (TRUCK_EV_ROUTE_SHARE): a
+   * van's always, a lorry's once its seeded route is among the share electric ones can serve — or
+   * if it was electric to begin with. */
+  private routeSuits(v: FleetVehicle, atMs: number): boolean {
+    if (v.vehicleClass !== "truck") return true;
+    if (FLEET_CATALOG[this.initialType(v)].electric) return true;
+    return firstRandom(hashSeed(v.key, "fleet-route")) < interpolateCurve(TRUCK_EV_ROUTE_SHARE, yearOf(atMs));
+  }
+
   private biasRp(v: FleetVehicle): number {
     const diesel = FLEET_CATALOG[FLEET_CHOICES[v.vehicleClass][1]];
     const yearlyRp = diesel.purchaseCostRp / diesel.lifetimeMeanYears;
@@ -303,6 +323,7 @@ class Fleets {
   /** Whether a vehicle without a depot that just went diesel would have gone electric with a
    * charger of its kind close by — demand a private operator (for vans) may meet. */
   private wouldGoElectricWithCharger(v: FleetVehicle, incumbent: FleetVehicleId, atMs: number): boolean {
+    if (!this.routeSuits(v, atMs)) return false; // no charger would make an electric lorry do this route
     const kind: ChargingKind = v.vehicleClass === "van" ? "ac" : "fleet";
     const candidates = candidatesFor(v.vehicleClass, tariffStore.at(atMs), { kind: "public", option: publicCharging.hypotheticalOption(v.vehicleClass, kind) }, atMs, () => {});
     return chooseNext(candidates, incumbent, FLEET_UNCERTAINTY_FRACTION, this.biasRp(v) + policyStore.get().progressiveNudgeRp).chosen !== FLEET_CHOICES[v.vehicleClass][1];
@@ -325,9 +346,16 @@ class Fleets {
       candidatesAt: (atMs, incumbent) => {
         const b = this.lookupBuilding(v.egid);
         const access: FleetAccess = b ? this.accessAt(v, b, atMs, incumbent) : { kind: "depot", chargerRp: 0 };
-        return candidatesFor(v.vehicleClass, tariffStore.at(atMs), access, atMs, (chosenAtMs) => {
-          if (access.kind === "public") publicCharging.assign(v.key, null, access.option, chosenAtMs, publicNeed(v.vehicleClass));
-        });
+        return candidatesFor(
+          v.vehicleClass,
+          tariffStore.at(atMs),
+          access,
+          atMs,
+          (chosenAtMs) => {
+            if (access.kind === "public") publicCharging.assign(v.key, null, access.option, chosenAtMs, publicNeed(v.vehicleClass));
+          },
+          this.routeSuits(v, atMs),
+        );
       },
       onCommit: (event) => {
         publicCharging.endAssignment(v.key, event.installedAtMs);

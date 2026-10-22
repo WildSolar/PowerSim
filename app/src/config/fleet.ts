@@ -2,6 +2,8 @@
 // real (the BFS vehicle register, dataset.vehicleRegister); how they spread over the buildings, the
 // van/truck split and the costs are informed placeholders.
 
+import type { CurvePoint } from "./curve";
+
 export type FleetVehicleClass = "van" | "truck";
 export type FleetVehicleId = "vanDiesel" | "vanEV" | "truckDiesel" | "truckEV";
 
@@ -32,10 +34,24 @@ export const FLEET_CHOICES: Record<FleetVehicleClass, FleetVehicleId[]> = {
 };
 
 // The heavy vehicle fee (LSVA/RPLP) for a lorry like the one above: about 2.3 Rp per tonne-km at
-// 18 t. Electric lorries are exempt through 2030 under current law; what follows is still being
-// decided — the game assumes they pay the full fee from 2031.
+// 18 t. Electric lorries are exempt through 2030; from 2031 they pay it too, at a discount that
+// steps down. The revised law (passed in October 2026) sets at least 70% for 2031; the later steps
+// here are the ones reported while the Federal Council's ordinance is pending. None from 2036.
 export const LSVA_RP_PER_KM = 41;
 export const LSVA_EV_EXEMPT_THROUGH_YEAR = 2030;
+export const LSVA_EV_DISCOUNT_BY_YEAR: Record<number, number> = { 2031: 0.7, 2032: 0.5, 2033: 0.3, 2034: 0.2, 2035: 0.1 };
+
+// The share of lorry routes an electric lorry can take on — the day's distance and load, a model of
+// the right size on sale: local distribution first, heavier and longer work later. A lorry whose
+// route isn't among them yet stays diesel whatever the price; each lorry's route is seeded. An
+// estimate, set so that electric lorries stay a minority of new ones through the 2020s.
+export const TRUCK_EV_ROUTE_SHARE: CurvePoint[] = [
+  { x: 2026, y: 0.15 },
+  { x: 2030, y: 0.4 },
+  { x: 2035, y: 0.75 },
+  { x: 2040, y: 0.9 },
+  { x: 2045, y: 0.95 },
+];
 
 // Fallbacks for a dataset without the vehicle register (BFS withdrew the per-municipality table,
 // px-x-1103020100_111, from its API in 2026): the Swiss average, about 0.05 goods vehicles per

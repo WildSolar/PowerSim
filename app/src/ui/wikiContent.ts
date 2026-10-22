@@ -1036,7 +1036,10 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Each vehicle lasts about ten years and is replaced by the same kind of decision as a household's car, only more businesslike. An electric van costs more to buy but far less to run, above all when it charges overnight in its own yard at the night rate — once a charger is installed: a wallbox for a van (about CHF 3,000), a high-power charger and usually a stronger connection for a lorry (about CHF 80,000). Most vehicles at industry and warehouses have a yard, fewer at shops and offices. Without one, a business relies on public chargers, the same way a household without a charger at home does (see \"Public charging\") — a van on-street, at a hub or a lorry park, a lorry only at a hub or a lorry park.",
       ),
       p(
-        "Lorries pay the heavy vehicle fee (LSVA) on diesel — about CHF 18,000 a year for a local delivery lorry — and electric lorries are exempt through 2030. Until then an electric lorry is the cheaper choice for a business with a depot. A lorry without one needs room at a hub (where it takes about twenty cars' worth) or a lorry charging park, which only you build. Vans without a yard rarely go electric: charging in public costs them more than the diesel they save.",
+        "Lorries pay the heavy vehicle fee (LSVA) on diesel — about CHF 18,000 a year for a local delivery lorry. Electric lorries are exempt through 2030; from 2031 they pay it too, at a discount that shrinks each year — 70% in 2031, then 50, 30, 20 and 10% — and in full from 2036. Electric lorries keep getting cheaper meanwhile, so for a business with a depot an electric one stays the cheaper choice.",
+      ),
+      p(
+        "But not every lorry can go electric yet: the day's distance and load have to suit one, and a model of the right size has to be on sale. About one lorry in seven has such a route today, most by the mid-2030s, nearly all by 2045 — until then the others stay diesel, whatever it costs. A lorry without a depot needs room at a hub (where it takes about twenty cars' worth) or a lorry charging park, which only you build; a new charger at a depot needs room on the local grid (see \"The electricity grid\"). Vans without a yard rarely go electric: charging in public costs them more than the diesel they save.",
       ),
       p(
         "The electric van and lorry grant (Town hall → Measures) pays a business a flat sum for each electric van or lorry it buys, set separately for each. It weighs into the same decision, so it tips businesses that were close — and, like any grant, is also paid to those who would have gone electric anyway.",
@@ -1047,7 +1050,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "A federal end to new petrol and diesel car sales covers vans, not lorries.",
       ]),
       note(
-        "How the vehicles spread over the buildings, the share with a yard, prices and mileages (a van 18,000 km a year, a lorry 45,000) are estimates. What happens to the LSVA exemption after 2030 is undecided; the game assumes electric lorries pay the full fee from 2031. Company cars are counted with the households' cars.",
+        "How the vehicles spread over the buildings, the share with a yard, prices and mileages (a van 18,000 km a year, a lorry 45,000) are estimates. The law sets the LSVA discount for 2031; the steps after it are the ones expected until the Federal Council sets them. The share of routes an electric lorry can serve is an estimate. Company cars are counted with the households' cars.",
       ),
     ],
   },
