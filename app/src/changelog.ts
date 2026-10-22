@@ -28,7 +28,7 @@ export const CHANGELOG: Release[] = [
       "Ten more towns in the canton of Zürich: Winterthur, Dietikon, Dübendorf, Opfikon, Kloten, Bülach, Küsnacht, Hinwil, Wald and Stammheim — from a city of over a hundred thousand to a handful of wine-growing villages. Winterthur is big: it takes longer to load.",
     ],
     changed: [
-      "Emissions in more detail: transport comes by vehicle — cars, vans, lorries — and what charging electric vehicles emits shows on its own, apart from the rest of the electricity. In the Year in Review, the Overview and the emissions chart.",
+      "Emissions in more detail: for cars, vans and lorries each, the petrol or diesel they burn and what charging the electric ones emits, taken out of the electricity. In the Year in Review, the Overview and the emissions chart.",
       "Electric lorries no longer stall in 2031. As Parliament decided in October 2026, they pay the heavy vehicle fee (LSVA) from 2031 at a discount that steps down — 70%, 50, 30, 20, 10% — and in full only from 2036, instead of all of it at once.",
       "Not every lorry can go electric yet: its route has to suit an electric one — about one in seven today, most by the mid-2030s, nearly all by 2045. Electric lorries now catch on more slowly at first, and then steadily.",
     ],

@@ -113,6 +113,9 @@ export interface YearElectricityMonth {
   dhHeatPumpW: number[];
   /** What the businesses on the open market draw (W): carried by the grid, their energy their supplier's. */
   marketW: number[];
+  /** The part of series.evW charging vans, and lorries (W). */
+  evVanW: number[];
+  evTruckW: number[];
 }
 
 const electricityByMonth = new Map<number, Promise<YearElectricityMonth>>();
@@ -129,6 +132,10 @@ const electricityByMonth = new Map<number, Promise<YearElectricityMonth>>();
 
 interface ElectricitySample {
   series: CategorySeries;
+  /** The part of series.evW that charged vans, and lorries (at public chargers and depots); the
+   * rest charged cars. */
+  evVanW: number;
+  evTruckW: number;
   dynamicW: number;
   /** What the businesses buying on the open market draw (W): their energy isn't the utility's. */
   marketW: number;
@@ -172,10 +179,22 @@ function electricitySamplePass(buildings: Building[], realPlants: PowerPlant[], 
     const town = municipalityCategorySteps(buildings, [t], tariff, plants);
     let dynamicW = 0;
     let marketW = 0;
+    let evVanW = 0;
+    let evTruckW = 0;
     job = {
-      steps: [...town.steps, () => (dynamicW = sampleDynamicConsumptionW(buildings, [t], tariff)[0]), () => (marketW = marketAccess.marketPowerW(buildings, t))],
+      steps: [
+        ...town.steps,
+        () => (dynamicW = sampleDynamicConsumptionW(buildings, [t], tariff)[0]),
+        () => (marketW = marketAccess.marketPowerW(buildings, t)),
+        () => {
+          const atChargers = publicCharging.totalLoadByVehicleW(t);
+          const atDepots = fleets.depotPowerByClassW(buildings, t);
+          evVanW = atChargers.van + atDepots.van;
+          evTruckW = atChargers.truck + atDepots.truck;
+        },
+      ],
       done: 0,
-      finish: () => ({ series: town.result(), dynamicW, marketW }),
+      finish: () => ({ series: town.result(), dynamicW, marketW, evVanW, evTruckW }),
     };
     electricityInProgress.set(id, job);
   }
@@ -337,7 +356,15 @@ export function monthElectricity(buildings: Building[], realPlants: PowerPlant[]
     await recordMonthElectricity(buildings, year, month, times, series, dhHeatPumpW, plants, monthEndMs - 1);
     await yieldToEventLoop();
     await recordMonthAssets(buildings, year, month, plants, monthEndMs - 1);
-    return { times, series, dynamicW: samples.map((s) => s.dynamicW), dhHeatPumpW, marketW: samples.map((s) => s.marketW ?? 0) };
+    return {
+      times,
+      series,
+      dynamicW: samples.map((s) => s.dynamicW),
+      dhHeatPumpW,
+      marketW: samples.map((s) => s.marketW ?? 0),
+      evVanW: samples.map((s) => s.evVanW ?? 0),
+      evTruckW: samples.map((s) => s.evTruckW ?? 0),
+    };
   }, "month electricity");
 }
 
@@ -785,13 +812,19 @@ export async function computeNetElectricityKWh(buildings: Building[], realPlants
 
 /** The town's electricity over a calendar year: net of its solar (computeNetElectricityKWh), all
  * it used before solar, and how much of that charged electric vehicles — at home, at public
- * chargers and at businesses' depots. */
+ * chargers and at businesses' depots — and of that, vans and lorries. */
 export async function computeElectricityUseKWh(
   buildings: Building[],
   realPlants: PowerPlant[],
   year: number,
-): Promise<{ netKWh: number; consumptionKWh: number; evKWh: number }> {
+): Promise<{ netKWh: number; consumptionKWh: number; evKWh: number; evVanKWh: number; evTruckKWh: number }> {
   const energy = await yearCategoryEnergyKWh(buildings, realPlants, year);
+  let evVanKWh = 0;
+  let evTruckKWh = 0;
+  for (const m of await yearElectricity(buildings, realPlants, year)) {
+    evVanKWh += energyKWh(m.times, m.evVanW ?? m.times.map(() => 0));
+    evTruckKWh += energyKWh(m.times, m.evTruckW ?? m.times.map(() => 0));
+  }
   const dhHeatPumpKWh = await yearDhHeatPumpKWh(buildings, realPlants, year);
   const consumptionKWh =
     dhHeatPumpKWh +
@@ -805,7 +838,7 @@ export async function computeElectricityUseKWh(
     energy.ac +
     energy.waterHeating +
     energy.commercial;
-  return { netKWh: consumptionKWh - energy.solar, consumptionKWh, evKWh: energy.ev };
+  return { netKWh: consumptionKWh - energy.solar, consumptionKWh, evKWh: energy.ev, evVanKWh, evTruckKWh };
 }
 
 interface MobilityFuelMonth {

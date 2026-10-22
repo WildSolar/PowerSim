@@ -38,9 +38,12 @@ import { computeElectricityUseKWh, computeHeatingTechnologyBreakdown, computeMob
 export interface EmissionsBreakdown {
   year: number;
   electricityKgCO2: number; // net of solar export, at that year's grid intensity
-  /** The part of electricityKgCO2 that charged electric vehicles (cars, vans, lorries): their share
-   * of the town's electricity use. */
+  /** The part of electricityKgCO2 that charged electric vehicles: their share of the town's
+   * electricity use — cars', vans' and lorries' (the three below together). */
   evChargingKgCO2: number;
+  evCarsKgCO2: number;
+  evVansKgCO2: number;
+  evLorriesKgCO2: number;
   gasKgCO2: number;
   oilKgCO2: number;
   districtHeatingKgCO2: number;
@@ -62,18 +65,21 @@ export interface EmissionsBreakdown {
 // gas/oil/districtHeating reuse heatingSystems.ts's own colors for those same
 // fuels (semantically consistent across the report's sections); electricity
 // and mobility are new, distinct colors chosen so the five work together.
-// The vehicles apart (cars as mobility before; vans, lorries and charging from the same categorical
-// palette), validated as eight in the order the charts stack them: electricity, charging, district
-// heating, gas, oil, cars, vans, lorries.
+// Ten sources, more than a palette has distinct hues: each kind of vehicle has one hue — its petrol
+// or diesel a darker shade, its charging a lighter one. Validated (dataviz validate_palette.js, light)
+// in the order the charts stack them: electricity; cars, vans, lorries, fuel then charging; district
+// heating, gas, oil.
 export const EMISSIONS_SOURCE_COLOR = {
   electricity: "#2a78d6",
-  evCharging: "#e87ba4",
+  cars: "#0e7a52",
+  evCars: "#1fbf86",
+  vans: "#a86f00",
+  evVans: "#eda100",
+  lorries: "#0b6b0b",
+  evLorries: "#3aa63a",
   districtHeating: "#4a3aa7",
   gas: "#eb6834",
   oil: "#b23a2e",
-  cars: "#1baf7a",
-  vans: "#eda100",
-  lorries: "#008300",
 } as const;
 
 /** The sources a year's emissions are shown by, in the order the charts stack them: electricity
@@ -81,13 +87,15 @@ export const EMISSIONS_SOURCE_COLOR = {
  * They add up to the total. */
 export const EMISSION_SOURCES: { key: keyof typeof EMISSIONS_SOURCE_COLOR; label: string; icon: string; kgCO2: (e: EmissionsBreakdown) => number }[] = [
   { key: "electricity", label: "Other electricity", icon: "⚡", kgCO2: (e) => e.electricityKgCO2 - e.evChargingKgCO2 },
-  { key: "evCharging", label: "Charging electric vehicles", icon: "🔌", kgCO2: (e) => e.evChargingKgCO2 },
+  { key: "cars", label: "Cars, petrol and diesel", icon: "🚗", kgCO2: (e) => e.carsKgCO2 },
+  { key: "evCars", label: "Cars, charging", icon: "🔌", kgCO2: (e) => e.evCarsKgCO2 ?? e.evChargingKgCO2 },
+  { key: "vans", label: "Vans, diesel", icon: "🚐", kgCO2: (e) => e.vansKgCO2 },
+  { key: "evVans", label: "Vans, charging", icon: "🔌", kgCO2: (e) => e.evVansKgCO2 ?? 0 },
+  { key: "lorries", label: "Lorries, diesel", icon: "🚚", kgCO2: (e) => e.lorriesKgCO2 },
+  { key: "evLorries", label: "Lorries, charging", icon: "🔌", kgCO2: (e) => e.evLorriesKgCO2 ?? 0 },
   { key: "districtHeating", label: "District heating", icon: "🏭", kgCO2: (e) => e.districtHeatingKgCO2 },
   { key: "gas", label: "Gas heating", icon: "🔥", kgCO2: (e) => e.gasKgCO2 },
   { key: "oil", label: "Oil heating", icon: "🛢️", kgCO2: (e) => e.oilKgCO2 },
-  { key: "cars", label: "Cars, petrol and diesel", icon: "🚗", kgCO2: (e) => e.carsKgCO2 },
-  { key: "vans", label: "Vans, diesel", icon: "🚐", kgCO2: (e) => e.vansKgCO2 },
-  { key: "lorries", label: "Lorries, diesel", icon: "🚚", kgCO2: (e) => e.lorriesKgCO2 },
 ];
 
 const emissionsCache = new Map<number, EmissionsBreakdown>();
@@ -135,6 +143,11 @@ async function countYear(buildings: Building[], plants: PowerPlant[], year: numb
   // Electric vehicles' part of it: their share of what the town used (the data centre's aside).
   const usedKWh = electricityUse.consumptionKWh - datacenterKWh;
   const evChargingKgCO2 = usedKWh > 0 ? electricityKgCO2 * Math.min(1, electricityUse.evKWh / usedKWh) : 0;
+  // ...vans' and lorries' share of that by what they charged; cars the rest.
+  const evShareOf = (kWh: number) => (electricityUse.evKWh > 0 ? Math.min(1, kWh / electricityUse.evKWh) : 0);
+  const evVansKgCO2 = evChargingKgCO2 * evShareOf(electricityUse.evVanKWh);
+  const evLorriesKgCO2 = evChargingKgCO2 * evShareOf(electricityUse.evTruckKWh);
+  const evCarsKgCO2 = Math.max(0, evChargingKgCO2 - evVansKgCO2 - evLorriesKgCO2);
 
   const gasFuelKWh = heatingTechnology.gasBoilerSpaceKWh / GAS_BOILER_EFFICIENCY;
   const gasKgCO2 = gasFuelKWh * NATURAL_GAS_KG_CO2_PER_KWH;
@@ -162,6 +175,9 @@ async function countYear(buildings: Building[], plants: PowerPlant[], year: numb
     year,
     electricityKgCO2,
     evChargingKgCO2,
+    evCarsKgCO2,
+    evVansKgCO2,
+    evLorriesKgCO2,
     gasKgCO2,
     oilKgCO2,
     districtHeatingKgCO2,

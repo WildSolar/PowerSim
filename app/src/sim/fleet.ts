@@ -445,6 +445,17 @@ class Fleets {
     return total;
   }
 
+  /** totalDepotPowerW, vans' and lorries' apart. */
+  depotPowerByClassW(buildings: Building[], simTimeMs: number): Record<FleetVehicleClass, number> {
+    const out = { van: 0, truck: 0 };
+    for (const { v, b } of this.flatten(buildings)) {
+      if (!v.depot) continue;
+      const id = this.typeAt(v, simTimeMs);
+      if (FLEET_CATALOG[id].electric && existsAt(b, simTimeMs) && !this.chargesPubliclyAt(v, simTimeMs)) out[v.vehicleClass] += this.depotSessionW(v, id, simTimeMs);
+    }
+    return out;
+  }
+
   /** Diesel the given buildings' vans and lorries burn in a year at the rate they stand at
    * `simTimeMs` (L), each kind apart. */
   dieselLitersPerYearAt(buildings: Building[], simTimeMs: number): Record<FleetVehicleClass, number> {

@@ -769,6 +769,18 @@ class PublicCharging {
     return total;
   }
 
+  /** totalLoadW by the kind of vehicle charging (for the emissions of each). */
+  totalLoadByVehicleW(atMs: number): Record<ChargingVehicle, number> {
+    const out: Record<ChargingVehicle, number> = { car: 0, van: 0, truck: 0 };
+    for (const site of this.sites) {
+      for (const a of this.bySite.get(site.id) ?? []) {
+        if (a.fromMs > atMs || atMs >= a.toMs || !this.isDriving(a.slot, atMs)) continue;
+        out[a.vehicle] += this.assignmentLoadW(a, site, atMs);
+      }
+    }
+    return out;
+  }
+
   // --- statistics ---
 
   /** Energy a site delivered between two instants (kWh), from the cars relying on it. */
