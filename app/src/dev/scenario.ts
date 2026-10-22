@@ -7,6 +7,7 @@
  * and remember everything.
  */
 
+import { townSurplus } from "../sim/townSurplus";
 import { chargingTariff } from "../sim/chargingTariff";
 import { dataUrl } from "../data/loadDataset";
 import type { MunicipalityDataset } from "../data/types";
@@ -177,6 +178,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   const difficulty = spec.difficulty ?? "normal";
   market.init(`market:${dataset.bfsNumber}`);
   tariffStore.init();
+  townSurplus.init(() => stock.getAll(), dataset.powerPlants);
   chargingTariff.init(() => stock.getAll());
   dynamicTariff.init(() => stock.getAll());
   measures.init(difficulty);
