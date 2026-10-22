@@ -31,7 +31,7 @@ import { dayOfYear, toDateMs } from "./calendar";
 import { GREEN_POWER_MAX_EMISSION_REDUCTION } from "../config/policy";
 import { districtHeat, type DhNetworkInfo, type DhSource } from "./districtHeat";
 import { HEATING_OIL_KG_CO2_PER_LITER, NATURAL_GAS_KG_CO2_PER_KWH } from "./emissionFactors";
-import { gridCarbonIntensityGPerKWh } from "./gridCarbon";
+import { gridCarbonWinterGPerKWh } from "./gridCarbon";
 import { OIL_ENERGY_KWH_PER_LITER } from "./heatingSystems";
 import { market } from "./market";
 import { policyStore } from "./policy";
@@ -150,13 +150,14 @@ export function dhInputs(e: DhEnergyKWh): { woodFuelKWh: number; chpPowerKWh: nu
 }
 
 /** A year's district heating emissions: the boilers' oil and gas, less the power the wood plants feed
- * in at the grid's intensity (never below nothing). The heat pumps' power counts with the town's
+ * in at the grid's winter intensity — they make it with their heat, in the heating months (never
+ * below nothing). The heat pumps' power counts with the town's
  * electricity. Wood counts as carbon-neutral, as in the national inventory; waste heat carries
  * nothing. */
 export function dhEmissionsKgCO2(e: DhEnergyKWh, year: number): number {
   const inputs = dhInputs(e);
   const greenShare = policyStore.get().greenPowerShare / 100;
-  const gridKgPerKWh = (gridCarbonIntensityGPerKWh(year) * (1 - GREEN_POWER_MAX_EMISSION_REDUCTION * greenShare)) / 1000;
+  const gridKgPerKWh = (gridCarbonWinterGPerKWh(year) * (1 - GREEN_POWER_MAX_EMISSION_REDUCTION * greenShare)) / 1000;
   const fossil = (inputs.oilFuelKWh / OIL_ENERGY_KWH_PER_LITER) * HEATING_OIL_KG_CO2_PER_LITER + inputs.gasFuelKWh * NATURAL_GAS_KG_CO2_PER_KWH;
   return Math.max(0, fossil - inputs.chpPowerKWh * gridKgPerKWh);
 }

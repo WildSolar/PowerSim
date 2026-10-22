@@ -29,15 +29,17 @@ import {
   ICE_CAR_FUEL_KG_CO2_PER_LITER,
   NATURAL_GAS_KG_CO2_PER_KWH,
 } from "./emissionFactors";
-import { gridCarbonIntensityGPerKWh } from "./gridCarbon";
+import { gridCarbonIntensityGPerKWhAt } from "./gridCarbon";
+import { consumptionSeriesW } from "./billing";
+import { energyKWh } from "./energy";
 import { dhEmissionsKgCO2 } from "./districtHeatDispatch";
 import { datacenter } from "./datacenter";
 import { GAS_BOILER_EFFICIENCY, OIL_BOILER_EFFICIENCY, OIL_ENERGY_KWH_PER_LITER } from "./heatingSystems";
-import { computeElectricityUseKWh, computeHeatingTechnologyBreakdown, computeMobilityFuelLiters } from "./yearReport";
+import { computeHeatingTechnologyBreakdown, computeMobilityFuelLiters, yearElectricity } from "./yearReport";
 
 export interface EmissionsBreakdown {
   year: number;
-  electricityKgCO2: number; // net of solar export, at that year's grid intensity
+  electricityKgCO2: number; // what the town drew from the grid less what its solar fed in, each at the moment's grid intensity
   /** The part of electricityKgCO2 that charged electric vehicles: their share of the town's
    * electricity use — cars', vans' and lorries' (the three below together). */
   evChargingKgCO2: number;
@@ -129,24 +131,35 @@ async function countYear(buildings: Building[], plants: PowerPlant[], year: numb
   // The baseline first: the removals bought are capped against it.
   if (year > BASELINE_YEAR) await computeEmissionsForYear(buildings, plants, BASELINE_YEAR);
 
-  const [heatingTechnology, electricityUse, fuelLiters] = await Promise.all([
+  const [heatingTechnology, months, fuelLiters] = await Promise.all([
     computeHeatingTechnologyBreakdown(buildings, year),
-    computeElectricityUseKWh(buildings, plants, year),
+    yearElectricity(buildings, plants, year),
     computeMobilityFuelLiters(buildings, year),
   ]);
-  const netElectricityKWh = electricityUse.netKWh;
 
+  // Electricity, sample by sample: what the town drew (its district heating heat pumps included, a
+  // data centre's certified renewable power left out) less what its solar and wind fed back, each at
+  // the grid's intensity of the moment — a winter night's kWh weighs more than a sunny noon's.
+  // Electric vehicles' part: their share of what the town used, weighed the same way.
+  const kg = { net: 0, used: 0, ev: 0, evVan: 0, evTruck: 0 };
+  for (const m of months) {
+    const consumptionW = consumptionSeriesW(m.series);
+    const gKgPerWh = m.times.map((t) => gridCarbonIntensityGPerKWhAt(t) / 1e6); // kg per kWh, per W over an hour
+    const datacenterW = m.times.map((t) => datacenter.powerW(t));
+    const weigh = (w: (i: number) => number) => energyKWh(m.times, m.times.map((_, i) => w(i) * gKgPerWh[i] * 1000));
+    kg.net += weigh((i) => consumptionW[i] + m.dhHeatPumpW[i] - datacenterW[i] - m.series.solarW[i]);
+    kg.used += weigh((i) => consumptionW[i] + m.dhHeatPumpW[i] - datacenterW[i]);
+    kg.ev += weigh((i) => m.series.evW[i]);
+    kg.evVan += weigh((i) => m.evVanW?.[i] ?? 0);
+    kg.evTruck += weigh((i) => m.evTruckW?.[i] ?? 0);
+  }
   const greenShare = policyStore.get().greenPowerShare / 100;
-  // A data centre buys certified renewable power (datacenter.ts): its electricity carries nothing.
-  const datacenterKWh = datacenter.kWhBetween(toSimTimeMs(Date.UTC(year, 0, 1)), toSimTimeMs(Date.UTC(year + 1, 0, 1)));
-  const electricityKgCO2 = (Math.max(0, netElectricityKWh - datacenterKWh) * gridCarbonIntensityGPerKWh(year) * (1 - GREEN_POWER_MAX_EMISSION_REDUCTION * greenShare)) / 1000;
-  // Electric vehicles' part of it: their share of what the town used (the data centre's aside).
-  const usedKWh = electricityUse.consumptionKWh - datacenterKWh;
-  const evChargingKgCO2 = usedKWh > 0 ? electricityKgCO2 * Math.min(1, electricityUse.evKWh / usedKWh) : 0;
-  // ...vans' and lorries' share of that by what they charged; cars the rest.
-  const evShareOf = (kWh: number) => (electricityUse.evKWh > 0 ? Math.min(1, kWh / electricityUse.evKWh) : 0);
-  const evVansKgCO2 = evChargingKgCO2 * evShareOf(electricityUse.evVanKWh);
-  const evLorriesKgCO2 = evChargingKgCO2 * evShareOf(electricityUse.evTruckKWh);
+  const electricityKgCO2 = Math.max(0, kg.net) * (1 - GREEN_POWER_MAX_EMISSION_REDUCTION * greenShare);
+  const evChargingKgCO2 = kg.used > 0 ? electricityKgCO2 * Math.min(1, kg.ev / kg.used) : 0;
+  // ...vans' and lorries' share of that by what they charged, when; cars the rest.
+  const evShareOf = (part: number) => (kg.ev > 0 ? Math.min(1, part / kg.ev) : 0);
+  const evVansKgCO2 = evChargingKgCO2 * evShareOf(kg.evVan);
+  const evLorriesKgCO2 = evChargingKgCO2 * evShareOf(kg.evTruck);
   const evCarsKgCO2 = Math.max(0, evChargingKgCO2 - evVansKgCO2 - evLorriesKgCO2);
 
   const gasFuelKWh = heatingTechnology.gasBoilerSpaceKWh / GAS_BOILER_EFFICIENCY;

@@ -819,29 +819,12 @@ export function computeHeatingRenewalTally(buildings: Building[], year: number):
 }
 
 /** Net municipality-wide electricity consumption for the given calendar year — every device
- * category and the district heating heat pumps, minus solar generation — for emissions.ts's
- * grid-electricity figure, read off the shared year pass. */
+ * category and the district heating heat pumps, minus solar generation — read off the shared year
+ * pass (the emissions weigh each sample by the grid's intensity instead, emissions.ts). */
 export async function computeNetElectricityKWh(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<number> {
-  return (await computeElectricityUseKWh(buildings, realPlants, year)).netKWh;
-}
-
-/** The town's electricity over a calendar year: net of its solar (computeNetElectricityKWh), all
- * it used before solar, and how much of that charged electric vehicles — at home, at public
- * chargers and at businesses' depots — and of that, vans and lorries. */
-export async function computeElectricityUseKWh(
-  buildings: Building[],
-  realPlants: PowerPlant[],
-  year: number,
-): Promise<{ netKWh: number; consumptionKWh: number; evKWh: number; evVanKWh: number; evTruckKWh: number }> {
   const energy = await yearCategoryEnergyKWh(buildings, realPlants, year);
-  let evVanKWh = 0;
-  let evTruckKWh = 0;
-  for (const m of await yearElectricity(buildings, realPlants, year)) {
-    evVanKWh += energyKWh(m.times, m.evVanW ?? m.times.map(() => 0));
-    evTruckKWh += energyKWh(m.times, m.evTruckW ?? m.times.map(() => 0));
-  }
   const dhHeatPumpKWh = await yearDhHeatPumpKWh(buildings, realPlants, year);
-  const consumptionKWh =
+  return (
     dhHeatPumpKWh +
     energy.fridge +
     energy.lighting +
@@ -852,8 +835,9 @@ export async function computeElectricityUseKWh(
     energy.heatPump +
     energy.ac +
     energy.waterHeating +
-    energy.commercial;
-  return { netKWh: consumptionKWh - energy.solar, consumptionKWh, evKWh: energy.ev, evVanKWh, evTruckKWh };
+    energy.commercial -
+    energy.solar
+  );
 }
 
 interface MobilityFuelMonth {

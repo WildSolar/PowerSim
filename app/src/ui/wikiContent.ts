@@ -310,13 +310,16 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "The goal is net zero by 2050. At the end of each year the town's CO₂ is added up from five sources, less any carbon removed, and compared with the first year of the game — the baseline every later year is measured against.",
       ),
       list([
-        "Electricity: what the town draws from the grid, less the solar it feeds back, times how clean Swiss electricity is that year. The national grid gets cleaner over the decades whatever you do; your levers are how much the town draws, and green power as the default for its customers.",
+        "Electricity: what the town draws from the grid, less what its solar and wind feed back, each at how clean Swiss electricity is at that moment. It is dirtiest on winter nights, when much of it is imported, and cleanest at sunny middays, when hydro and solar cover everything — on a winter's night two or three times the year's average, at a summer noon a fraction of it. The national grid gets cleaner over the decades whatever you do; your levers are how much the town draws, when, and green power as the default for its customers.",
         "Gas and oil heating: the fuel actually burned for heating. Every boiler replaced by a heat pump or district heat takes its share away. Wood heating counts as clean, as in Switzerland's own inventory: the CO₂ a tree took up is given back.",
         "District heating: the oil and gas its boilers burn, and the electricity its heat pumps use (see \"Heat for district heating\"). Wood and waste heat count as clean.",
         "Transport: the petrol and diesel burned by households' cars and businesses' vans and lorries. Public transport, cycling and walking count as zero.",
       ]),
       p(
         "The Year in Review, the Overview and the emissions chart show the sources in more detail: for cars, vans and lorries each, the petrol or diesel they burn and — taken out of the electricity — what charging the electric ones emits, at home, at public chargers and at businesses' depots. Each kind of vehicle has its own colour, darker for its fuel, lighter for its charging. Charging's share follows how clean the grid is, so it shrinks as the grid gets cleaner and the town's solar grows; an electric vehicle never emits as much as the petrol or diesel one it replaces. Commuters charging at the town's workplaces count too — it is the town's electricity — while their petrol, burned by non-residents, never did.",
+      ),
+      p(
+        "When matters. Solar fed in at a summer noon displaces power that was clean already, so it counts for less than the same kWh in winter; a heat pump's power, drawn mostly in winter, counts for more than its share of the year. Moving use from the evening into the night eases the grid but adds a little CO₂ in winter; moving it into sunny hours does both good.",
       ),
       p(
         "Some emissions can't be avoided within a town's reach: the national grid is still not clean in 2050, a few buildings have no alternative to their boiler, and old cars and lorries run on for years. As in Swiss climate law, that rest is balanced with carbon removal — CO₂ taken back out of the air by biochar, direct air capture or capture at a waste-to-energy plant. The ‘Carbon removal contracts’ measure buys them, but only for that rest: removals count once the town's own emissions are down to a fifth of what they were at the start. From the year after a counted year gets there, the contract buys month by month — a twelfth each month of what that year left, up to the share you choose — and pays each month, at the price of the day: around CHF 450 a tonne today, about CHF 200 by 2050. What a year bought counts against its emissions, never below nothing. Before that it costs nothing — the first four fifths have to be cut.",
@@ -499,7 +502,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       p(
         "What it does: cars on it charge at night instead of in the evening, so the evening peak on the grid falls (see \"The electricity grid\"). A cheap charging price also makes an electric car cheaper to run for anyone with a wallbox, so more go electric. What it costs: the energy sold at your charging price, against the meter fees. Drivers welcome a charging price below what households pay, homeowners a little.",
       ),
-      note("Moving charging into the night doesn't lower the town's emissions in the game: electricity counts at the year's average grid intensity, whenever it is used."),
+      note("Night charging eases the grid, but in winter Swiss power is dirtiest at night, when much of it is imported — so moving charging from the evening into the night adds a little CO₂ (see \"Emissions & net zero\")."),
     ],
   },
 
