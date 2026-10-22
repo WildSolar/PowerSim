@@ -419,15 +419,27 @@ class Fleets {
     return list;
   }
 
-  /** One electric vehicle's draw at its depot at `simTimeMs`: overnight, starting some time after
-   * the working day, until the day's energy is in. */
+  /** One electric vehicle's draw at its depot at `simTimeMs`, until the day's energy is in. It is
+   * back in the yard between 17:00 and 20:00; a business pays the night rate for it (depotRunningRp),
+   * so where that is cheaper the charge starts at some moment in the night rate — the business's
+   * timer or load management — and is done by the time it ends; otherwise as soon as it is back. */
   private depotSessionW(v: FleetVehicle, id: FleetVehicleId, simTimeMs: number): number {
     const powerKw = DEPOT_POWER_KW[v.vehicleClass];
     const hours = dailyKWh(id) / powerKw;
     // The session that started yesterday evening may still be running.
     for (const dayOffset of [0, -1]) {
       const day = Math.floor(simTimeMs / DAY_MS) + dayOffset;
-      const startHour = 17 + firstRandom(hashSeedFrom(hashSeed(v.key, "depot"), String(day))) * 3;
+      const seed = hashSeedFrom(hashSeed(v.key, "depot"), String(day));
+      const backHour = 17 + firstRandom(seed) * 3;
+      const tariff = tariffStore.at(day * DAY_MS);
+      let startHour = backHour;
+      if (tariff.offPeakPriceRpKWh < tariff.peakPriceRpKWh) {
+        // Hours from this day's midnight: the night rate from the evening, done by the next morning.
+        const nightFrom = tariff.offPeakStartHour >= 12 ? tariff.offPeakStartHour : 24 + tariff.offPeakStartHour;
+        const earliest = Math.max(backHour, nightFrom);
+        const latest = Math.max(backHour, 24 + tariff.offPeakEndHour - hours);
+        startHour = earliest >= latest ? latest : earliest + firstRandom(seed ^ 0x9e3779b9) * (latest - earliest);
+      }
       const startMs = day * DAY_MS + startHour * 3_600_000;
       if (simTimeMs >= startMs && simTimeMs < startMs + hours * 3_600_000) return powerKw * 1000;
     }
