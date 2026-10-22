@@ -22,6 +22,7 @@
  * to the tariff, a naive one just plugs in and charges.
  */
 
+import { ANNUAL_CAR_KM, EV_CAR_KWH_PER_100KM } from "../config/mobility";
 import { hashSeed, hashSeedFrom, mulberry32 } from "./rng";
 import type { Tariff } from "./tariff";
 import { smartChargeStartMs } from "./dynamicTariff";
@@ -30,6 +31,10 @@ import { policyStore } from "./policy";
 const DAY_MS = 24 * 60 * 60_000;
 export const CHARGING_POWER_KW = 7.4; // typical home wallbox
 export const RESPONSIVE_FRACTION = 0.3;
+// Nobody plugs in every night: about three nights a week, each time putting back the days since.
+export const PLUG_IN_NIGHT_SHARE = 0.45;
+// A day's driving, on average (kWh): what the car's year at the usual mileage takes.
+const DAILY_KWH = ((ANNUAL_CAR_KM / 100) * EV_CAR_KWH_PER_100KM) / 365;
 
 /** A car's fixed draw against the share of households who charge off-peak. */
 export function responsiveDraw(egid: string, sessionKey: string): number {
@@ -47,6 +52,8 @@ export function isResponsive(egid: string, sessionKey: string): boolean {
 }
 
 export interface EvSession {
+  /** Whether the car is plugged in that night at all (on other nights the session is empty). */
+  plugsIn: boolean;
   startMs: number;
   endMs: number;
 }
@@ -68,16 +75,19 @@ function evDailySessionFrom(seed: number, dayIndex: number, responsive: boolean,
   const rng = mulberry32(hashSeedFrom(seed, String(dayIndex)));
   const plugInHour = 18.5 + (rng() - 0.5) * 3; // arrive home ~17:00-20:00
   const deadlineHour = 7 + (rng() - 0.5) * 1; // need to leave ~06:30-07:30 next morning
-  const energyNeededKWh = 6 + rng() * 10; // a day's driving, roughly
-  const durationMs = (energyNeededKWh / CHARGING_POWER_KW) * 3_600_000;
+  const plugsIn = rng() < PLUG_IN_NIGHT_SHARE;
+  // The days' driving since it last charged: on average a day's over the share of nights it plugs in.
+  const energyNeededKWh = (DAILY_KWH / PLUG_IN_NIGHT_SHARE) * (0.6 + 0.8 * rng());
+  const durationMs = plugsIn ? (energyNeededKWh / CHARGING_POWER_KW) * 3_600_000 : 0;
 
   const dayStartMs = dayIndex * DAY_MS;
   const plugInMs = dayStartMs + plugInHour * 3_600_000;
   const deadlineMs = dayStartMs + DAY_MS + deadlineHour * 3_600_000;
+  if (!plugsIn) return { plugsIn, startMs: plugInMs, endMs: plugInMs };
 
   if (smart) {
     const startMs = smartChargeStartMs(dayIndex, plugInMs, Math.max(plugInMs, deadlineMs - durationMs), durationMs, rng());
-    return { startMs, endMs: startMs + durationMs };
+    return { plugsIn, startMs, endMs: startMs + durationMs };
   }
 
   // Only worth shifting if off-peak is actually cheaper — a household isn't
@@ -85,16 +95,17 @@ function evDailySessionFrom(seed: number, dayIndex: number, responsive: boolean,
   // player sets off-peak >= peak, there's nothing to gain by waiting.
   const offPeakIsCheaper = tariff.offPeakPriceRpKWh < tariff.peakPriceRpKWh;
   if (!responsive || !offPeakIsCheaper) {
-    return { startMs: plugInMs, endMs: plugInMs + durationMs };
+    return { plugsIn, startMs: plugInMs, endMs: plugInMs + durationMs };
   }
 
-  // Responsive: charge starting at the later of "plugged in" and "off-peak begins",
-  // but no later than needed to still finish by the deadline — the cheapest
-  // contiguous window a flat two-rate tariff can offer.
+  // Responsive: a timer starts the charge some time in the off-peak hours — from when they begin
+  // (or the car is plugged in) until the latest start that still finishes by the morning — so the
+  // town's off-peak charging spreads over the night rather than all starting at once.
   const offPeakStartMs = dayStartMs + tariff.offPeakStartHour * 3_600_000;
+  const earliestStart = Math.max(plugInMs, offPeakStartMs);
   const latestStart = Math.max(plugInMs, deadlineMs - durationMs);
-  const startMs = Math.min(Math.max(plugInMs, offPeakStartMs), latestStart);
-  return { startMs, endMs: startMs + durationMs };
+  const startMs = earliestStart >= latestStart ? latestStart : earliestStart + rng() * (latestStart - earliestStart);
+  return { plugsIn, startMs, endMs: startMs + durationMs };
 }
 
 /** Zero unless `simTimeMs` falls inside that car's session for today or

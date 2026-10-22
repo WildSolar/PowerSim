@@ -183,12 +183,13 @@ export function DwellingPanel({ building, dwelling, allBuildings, realPlants, on
               )}
             </div>
             {charging && <ChargingNote charging={charging} />}
-            {session && (
+            {session && session.plugsIn && (
               <div className="ev-session-note">
                 Tonight: {formatHourOfDay(session.startMs)}–{formatHourOfDay(session.endMs)}
                 {onDynamic ? " (the cheapest hours)" : sessionStartsOffPeak ? " (off-peak)" : " (peak)"}
               </div>
             )}
+            {session && !session.plugsIn && <div className="ev-session-note">Not plugged in tonight: it charges two or three nights a week.</div>}
           </div>
         );
       })}
