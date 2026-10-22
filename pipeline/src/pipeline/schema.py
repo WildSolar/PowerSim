@@ -35,6 +35,7 @@ class Building:
     hot_water_energy_source: str | None
     dwellings: list[Dwelling] = field(default_factory=list)
     street_segments: list[int] = field(default_factory=list)  # StreetSegment ids this building fronts on (see sources/streets.py)
+    jobs: float | None = None  # full-time equivalent jobs here (BFS STATENT by hectare, see sources/jobs.py)
 
 
 @dataclass

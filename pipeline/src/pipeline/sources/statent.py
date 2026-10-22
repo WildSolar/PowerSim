@@ -1,4 +1,5 @@
-"""BFS STATENT (employment by sector) — NOT wired up yet.
+"""BFS STATENT (employment by sector) — NOT wired up yet. The jobs per building (the STATENT
+hectare grid's full-time equivalents, no sectors) come from sources/jobs.py instead.
 
 Research confirmed the only directly-downloadable machine-readable STATENT file is a
 Switzerland-wide 100m hectare grid with a single classed total-FTE value per cell (no

@@ -28,6 +28,7 @@ from .schema import Building, Dwelling, MunicipalityDataset, PowerPlant, StreetS
 from .sources import footprints as footprints_source
 from .sources import boundary as boundary_source
 from .sources import heat_use as heat_use_source
+from .sources import jobs as jobs_source
 from .sources import chargers as chargers_source
 from .sources import vehicles as vehicles_source
 from .sources import district_heat as district_heat_source
@@ -123,7 +124,7 @@ def _district_heat(bfs_number: int, buildings_df, segments, boundary_lv95, posit
     return network
 
 
-REFRESHABLE = ("streets", "district-heat", "farm", "wind", "car-parks", "transit", "heat-use")
+REFRESHABLE = ("streets", "district-heat", "farm", "wind", "car-parks", "transit", "heat-use", "jobs")
 
 
 def refresh(bfs_number: int, parts: list[str]) -> Path:
@@ -136,7 +137,8 @@ def refresh(bfs_number: int, parts: list[str]) -> Path:
     - "farm": the farmland plots;
     - "car-parks": the open-air car parks (OpenStreetMap);
     - "transit": the public transport quality classes (ARE);
-    - "heat-use": canton Zurich's heat-use atlas (where the ground's heat may be used)."""
+    - "heat-use": canton Zurich's heat-use atlas (where the ground's heat may be used);
+    - "jobs": the jobs in each building (BFS STATENT by hectare)."""
     path = next(
         (p for p in OUTPUT_DIR.glob("*.json") if p.name != INDEX_FILENAME and json.loads(p.read_text(encoding="utf-8")).get("bfsNumber") == bfs_number),
         None,
@@ -170,12 +172,35 @@ def refresh(bfs_number: int, parts: list[str]) -> Path:
             raise SystemExit("The heat-use atlas couldn't be fetched; the dataset is left as it was.")
         data["heatUse"] = _to_camel(heat_use)
         print(f"  {len(heat_use['zones'])} zones ({', '.join(z['zone'] for z in heat_use['zones'])}), {len(heat_use['conditions'])} condition areas, {len(heat_use['tunnels'])} tunnels")
+    if "jobs" in parts:
+        print(f"Refreshing the jobs in {path.name}...")
+        jobs = jobs_source.jobs_by_egid(boundary_lv95, _job_inputs(data["buildings"]))
+        for b in data["buildings"]:
+            b["jobs"] = jobs.get(b["egid"])
+        print(f"  {round(sum(jobs.values()))} full-time jobs in {len(jobs)} buildings")
     if "streets" in parts:
         _refresh_streets(bfs_number, data, boundary_lv95)
     if "district-heat" in parts or "streets" in parts:
         _refresh_district_heat(bfs_number, data, boundary_lv95)
     path.write_text(json.dumps(data, ensure_ascii=False, allow_nan=False), encoding="utf-8")
     return path
+
+
+def _job_inputs(buildings: list[dict]) -> list[dict]:
+    """What sources/jobs.py needs of each building of a written dataset (camelCase fields)."""
+    out = []
+    for b in buildings:
+        x, y = coords.lonlat_to_lv95(b["lon"], b["lat"])
+        out.append(
+            {
+                "egid": b["egid"],
+                "x": x,
+                "y": y,
+                "floor_m2": (b.get("footprintAreaM2") or 0) * max(1, b.get("floorCount") or 1),
+                "category": b.get("category"),
+            }
+        )
+    return out
 
 
 def _refresh_streets(bfs_number: int, data: dict, boundary_lv95) -> None:
@@ -397,6 +422,24 @@ def build(bfs_number: int) -> MunicipalityDataset:
                 street_segments=segments_by_egid.get(egid, []),
             )
         )
+
+    print("Fetching the jobs (BFS STATENT by hectare)...")
+    jobs = jobs_source.jobs_by_egid(
+        boundary_lv95,
+        [
+            {
+                "egid": b.egid,
+                "x": coords.lonlat_to_lv95(b.lon, b.lat)[0],
+                "y": coords.lonlat_to_lv95(b.lon, b.lat)[1],
+                "floor_m2": (b.footprint_area_m2 or 0) * max(1, b.floor_count or 1),
+                "category": b.category,
+            }
+            for b in buildings
+        ],
+    )
+    for b in buildings:
+        b.jobs = jobs.get(b.egid)
+    print(f"  {round(sum(jobs.values()))} full-time jobs in {len(jobs)} buildings")
 
     plants: list[PowerPlant] = []
     for _, row in plants_df.iterrows():
