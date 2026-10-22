@@ -134,10 +134,11 @@ export const SESSION_DAY_SHARE: Record<ChargingVehicle, Record<ChargingKind, num
   truck: { ac: 0.9, dc: 0.9, fleet: 0.9 },
 };
 // What a vehicle actually draws while charging, on average, kW: a fast charger's rated power is
-// rarely reached, and a car slows down as its battery fills (about 60 kW over a session).
+// rarely reached, and a car slows down as its battery fills (about 60 kW over a session; a van,
+// with a smaller battery and usually slower charging, about 50).
 export const SESSION_POWER_KW: Record<ChargingVehicle, Record<ChargingKind, number>> = {
   car: { ac: 11, dc: 60, fleet: 100 },
-  van: { ac: 11, dc: 80, fleet: 80 },
+  van: { ac: 11, dc: 50, fleet: 50 },
   truck: { ac: 22, dc: 150, fleet: 300 },
 };
 

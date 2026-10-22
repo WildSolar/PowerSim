@@ -29,7 +29,7 @@ export const CHANGELOG: Release[] = [
     ],
     changed: [
       "Emissions in more detail: for cars, vans and lorries each, the petrol or diesel they burn and what charging the electric ones emits, taken out of the electricity. In the Year in Review, the Overview and the emissions chart.",
-      "A fast-charging point serves about 50 cars that rely on it, up from 30 — as many as a busy real station — and a car charges there at about 60 kW on average, as cars slow down while their battery fills, so a stop takes about half an hour.",
+      "A fast-charging point serves about 50 cars that rely on it, up from 30 — as many as a busy real station — and a car charges there at about 60 kW on average (a van about 50), as vehicles slow down while their battery fills, so a stop takes about half an hour.",
       "Electric lorries no longer stall in 2031. As Parliament decided in October 2026, they pay the heavy vehicle fee (LSVA) from 2031 at a discount that steps down — 70%, 50, 30, 20, 10% — and in full only from 2036, instead of all of it at once.",
       "Not every lorry can go electric yet: its route has to suit an electric one — about one in seven today, most by the mid-2030s, nearly all by 2045. Electric lorries now catch on more slowly at first, and then steadily.",
     ],
