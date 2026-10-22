@@ -233,11 +233,23 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "mobility",
     title: "Workplace charging programme",
     summary:
-      "Grants and advice for employers to put chargers in their staff car parks. More drivers can then charge at work — a good part of their week's charging, wherever they live — which helps most those without a charger at home or close by. A running cost, in proportion to how many employers it reaches.",
-    params: [{ kind: "slider", key: "reach", label: "Employers it reaches", min: 0, max: 60, step: 10, unit: "% of those without chargers", default: 30 }],
+      "Grants and advice for employers to put chargers in their staff car parks. More drivers can then charge at work — a good part of their week's charging, wherever they live — which helps most those without a charger at home or close by. With the sun, the employers' chargers also get load management that spreads their staff's charging over the sunny middle of the day, where the town's solar has power to spare; a little dearer. A running cost, in proportion to how many employers it reaches.",
+    params: [
+      { kind: "slider", key: "reach", label: "Employers it reaches", min: 0, max: 60, step: 10, unit: "% of those without chargers", default: 30 },
+      {
+        kind: "choice",
+        key: "timing",
+        label: "When staff cars charge",
+        options: [
+          { value: "sun", label: "With the sun (load management)" },
+          { value: "arrival", label: "As soon as they arrive" },
+        ],
+        default: "sun",
+      },
+    ],
     leadTimeMonths: 12,
-    effects: (p) => ({ workChargingBoost: num(p, "reach") / 100 }),
-    annualCostRp: (p, ctx) => (num(p, "reach") / 100) * ctx.residents * 6 * CHF,
+    effects: (p) => ({ workChargingBoost: num(p, "reach") / 100, workChargingWithSun: p.timing !== "arrival" }),
+    annualCostRp: (p, ctx) => (num(p, "reach") / 100) * ctx.residents * (p.timing === "arrival" ? 6 : 8) * CHF,
     approval: () => ({ climate: 0.25, drivers: 0.15, business: 0.1 }),
   },
 

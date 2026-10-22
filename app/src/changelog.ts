@@ -25,6 +25,7 @@ export const CHANGELOG: Release[] = [
     version: "0.10.0",
     date: null,
     added: [
+      "Charging at work in the town: every building has its jobs (from the federal business statistics), and the staff who drive an electric car to an employer with chargers charge there on working days — residents and commuters alike. A morning hump around 8, shown on the building's card, in the statistics and on the grid. The workplace charging programme can now also spread it over the middle of the day, with the sun.",
       "Ten more towns in the canton of Zürich: Winterthur, Dietikon, Dübendorf, Opfikon, Kloten, Bülach, Küsnacht, Hinwil, Wald and Stammheim — from a city of over a hundred thousand to a handful of wine-growing villages. Winterthur is big: it takes longer to load.",
     ],
     changed: [

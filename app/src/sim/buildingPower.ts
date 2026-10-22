@@ -1,4 +1,5 @@
 import type { Building, PowerPlant } from "../data/types";
+import { workChargingPowerW } from "./workCharging";
 import { acPowerW } from "./ac";
 import { existsAt } from "./lifetime";
 import { commercialPowerW } from "./commercial";
@@ -33,7 +34,8 @@ export function buildingLoadW(building: Building, simTimeMs: number): number {
     acPowerW(building, simTimeMs) +
     waterHeatingPowerW(building, simTimeMs) +
     commercialPowerW(building, simTimeMs) +
-    fleets.depotPowerW(building, simTimeMs);
+    fleets.depotPowerW(building, simTimeMs) +
+    workChargingPowerW(building, simTimeMs);
   const tariff = tariffStore.get();
   for (const dwelling of building.dwellings) {
     const { fridgeW, lightingW, cookingW, laundryW, plugLoadW } = dwellingDevicePowerW(building.egid, dwelling, simTimeMs);

@@ -1,4 +1,5 @@
 import { roofOrientationLabel } from "../sim/pv";
+import { workChargingCars, workChargingPowerW } from "../sim/workCharging";
 import { useState } from "react";
 import { ENERGY_CLASS_CATALOG } from "../sim/energyClass";
 import { energyClassAt, retrofitLog } from "../sim/retrofit";
@@ -75,6 +76,8 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
   const commCategory = commercialCategory(building);
   const commFloorAreaM2 = commCategory ? totalFloorAreaM2(building) : null;
   const commercialW = commCategory ? commercialPowerW(building, simTimeMs) : 0;
+  const staffCars = workChargingCars(building, simTimeMs);
+  const staffChargingW = workChargingPowerW(building, simTimeMs);
 
   const buildingPlants = plants.filter((p) => p.egid === building.egid && p.technology === "Photovoltaic");
   const hasSolar = buildingPlants.length > 0;
@@ -228,6 +231,22 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
               {commFloorAreaM2 && <span className="ev-badge">{Math.round(commFloorAreaM2)} m² floor area</span>}
             </span>
             <span className={`device-watts${commercialW === 0 ? " off" : ""}`}>{formatWatts(commercialW)}</span>
+          </div>
+        </>
+      )}
+
+      {(building.jobs ?? 0) > 0 && (
+        <>
+          <h3 className="section-heading">Staff</h3>
+          <div
+            className="device-row"
+            title="Full-time jobs here (federal business statistics, by hectare), and the staff cars charging at work on a working day: those who come by car, drive an electric one and have an employer with chargers — residents of the town and commuters alike."
+          >
+            <span className="device-name">
+              🅿️ {Math.round(building.jobs ?? 0)} jobs
+              {staffCars >= 0.5 && <span className="ev-badge">🔌 ~{Math.round(staffCars)} cars charge here on a working day</span>}
+            </span>
+            <span className={`device-watts${staffChargingW === 0 ? " off" : ""}`}>{formatWatts(staffChargingW)}</span>
           </div>
         </>
       )}

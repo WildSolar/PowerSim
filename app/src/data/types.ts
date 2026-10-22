@@ -29,6 +29,9 @@ export interface Building {
   /** The street segments (StreetSegment ids) this building fronts on, from its entrances. Absent
    * in datasets built before streets were added. */
   streetSegments?: number[];
+  /** Full-time equivalent jobs here (BFS STATENT by hectare): the staff whose electric cars charge
+   * at work (sim/workCharging.ts). Absent in datasets built before jobs were added. */
+  jobs?: number | null;
 
   // Lifecycle, set at runtime by sim/stock.ts (never by the pipeline). All absent on a
   // building that simply existed when the game started.

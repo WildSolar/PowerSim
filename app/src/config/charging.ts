@@ -117,6 +117,36 @@ export const WORK_CHARGING_SHARE: CurvePoint[] = [
 export const WORK_CHARGING_QOS = 0.45;
 export const WORK_CHARGING_PRICE_RP_PER_KWH = 25;
 
+// --- Charging at the town's own workplaces (sim/workCharging.ts) ---
+// Everyone who works in the town — residents and commuters alike — and drives an electric car to an
+// employer with chargers charges there on working days. The jobs are BFS STATENT's (Building.jobs).
+
+// The share of a workplace's staff who come by car, by the public transport class where it stands
+// (the federal ÖV-Güteklassen): about half on average in Switzerland, far fewer at a station.
+export const WORK_CAR_COMMUTE_SHARE: Record<"A" | "B" | "C" | "D" | "none", number> = { A: 0.3, B: 0.4, C: 0.5, D: 0.6, none: 0.7 };
+// The share of the region's cars that are electric — commuters' cars belong to other towns, so the
+// town's own measures don't move it. Set to the pace electric cars spread at in a game where the
+// town does nothing.
+export const REGIONAL_EV_CAR_SHARE: CurvePoint[] = [
+  { x: 2025, y: 0.04 },
+  { x: 2030, y: 0.13 },
+  { x: 2035, y: 0.28 },
+  { x: 2040, y: 0.41 },
+  { x: 2045, y: 0.52 },
+  { x: 2050, y: 0.62 },
+];
+// What an electric car takes on at work on a working day, on average (kWh): about a day's commute.
+export const WORK_CHARGE_KWH_PER_DAY = 5;
+export const WORK_CHARGER_KW = 11;
+// Cars arrive between these hours and charge as soon as they're plugged in...
+export const WORK_ARRIVAL_HOURS: [number, number] = [7, 9];
+// ...unless the employer's load management spreads it over the sunny hours instead: this share, or
+// most of it with the workplace charging programme set to charge with the sun.
+export const WORK_CHARGING_WITH_SUN_SHARE = { base: 0.2, programme: 0.8 };
+export const WORK_SUN_HOURS: [number, number] = [9, 16];
+// How much of a weekday's charging happens on a Saturday and a Sunday.
+export const WORK_WEEKEND_FACTOR = { saturday: 0.2, sunday: 0.05 };
+
 // How many cars relying on public charging one charge point can serve. A van or truck takes up
 // room by the energy it needs a day, in cars' worth (a van about two cars, a truck about twenty).
 // A full fast-charging point delivers about 300 kWh a day, busy about a fifth of the day — like a

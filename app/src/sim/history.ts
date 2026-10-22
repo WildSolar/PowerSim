@@ -11,6 +11,7 @@
  * (~11k dwellings, ~2.5k buildings) cheap to repeat on every chart refresh.
  */
 
+import { totalWorkChargingPowerW, workChargingPowerW } from "./workCharging";
 import { dynamicTariff } from "./dynamicTariff";
 import type { Building, Dwelling, PowerPlant } from "../data/types";
 import {
@@ -345,7 +346,8 @@ export function sampleBuildingCategorySeries(building: Building, times: number[]
   const { heatPumpW, acW, businessCoolingW } = climateControlCategorySeries([building], times);
   const waterHeatingW = waterHeatingCategorySeries([building], times);
   const commercialW = commercialCategorySeries([building], times).map((w, i) => w + businessCoolingW[i]);
-  dwellingTotals.evW = dwellingTotals.evW.map((w, i) => w + fleets.depotPowerW(building, times[i])); // its businesses' vans and lorries
+  // Its businesses' vans and lorries, and its staff's cars charging at work.
+  dwellingTotals.evW = dwellingTotals.evW.map((w, i) => w + fleets.depotPowerW(building, times[i]) + workChargingPowerW(building, times[i]));
   const solarW = pvSeries(
     plants.filter((p) => p.egid === building.egid),
     times,
@@ -401,9 +403,12 @@ export function municipalityCategorySteps(
   const homes = times.length === 1 ? dwellingCategoryTotalsInRuns(dwellingProfileSets(buildings), times[0], tariff) : null;
   const steps = [
     ...(homes ? [...homes.steps, () => (dwellingTotals = homes.result())] : [() => (dwellingTotals = dwellingCategoryTotals(dwellingProfileSets(buildings), times, tariff))]),
-    // Vehicles charged at public chargers draw there, not at home, and businesses' at their depots —
-    // all of it the town's EV charging.
-    () => (dwellingTotals.evW = dwellingTotals.evW.map((w, i) => w + publicCharging.totalLoadW(times[i]) + fleets.totalDepotPowerW(buildings, times[i]))),
+    // Vehicles charged at public chargers draw there, not at home, businesses' at their depots and
+    // staff cars at work — all of it the town's EV charging.
+    () =>
+      (dwellingTotals.evW = dwellingTotals.evW.map(
+        (w, i) => w + publicCharging.totalLoadW(times[i]) + fleets.totalDepotPowerW(buildings, times[i]) + totalWorkChargingPowerW(buildings, times[i]),
+      )),
     () => (climate = climateControlCategorySeries(buildings, times)),
     () => (waterHeatingW = waterHeatingCategorySeries(buildings, times)),
     () => (commercialW = commercialCategorySeries(buildings, times)),

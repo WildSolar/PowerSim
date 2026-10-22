@@ -56,6 +56,7 @@ export interface Channels {
   advisorFinance: number;
   homeChargingBoost: number; // 0-1: share of the households who couldn't charge at home who now can (right to charge)
   workChargingBoost: number; // 0-1: share of the drivers who couldn't charge at work who now can (workplace charging programme)
+  workChargingWithSun: boolean; // the programme's employers spread their staff's charging over the sunny hours
   publicBuildingChargerSitesPerYear: number; // charging sites the municipality puts at its own buildings each year
   publicBuildingChargerPoints: number; // how many points each of those gets
   heatPumpLoadControlShare: number; // 0-1: heat pumps the utility may switch off in turns at peaks
@@ -115,6 +116,7 @@ export const CHANNEL_DEFAULTS: Channels = {
   advisorFinance: 0,
   homeChargingBoost: 0,
   workChargingBoost: 0,
+  workChargingWithSun: false,
   publicBuildingChargerSitesPerYear: 0,
   publicBuildingChargerPoints: 4,
   heatPumpLoadControlShare: 0,
@@ -179,6 +181,7 @@ const COMBINERS: { [K in keyof Channels]: Combiner<Channels[K]> } = {
   advisorFinance: max,
   homeChargingBoost: max,
   workChargingBoost: max,
+  workChargingWithSun: any,
   publicBuildingChargerSitesPerYear: sum,
   publicBuildingChargerPoints: max,
   heatPumpLoadControlShare: max,
