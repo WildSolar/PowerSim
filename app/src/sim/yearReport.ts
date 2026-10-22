@@ -22,6 +22,8 @@
 
 import { designLoadW, networkCoverage } from "./districtHeatStats";
 import { publicCharging } from "./publicCharging";
+import { chargingTariff } from "./chargingTariff";
+import { dynamicTariff } from "./dynamicTariff";
 import { wind } from "./wind";
 import { agriPv } from "./agriPv";
 import { carParks } from "./carParks";
@@ -116,6 +118,8 @@ export interface YearElectricityMonth {
   /** The part of series.evW charging vans, and lorries (W). */
   evVanW: number[];
   evTruckW: number[];
+  /** What the charging tariff's meters draw (W). */
+  chargingMeterW: number[];
 }
 
 const electricityByMonth = new Map<number, Promise<YearElectricityMonth>>();
@@ -139,6 +143,8 @@ interface ElectricitySample {
   dynamicW: number;
   /** What the businesses buying on the open market draw (W): their energy isn't the utility's. */
   marketW: number;
+  /** What the charging tariff's meters draw (W) — not on the time-of-use or dynamic tariff. */
+  chargingMeterW: number;
 }
 interface FuelSample {
   iceCarSlots: number;
@@ -181,10 +187,18 @@ function electricitySamplePass(buildings: Building[], realPlants: PowerPlant[], 
     let marketW = 0;
     let evVanW = 0;
     let evTruckW = 0;
+    let chargingMeterW = 0;
     job = {
       steps: [
         ...town.steps,
         () => (dynamicW = sampleDynamicConsumptionW(buildings, [t], tariff)[0]),
+        // The charging meters, apart — and the cars of households also on the dynamic tariff, which
+        // charge on their own meter, out of the dynamic consumption.
+        () => {
+          const meters = chargingTariff.meterPowerW(t, tariff, (key) => dynamicTariff.onDynamicKey(key, t));
+          chargingMeterW = meters.allW;
+          dynamicW -= meters.onDynamicW;
+        },
         () => (marketW = marketAccess.marketPowerW(buildings, t)),
         () => {
           const atChargers = publicCharging.totalLoadByVehicleW(t);
@@ -194,7 +208,7 @@ function electricitySamplePass(buildings: Building[], realPlants: PowerPlant[], 
         },
       ],
       done: 0,
-      finish: () => ({ series: town.result(), dynamicW, marketW, evVanW, evTruckW }),
+      finish: () => ({ series: town.result(), dynamicW, marketW, evVanW, evTruckW, chargingMeterW }),
     };
     electricityInProgress.set(id, job);
   }
@@ -364,6 +378,7 @@ export function monthElectricity(buildings: Building[], realPlants: PowerPlant[]
       marketW: samples.map((s) => s.marketW ?? 0),
       evVanW: samples.map((s) => s.evVanW ?? 0),
       evTruckW: samples.map((s) => s.evTruckW ?? 0),
+      chargingMeterW: samples.map((s) => s.chargingMeterW ?? 0),
     };
   }, "month electricity");
 }

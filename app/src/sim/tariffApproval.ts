@@ -8,6 +8,13 @@
  */
 
 import {
+  CHARGING_DISCOUNT_TENANT_RESENTMENT,
+  CHARGING_DRIVER_GOODWILL,
+  CHARGING_HOMEOWNER_GOODWILL,
+  MAX_CHARGING_NETWORK_DISCOUNT,
+} from "../config/chargingTariff";
+import { chargingAllInRpKWh } from "./chargingTariff";
+import {
   BENCHMARK_DISTRICT_HEAT_RP_KWH,
   BENCHMARK_HOUSEHOLD_RP_KWH,
   BENCHMARK_WHOLESALE_RP_KWH,
@@ -74,12 +81,27 @@ export function stancesFor(sheet: TariffSheet, year: number): Stances {
   // What panels earn here against elsewhere: the federal price is the same, the bonus is the utility's.
   const federal = feedInYearBaseRpKWh(year);
   const feedIn = Math.max(-FEED_IN_WEIGHT, Math.min(FEED_IN_WEIGHT, ((federal + sheet.feedInBonusRpKWh) / (federal + BENCHMARK_FEED_IN_BONUS_RP_KWH) - 1) * FEED_IN_WEIGHT));
+  const charging = chargingStances(sheet, year);
   return {
-    tenants: bill * BILL_WEIGHT.tenants + heat,
-    homeowners: bill * BILL_WEIGHT.homeowners + heat + feedIn,
+    tenants: bill * BILL_WEIGHT.tenants + heat + charging.tenants,
+    homeowners: bill * BILL_WEIGHT.homeowners + heat + feedIn + charging.homeowners,
     // Businesses on the open market don't buy their energy here.
     business: bill * BILL_WEIGHT.business * (1 - marketAccess.businessShareOnMarket(toSimTimeMs(Date.UTC(year, 0, 1)))),
-    drivers: bill * BILL_WEIGHT.drivers,
+    drivers: bill * BILL_WEIGHT.drivers + charging.drivers,
+  };
+}
+
+/** The charging tariff, as people take it: drivers welcome a charging price below what a household
+ * pays, homeowners (who have the wallboxes) a little; tenants resent the network discount the rest
+ * of the town makes up. */
+function chargingStances(sheet: TariffSheet, year: number): { drivers: number; homeowners: number; tenants: number } {
+  if (!sheet.chargingTariffOffered) return { drivers: 0, homeowners: 0, tenants: 0 };
+  const relief = Math.max(0, 1 - chargingAllInRpKWh(sheet, year) / householdRpKWh(sheet, year));
+  const discount = sheet.chargingControlled ? sheet.chargingNetworkDiscount / MAX_CHARGING_NETWORK_DISCOUNT : 0;
+  return {
+    drivers: Math.min(CHARGING_DRIVER_GOODWILL, relief),
+    homeowners: Math.min(CHARGING_HOMEOWNER_GOODWILL, relief * 0.3),
+    tenants: -CHARGING_DISCOUNT_TENANT_RESENTMENT * discount,
   };
 }
 

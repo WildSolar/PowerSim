@@ -2,9 +2,12 @@
 // day before, that households may sign up for instead of the time-of-use tariff — the day-ahead
 // price of each hour and the utility's margin, plus the network fee. Informed placeholders.
 
+import { ANNUAL_CAR_KM, EV_CAR_KWH_PER_100KM } from "./mobility";
+
 /** How much the market's demand moves the day-ahead price through the day (00:00-01:00 first):
  * the morning and evening peaks, the night trough. Only the shape matters: it is shifted to average
  * zero and scaled so its extreme is 1; the sun's effect is the spot model's (config/spotMarket.ts). */
+
 export const DAY_AHEAD_DEMAND_SHAPE = [
   -0.8, -0.9, -1.0, -1.0, -0.9, -0.6, 0.0, 0.5, 0.6, 0.4, 0.3, 0.3, 0.3, 0.2, 0.1, 0.2, 0.5, 0.9, 1.0, 0.8, 0.4, 0.0, -0.3, -0.6,
 ];
@@ -35,7 +38,7 @@ export const LAUNDRY_MAX_DELAY_HOURS = 10;
 // What a household weighs when deciding to sign up (kWh a year): its everyday use, a car's charging,
 // its laundry. A heat pump is on its own meter, judged by the building's owner.
 export const DWELLING_BASE_KWH = 3000;
-export const EV_KWH = 4000;
+export const EV_KWH = (ANNUAL_CAR_KM / 100) * EV_CAR_KWH_PER_100KM; // its 12,000 km a year
 export const LAUNDRY_KWH = 575;
 
 /** The bother of switching tariff and watching prices, a yearly sum in CHF that varies a lot from

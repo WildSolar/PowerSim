@@ -27,6 +27,13 @@ export const DEFAULT_SHEET: TariffSheet = {
   publicChargingFleetRpKWh: 40,
   // No dynamic tariff at the start (config/dynamicTariff.ts).
   dynamicMarginRpKWh: 0,
+  // No charging tariff at the start either (sim/chargingTariff.ts); these are what it starts from
+  // once offered: the night's energy price, a few francs for the meter, power at night only.
+  chargingTariffOffered: false,
+  chargingEnergyRpKWh: 8,
+  chargingMeterFeeChfPerMonth: 5,
+  chargingControlled: false,
+  chargingNetworkDiscount: 0,
 };
 
 // The network fee, regulated cost-plus (sim/networkTariff.ts): what the grid costs to run (config/

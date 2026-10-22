@@ -40,6 +40,7 @@
  */
 
 import { commercialCategory } from "./commercial";
+import { chargingTariff } from "./chargingTariff";
 import { dynamicPriceRpKWh, dynamicTariff } from "./dynamicTariff";
 import type { Building, Dwelling } from "../data/types";
 import { toDateMs } from "./calendar";
@@ -112,22 +113,29 @@ export function hourOfDayAt(simTimeMs: number): number {
  * returning raw kWh — see module docs for why that distinction matters.
  * `dynamicW`, if given, is the part of `powerW` on the dynamic tariff (dynamicTariff.ts),
  * priced at the dynamic price of the moment instead. */
-export function electricityCostRp(times: number[], powerW: number[], tariff: Tariff, dynamicW?: number[]): number {
+export function electricityCostRp(times: number[], powerW: number[], tariff: Tariff, dynamicW?: number[], chargingW?: number[]): number {
   let costRp = 0;
   for (let i = 1; i < times.length; i++) {
     const dtHours = (times[i] - times[i - 1]) / HOUR_MS;
     const kWh = (((powerW[i] + powerW[i - 1]) / 2) * dtHours) / 1000;
     const dynamicKWh = dynamicW ? (((dynamicW[i] + dynamicW[i - 1]) / 2) * dtHours) / 1000 : 0;
+    const chargingKWh = chargingW ? (((chargingW[i] + chargingW[i - 1]) / 2) * dtHours) / 1000 : 0;
     const midMs = (times[i] + times[i - 1]) / 2;
     const rate = isOffPeakHour(tariff, hourOfDayAt(midMs)) ? tariff.offPeakPriceRpKWh : tariff.peakPriceRpKWh;
-    costRp += (kWh - dynamicKWh) * rate + (dynamicKWh > 0 ? dynamicKWh * dynamicPriceRpKWh(tariff, midMs) : 0);
+    costRp += (kWh - dynamicKWh - chargingKWh) * rate + (dynamicKWh > 0 ? dynamicKWh * dynamicPriceRpKWh(tariff, midMs) : 0) + chargingKWh * tariff.chargingPriceRpKWh;
   }
   return costRp;
 }
 
 /** electricityCostRp, split into what goes to the energy price and what to the network fee: the
  * time-of-use energy and network rates, and on the dynamic tariff its price less the network fee. */
-export function electricityCostSplitRp(times: number[], powerW: number[], tariff: Tariff, dynamicW?: number[]): { energyRp: number; networkRp: number; offPeakKWh: number } {
+export function electricityCostSplitRp(
+  times: number[],
+  powerW: number[],
+  tariff: Tariff,
+  dynamicW?: number[],
+  chargingW?: number[],
+): { energyRp: number; networkRp: number; offPeakKWh: number } {
   let energyRp = 0;
   let networkRp = 0;
   let offPeakKWh = 0;
@@ -135,14 +143,20 @@ export function electricityCostSplitRp(times: number[], powerW: number[], tariff
     const dtHours = (times[i] - times[i - 1]) / HOUR_MS;
     const kWh = (((powerW[i] + powerW[i - 1]) / 2) * dtHours) / 1000;
     const dynamicKWh = dynamicW ? (((dynamicW[i] + dynamicW[i - 1]) / 2) * dtHours) / 1000 : 0;
+    const chargingKWh = chargingW ? (((chargingW[i] + chargingW[i - 1]) / 2) * dtHours) / 1000 : 0;
     const midMs = (times[i] + times[i - 1]) / 2;
     const offPeak = isOffPeakHour(tariff, hourOfDayAt(midMs));
     const network = offPeak ? tariff.networkOffPeakRpKWh : tariff.networkPeakRpKWh;
     const energy = offPeak ? tariff.energyOffPeakRpKWh : tariff.energyPeakRpKWh;
-    // On the dynamic tariff the network fee is flat through the day (its average).
-    networkRp += (kWh - dynamicKWh) * network + dynamicKWh * tariff.networkAvgRpKWh;
+    const timed = kWh - dynamicKWh - chargingKWh;
+    // On the dynamic tariff the network fee is flat through the day (its average); the charging
+    // meter has its own.
+    networkRp += timed * network + dynamicKWh * tariff.networkAvgRpKWh + chargingKWh * tariff.chargingNetworkRpKWh;
     if (offPeak) offPeakKWh += kWh;
-    energyRp += (kWh - dynamicKWh) * energy + (dynamicKWh > 0 ? dynamicKWh * (dynamicPriceRpKWh(tariff, midMs) - tariff.networkAvgRpKWh) : 0);
+    energyRp +=
+      timed * energy +
+      (dynamicKWh > 0 ? dynamicKWh * (dynamicPriceRpKWh(tariff, midMs) - tariff.networkAvgRpKWh) : 0) +
+      chargingKWh * tariff.chargingEnergyRpKWh;
   }
   return { energyRp, networkRp, offPeakKWh };
 }
@@ -151,6 +165,12 @@ export function electricityCostSplitRp(times: number[], powerW: number[], tariff
 function baseFeeFor(meters: number, times: number[], tariff: Tariff): number {
   const months = times.length > 1 ? (times[times.length - 1] - times[0]) / MONTH_MS : 0;
   return meters * tariff.baseFeeRpPerMonth * months;
+}
+
+/** The charging meters' own fee, for `meters` of them over the period the sample times span. */
+function chargingMeterFeeFor(meters: number, times: number[], tariff: Tariff): number {
+  const months = times.length > 1 ? (times[times.length - 1] - times[0]) / MONTH_MS : 0;
+  return meters * tariff.chargingMeterFeeChfPerMonth * 100 * months;
 }
 
 /** A flat (non-time-of-use) rate over a power series — solar feed-in and
@@ -202,8 +222,8 @@ export function consumptionSeriesW(series: CategorySeries): number[] {
  * solar credit. No heating-fuel line: that's a building-wide add-on (below),
  * since a bare CategorySeries (e.g. a single dwelling's) doesn't carry enough
  * building context to know the heating fuel type. */
-export function ownBillFromSeries(series: CategorySeries, times: number[], tariff: Tariff, dynamicW?: number[]): BillBreakdown {
-  const electricityRp = electricityCostRp(times, consumptionSeriesW(series), tariff, dynamicW);
+export function ownBillFromSeries(series: CategorySeries, times: number[], tariff: Tariff, dynamicW?: number[], chargingW?: number[]): BillBreakdown {
+  const electricityRp = electricityCostRp(times, consumptionSeriesW(series), tariff, dynamicW, chargingW);
   const solarCreditRp = flatCostRp(times, series.solarW, tariff.feedInPriceRpKWh);
   return {
     electricityRp,
@@ -225,19 +245,24 @@ export function buildingBillRp(building: Building, series: CategorySeries, times
   const at = times[times.length - 1];
   const heatPump = dynamicTariff.onDynamicHeatPump(building.egid, at);
   const households = building.dwellings.length > 0 ? building.dwellings.filter((d) => dynamicTariff.onDynamicDwelling(building.egid, d.ewid, at)).length / building.dwellings.length : 0;
+  // Its households' charging meters: their share of the building's charging, roughly (the
+  // building's series doesn't say whose car is whose).
+  const meters = building.dwellings.filter((d) => chargingTariff.meterAt(building.egid, d.ewid, at) !== null).length;
+  const meterShare = building.dwellings.length > 0 ? meters / building.dwellings.length : 0;
+  const chargingW = meters > 0 ? series.evW.map((w) => w * meterShare) : undefined;
   const dynamicW =
     heatPump || households > 0
       ? series.fridgeW.map(
           (_, i) =>
             (heatPump ? series.heatPumpW[i] : 0) +
-            households * (series.fridgeW[i] + series.lightingW[i] + series.cookingW[i] + series.laundryW[i] + series.plugLoadW[i] + series.evW[i]),
+            households * (series.fridgeW[i] + series.lightingW[i] + series.cookingW[i] + series.laundryW[i] + series.plugLoadW[i] + series.evW[i] * (1 - meterShare)),
         )
       : undefined;
-  const own = ownBillFromSeries(series, times, tariff, dynamicW);
+  const own = ownBillFromSeries(series, times, tariff, dynamicW, chargingW);
   const fuel = heatingFuelType(building, times[times.length - 1]);
   const { costRp: heatingFuelRp, quantity: heatingFuelQuantity } = heatingFuelCostAndQuantity(building, fuel, times, tariff);
   // A meter for each household, and one for the business if there is one.
-  const baseFeeRp = baseFeeFor(building.dwellings.length + (commercialCategory(building) ? 1 : 0), times, tariff);
+  const baseFeeRp = baseFeeFor(building.dwellings.length + (commercialCategory(building) ? 1 : 0), times, tariff) + chargingMeterFeeFor(meters, times, tariff);
   return { ...own, baseFeeRp, heatingFuel: fuel, heatingFuelRp, heatingFuelQuantity, netRp: own.netRp + heatingFuelRp + baseFeeRp };
 }
 
@@ -309,11 +334,16 @@ export function dwellingBillRp(
   times: number[],
   tariff: Tariff,
 ): BillBreakdown {
-  const onDynamic = dynamicTariff.onDynamicDwelling(building.egid, dwelling.ewid, times[times.length - 1]);
-  const own = ownBillFromSeries(ownSeries, times, tariff, onDynamic ? consumptionSeriesW(ownSeries) : undefined);
+  const at = times[times.length - 1];
+  const onDynamic = dynamicTariff.onDynamicDwelling(building.egid, dwelling.ewid, at);
+  // On the charging tariff, its car is on its own meter, at the charging price (and not on the dynamic one).
+  const onMeter = chargingTariff.meterAt(building.egid, dwelling.ewid, at) !== null;
+  const chargingW = onMeter ? ownSeries.evW : undefined;
+  const dynamicW = onDynamic ? consumptionSeriesW(ownSeries).map((w, i) => w - (chargingW ? chargingW[i] : 0)) : undefined;
+  const own = ownBillFromSeries(ownSeries, times, tariff, dynamicW, chargingW);
   const shareFraction = dwellingAreaShareFraction(building, dwelling);
   const share = scaleBill(sharedBuildingBillRp(building, buildingSeries, times, tariff), shareFraction);
-  const baseFeeRp = baseFeeFor(1, times, tariff);
+  const baseFeeRp = baseFeeFor(1, times, tariff) + (onMeter ? chargingMeterFeeFor(1, times, tariff) : 0);
   return addBills({ ...own, baseFeeRp, netRp: own.netRp + baseFeeRp }, share);
 }
 

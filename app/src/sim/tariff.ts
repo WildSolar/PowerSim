@@ -28,6 +28,12 @@ export interface TariffSheet {
   publicChargingDcRpKWh: number; // at the municipality's own fast-charging hubs
   publicChargingFleetRpKWh: number; // at the municipality's own lorry charging parks
   dynamicMarginRpKWh: number; // the dynamic tariff's margin on the day-ahead price; 0: not offered — see dynamicTariff.ts
+  // The charging tariff: a wallbox on its own meter, at its own price (chargingTariff.ts).
+  chargingTariffOffered: boolean;
+  chargingEnergyRpKWh: number; // the energy price on the charging meter, flat through the day
+  chargingMeterFeeChfPerMonth: number; // what the second meter costs a month
+  chargingControlled: boolean; // false: power only in the night rate; true: the utility decides when
+  chargingNetworkDiscount: number; // 0-0.6: off the network fee for a utility-controlled wallbox
 }
 
 /** Every price at one moment: the year's sheet plus the month's market prices and the grid upkeep —
@@ -36,6 +42,8 @@ export interface Tariff extends TariffSheet {
   networkPeakRpKWh: number; // the regulated network fee per kWh, peak (networkTariff.ts)
   networkOffPeakRpKWh: number; // ...and off-peak
   networkAvgRpKWh: number; // ...flat through the day, as on the dynamic tariff
+  chargingNetworkRpKWh: number; // ...on the charging meter: the night rate's, or (utility-controlled) the flat one less the discount
+  chargingPriceRpKWh: number; // what a kWh costs on the charging meter, energy and network fee together
   peakPriceRpKWh: number; // energy and network together, peak — what a kWh costs a consumer in basic supply
   offPeakPriceRpKWh: number; // ...off-peak
   baseFeeRpPerMonth: number; // the base fee, per meter and month
@@ -60,5 +68,5 @@ export function isOffPeakHour(tariff: Tariff, hourOfDay: number): boolean {
  * is fixed), so this deliberately ignores offPeakStartHour/offPeakEndHour rather
  * than invalidating a cache over a value that never actually changes. */
 export function tariffKey(tariff: Tariff): string {
-  return `${tariff.offPeakPriceRpKWh}:${tariff.peakPriceRpKWh}:${tariff.dynamicMarginRpKWh}`;
+  return `${tariff.offPeakPriceRpKWh}:${tariff.peakPriceRpKWh}:${tariff.dynamicMarginRpKWh}:${tariff.chargingTariffOffered ? `${tariff.chargingPriceRpKWh}:${tariff.chargingControlled}` : "-"}`;
 }

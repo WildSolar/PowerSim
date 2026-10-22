@@ -261,6 +261,13 @@
   margin-top: 6px;
 }
 
+.charge-draft-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
 .dyn-chart {
   margin: 0;
   --dyn-winter: #2a78d6;

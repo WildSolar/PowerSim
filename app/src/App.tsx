@@ -1,4 +1,5 @@
 import * as financesModule from "./sim/finances";
+import { chargingTariff } from "./sim/chargingTariff";
 import { LoadingScreen } from "./ui/LoadingScreen";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { BASELINE_YEAR, formatDate, toDateMs } from "./sim/calendar";
@@ -262,6 +263,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         measures.init(difficulty); // before the stock: it registers the town size the measures' costs scale with
         market.init(`market:${loaded.bfsNumber}`); // before anything prices: the shocks of the whole game
         tariffStore.init();
+        chargingTariff.init(() => stock.getAll());
         dynamicTariff.init(() => stock.getAll());
         approval.init(difficulty, `approval:${loaded.bfsNumber}`);
         initTariffApproval();

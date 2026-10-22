@@ -20,6 +20,7 @@
  * mobilityRenewalLog for how that stays invisible to the player.
  */
 
+import { chargingTariff, expectedHomeChargingRpKWh, type ChargingMeter } from "./chargingTariff";
 import { dynamicTariff } from "./dynamicTariff";
 import type { Dwelling } from "../data/types";
 import {
@@ -196,8 +197,10 @@ function chargingAccessAt(egid: string, ewid: string, slotIndex: number, atMs: n
  * a year. */
 function evChargingChoice(access: ChargingAccess | null, tariff: Tariff): { where: "home" | "public" | "none"; runningRp: number } {
   const annualKWh = (ANNUAL_CAR_KM / 100) * EV_CAR_KWH_PER_100KM;
-  if (!access) return { where: "home", runningRp: annualKWh * avgElecRpKWh(tariff) };
-  const homeRp = access.wallboxRp === null ? Infinity : annualKWh * avgElecRpKWh(tariff) + access.wallboxRp / WALLBOX_LIFETIME_YEARS;
+  // At home: the household's electricity price, or the charging tariff's if that comes out cheaper.
+  const homeRpKWh = expectedHomeChargingRpKWh(tariff, avgElecRpKWh(tariff));
+  if (!access) return { where: "home", runningRp: annualKWh * homeRpKWh };
+  const homeRp = access.wallboxRp === null ? Infinity : annualKWh * homeRpKWh + access.wallboxRp / WALLBOX_LIFETIME_YEARS;
   const publicRp = usableOption(access.option) ? annualKWh * access.option.priceRpPerKWh + access.option.hassleRp : Infinity;
   if (homeRp === Infinity && publicRp === Infinity) return { where: "none", runningRp: Infinity };
   return homeRp <= publicRp ? { where: "home", runningRp: homeRp } : { where: "public", runningRp: publicRp };
@@ -519,14 +522,16 @@ export function slotsWithVehicleAt(egid: string, dwelling: Dwelling, vehicle: Ve
 export function mobilityChargingPowerW(egid: string, dwelling: Dwelling, simTimeMs: number, tariff: Tariff): number {
   let totalW = 0;
   let smart: boolean | undefined; // on the dynamic tariff: looked up only for a home with an electric car
+  let meter: ChargingMeter | null | undefined; // ...or the charging tariff's own meter, which decides instead
   for (const h of slotHandles(egid, dwelling)) {
     if (handleMode(h, simTimeMs) !== "car" || handleVehicle(h, "car", simTimeMs) !== "carEV") continue;
     // A car relying on a public charger draws its power there, not at home (publicCharging.ts).
     h.publicCharging ??= publicCharging.assignmentsFor(vehicleEntityKey(egid, h.ewid, h.slotIndex, "car"));
     if (h.publicCharging.length > 0 && publicCharging.chargesPubliclyAt(h.publicCharging, simTimeMs)) continue;
     h.ev ??= { seed: evSessionSeed(egid, h.sessionKey), responsiveDraw: responsiveDraw(egid, h.sessionKey) };
-    smart ??= dynamicTariff.onDynamicDwelling(egid, dwelling.ewid, simTimeMs);
-    totalW += evChargingPowerWFrom(h.ev.seed, h.ev.responsiveDraw < responsiveShare(), simTimeMs, tariff, smart);
+    if (meter === undefined) meter = chargingTariff.meterAt(egid, dwelling.ewid, simTimeMs);
+    smart ??= !meter && dynamicTariff.onDynamicDwelling(egid, dwelling.ewid, simTimeMs);
+    totalW += evChargingPowerWFrom(h.ev.seed, h.ev.responsiveDraw < responsiveShare(), simTimeMs, tariff, smart, meter);
   }
   return totalW;
 }
@@ -536,8 +541,10 @@ export function mobilityChargingPowerW(egid: string, dwelling: Dwelling, simTime
  * slot is currently car+EV before asking. */
 export function evSessionForSlot(egid: string, dwelling: Dwelling, slotIndex: number, dayIndex: number, tariff: Tariff): EvSession {
   const sessionKey = `${dwelling.ewid}:${slotIndex}`;
-  const smart = dynamicTariff.onDynamicDwelling(egid, dwelling.ewid, dayIndex * 24 * 3_600_000 + 12 * 3_600_000);
-  return evDailySession(egid, sessionKey, dayIndex, isResponsive(egid, sessionKey), tariff, smart);
+  const noon = dayIndex * 24 * 3_600_000 + 12 * 3_600_000;
+  const meter = chargingTariff.meterAt(egid, dwelling.ewid, noon);
+  const smart = !meter && dynamicTariff.onDynamicDwelling(egid, dwelling.ewid, noon);
+  return evDailySession(egid, sessionKey, dayIndex, isResponsive(egid, sessionKey), tariff, smart, meter);
 }
 
 /** One slot's own charging draw — zero unless it's currently car+EV. For a
@@ -553,7 +560,8 @@ export function slotChargingPowerW(
   tariff: Tariff,
 ): number {
   if (mode !== "car" || vehicleType !== "carEV") return 0;
-  return evChargingPowerW(egid, `${dwelling.ewid}:${slotIndex}`, simTimeMs, tariff, dynamicTariff.onDynamicDwelling(egid, dwelling.ewid, simTimeMs));
+  const meter = chargingTariff.meterAt(egid, dwelling.ewid, simTimeMs);
+  return evChargingPowerW(egid, `${dwelling.ewid}:${slotIndex}`, simTimeMs, tariff, !meter && dynamicTariff.onDynamicDwelling(egid, dwelling.ewid, simTimeMs), meter);
 }
 
 // --- UI summary ------------------------------------------------------------

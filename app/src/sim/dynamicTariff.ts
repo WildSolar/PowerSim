@@ -33,6 +33,7 @@ import {
   SMART_LAUNDRY_SHARE,
 } from "../config/dynamicTariff";
 import type { Building } from "../data/types";
+import { chargingTariff } from "./chargingTariff";
 import { EPOCH_MS, toDateMs, toSimTimeMs } from "./calendar";
 import { isResponsive } from "./ev";
 import { annualHeatDemandKWh, currentHeatingSystemId } from "./heatingRenewal";
@@ -242,10 +243,11 @@ function hassleChf(kind: "dwelling" | "heatPump", ...key: string[]): number {
 }
 
 /** A household's yearly saving on the dynamic tariff (CHF; negative if it would pay more). */
-function dwellingSavingChf(egid: string, ewid: string, slotCount: number, rates: YearRates, atMs: number): number {
+function dwellingSavingChf(egid: string, ewid: string, slotCount: number, rates: YearRates, atMs: number, carOnOwnMeter: boolean): number {
   let rp = DWELLING_BASE_KWH * (rates.touBase - rates.dynBase);
   rp += SMART_LAUNDRY_SHARE * LAUNDRY_KWH * (rates.touLaundry - rates.dynLaundrySmart);
-  for (let slot = 0; slot < slotCount; slot++) {
+  // A car on the charging tariff's own meter isn't on this one.
+  for (let slot = 0; slot < (carOnOwnMeter ? 0 : slotCount); slot++) {
     const mode = currentMobilityMode(egid, ewid, slot, atMs);
     if (mode !== "car" || currentVehicleType(egid, ewid, slot, mode, atMs) !== "carEV") continue;
     const tou = isResponsive(egid, `${ewid}:${slot}`) ? rates.touEvOffPeak : rates.touEvPlugIn;
@@ -271,8 +273,9 @@ export interface DynamicUptake {
 
 const EMPTY: DynamicUptake = { dwellings: new Set(), heatPumps: new Set(), dwellingCount: 0, heatPumpCount: 0 };
 
-/** Who would sign up for a sheet's dynamic tariff in `year`, with the town as it stands at `atMs`. */
-export function estimateUptake(buildings: Building[], sheet: TariffSheet, year: number, atMs: number): DynamicUptake {
+/** Who would sign up for a sheet's dynamic tariff in `year`, with the town as it stands at `atMs` —
+ * `onChargingMeter`: the households whose car is on the charging tariff's own meter. */
+export function estimateUptake(buildings: Building[], sheet: TariffSheet, year: number, atMs: number, onChargingMeter: (key: string) => boolean = () => false): DynamicUptake {
   if (!offersDynamic(sheet)) return EMPTY;
   const rates = yearRates(sheet, year);
   const out: DynamicUptake = { dwellings: new Set(), heatPumps: new Set(), dwellingCount: 0, heatPumpCount: 0 };
@@ -280,7 +283,7 @@ export function estimateUptake(buildings: Building[], sheet: TariffSheet, year: 
     if (!existsAt(building, atMs)) continue;
     for (const dwelling of building.dwellings) {
       out.dwellingCount++;
-      const saving = dwellingSavingChf(building.egid, dwelling.ewid, mobilitySlotCount(building.egid, dwelling), rates, atMs);
+      const saving = dwellingSavingChf(building.egid, dwelling.ewid, mobilitySlotCount(building.egid, dwelling), rates, atMs, onChargingMeter(`${building.egid}:${dwelling.ewid}`));
       if (saving > hassleChf("dwelling", building.egid, dwelling.ewid)) out.dwellings.add(`${building.egid}:${dwelling.ewid}`);
     }
     const system = currentHeatingSystemId(building, atMs);
@@ -328,7 +331,9 @@ class DynamicTariff {
     if (uptake) return uptake;
     // Decided as the town stood on 1 January (only ever asked about once it has: the live game and
     // the history look at the present and the past). A tariff republished for the year starts over.
-    uptake = estimateUptake(this.buildingsProvider(), tariffStore.sheetFor(year), year, toSimTimeMs(Date.UTC(year, 0, 1)));
+    const jan1 = toSimTimeMs(Date.UTC(year, 0, 1));
+    const meters = chargingTariff.uptakeAt(jan1).households;
+    uptake = estimateUptake(this.buildingsProvider(), tariffStore.sheetFor(year), year, jan1, (key) => meters.has(key));
     this.uptake.set(year, uptake);
     return uptake;
   }

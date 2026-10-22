@@ -41,6 +41,13 @@ export function sheetPrices(
   };
 }
 
+/** The network fee on the charging meter: a wallbox with power at night only pays the night rate; one
+ * the utility controls pays the flat rate, less the discount (the regulator's allowance stays the
+ * same, so the rest of the town makes it up in the years after — networkTariff.ts). */
+export function chargingNetworkRpKWh(sheet: TariffSheet, prices: { networkOffPeakRpKWh: number; networkAvgRpKWh: number }): number {
+  return sheet.chargingControlled ? prices.networkAvgRpKWh * (1 - sheet.chargingNetworkDiscount) : prices.networkOffPeakRpKWh;
+}
+
 export interface TariffPublication {
   atMs: number;
   /** The year it takes effect. */
@@ -133,7 +140,7 @@ class TariffStore {
   /** For the dev scenario runner: change the sheet in force from the start, without publishing. */
   set(patch: Partial<TariffSheet>): void {
     const sheet = { ...this.sheetFor(BASELINE_YEAR) };
-    for (const key of Object.keys(DEFAULT_SHEET) as (keyof TariffSheet)[]) if (patch[key] !== undefined) sheet[key] = patch[key] as number;
+    for (const key of Object.keys(DEFAULT_SHEET) as (keyof TariffSheet)[]) if (patch[key] !== undefined) (sheet as unknown as Record<string, unknown>)[key] = patch[key];
     this.sheets = new Map([[BASELINE_YEAR, sheet]]);
     this.refresh();
   }
@@ -162,6 +169,8 @@ class TariffStore {
       networkPeakRpKWh: prices.networkPeakRpKWh,
       networkOffPeakRpKWh: prices.networkOffPeakRpKWh,
       networkAvgRpKWh: prices.networkAvgRpKWh,
+      chargingNetworkRpKWh: chargingNetworkRpKWh(sheet, prices),
+      chargingPriceRpKWh: sheet.chargingEnergyRpKWh + chargingNetworkRpKWh(sheet, prices),
       peakPriceRpKWh: prices.peakRpKWh,
       offPeakPriceRpKWh: prices.offPeakRpKWh,
       baseFeeRpPerMonth: prices.baseFeeRpPerMonth,

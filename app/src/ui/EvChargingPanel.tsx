@@ -21,6 +21,8 @@ import {
 import { fleets } from "../sim/fleet";
 import { mapFocus } from "../map/mapFocus";
 import { useSimDay } from "../sim/store";
+import { chargingTariff } from "../sim/chargingTariff";
+import { tariffStore } from "../sim/tariffStore";
 import { formatCHF } from "./format";
 import { useStockBuildings } from "./useStock";
 import "./districtHeatPanel.css";
@@ -306,6 +308,9 @@ export function EvChargingPanel() {
     () => publicCharging.getVersion(),
   );
   const simDay = useSimDay();
+  // The charging tariff this year: who put their wallbox on its meter (decided once a year, cached).
+  const meterUptake = tariffStore.sheetFor(new Date(toDateMs(simDay)).getUTCFullYear()).chargingTariffOffered ? chargingTariff.uptakeAt(simDay) : null;
+  const meters = { offered: meterUptake !== null, on: meterUptake?.households.size ?? 0, eligible: meterUptake?.eligible ?? 0 };
   const buildings = useStockBuildings();
   const placing = publicCharging.getPlacing();
   const coverage = publicCharging.getCoverage();
@@ -422,6 +427,14 @@ export function EvChargingPanel() {
         <span>Drivers who can charge at work</span>
         <span className="info-value">{percent(workChargingShareAt(simDay), 1)}</span>
       </div>
+      {meters.offered && (
+        <div className="info-row" title="Households with a wallbox and an electric car who put their wallbox on the charging tariff's own meter this year (Town hall → Prices).">
+          <span>On the charging tariff</span>
+          <span className="info-value">
+            {meters.on.toLocaleString("en-GB")} of {meters.eligible.toLocaleString("en-GB")}
+          </span>
+        </div>
+      )}
       <div className="info-row" title="Households and businesses that bought a petrol or diesel vehicle in the last 12 months but would have gone electric with an empty public charger next door. Private operators build on-street chargers where this gathers; lorries need a fast-charging hub, which they leave to the municipality.">
         <span>Wanted an EV, lacked charging (12 mo.)</span>
         <span className="info-value">{town.unmet}</span>

@@ -36,6 +36,7 @@
  * month's market price for wholesale power (tariffStore.ts).
  */
 
+import { chargingTariff } from "./chargingTariff";
 import { timedAsync } from "./devTiming";
 import type { Building, PowerPlant } from "../data/types";
 import { consumptionSeriesW, electricityCostSplitRp } from "./billing";
@@ -274,7 +275,7 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
   // The year's sheet (one per year); wholesale power at the month's market price.
   const tariff: Tariff = tariffStore.at(toSimTimeMs(Date.UTC(year, month, 15)));
   const greenShare = policyStore.get().greenPowerShare / 100;
-  const { times, series, dynamicW, dhHeatPumpW, marketW } = await monthElectricity(buildings, realPlants, year, month);
+  const { times, series, dynamicW, dhHeatPumpW, marketW, chargingMeterW } = await monthElectricity(buildings, realPlants, year, month);
   const consumptionW = consumptionSeriesW(series);
   const grossKWh = energyKWh(times, consumptionW);
   // A data centre pays its concession fee straight to the town (datacenter.ts): what the utility's
@@ -369,8 +370,10 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
       ? paidPlants.reduce((sum, p) => sum + (p.capacityKw ?? 0) * feedInBaseRpKWh(midMonthMs, p.capacityKw ?? 0), 0) / paidKw + tariff.feedInBonusRpKWh
       : tariff.feedInPriceRpKWh;
   const feedInKWh = Math.max(0, energyKWh(times, series.solarW) - energyKWh(times, contractW) - ppaKWh - ownFieldsKWh - windKWh);
-  const split = electricityCostSplitRp(times, consumptionW, tariff, dynamicW);
-  const basicSplit = electricityCostSplitRp(times, basicW, tariff, dynamicW);
+  const split = electricityCostSplitRp(times, consumptionW, tariff, dynamicW, chargingMeterW);
+  const basicSplit = electricityCostSplitRp(times, basicW, tariff, dynamicW, chargingMeterW);
+  // The charging meters' monthly fee, with the network's base fees.
+  const chargingMetersRp = tariff.chargingTariffOffered ? chargingTariff.uptakeAt(midMonthMs).households.size * tariff.chargingMeterFeeChfPerMonth * 100 : 0;
   const energyAvgRpKWh = (tariff.energyPeakRpKWh + tariff.energyOffPeakRpKWh) / 2;
   const networkAvgRpKWh = (tariff.networkPeakRpKWh + tariff.networkOffPeakRpKWh) / 2;
   return {
@@ -378,7 +381,7 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
     // the meters' base fees — less the municipality's own chargers' power (the utility's own use,
     // sold at their own price), and the Agri-PV partners' energy (they take the field's instead).
     energyRevenueRp: basicSplit.energyRp - charging.kWh * energyAvgRpKWh - ppaKWh * agriPv.ppaEnergyValueRpPerKWh(midMonthMs),
-    networkRevenueRp: split.networkRp - charging.kWh * networkAvgRpKWh + networkTariff.meters(midMonthMs) * tariff.baseFeeRpPerMonth,
+    networkRevenueRp: split.networkRp - charging.kWh * networkAvgRpKWh + networkTariff.meters(midMonthMs) * tariff.baseFeeRpPerMonth + chargingMetersRp,
     networkKWh: grossKWh - datacenterKWh,
     datacenterKWh,
     networkOffPeakKWh: split.offPeakKWh,

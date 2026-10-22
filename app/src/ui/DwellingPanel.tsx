@@ -1,4 +1,5 @@
 import type { Building, Dwelling, PowerPlant } from "../data/types";
+import { chargingTariff } from "../sim/chargingTariff";
 import { dynamicTariff } from "../sim/dynamicTariff";
 import { dwellingDevicePowerW } from "../sim/devices";
 import { mobilityChargingPowerW, mobilityRenewalLog, mobilitySlotSummaries, evSessionForSlot, slotCharging, slotChargingPowerW, type SlotCharging } from "../sim/mobility";
@@ -98,6 +99,7 @@ export function DwellingPanel({ building, dwelling, allBuildings, realPlants, on
   const dayIndex = Math.floor(simTimeMs / DAY_MS);
   const hasCarEV = mobilitySlots.some((s) => s.vehicleType === "carEV");
   const onDynamic = dynamicTariff.onDynamicDwelling(building.egid, dwelling.ewid, simTimeMs);
+  const meter = chargingTariff.meterAt(building.egid, dwelling.ewid, simTimeMs);
 
   const history = useHistorySeries(
     () => {
@@ -186,10 +188,23 @@ export function DwellingPanel({ building, dwelling, allBuildings, realPlants, on
             {session && session.plugsIn && (
               <div className="ev-session-note">
                 Tonight: {formatHourOfDay(session.startMs)}–{formatHourOfDay(session.endMs)}
-                {onDynamic ? " (the cheapest hours)" : sessionStartsOffPeak ? " (off-peak)" : " (peak)"}
+                {meter === "controlled"
+                  ? " (when the utility chooses)"
+                  : meter === "night"
+                    ? " (night rate)"
+                    : onDynamic
+                      ? " (the cheapest hours)"
+                      : sessionStartsOffPeak
+                        ? " (off-peak)"
+                        : " (peak)"}
               </div>
             )}
             {session && !session.plugsIn && <div className="ev-session-note">Not plugged in tonight: it charges two or three nights a week.</div>}
+            {meter && atHome && (
+              <div className="ev-session-note">
+                Charging meter: {meter === "controlled" ? "utility-controlled" : "night rate only"}, {tariff.chargingPriceRpKWh.toFixed(1)} Rp/kWh.
+              </div>
+            )}
           </div>
         );
       })}

@@ -480,6 +480,29 @@ export const WIKI_SECTIONS: WikiSection[] = [
     ],
   },
 
+  {
+    id: "charging-tariff",
+    title: "The charging tariff",
+    blocks: [
+      p(
+        "You can also offer a charging tariff (Town hall → Prices): a household puts its wallbox on a meter of its own and pays a charging price of your choosing for what the car charges, in return for when it may charge. As with heat pumps, many Swiss utilities already do this.",
+      ),
+      list([
+        "Energy price: per kWh on the charging meter, flat through the day — under the regulator's ceiling like every price in basic supply. The network fee comes on top.",
+        "Meter fee: what the second meter costs a month. It keeps those who charge little away.",
+        "Night rate only: the wallbox has power only at night; each car's charge starts at some moment in the night rate, full by the time it ends. It pays the night's network fee.",
+        "Utility-controlled: the utility decides when each car charges while it's plugged in — for now, in the night's quietest hours, most around the middle of the night. It pays the network fee's daily average, less a discount you may give (up to 60%), as utilities give heat pumps. The regulator's allowance stays the same, so the rest of the town makes the discount up in the years after — tenants, who mostly have no wallbox, resent it.",
+      ]),
+      p(
+        "Who signs up: on 1 January each household with a wallbox and an electric car weighs what its charging would cost on the charging meter, the meter fee included, against what it pays now — the night rate if it already waits for it, the day rate if it charges as soon as it gets home — and goes for it if the saving beats the bother: the meter, giving up control, and for those who charge on arrival, that habit. The Prices tab shows how many would, before you publish. A household on the charging tariff weighs the dynamic tariff without its car.",
+      ),
+      p(
+        "What it does: cars on it charge at night instead of in the evening, so the evening peak on the grid falls (see \"The electricity grid\"). A cheap charging price also makes an electric car cheaper to run for anyone with a wallbox, so more go electric. What it costs: the energy sold at your charging price, against the meter fees. Drivers welcome a charging price below what households pay, homeowners a little.",
+      ),
+      note("Moving charging into the night doesn't lower the town's emissions in the game: electricity counts at the year's average grid intensity, whenever it is used."),
+    ],
+  },
+
   // --- How people decide -----------------------------------------------------------------
   {
     id: "stock-renewal",
@@ -1154,7 +1177,7 @@ export const WIKI_GROUPS: WikiGroup[] = [
     id: "money",
     title: "Money",
     blurb: "The treasury, the utility, borrowing, and the prices you set.",
-    sections: ["municipal-finances", "borrowing", "tariff", "dynamic-tariff"],
+    sections: ["municipal-finances", "borrowing", "tariff", "dynamic-tariff", "charging-tariff"],
   },
   {
     id: "decisions",

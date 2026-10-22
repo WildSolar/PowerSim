@@ -7,6 +7,7 @@
  * and remember everything.
  */
 
+import { chargingTariff } from "../sim/chargingTariff";
 import { dataUrl } from "../data/loadDataset";
 import type { MunicipalityDataset } from "../data/types";
 import { approval } from "../sim/approval";
@@ -176,6 +177,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   const difficulty = spec.difficulty ?? "normal";
   market.init(`market:${dataset.bfsNumber}`);
   tariffStore.init();
+  chargingTariff.init(() => stock.getAll());
   dynamicTariff.init(() => stock.getAll());
   measures.init(difficulty);
   if (spec.withApproval) {

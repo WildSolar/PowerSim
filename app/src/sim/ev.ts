@@ -22,7 +22,9 @@
  * to the tariff, a naive one just plugs in and charges.
  */
 
+import { CONTROLLED_EARLIEST_HOUR } from "../config/chargingTariff";
 import { ANNUAL_CAR_KM, EV_CAR_KWH_PER_100KM } from "../config/mobility";
+import type { ChargingMeter } from "./chargingTariff";
 import { hashSeed, hashSeedFrom, mulberry32 } from "./rng";
 import type { Tariff } from "./tariff";
 import { smartChargeStartMs } from "./dynamicTariff";
@@ -61,8 +63,8 @@ export interface EvSession {
 /** The charging session for a given calendar day (dayIndex = floor(simTimeMs / dayMs)),
  * exported for inspection UI that wants to show "tonight's session" rather than just
  * an instantaneous on/off reading. */
-export function evDailySession(egid: string, sessionKey: string, dayIndex: number, responsive: boolean, tariff: Tariff, smart = false): EvSession {
-  return evDailySessionFrom(evSessionSeed(egid, sessionKey), dayIndex, responsive, tariff, smart);
+export function evDailySession(egid: string, sessionKey: string, dayIndex: number, responsive: boolean, tariff: Tariff, smart = false, meter: ChargingMeter | null = null): EvSession {
+  return evDailySessionFrom(evSessionSeed(egid, sessionKey), dayIndex, responsive, tariff, smart, meter);
 }
 
 /** A car's session seed, for the *From variants — hashed once per car rather than per call. */
@@ -70,8 +72,9 @@ export function evSessionSeed(egid: string, sessionKey: string): number {
   return hashSeed(egid, sessionKey, "ev-session");
 }
 
-/** `smart`: the household is on the dynamic tariff, and the car charges in the night's cheapest hours. */
-function evDailySessionFrom(seed: number, dayIndex: number, responsive: boolean, tariff: Tariff, smart: boolean): EvSession {
+/** `smart`: the household is on the dynamic tariff, and the car charges in the night's cheapest hours.
+ * `meter`: the car is on the charging tariff's own meter (chargingTariff.ts), which decides instead. */
+function evDailySessionFrom(seed: number, dayIndex: number, responsive: boolean, tariff: Tariff, smart: boolean, meter: ChargingMeter | null = null): EvSession {
   const rng = mulberry32(hashSeedFrom(seed, String(dayIndex)));
   const plugInHour = 18.5 + (rng() - 0.5) * 3; // arrive home ~17:00-20:00
   const deadlineHour = 7 + (rng() - 0.5) * 1; // need to leave ~06:30-07:30 next morning
@@ -84,6 +87,19 @@ function evDailySessionFrom(seed: number, dayIndex: number, responsive: boolean,
   const plugInMs = dayStartMs + plugInHour * 3_600_000;
   const deadlineMs = dayStartMs + DAY_MS + deadlineHour * 3_600_000;
   if (!plugsIn) return { plugsIn, startMs: plugInMs, endMs: plugInMs };
+
+  if (meter) {
+    // On the charging meter: power only in the night rate, the charge starting some time in it that
+    // still has the car full when it ends — or, under the utility's control, in the night's quietest
+    // hours, most of the cars around the middle of the night.
+    const nightStartMs = dayStartMs + tariff.offPeakStartHour * 3_600_000;
+    const nightEndMs = dayStartMs + DAY_MS + tariff.offPeakEndHour * 3_600_000;
+    const earliestStart = Math.max(plugInMs, meter === "controlled" ? dayStartMs + CONTROLLED_EARLIEST_HOUR * 3_600_000 : nightStartMs);
+    const latestStart = Math.max(earliestStart, (meter === "night" ? Math.min(deadlineMs, nightEndMs) : deadlineMs) - durationMs);
+    const draw = meter === "controlled" ? (rng() + rng()) / 2 : rng();
+    const startMs = earliestStart + draw * (latestStart - earliestStart);
+    return { plugsIn, startMs, endMs: startMs + durationMs };
+  }
 
   if (smart) {
     const startMs = smartChargeStartMs(dayIndex, plugInMs, Math.max(plugInMs, deadlineMs - durationMs), durationMs, rng());
@@ -111,15 +127,15 @@ function evDailySessionFrom(seed: number, dayIndex: number, responsive: boolean,
 /** Zero unless `simTimeMs` falls inside that car's session for today or
  * yesterday evening (a session can run past midnight, so a query time can
  * belong to either day's session — check both rather than assuming). */
-export function evChargingPowerW(egid: string, sessionKey: string, simTimeMs: number, tariff: Tariff, smart = false): number {
-  return evChargingPowerWFrom(evSessionSeed(egid, sessionKey), isResponsive(egid, sessionKey), simTimeMs, tariff, smart);
+export function evChargingPowerW(egid: string, sessionKey: string, simTimeMs: number, tariff: Tariff, smart = false, meter: ChargingMeter | null = null): number {
+  return evChargingPowerWFrom(evSessionSeed(egid, sessionKey), isResponsive(egid, sessionKey), simTimeMs, tariff, smart, meter);
 }
 
 /** The same, for a caller that keeps the car's session seed and (seeded, fixed) responsiveness. */
-export function evChargingPowerWFrom(sessionSeed: number, responsive: boolean, simTimeMs: number, tariff: Tariff, smart = false): number {
+export function evChargingPowerWFrom(sessionSeed: number, responsive: boolean, simTimeMs: number, tariff: Tariff, smart = false, meter: ChargingMeter | null = null): number {
   const dayIndex = Math.floor(simTimeMs / DAY_MS);
   for (let d = dayIndex - 1; d <= dayIndex; d++) {
-    const session = evDailySessionFrom(sessionSeed, d, responsive, tariff, smart);
+    const session = evDailySessionFrom(sessionSeed, d, responsive, tariff, smart, meter);
     if (simTimeMs >= session.startMs && simTimeMs < session.endMs) {
       return CHARGING_POWER_KW * 1000;
     }

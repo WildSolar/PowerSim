@@ -4,6 +4,8 @@ import { WHOLESALE_HEDGED_SHARE, type Commodity } from "../config/market";
 import { approval } from "../sim/approval";
 import { toDateMs } from "../sim/calendar";
 import { estimateUptake } from "../sim/dynamicTariff";
+import { chargingAllInRpKWh, estimateChargingUptake } from "../sim/chargingTariff";
+import { MAX_CHARGING_NETWORK_DISCOUNT } from "../config/chargingTariff";
 import { market } from "../sim/market";
 import { stock } from "../sim/stock";
 import { useSimDay, useTariff } from "../sim/store";
@@ -21,7 +23,10 @@ import "./tariffControl.css";
 
 const YEAR_MS = 365.25 * 24 * 3_600_000;
 
-type SheetField = Exclude<keyof TariffSheet, "offPeakStartHour" | "offPeakEndHour" | "dynamicMarginRpKWh">;
+// The charging tariff's fields have a card of their own (ChargingTariffDraft).
+type ChargingField = "chargingTariffOffered" | "chargingEnergyRpKWh" | "chargingMeterFeeChfPerMonth" | "chargingControlled" | "chargingNetworkDiscount";
+const CHARGING_FIELDS: ChargingField[] = ["chargingTariffOffered", "chargingEnergyRpKWh", "chargingMeterFeeChfPerMonth", "chargingControlled", "chargingNetworkDiscount"];
+type SheetField = Exclude<keyof TariffSheet, "offPeakStartHour" | "offPeakEndHour" | "dynamicMarginRpKWh" | ChargingField>;
 type FieldGroup = "energy" | "network" | "solar" | "other";
 
 const GROUP_LABEL: Record<FieldGroup, string> = {
@@ -68,7 +73,7 @@ function signedPct(pct: number): string {
 }
 
 function sameSheet(a: TariffSheet, b: TariffSheet): boolean {
-  return FIELDS.every(({ key }) => a[key] === b[key]) && a.dynamicMarginRpKWh === b.dynamicMarginRpKWh;
+  return FIELDS.every(({ key }) => a[key] === b[key]) && a.dynamicMarginRpKWh === b.dynamicMarginRpKWh && CHARGING_FIELDS.every((key) => a[key] === b[key]);
 }
 
 /** The utility's prices: the tariff in force, next year's to publish, and the market prices it
@@ -92,6 +97,7 @@ export function TariffControl() {
   const cap = energyPriceCap(targetYear);
   const average = householdEnergyRpKWh(draft);
   const overCap = average > cap.capRpKWh + 0.005;
+  const chargingOverCap = draft.chargingTariffOffered && draft.chargingEnergyRpKWh > cap.capRpKWh + 0.005;
   const access = useMemo(() => marketAccess.stats(simDay), [Math.floor(simDay / 86_400_000)]);
   const pricesNow = sheetPrices(inForce, nowYear);
   const pricesNext = sheetPrices(draft, targetYear);
@@ -152,6 +158,8 @@ export function TariffControl() {
         onSpread={(v) => setDraft((d) => ({ ...d, dynamicMarginRpKWh: v }))}
       />
 
+      <ChargingTariffDraft draft={draft} inForce={inForce} year={targetYear} atMs={simDay} capRpKWh={cap.capRpKWh} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} />
+
       <div className="tariff-preview">
         <div className="tariff-preview-bill">
           <span>A typical household’s electricity</span>
@@ -198,7 +206,12 @@ export function TariffControl() {
             {cap.capRpKWh.toFixed(1)} Rp/kWh on average for a typical household. Lower the energy prices to publish.
           </p>
         )}
-        <button className="tariff-publish-btn" disabled={unchanged || overCap} onClick={() => tariffStore.publish(draft, simDay)}>
+        {chargingOverCap && (
+          <p className="tariff-over-cap">
+            The charging price is over the regulator&apos;s ceiling of {cap.capRpKWh.toFixed(1)} Rp/kWh for the energy. Lower it to publish.
+          </p>
+        )}
+        <button className="tariff-publish-btn" disabled={unchanged || overCap || chargingOverCap} onClick={() => tariffStore.publish(draft, simDay)}>
           {published ? `Publish again for ${targetYear}` : `Publish for ${targetYear}`}
         </button>
         <span className="tariff-deadline">
@@ -284,10 +297,26 @@ function DynamicTariffDraft({
 }) {
   const offered = draft.dynamicMarginRpKWh > 0;
   // Who would sign up, with the town as it is today (it pauses while the town hall is open).
-  const uptake = useMemo(
-    () => (offered ? estimateUptake(stock.getAll(), draft, year, atMs) : null),
-    [offered, draft.dynamicMarginRpKWh, draft.energyOffPeakRpKWh, draft.energyPeakRpKWh, draft.baseFeeChfPerMonth, draft.networkOffPeakShare, year, Math.floor(atMs / 86_400_000)],
-  );
+  const uptake = useMemo(() => {
+    if (!offered) return null;
+    // Households whose car would go on the charging meter weigh this one without it.
+    const meters = draft.chargingTariffOffered ? estimateChargingUptake(stock.getAll(), draft, year, atMs).households : null;
+    return estimateUptake(stock.getAll(), draft, year, atMs, (key) => meters?.has(key) ?? false);
+  }, [
+    offered,
+    draft.dynamicMarginRpKWh,
+    draft.energyOffPeakRpKWh,
+    draft.energyPeakRpKWh,
+    draft.baseFeeChfPerMonth,
+    draft.networkOffPeakShare,
+    draft.chargingTariffOffered,
+    draft.chargingEnergyRpKWh,
+    draft.chargingMeterFeeChfPerMonth,
+    draft.chargingControlled,
+    draft.chargingNetworkDiscount,
+    year,
+    Math.floor(atMs / 86_400_000),
+  ]);
   return (
     <div className="dyn-draft">
       <div className="dyn-draft-head">
@@ -322,6 +351,127 @@ function DynamicTariffDraft({
               <span>Likely to sign up</span>
               <span>
                 {uptake.dwellings.size.toLocaleString("en-GB")} of {uptake.dwellingCount.toLocaleString("en-GB")} households · {uptake.heatPumps.size} of {uptake.heatPumpCount} heat pumps
+              </span>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** The charging tariff for next year: a wallbox on its own meter (chargingTariff.ts) — its price, the
+ * meter's fee, when it may charge, and the network discount for one the utility controls — with who
+ * would likely sign up, the town as it is today. */
+function ChargingTariffDraft({
+  draft,
+  inForce,
+  year,
+  atMs,
+  capRpKWh,
+  onChange,
+}: {
+  draft: TariffSheet;
+  inForce: TariffSheet;
+  year: number;
+  atMs: number;
+  capRpKWh: number;
+  onChange: (patch: Partial<TariffSheet>) => void;
+}) {
+  const offered = draft.chargingTariffOffered;
+  const uptake = useMemo(
+    () => (offered ? estimateChargingUptake(stock.getAll(), draft, year, atMs) : null),
+    [
+      offered,
+      draft.chargingEnergyRpKWh,
+      draft.chargingMeterFeeChfPerMonth,
+      draft.chargingControlled,
+      draft.chargingNetworkDiscount,
+      draft.energyOffPeakRpKWh,
+      draft.energyPeakRpKWh,
+      draft.baseFeeChfPerMonth,
+      draft.networkOffPeakShare,
+      year,
+      Math.floor(atMs / 86_400_000),
+    ],
+  );
+  const prices = sheetPrices(draft, year);
+  const allIn = chargingAllInRpKWh(draft, year);
+  const number = (key: "chargingEnergyRpKWh" | "chargingMeterFeeChfPerMonth", min: number, max: number, step: number) => (
+    <input
+      type="number"
+      min={min}
+      max={max}
+      step={step}
+      value={draft[key]}
+      className={draft[key] !== inForce[key] ? "changed" : ""}
+      onChange={(e) => onChange({ [key]: Math.max(min, Math.min(max, Math.round((Number(e.target.value) || 0) / step) * step)) })}
+    />
+  );
+  const inForceLabel = inForce.chargingTariffOffered
+    ? `Now: ${inForce.chargingEnergyRpKWh} Rp/kWh, ${inForce.chargingControlled ? "utility-controlled" : "night only"}`
+    : "Not offered now";
+  return (
+    <div className="dyn-draft">
+      <div className="dyn-draft-head">
+        <label className="dyn-draft-toggle">
+          <input type="checkbox" checked={offered} onChange={(e) => onChange({ chargingTariffOffered: e.target.checked })} />
+          <span>Offer a charging tariff</span>
+        </label>
+        <span className="tariff-unit">{inForceLabel}</span>
+      </div>
+      <p className="tech-prices-note">
+        A wallbox on its own meter, at a price of its own, in return for when it may charge: only in the night rate, or whenever the utility decides — which it uses to fill the night&apos;s quietest hours. Households with a wallbox and an electric car sign up on 1 January if it saves them more than the bother. The meter has its own monthly fee. A wallbox the utility controls may pay less network fee; the regulator&apos;s allowance stays the same, so the rest of the town makes it up in the years after.
+      </p>
+      {offered && (
+        <>
+          <div className="dyn-draft-spread">
+            <span className="tariff-label">Energy price on the charging meter</span>
+            {number("chargingEnergyRpKWh", 0, Math.floor(capRpKWh * 2) / 2, 0.5)}
+            <span className="tariff-unit">Rp/kWh</span>
+          </div>
+          <div className="dyn-draft-spread">
+            <span className="tariff-label">Meter fee</span>
+            {number("chargingMeterFeeChfPerMonth", 0, 30, 1)}
+            <span className="tariff-unit">CHF/month</span>
+          </div>
+          <div className="dyn-draft-spread charge-draft-options" role="radiogroup" aria-label="When it may charge">
+            <span className="tariff-label">When it may charge</span>
+            <label>
+              <input type="radio" checked={!draft.chargingControlled} onChange={() => onChange({ chargingControlled: false, chargingNetworkDiscount: 0 })} /> Night rate only
+            </label>
+            <label>
+              <input type="radio" checked={draft.chargingControlled} onChange={() => onChange({ chargingControlled: true })} /> Utility-controlled
+            </label>
+          </div>
+          {draft.chargingControlled && (
+            <div className="dyn-draft-spread">
+              <span className="tariff-label" title="Off the network fee for a wallbox the utility controls, as utilities give heat pumps; everyone else's fee makes it up in the years after">
+                Network fee discount
+              </span>
+              <input
+                type="number"
+                min={0}
+                max={MAX_CHARGING_NETWORK_DISCOUNT * 100}
+                step={5}
+                value={Math.round(draft.chargingNetworkDiscount * 100)}
+                className={draft.chargingNetworkDiscount !== inForce.chargingNetworkDiscount ? "changed" : ""}
+                onChange={(e) => onChange({ chargingNetworkDiscount: Math.max(0, Math.min(MAX_CHARGING_NETWORK_DISCOUNT, Math.round((Number(e.target.value) || 0) / 5) * 0.05)) })}
+              />
+              <span className="tariff-unit">%</span>
+            </div>
+          )}
+          <div className="tariff-preview-line">
+            <span>All in, per kWh on the charging meter</span>
+            <span>
+              {allIn.toFixed(1)} Rp/kWh · household night rate {prices.offPeakRpKWh.toFixed(1)}, day {prices.peakRpKWh.toFixed(1)}
+            </span>
+          </div>
+          {uptake && (
+            <div className="tariff-preview-line dyn-uptake">
+              <span>Likely to sign up</span>
+              <span>
+                {uptake.households.size.toLocaleString("en-GB")} of {uptake.eligible.toLocaleString("en-GB")} households with a wallbox and an electric car
               </span>
             </div>
           )}
