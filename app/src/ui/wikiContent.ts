@@ -992,6 +992,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "A busy charger is less use. Once an on-street charger is more than about 60% full, finding a free spot gets harder, and when full it is worth less than half as much; a hub hardly suffers until it is nearly full. A quarter over its room, a charger takes nobody new.",
       ),
       p(
+        "How full a charger is counts everyone who relies on it, not who is there at the moment. Nobody charges in public every day: on the street a car plugs in two or three evenings a week and stays until morning, at a hub it stops for a quarter of an hour once a week or so. So a charger with no room left still stands empty much of the day — on the street during the day, at a hub at night. A charger's card shows both: the room taken, and who is plugged in right now.",
+      ),
+      p(
         "Different kinds of charging add up, each covering part of what the others leave: an on-street charger next door (90%) and charging at work (45%) make 95%. Two of the same kind don't: two hubs do the same job, so only the better one counts.",
       ),
       p(

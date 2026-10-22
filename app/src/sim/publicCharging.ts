@@ -738,19 +738,31 @@ class PublicCharging {
 
   // --- load ---
 
-  private assignmentLoadW(a: Assignment, site: ChargingSite, atMs: number): number {
+  /** A booking's session at a site on `day` (days since the epoch), if the vehicle charges there
+   * that day: when it plugs in, when it's charged, and when it gives the point up — on the street
+   * the next morning (it stays parked overnight), elsewhere a few minutes after it's charged. */
+  private sessionOn(a: Assignment, site: ChargingSite, day: number): { startMs: number; chargedMs: number; leavesMs: number; powerKw: number } | null {
     const kind = site.kind;
-    const day = Math.floor(atMs / DAY_MS);
     const seed = hashSeedFrom(a.seed, String(day), site.id);
     const dayShare = SESSION_DAY_SHARE[a.vehicle][kind];
-    if (firstRandom(seed) >= dayShare) return 0;
+    if (firstRandom(seed) >= dayShare) return null;
     // On-street: overnight from the evening; a hub or a shop's car park: during the day.
-    const startHour = kind === "ac" && !site.shop ? 17.5 + firstRandom(seed ^ 0x5bd1e995) * 3 : 9 + firstRandom(seed ^ 0x5bd1e995) * 10;
+    const overnight = kind === "ac" && !site.shop;
+    const startHour = overnight ? 17.5 + firstRandom(seed ^ 0x5bd1e995) * 3 : 9 + firstRandom(seed ^ 0x5bd1e995) * 10;
     const powerKw = SESSION_POWER_KW[a.vehicle][kind];
     const energyKWh = a.kWhPerDay / dayShare;
     const startMs = day * DAY_MS + startHour * 3_600_000;
-    const endMs = startMs + (energyKWh / powerKw) * 3_600_000;
-    return atMs >= startMs && atMs < endMs ? powerKw * 1000 : 0;
+    const chargedMs = startMs + (energyKWh / powerKw) * 3_600_000;
+    const leave = firstRandom(seed ^ 0x27d4eb2f);
+    const leavesMs = overnight
+      ? Math.max(chargedMs, (day + 1) * DAY_MS + (6.5 + leave * 2) * 3_600_000) // off to work, 6:30–8:30
+      : chargedMs + (5 + leave * 10) * 60_000;
+    return { startMs, chargedMs, leavesMs, powerKw };
+  }
+
+  private assignmentLoadW(a: Assignment, site: ChargingSite, atMs: number): number {
+    const s = this.sessionOn(a, site, Math.floor(atMs / DAY_MS));
+    return s && atMs >= s.startMs && atMs < s.chargedMs ? s.powerKw * 1000 : 0;
   }
 
   siteLoadW(site: ChargingSite, atMs: number): number {
@@ -904,14 +916,30 @@ class PublicCharging {
     return { users, capacity, points, sites, vehicles };
   }
 
-  /** Charge points in use right now: the sessions under way, never more than the site has. */
-  pointsInUseAt(site: ChargingSite, atMs: number): number {
-    let inUse = 0;
+  /** Charge points taken right now — a vehicle plugged in, charging or (on the street, overnight)
+   * charged and still parked — and how many of those are charging; never more than the site has. */
+  pointsInUseAt(site: ChargingSite, atMs: number): { pluggedIn: number; charging: number } {
+    const day = Math.floor(atMs / DAY_MS);
+    let pluggedIn = 0;
+    let charging = 0;
     for (const a of this.bySite.get(site.id) ?? []) {
       if (a.fromMs > atMs || atMs >= a.toMs || !this.isDriving(a.slot, atMs)) continue;
-      if (this.assignmentLoadW(a, site, atMs) > 0) inUse++;
+      if (this.assignmentLoadW(a, site, atMs) > 0) {
+        pluggedIn++;
+        charging++;
+        continue;
+      }
+      // Still parked from a session that began today, or last night.
+      for (const d of [day, day - 1]) {
+        const s = this.sessionOn(a, site, d);
+        if (s && atMs >= s.startMs && atMs < s.leavesMs) {
+          pluggedIn++;
+          break;
+        }
+      }
     }
-    return Math.min(pointsAt(site, atMs), inUse);
+    const points = pointsAt(site, atMs);
+    return { pluggedIn: Math.min(points, pluggedIn), charging: Math.min(points, charging) };
   }
 
   /** The points a site will have once everything ordered is built. */

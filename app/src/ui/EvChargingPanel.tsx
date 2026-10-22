@@ -39,6 +39,13 @@ function distanceLabel(m: number): string {
 }
 
 /** How far a kind of charger reaches, for the player: full quality up to here, nothing from there. */
+/** When a site is busiest, by how the vehicles relying on it charge (publicCharging.ts's sessions). */
+function busiestLabel(site: ChargingSite): string {
+  if (site.kind === "ac" && !site.shop) return "Evenings and overnight";
+  if (site.shop) return "Shopping hours";
+  return "During the day";
+}
+
 function reachLabel(kind: QosKind): string {
   const how = kind === "ac" ? "on foot" : "by road";
   return `best within ${distanceLabel(QOS_CURVE[kind].plateauM)} ${how}, fading out by ${distanceLabel(qosReachM(kind))}`;
@@ -184,7 +191,7 @@ function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
   const pending = site.expansions.filter((e) => e.atMs > now);
   const planned = publicCharging.plannedPoints(site);
   const owner = site.owner === "municipal" ? "The municipality" : site.id.startsWith("real-") ? "Private (in the federal register)" : "Private operator";
-  const inUse = building ? 0 : publicCharging.pointsInUseAt(site, now);
+  const inUse = building ? { pluggedIn: 0, charging: 0 } : publicCharging.pointsInUseAt(site, now);
 
   return (
     <>
@@ -229,11 +236,19 @@ function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
             </span>
           </div>
           <UsageBar used={stats.users} capacity={stats.capacity} />
-          <div className="info-row" style={{ marginTop: 6 }}>
-            <span>Charging right now</span>
+          <div
+            className="info-row"
+            style={{ marginTop: 6 }}
+            title="Vehicles at a charge point right now. Those relying on a charger don't charge there every day: on the street a car plugs in in the evening and stays until morning, at a hub it stops for a quarter of an hour. So even a charger with no room left stands empty much of the day."
+          >
+            <span>Plugged in right now</span>
             <span className="info-value">
-              {inUse} of {stats.points} points
+              {inUse.pluggedIn} of {stats.points} points{inUse.pluggedIn > 0 ? ` · ${inUse.charging} charging` : ""}
             </span>
+          </div>
+          <div className="info-row">
+            <span>Busiest</span>
+            <span className="info-value">{busiestLabel(site)}</span>
           </div>
           <div className="info-row">
             <span>Energy per day</span>
