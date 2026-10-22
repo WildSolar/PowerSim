@@ -445,12 +445,13 @@ class Fleets {
     return total;
   }
 
-  /** Diesel the given buildings' vehicles burn in a year at the rate they stand at `simTimeMs` (L). */
-  dieselLitersPerYearAt(buildings: Building[], simTimeMs: number): number {
-    let liters = 0;
+  /** Diesel the given buildings' vans and lorries burn in a year at the rate they stand at
+   * `simTimeMs` (L), each kind apart. */
+  dieselLitersPerYearAt(buildings: Building[], simTimeMs: number): Record<FleetVehicleClass, number> {
+    const liters = { van: 0, truck: 0 };
     for (const { v, b } of this.flatten(buildings)) {
       const spec = FLEET_CATALOG[this.typeAt(v, simTimeMs)];
-      if (spec.litersPer100Km > 0 && existsAt(b, simTimeMs)) liters += (spec.annualKm / 100) * spec.litersPer100Km;
+      if (spec.litersPer100Km > 0 && existsAt(b, simTimeMs)) liters[v.vehicleClass] += (spec.annualKm / 100) * spec.litersPer100Km;
     }
     return liters;
   }

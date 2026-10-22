@@ -316,6 +316,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Transport: the petrol and diesel burned by households' cars and businesses' vans and lorries. Public transport, cycling and walking count as zero.",
       ]),
       p(
+        "The Year in Review, the Overview and the emissions chart show the sources in more detail: transport by vehicle — cars, vans, lorries — and, apart from the rest of the electricity, what charging electric cars, vans and lorries emits, at home, at public chargers and at businesses' depots. That share follows how clean the grid is, so it shrinks as the grid gets cleaner and the town's solar grows; an electric vehicle never emits as much as the petrol or diesel one it replaces.",
+      ),
+      p(
         "Some emissions can't be avoided within a town's reach: the national grid is still not clean in 2050, a few buildings have no alternative to their boiler, and old cars and lorries run on for years. As in Swiss climate law, that rest is balanced with carbon removal — CO₂ taken back out of the air by biochar, direct air capture or capture at a waste-to-energy plant. The ‘Carbon removal contracts’ measure buys them, but only for that rest: removals count once the town's own emissions are down to a fifth of what they were at the start. From the year after a counted year gets there, the contract buys month by month — a twelfth each month of what that year left, up to the share you choose — and pays each month, at the price of the day: around CHF 450 a tonne today, about CHF 200 by 2050. What a year bought counts against its emissions, never below nothing. Before that it costs nothing — the first four fifths have to be cut.",
       ),
       p(

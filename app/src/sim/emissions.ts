@@ -33,15 +33,21 @@ import { gridCarbonIntensityGPerKWh } from "./gridCarbon";
 import { dhEmissionsKgCO2 } from "./districtHeatDispatch";
 import { datacenter } from "./datacenter";
 import { GAS_BOILER_EFFICIENCY, OIL_BOILER_EFFICIENCY, OIL_ENERGY_KWH_PER_LITER } from "./heatingSystems";
-import { computeHeatingTechnologyBreakdown, computeMobilityFuelLiters, computeNetElectricityKWh } from "./yearReport";
+import { computeElectricityUseKWh, computeHeatingTechnologyBreakdown, computeMobilityFuelLiters } from "./yearReport";
 
 export interface EmissionsBreakdown {
   year: number;
   electricityKgCO2: number; // net of solar export, at that year's grid intensity
+  /** The part of electricityKgCO2 that charged electric vehicles (cars, vans, lorries): their share
+   * of the town's electricity use. */
+  evChargingKgCO2: number;
   gasKgCO2: number;
   oilKgCO2: number;
   districtHeatingKgCO2: number;
-  mobilityKgCO2: number; // ICE car petrol/diesel — e-bikes and non-electric water heating aren't priced/modeled at all, same boundary billing.ts already draws
+  mobilityKgCO2: number; // petrol and diesel burned on the road — the three below together
+  carsKgCO2: number; // residents' petrol and diesel cars
+  vansKgCO2: number; // businesses' diesel vans
+  lorriesKgCO2: number; // businesses' diesel lorries
   /** Everything emitted (the five sources above). */
   totalKgCO2: number;
   /** Removals credited against it (carbon removal contracts; none in the baseline year). */
@@ -56,13 +62,33 @@ export interface EmissionsBreakdown {
 // gas/oil/districtHeating reuse heatingSystems.ts's own colors for those same
 // fuels (semantically consistent across the report's sections); electricity
 // and mobility are new, distinct colors chosen so the five work together.
+// The vehicles apart (cars as mobility before; vans, lorries and charging from the same categorical
+// palette), validated as eight in the order the charts stack them: electricity, charging, district
+// heating, gas, oil, cars, vans, lorries.
 export const EMISSIONS_SOURCE_COLOR = {
   electricity: "#2a78d6",
-  mobility: "#1baf7a",
+  evCharging: "#e87ba4",
   districtHeating: "#4a3aa7",
   gas: "#eb6834",
   oil: "#b23a2e",
+  cars: "#1baf7a",
+  vans: "#eda100",
+  lorries: "#008300",
 } as const;
+
+/** The sources a year's emissions are shown by, in the order the charts stack them: electricity
+ * without what electric vehicles charged, which stands on its own, and petrol and diesel by vehicle.
+ * They add up to the total. */
+export const EMISSION_SOURCES: { key: keyof typeof EMISSIONS_SOURCE_COLOR; label: string; icon: string; kgCO2: (e: EmissionsBreakdown) => number }[] = [
+  { key: "electricity", label: "Other electricity", icon: "⚡", kgCO2: (e) => e.electricityKgCO2 - e.evChargingKgCO2 },
+  { key: "evCharging", label: "Charging electric vehicles", icon: "🔌", kgCO2: (e) => e.evChargingKgCO2 },
+  { key: "districtHeating", label: "District heating", icon: "🏭", kgCO2: (e) => e.districtHeatingKgCO2 },
+  { key: "gas", label: "Gas heating", icon: "🔥", kgCO2: (e) => e.gasKgCO2 },
+  { key: "oil", label: "Oil heating", icon: "🛢️", kgCO2: (e) => e.oilKgCO2 },
+  { key: "cars", label: "Cars, petrol and diesel", icon: "🚗", kgCO2: (e) => e.carsKgCO2 },
+  { key: "vans", label: "Vans, diesel", icon: "🚐", kgCO2: (e) => e.vansKgCO2 },
+  { key: "lorries", label: "Lorries, diesel", icon: "🚚", kgCO2: (e) => e.lorriesKgCO2 },
+];
 
 const emissionsCache = new Map<number, EmissionsBreakdown>();
 // A year being counted: a second caller waits for the same count (and the removals are paid once).
@@ -95,16 +121,20 @@ async function countYear(buildings: Building[], plants: PowerPlant[], year: numb
   // The baseline first: the removals bought are capped against it.
   if (year > BASELINE_YEAR) await computeEmissionsForYear(buildings, plants, BASELINE_YEAR);
 
-  const [heatingTechnology, netElectricityKWh, iceCarLiters] = await Promise.all([
+  const [heatingTechnology, electricityUse, fuelLiters] = await Promise.all([
     computeHeatingTechnologyBreakdown(buildings, year),
-    computeNetElectricityKWh(buildings, plants, year),
+    computeElectricityUseKWh(buildings, plants, year),
     computeMobilityFuelLiters(buildings, year),
   ]);
+  const netElectricityKWh = electricityUse.netKWh;
 
   const greenShare = policyStore.get().greenPowerShare / 100;
   // A data centre buys certified renewable power (datacenter.ts): its electricity carries nothing.
   const datacenterKWh = datacenter.kWhBetween(toSimTimeMs(Date.UTC(year, 0, 1)), toSimTimeMs(Date.UTC(year + 1, 0, 1)));
   const electricityKgCO2 = (Math.max(0, netElectricityKWh - datacenterKWh) * gridCarbonIntensityGPerKWh(year) * (1 - GREEN_POWER_MAX_EMISSION_REDUCTION * greenShare)) / 1000;
+  // Electric vehicles' part of it: their share of what the town used (the data centre's aside).
+  const usedKWh = electricityUse.consumptionKWh - datacenterKWh;
+  const evChargingKgCO2 = usedKWh > 0 ? electricityKgCO2 * Math.min(1, electricityUse.evKWh / usedKWh) : 0;
 
   const gasFuelKWh = heatingTechnology.gasBoilerSpaceKWh / GAS_BOILER_EFFICIENCY;
   const gasKgCO2 = gasFuelKWh * NATURAL_GAS_KG_CO2_PER_KWH;
@@ -115,7 +145,10 @@ async function countYear(buildings: Building[], plants: PowerPlant[], year: numb
   // District heating: what its boilers burned, and its heat pumps' power (districtHeatDispatch.ts).
   const districtHeatingKgCO2 = dhEmissionsKgCO2(heatingTechnology.districtHeat, year);
 
-  const mobilityKgCO2 = iceCarLiters * ICE_CAR_FUEL_KG_CO2_PER_LITER;
+  const carsKgCO2 = fuelLiters.cars * ICE_CAR_FUEL_KG_CO2_PER_LITER;
+  const vansKgCO2 = fuelLiters.vans * ICE_CAR_FUEL_KG_CO2_PER_LITER;
+  const lorriesKgCO2 = fuelLiters.lorries * ICE_CAR_FUEL_KG_CO2_PER_LITER;
+  const mobilityKgCO2 = carsKgCO2 + vansKgCO2 + lorriesKgCO2;
 
   const totalKgCO2 = electricityKgCO2 + gasKgCO2 + oilKgCO2 + districtHeatingKgCO2 + mobilityKgCO2;
 
@@ -128,10 +161,14 @@ async function countYear(buildings: Building[], plants: PowerPlant[], year: numb
   const result: EmissionsBreakdown = {
     year,
     electricityKgCO2,
+    evChargingKgCO2,
     gasKgCO2,
     oilKgCO2,
     districtHeatingKgCO2,
     mobilityKgCO2,
+    carsKgCO2,
+    vansKgCO2,
+    lorriesKgCO2,
     totalKgCO2,
     removalsKgCO2,
     netKgCO2: totalKgCO2 - removalsKgCO2,

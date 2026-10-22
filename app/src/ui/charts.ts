@@ -14,7 +14,7 @@ import { ENERGY_CLASS_CATALOG, ENERGY_CLASS_ORDER } from "../config/retrofit";
 import { MOBILITY_MODE_CATALOG } from "../config/mobility";
 import { approval } from "../sim/approval";
 import { BASELINE_YEAR, MONTH_NAMES, toDateMs, toSimTimeMs } from "../sim/calendar";
-import { cachedEmissionsForYear, EMISSIONS_SOURCE_COLOR } from "../sim/emissions";
+import { cachedEmissionsForYear, EMISSION_SOURCES, EMISSIONS_SOURCE_COLOR } from "../sim/emissions";
 import { bookedFinances, townTakeRp, utilityProfitRp, type UtilityMonth } from "../sim/finances";
 import { grid } from "../sim/grid";
 import { measures } from "../sim/measures";
@@ -544,13 +544,6 @@ function emissionsChart(nowMs: number): ChartData {
     if (e) list.push(e);
   }
   const t = (kg: number) => kg / 1000;
-  const keys = [
-    ["electricity", "Electricity", "electricityKgCO2"],
-    ["districtHeating", "District heating", "districtHeatingKgCO2"],
-    ["gas", "Gas heating", "gasKgCO2"],
-    ["oil", "Oil heating", "oilKgCO2"],
-    ["mobility", "Cars", "mobilityKgCO2"],
-  ] as const;
   return {
     xs: list.map((e) => e.year + 0.5),
     xLabels: list.map((e) => String(e.year)),
@@ -559,7 +552,7 @@ function emissionsChart(nowMs: number): ChartData {
     bars: true,
     total: "Emitted",
     series: [
-      ...keys.map(([k, label, field]) => ({ key: k, label, color: EMISSIONS_SOURCE_COLOR[k], kind: "stack" as const, values: list.map((e) => t(e[field])) })),
+      ...EMISSION_SOURCES.map((s) => ({ key: s.key, label: s.label, color: EMISSIONS_SOURCE_COLOR[s.key], kind: "stack" as const, values: list.map((e) => t(s.kgCO2(e))) })),
       { key: "removals", label: "Removed (contracts)", color: "#888", kind: "hidden", values: list.map((e) => t(e.removalsKgCO2)) },
       { key: "net", label: "Net, after removals", color: "var(--ink)", kind: "line", values: list.map((e) => t(e.netKgCO2)) },
     ],

@@ -8,7 +8,7 @@ import { existsAt } from "../sim/lifetime";
 import { MONTH_NAMES, toDateMs, toSimTimeMs } from "../sim/calendar";
 import { stock } from "../sim/stock";
 import type { MunicipalityDataset } from "../data/types";
-import { EMISSIONS_SOURCE_COLOR } from "../sim/emissions";
+import { EMISSION_SOURCES, EMISSIONS_SOURCE_COLOR } from "../sim/emissions";
 import { HEATING_SYSTEM_CATALOG, HEATING_SYSTEM_ORDER, WATER_HEATING_KIND_COLOR } from "../sim/heatingSystems";
 import { solarAdoptionTallyForYear } from "../sim/solarAdoption";
 import { inbox } from "../sim/inbox";
@@ -158,19 +158,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
 
   const { data: emissions, loading: emissionsLoading } = useYearEmissions(dataset, year);
   const emissionSlices: PieSlice[] = emissions
-    ? [
-        { key: "electricity", label: "Electricity", icon: "⚡", color: EMISSIONS_SOURCE_COLOR.electricity, valueKWh: emissions.current.electricityKgCO2 },
-        { key: "mobility", label: "Mobility (petrol/diesel)", icon: "🚗", color: EMISSIONS_SOURCE_COLOR.mobility, valueKWh: emissions.current.mobilityKgCO2 },
-        {
-          key: "districtHeating",
-          label: "District heating",
-          icon: "🏭",
-          color: EMISSIONS_SOURCE_COLOR.districtHeating,
-          valueKWh: emissions.current.districtHeatingKgCO2,
-        },
-        { key: "gas", label: "Gas heating", icon: "🔥", color: EMISSIONS_SOURCE_COLOR.gas, valueKWh: emissions.current.gasKgCO2 },
-        { key: "oil", label: "Oil heating", icon: "🛢️", color: EMISSIONS_SOURCE_COLOR.oil, valueKWh: emissions.current.oilKgCO2 },
-      ]
+    ? EMISSION_SOURCES.map((s) => ({ key: s.key, label: s.label, icon: s.icon, color: EMISSIONS_SOURCE_COLOR[s.key], valueKWh: s.kgCO2(emissions.current) }))
     : [];
   // The change in net emissions per resident against the start (negative: a cut).
   const vsBaselinePct = emissions ? -yearPoints(emissions.current, emissions.baseline) : 0;

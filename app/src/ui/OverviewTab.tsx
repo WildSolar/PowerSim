@@ -2,7 +2,7 @@ import { useSyncExternalStore, type ReactNode } from "react";
 import type { MunicipalityDataset } from "../data/types";
 import { approval, votePct } from "../sim/approval";
 import { formatDate, toDateMs } from "../sim/calendar";
-import { cachedEmissionsForYear } from "../sim/emissions";
+import { cachedEmissionsForYear, EMISSION_SOURCES } from "../sim/emissions";
 import { MEASURE_CATALOG } from "../sim/measureCatalog";
 import { measures } from "../sim/measures";
 import { studies } from "../sim/studies";
@@ -44,13 +44,6 @@ function Figure({ label, value, children, onClick, chart }: { label: string; val
   );
 }
 
-const SECTORS: { key: "electricityKgCO2" | "gasKgCO2" | "oilKgCO2" | "districtHeatingKgCO2" | "mobilityKgCO2"; label: string }[] = [
-  { key: "gasKgCO2", label: "Gas heating" },
-  { key: "oilKgCO2", label: "Oil heating" },
-  { key: "mobilityKgCO2", label: "Petrol and diesel cars" },
-  { key: "electricityKgCO2", label: "Electricity" },
-  { key: "districtHeatingKgCO2", label: "District heat" },
-];
 
 /** The town hall's first page: where the town stands, what is coming, and what was decided lately. */
 export function OverviewTab({ dataset, onOpen }: { dataset: MunicipalityDataset; onOpen: (section: "measures" | "treasury") => void }) {
@@ -134,15 +127,16 @@ export function OverviewTab({ dataset, onOpen }: { dataset: MunicipalityDataset;
                 Where the emissions come from, {last.year} <PlotLink chart="emissions" title="Emissions over time" />
               </h3>
               <div className="ov-sectors">
-                {SECTORS.map((s) => {
-                  const share = last.totalKgCO2 > 0 ? last[s.key] / last.totalKgCO2 : 0;
+                {EMISSION_SOURCES.map((s) => {
+                  const kg = s.kgCO2(last);
+                  const share = last.totalKgCO2 > 0 ? kg / last.totalKgCO2 : 0;
                   return (
                     <div className="ov-sector" key={s.key}>
                       <span>{s.label}</span>
                       <span className="ov-sector-bar">
                         <span style={{ width: `${Math.max(0, share) * 100}%` }} />
                       </span>
-                      <span className="ov-sector-value">{(last[s.key] / 1_000_000).toLocaleString("de-CH", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kt</span>
+                      <span className="ov-sector-value">{(kg / 1_000_000).toLocaleString("de-CH", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kt</span>
                     </div>
                   );
                 })}

@@ -135,7 +135,8 @@ interface ElectricitySample {
 }
 interface FuelSample {
   iceCarSlots: number;
-  fleetLitersPerYear: number;
+  vanLitersPerYear: number;
+  truckLitersPerYear: number;
 }
 
 const electricitySamples = new Map<number, (ElectricitySample | null)[]>();
@@ -205,7 +206,8 @@ function fuelSampleAt(buildings: Building[], year: number, month: number, i: num
       if (!existsAt(building, t)) continue;
       for (const dwelling of building.dwellings) iceCarSlots += slotsWithVehicleAt(building.egid, dwelling, "carICE", t);
     }
-    sample = { iceCarSlots, fleetLitersPerYear: fleets.dieselLitersPerYearAt(buildings, t) };
+    const diesel = fleets.dieselLitersPerYearAt(buildings, t);
+    sample = { iceCarSlots, vanLitersPerYear: diesel.van, truckLitersPerYear: diesel.truck };
     slots[i] = sample;
   }
   return sample;
@@ -778,9 +780,20 @@ export function computeHeatingRenewalTally(buildings: Building[], year: number):
  * category and the district heating heat pumps, minus solar generation — for emissions.ts's
  * grid-electricity figure, read off the shared year pass. */
 export async function computeNetElectricityKWh(buildings: Building[], realPlants: PowerPlant[], year: number): Promise<number> {
+  return (await computeElectricityUseKWh(buildings, realPlants, year)).netKWh;
+}
+
+/** The town's electricity over a calendar year: net of its solar (computeNetElectricityKWh), all
+ * it used before solar, and how much of that charged electric vehicles — at home, at public
+ * chargers and at businesses' depots. */
+export async function computeElectricityUseKWh(
+  buildings: Building[],
+  realPlants: PowerPlant[],
+  year: number,
+): Promise<{ netKWh: number; consumptionKWh: number; evKWh: number }> {
   const energy = await yearCategoryEnergyKWh(buildings, realPlants, year);
   const dhHeatPumpKWh = await yearDhHeatPumpKWh(buildings, realPlants, year);
-  return (
+  const consumptionKWh =
     dhHeatPumpKWh +
     energy.fridge +
     energy.lighting +
@@ -791,19 +804,26 @@ export async function computeNetElectricityKWh(buildings: Building[], realPlants
     energy.heatPump +
     energy.ac +
     energy.waterHeating +
-    energy.commercial -
-    energy.solar
-  );
+    energy.commercial;
+  return { netKWh: consumptionKWh - energy.solar, consumptionKWh, evKWh: energy.ev };
 }
 
-const mobilityFuelByMonth = new Map<number, Promise<{ iceCarSlotSamples: number; fleetLitersPerYearSum: number; samples: number }>>();
+interface MobilityFuelMonth {
+  iceCarSlotSamples: number;
+  vanLitersPerYearSum: number;
+  truckLitersPerYearSum: number;
+  samples: number;
+}
 
-function monthMobilityFuel(buildings: Building[], year: number, month: number): Promise<{ iceCarSlotSamples: number; fleetLitersPerYearSum: number; samples: number }> {
+const mobilityFuelByMonth = new Map<number, Promise<MobilityFuelMonth>>();
+
+function monthMobilityFuel(buildings: Building[], year: number, month: number): Promise<MobilityFuelMonth> {
   return sharedMonth(mobilityFuelByMonth, year, month, async () => {
     const samples = await eachSample(fuelSamples, year * 12 + month, COARSE_SAMPLES_PER_MONTH, (i) => fuelSampleAt(buildings, year, month, i), "month fuel: sample");
     return {
       iceCarSlotSamples: samples.reduce((s, x) => s + x.iceCarSlots, 0),
-      fleetLitersPerYearSum: samples.reduce((s, x) => s + x.fleetLitersPerYear, 0),
+      vanLitersPerYearSum: samples.reduce((s, x) => s + x.vanLitersPerYear, 0),
+      truckLitersPerYearSum: samples.reduce((s, x) => s + x.truckLitersPerYear, 0),
       samples: samples.length,
     };
   }, "month mobility fuel");
@@ -819,19 +839,26 @@ function monthMobilityFuel(buildings: Building[], year: number, month: number): 
  * sampling than the technology breakdown for the same reason — renewal
  * events are rare (years apart per slot), so the underlying quantity barely
  * moves within a month. */
-export async function computeMobilityFuelLiters(buildings: Building[], year: number): Promise<number> {
+export async function computeMobilityFuelLiters(buildings: Building[], year: number): Promise<{ cars: number; vans: number; lorries: number }> {
   let iceCarSlotSamples = 0;
-  let fleetLitersPerYearSum = 0;
+  let vanLitersPerYearSum = 0;
+  let truckLitersPerYearSum = 0;
   let totalSamples = 0;
   for (const month of await eachMonth((m) => monthMobilityFuel(buildings, year, m))) {
     iceCarSlotSamples += month.iceCarSlotSamples;
-    fleetLitersPerYearSum += month.fleetLitersPerYearSum;
+    vanLitersPerYearSum += month.vanLitersPerYearSum;
+    truckLitersPerYearSum += month.truckLitersPerYearSum;
     totalSamples += month.samples;
   }
-  if (totalSamples === 0) return 0;
+  if (totalSamples === 0) return { cars: 0, vans: 0, lorries: 0 };
   const avgIceCarCount = iceCarSlotSamples / totalSamples;
-  // Plus businesses' diesel vans and lorries (fleet.ts), at their average yearly rate.
-  return avgIceCarCount * (ANNUAL_CAR_KM / 100) * ICE_CAR_L_PER_100KM + fleetLitersPerYearSum / totalSamples;
+  // Residents' petrol and diesel cars, and businesses' diesel vans and lorries (fleet.ts) at their
+  // average yearly rate.
+  return {
+    cars: avgIceCarCount * (ANNUAL_CAR_KM / 100) * ICE_CAR_L_PER_100KM,
+    vans: vanLitersPerYearSum / totalSamples,
+    lorries: truckLitersPerYearSum / totalSamples,
+  };
 }
 
 export interface RetrofitTallyEntry {
@@ -872,7 +899,7 @@ export function computeRetrofitTally(buildings: Building[], year: number): Retro
 export interface YearReportSnapshot {
   electricity: Map<number, YearElectricityMonth>;
   heating: Map<number, HeatingTechnologyEnergyKWh>;
-  mobility: Map<number, { iceCarSlotSamples: number; fleetLitersPerYearSum: number; samples: number }>;
+  mobility: Map<number, MobilityFuelMonth>;
   /** The month in progress's samples taken ahead — each under the policy of its day. */
   samples: {
     electricity: [number, (ElectricitySample | null)[]][];

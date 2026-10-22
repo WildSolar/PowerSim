@@ -300,7 +300,10 @@ export async function runPerf(year?: number): Promise<Record<string, number>> {
   let fuel = 0;
   out.heatingTechYear = await timed(async () => (heating = (await computeHeatingTechnologyBreakdown(buildings, y)).airHeatPumpSpaceKWh));
   out.netElectricityYear = await timed(async () => (net = await computeNetElectricityKWh(buildings, [], y)));
-  out.mobilityFuelYear = await timed(async () => (fuel = await computeMobilityFuelLiters(buildings, y)));
+  out.mobilityFuelYear = await timed(async () => {
+    const liters = await computeMobilityFuelLiters(buildings, y);
+    fuel = liters.cars + liters.vans + liters.lorries;
+  });
   // Results too, so an optimisation can be checked for changing nothing.
   out.resultAirHpKWh = Math.round(heating);
   out.resultNetKWh = Math.round(net);
