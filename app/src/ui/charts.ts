@@ -302,10 +302,9 @@ function chargingChart(nowMs: number): ChartData {
   const { records, ...m } = monthly(nowMs, (r) => !!r.assets);
   return {
     ...m,
-    unit: "cars' worth",
+    unit: "%",
     series: [
-      { key: "room", label: "Room at public chargers", color: "#2a78d6", kind: "line", values: records.map((r) => r.assets!.chargerRoom) },
-      { key: "taken", label: "Room taken", color: "#eb6834", kind: "line", values: records.map((r) => r.assets!.chargerTaken) },
+      { key: "full", label: "How full", color: "#eb6834", kind: "line", values: records.map((r) => (r.assets!.chargerRoom > 0 ? (100 * r.assets!.chargerTaken) / r.assets!.chargerRoom : 0)) },
       { key: "points", label: "Charge points", color: "#888", kind: "hidden", values: records.map((r) => r.assets!.chargerPoints) },
     ],
   };
@@ -830,7 +829,7 @@ export const CHARTS: ChartDef[] = [
     id: "public-charging",
     group: "Mobility",
     title: "Public charging",
-    description: "The room at the town's public chargers and how much of it is taken, in cars' worth (a van takes about two cars' room, a lorry about twenty), at the end of each month.",
+    description: "How full the town's public chargers are, all of them together (a van needs about twice a car's room, a lorry many times), and how many charge points there are, at the end of each month.",
     data: (_, now) => chargingChart(now),
   },
   {

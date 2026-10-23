@@ -20,7 +20,7 @@ import { simClock } from "./engine";
 import { market } from "./market";
 import { networkTariff } from "./networkTariff";
 import { feedInBaseRpKWh, feedInYearBaseRpKWh, resetFeedIn } from "./feedIn";
-import { DEFAULT_SHEET, type Tariff, type TariffSheet } from "./tariff";
+import { DEFAULT_SHEET, withStandardPrice, withWindowDefaults, type Tariff, type TariffSheet } from "./tariff";
 
 /** What a kWh costs a consumer in basic supply under a sheet in a year: its energy price and the
  * regulated network fee (networkTariff.ts) — and the base fee per meter and month. */
@@ -139,8 +139,12 @@ class TariffStore {
 
   /** For the dev scenario runner: change the sheet in force from the start, without publishing. */
   set(patch: Partial<TariffSheet>): void {
-    const sheet = { ...this.sheetFor(BASELINE_YEAR) };
-    for (const key of Object.keys(DEFAULT_SHEET) as (keyof TariffSheet)[]) if (patch[key] !== undefined) (sheet as unknown as Record<string, unknown>)[key] = patch[key];
+    let sheet = { ...this.sheetFor(BASELINE_YEAR) };
+    for (const key of Object.keys(DEFAULT_SHEET) as (keyof TariffSheet)[]) {
+      const value = patch[key];
+      if (typeof value === "number") sheet = withStandardPrice(sheet, key, value); // window prices follow, unless also patched
+      else if (value !== undefined) (sheet as unknown as Record<string, unknown>)[key] = value;
+    }
     this.sheets = new Map([[BASELINE_YEAR, sheet]]);
     this.refresh();
   }
@@ -157,7 +161,7 @@ class TariffStore {
   }
 
   restore(s: ReturnType<TariffStore["snapshot"]>): void {
-    this.sheets = new Map([...s.sheets].map(([y, sheet]) => [y, { ...DEFAULT_SHEET, ...sheet }]));
+    this.sheets = new Map([...s.sheets].map(([y, sheet]) => [y, { ...DEFAULT_SHEET, ...withWindowDefaults(sheet) }]));
     this.refresh();
   }
 

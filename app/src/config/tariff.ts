@@ -25,6 +25,13 @@ export const DEFAULT_SHEET: TariffSheet = {
   publicChargingAcRpKWh: 45,
   publicChargingDcRpKWh: 55,
   publicChargingFleetRpKWh: 40,
+  // ...the same at night and in solar hours: no price windows until you set them apart.
+  publicChargingAcNightRpKWh: 45,
+  publicChargingDcNightRpKWh: 55,
+  publicChargingFleetNightRpKWh: 40,
+  publicChargingAcSolarRpKWh: 45,
+  publicChargingDcSolarRpKWh: 55,
+  publicChargingFleetSolarRpKWh: 40,
   // No dynamic tariff at the start (config/dynamicTariff.ts).
   dynamicMarginRpKWh: 0,
   // No charging tariff at the start either (sim/chargingTariff.ts); these are what it starts from

@@ -10,7 +10,7 @@ import { MAX_CHARGING_NETWORK_DISCOUNT } from "../config/chargingTariff";
 import { market } from "../sim/market";
 import { stock } from "../sim/stock";
 import { useSimDay, useTariff } from "../sim/store";
-import type { TariffSheet } from "../sim/tariff";
+import { withStandardPrice, type TariffSheet } from "../sim/tariff";
 import { householdBillChf, householdEnergyRpKWh, previewReaction } from "../sim/tariffApproval";
 import { energyPriceCap } from "../sim/tariffCap";
 import { BASE_FEE_MAX_CHF_PER_MONTH, TARIFF_CAP_MARGIN } from "../config/tariff";
@@ -35,13 +35,14 @@ const CHARGING_FIELDS: ChargingField[] = [
   "chargingSolarEnergyRpKWh",
 ];
 type SheetField = Exclude<keyof TariffSheet, "offPeakStartHour" | "offPeakEndHour" | "dynamicMarginRpKWh" | ChargingField>;
-type FieldGroup = "energy" | "network" | "solar" | "other";
+type FieldGroup = "energy" | "network" | "solar" | "other" | "chargers";
 
 const GROUP_LABEL: Record<FieldGroup, string> = {
   energy: "Energy price",
   network: "Network fee (regulated)",
   solar: "Solar",
-  other: "Heat and charging",
+  other: "Heat",
+  chargers: "Your public chargers",
 };
 
 const FIELDS: { key: SheetField; label: string; max: number; step: number; unit: string; scale?: number; title?: string; group: FieldGroup }[] = [
@@ -51,9 +52,15 @@ const FIELDS: { key: SheetField; label: string; max: number; step: number; unit:
   { key: "networkOffPeakShare", label: "Off-peak rate", max: 100, step: 5, unit: "% of peak", scale: 100, group: "network", title: "How much cheaper the network fee is at night" },
   { key: "feedInBonusRpKWh", label: "Your bonus", max: 30, step: 0.5, unit: "Rp/kWh", group: "solar", title: "What the utility adds to the federal feed-in price, typically for the certificate of origin" },
   { key: "districtHeatingPriceRpKWh", label: "District heating", max: 40, step: 0.5, unit: "Rp/kWh", group: "other" },
-  { key: "publicChargingAcRpKWh", label: "Public charging", max: 120, step: 0.5, unit: "Rp/kWh", group: "other", title: "At the municipality's own on-street chargers" },
-  { key: "publicChargingDcRpKWh", label: "Fast charging", max: 150, step: 0.5, unit: "Rp/kWh", group: "other", title: "At the municipality's own fast-charging hubs" },
-  { key: "publicChargingFleetRpKWh", label: "Lorry charging", max: 150, step: 0.5, unit: "Rp/kWh", group: "other", title: "At the municipality's own lorry charging parks" },
+  { key: "publicChargingAcRpKWh", label: "On-street", max: 120, step: 0.5, unit: "Rp/kWh", group: "chargers", title: "At the municipality's own on-street chargers (and in its car parks), outside the night and solar hours" },
+  { key: "publicChargingAcNightRpKWh", label: "…at night", max: 120, step: 0.5, unit: "Rp/kWh", group: "chargers", title: "In the night rate's hours. Cheaper, and the chargers charge the cars parked overnight then" },
+  { key: "publicChargingAcSolarRpKWh", label: "…in solar hours", max: 120, step: 0.5, unit: "Rp/kWh", group: "chargers", title: "When the town's own solar is forecast to make more than it uses. On the street few charge then: the cars are parked from the evening" },
+  { key: "publicChargingDcRpKWh", label: "Fast charging", max: 150, step: 0.5, unit: "Rp/kWh", group: "chargers", title: "At the municipality's own fast-charging hubs, outside the night and solar hours" },
+  { key: "publicChargingDcNightRpKWh", label: "…at night", max: 150, step: 0.5, unit: "Rp/kWh", group: "chargers", title: "In the night rate's hours. Cheaper, and some drivers come by then instead — leaving the hub room for more" },
+  { key: "publicChargingDcSolarRpKWh", label: "…in solar hours", max: 150, step: 0.5, unit: "Rp/kWh", group: "chargers", title: "When the town's own solar is forecast to make more than it uses. Cheaper, and some drivers come by then instead" },
+  { key: "publicChargingFleetRpKWh", label: "Lorry charging", max: 150, step: 0.5, unit: "Rp/kWh", group: "chargers", title: "At the municipality's own lorry charging parks, outside the night and solar hours" },
+  { key: "publicChargingFleetNightRpKWh", label: "…at night", max: 150, step: 0.5, unit: "Rp/kWh", group: "chargers", title: "In the night rate's hours. Cheaper, and some lorries charge overnight instead — leaving the park room for more" },
+  { key: "publicChargingFleetSolarRpKWh", label: "…in solar hours", max: 150, step: 0.5, unit: "Rp/kWh", group: "chargers", title: "When the town's own solar is forecast to make more than it uses. Cheaper, and some lorries charge at their midday break" },
 ];
 
 const MARKETS: { id: Commodity; label: string; unit: string; digits: number }[] = [
@@ -134,7 +141,7 @@ export function TariffControl() {
               field={f}
               now={inForce[f.key]}
               value={draft[f.key]}
-              onChange={(v) => setDraft((d) => ({ ...d, [f.key]: v }))}
+              onChange={(v) => setDraft((d) => withStandardPrice(d, f.key, v))}
               groupLabel={i === 0 || FIELDS[i - 1].group !== f.group ? GROUP_LABEL[f.group] : null}
             />
             {f.key === "feedInBonusRpKWh" && (

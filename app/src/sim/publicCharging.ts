@@ -29,7 +29,9 @@
  *
  * A publicly charged car draws its power at its sites, not at home: on-street chargers mostly in
  * the evening, fast chargers and shops' car parks during the day; what it charges at work is drawn
- * where its driver works, mostly outside the town.
+ * where its driver works, mostly outside the town. At the municipality's own chargers a cheaper
+ * price at night or in the town's solar hours moves part of that (chargerPricing.ts), and gives a
+ * hub or a lorry park room for more.
  */
 
 import { timed } from "./devTiming";
@@ -61,6 +63,7 @@ import {
   OPERATOR_SHOP_POWER_KW,
   SHOP_CAR_PARK_M,
   MAX_FILL,
+  NIGHT_STOP_SPREAD_HOURS,
   PRIVATE_PRICE_RP_PER_KWH,
   QOS_CURVE,
   QOS_FLOOR,
@@ -94,6 +97,9 @@ import { treasury } from "./treasury";
 import { priceFactor } from "./costTrends";
 import type { CostTrendId } from "../config/costTrends";
 import { cannotPay, spendingFrozen } from "./fiscalRules";
+import { chosenWindow, expectedMix, responsiveShare, roomFactor, siteGroup, windowPrices, type PriceWindow } from "./chargerPricing";
+import type { TariffSheet } from "./tariff";
+import { townSurplus } from "./townSurplus";
 
 const DAY_MS = 24 * 60 * 60_000;
 const MONTH_MS = (365.25 * DAY_MS) / 12;
@@ -345,14 +351,31 @@ export function pointsAt(site: ChargingSite, atMs: number): number {
   return points;
 }
 
+/** A site's room at `atMs`, in cars' worth: its points, and (at a municipal hub or lorry park) more
+ * with its use spread out by its price windows. */
 export function siteCapacityAt(site: ChargingSite, atMs: number): number {
-  return pointsAt(site, atMs) * CARS_PER_POINT[site.kind];
+  const points = pointsAt(site, atMs);
+  if (points === 0) return 0;
+  const room = points * CARS_PER_POINT[site.kind];
+  if (site.owner !== "municipal") return room;
+  const year = yearOf(atMs);
+  return room * roomFactor(site, tariffStore.sheetFor(year), year);
 }
 
-export function sitePriceRpPerKWh(site: ChargingSite): number {
+/** What charging at a site costs a vehicle relying on it, as its driver expects it over the year of
+ * `atMs` (Rp/kWh): a private operator's one price, or the municipality's prices by window, as its
+ * drivers spread over them. */
+export function sitePriceRpPerKWh(site: ChargingSite, atMs: number): number {
   if (site.owner === "private") return PRIVATE_PRICE_RP_PER_KWH[site.kind];
-  const tariff = tariffStore.get();
-  return site.kind === "fleet" ? tariff.publicChargingFleetRpKWh : site.kind === "dc" ? tariff.publicChargingDcRpKWh : tariff.publicChargingAcRpKWh;
+  const year = yearOf(atMs);
+  return expectedMix(site, tariffStore.sheetFor(year), year).priceRpKWh;
+}
+
+/** A municipal site's prices by window in the year of `atMs`, and the share of its energy expected in each. */
+export function sitePriceWindows(site: ChargingSite, atMs: number): { prices: Record<PriceWindow, number>; shares: Record<PriceWindow, number> } {
+  const year = yearOf(atMs);
+  const { prices, shares } = expectedMix(site, tariffStore.sheetFor(year), year);
+  return { prices, shares };
 }
 
 function yearStartMs(year: number): number {
@@ -602,7 +625,7 @@ class PublicCharging {
     }
     if (workQos > 0 && (!only || only.has(AT_WORK))) candidates.push({ site: null, distanceM: 0, qos: workQos });
     const { qos, sources } = shareOut(candidates);
-    const priceRpPerKWh = sources.reduce((sum, s) => sum + s.share * (s.site ? sitePriceRpPerKWh(s.site) : WORK_CHARGING_PRICE_RP_PER_KWH), 0);
+    const priceRpPerKWh = sources.reduce((sum, s) => sum + s.share * (s.site ? sitePriceRpPerKWh(s.site, atMs) : WORK_CHARGING_PRICE_RP_PER_KWH), 0);
     return { qos, sources, priceRpPerKWh, hassleRp: hassleRp(need.vehicle, qos) };
   }
 
@@ -739,9 +762,12 @@ class PublicCharging {
   // --- load ---
 
   /** A booking's session at a site on `day` (days since the epoch), if the vehicle charges there
-   * that day: when it plugs in, when it's charged, and when it gives the point up — on the street
-   * the next morning (it stays parked overnight), elsewhere a few minutes after it's charged. */
-  private sessionOn(a: Assignment, site: ChargingSite, day: number): { startMs: number; chargedMs: number; leavesMs: number; powerKw: number } | null {
+   * that day: when it plugs in, when it starts charging and is charged, and when it gives the point
+   * up — on the street the next morning (it stays parked overnight), elsewhere a few minutes after
+   * it's charged. At the municipality's own chargers a cheaper window moves it (chargerPricing.ts):
+   * on the street the charging, into the night hours of the time the car is parked; elsewhere, for
+   * the drivers who respond, the stop itself, into the day's solar hours or the night. */
+  private sessionOn(a: Assignment, site: ChargingSite, day: number): { startMs: number; chargeFromMs: number; chargedMs: number; leavesMs: number; powerKw: number } | null {
     const kind = site.kind;
     const seed = hashSeedFrom(a.seed, String(day), site.id);
     const dayShare = SESSION_DAY_SHARE[a.vehicle][kind];
@@ -751,18 +777,64 @@ class PublicCharging {
     const startHour = overnight ? 17.5 + firstRandom(seed ^ 0x5bd1e995) * 3 : 9 + firstRandom(seed ^ 0x5bd1e995) * 10;
     const powerKw = SESSION_POWER_KW[a.vehicle][kind];
     const energyKWh = a.kWhPerDay / dayShare;
-    const startMs = day * DAY_MS + startHour * 3_600_000;
-    const chargedMs = startMs + (energyKWh / powerKw) * 3_600_000;
+    const durationMs = (energyKWh / powerKw) * 3_600_000;
+    const plugInMs = day * DAY_MS + startHour * 3_600_000;
     const leave = firstRandom(seed ^ 0x27d4eb2f);
-    const leavesMs = overnight
-      ? Math.max(chargedMs, (day + 1) * DAY_MS + (6.5 + leave * 2) * 3_600_000) // off to work, 6:30–8:30
-      : chargedMs + (5 + leave * 10) * 60_000;
-    return { startMs, chargedMs, leavesMs, powerKw };
+    const morningMs = (day + 1) * DAY_MS + (6.5 + leave * 2) * 3_600_000; // off to work, 6:30–8:30
+    let startMs = plugInMs;
+    const moved = site.owner === "municipal" ? this.movedWindow(a, site, day) : "standard";
+    if (moved !== "standard") {
+      const spread = firstRandom(seed ^ 0x1b873593);
+      const sheet = this.sheetOfDay(day);
+      const nightMs = day * DAY_MS + sheet.offPeakStartHour * 3_600_000;
+      const nightEndMs = (day + 1) * DAY_MS + sheet.offPeakEndHour * 3_600_000;
+      if (overnight) {
+        // Plugged in as ever; charged in the night hours before the morning, the cars spread out.
+        const from = Math.max(plugInMs, nightMs);
+        startMs = from + spread * Math.max(0, morningMs - durationMs - from);
+      } else if (moved === "solar") {
+        const w = townSurplus.windowOf(day)!;
+        startMs = w.startMs + spread * Math.max(0, w.endMs - w.startMs - durationMs);
+      } else {
+        const spreadMs = NIGHT_STOP_SPREAD_HOURS[siteGroup(site) === "fleet" ? "fleet" : "hub"] * 3_600_000;
+        startMs = nightMs + spread * Math.max(0, Math.min(spreadMs, nightEndMs - nightMs - durationMs));
+      }
+    }
+    const chargedMs = startMs + durationMs;
+    const leavesMs = overnight ? Math.max(chargedMs, morningMs) : chargedMs + (5 + leave * 10) * 60_000;
+    return { startMs: overnight ? plugInMs : startMs, chargeFromMs: startMs, chargedMs, leavesMs, powerKw };
+  }
+
+  /** The tariff sheet in force on `day` (kept for the day: sessions ask for it often). */
+  private sheetDay = Number.NaN;
+  private daySheet: TariffSheet | null = null;
+  private sheetOfDay(day: number): TariffSheet {
+    if (day !== this.sheetDay || !this.daySheet) {
+      this.sheetDay = day;
+      this.daySheet = tariffStore.sheetFor(yearOf(day * DAY_MS + DAY_MS / 2));
+    }
+    return this.daySheet;
+  }
+
+  /** Where a booking at a municipal site charges on `day`: at its usual time, or — if its driver
+   * moves for the price and a window is cheaper — in that window. */
+  private movedWindow(a: Assignment, site: ChargingSite, day: number): PriceWindow {
+    const prices = windowPrices(this.sheetOfDay(day), site.kind);
+    if (prices.night >= prices.standard && prices.solar >= prices.standard) return "standard";
+    const responsive = responsiveShare(site);
+    if (responsive < 1 && firstRandom(hashSeedFrom(a.seed, site.id, "price-responsive")) >= responsive) return "standard";
+    const group = siteGroup(site);
+    return chosenWindow(prices, group, !!site.shop, group !== "street" && townSurplus.windowOf(day) !== null);
   }
 
   private assignmentLoadW(a: Assignment, site: ChargingSite, atMs: number): number {
-    const s = this.sessionOn(a, site, Math.floor(atMs / DAY_MS));
-    return s && atMs >= s.startMs && atMs < s.chargedMs ? s.powerKw * 1000 : 0;
+    const day = Math.floor(atMs / DAY_MS);
+    let s = this.sessionOn(a, site, day);
+    if (s && atMs >= s.chargeFromMs && atMs < s.chargedMs) return s.powerKw * 1000;
+    // At the municipality's own chargers a session moved into the night may still be charging the next morning.
+    if (site.owner !== "municipal" || atMs - day * DAY_MS >= DAY_MS / 2) return 0;
+    s = this.sessionOn(a, site, day - 1);
+    return s && atMs >= s.chargeFromMs && atMs < s.chargedMs ? s.powerKw * 1000 : 0;
   }
 
   siteLoadW(site: ChargingSite, atMs: number): number {
@@ -824,7 +896,7 @@ class PublicCharging {
       utilization: capacity > 0 ? users / capacity : 0,
       kWhPerDay,
       kWhLastYear,
-      revenueLastYearRp: site.owner === "municipal" ? kWhLastYear * sitePriceRpPerKWh(site) : 0,
+      revenueLastYearRp: site.owner === "municipal" ? kWhLastYear * sitePriceRpPerKWh(site, atMs) : 0,
       upkeepPerYearRp: this.upkeepPerYearRp(site, atMs),
     };
   }
@@ -853,7 +925,7 @@ class PublicCharging {
       if (site.owner !== "municipal") continue;
       const siteKWh = this.energyKWh(site, from, to);
       kWh += siteKWh;
-      revenueRp += siteKWh * sitePriceRpPerKWh(site);
+      revenueRp += siteKWh * sitePriceRpPerKWh(site, from);
       upkeepRp += this.upkeepPerYearRp(site, toSimTimeMs(Date.UTC(year, month, 15))) / 12;
     }
     return { kWh, revenueRp, upkeepRp };

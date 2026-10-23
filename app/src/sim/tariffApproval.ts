@@ -14,6 +14,8 @@ import {
   MAX_CHARGING_NETWORK_DISCOUNT,
 } from "../config/chargingTariff";
 import { chargingAllInRpKWh } from "./chargingTariff";
+import { CHARGER_WINDOW_DRIVER_GOODWILL } from "../config/charging";
+import { windowPrices } from "./chargerPricing";
 import {
   BENCHMARK_DISTRICT_HEAT_RP_KWH,
   BENCHMARK_HOUSEHOLD_RP_KWH,
@@ -87,7 +89,7 @@ export function stancesFor(sheet: TariffSheet, year: number): Stances {
     homeowners: bill * BILL_WEIGHT.homeowners + heat + feedIn + charging.homeowners,
     // Businesses on the open market don't buy their energy here.
     business: bill * BILL_WEIGHT.business * (1 - marketAccess.businessShareOnMarket(toSimTimeMs(Date.UTC(year, 0, 1)))),
-    drivers: bill * BILL_WEIGHT.drivers + charging.drivers,
+    drivers: bill * BILL_WEIGHT.drivers + charging.drivers + chargerWindowStance(sheet),
   };
 }
 
@@ -103,6 +105,17 @@ function chargingStances(sheet: TariffSheet, year: number): { drivers: number; h
     homeowners: Math.min(CHARGING_HOMEOWNER_GOODWILL, relief * 0.3),
     tenants: -CHARGING_DISCOUNT_TENANT_RESENTMENT * discount,
   };
+}
+
+/** Cheaper hours at the municipality's own chargers, as drivers take them: some goodwill, the more
+ * the cheaper. */
+function chargerWindowStance(sheet: TariffSheet): number {
+  let relief = 0;
+  for (const kind of ["ac", "dc", "fleet"] as const) {
+    const p = windowPrices(sheet, kind);
+    if (p.standard > 0) relief += Math.max(0, 1 - Math.min(p.night, p.solar) / p.standard) / 3;
+  }
+  return CHARGER_WINDOW_DRIVER_GOODWILL * Math.min(1, relief / 0.5);
 }
 
 /** The change from one sheet to another, as people feel it (for the jolt at publication). */

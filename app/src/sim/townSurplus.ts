@@ -46,6 +46,7 @@ class TownSurplus {
   private windows = new Map<number, SolarWindow | null>();
   private useByYear = new Map<number, number>();
   private plantsByYear = new Map<number, PowerPlant[]>();
+  private yearStats = new Map<number, { dayShare: number; middayCoverage: number }>();
 
   init(buildingsProvider: () => Building[], realPlants: PowerPlant[]): void {
     this.buildingsProvider = buildingsProvider;
@@ -53,6 +54,7 @@ class TownSurplus {
     this.windows.clear();
     this.useByYear.clear();
     this.plantsByYear.clear();
+    this.yearStats.clear();
   }
 
   /** The plants in service at the end of the year before `year` (or at `atMs`, if earlier). */
@@ -148,6 +150,32 @@ class TownSurplus {
       }
     }
     return days > 0 ? withSun / days : 0;
+  }
+
+  /** `year`'s solar hours in sum, with the plants it counts: the share of its days that have any,
+   * and how much of the day from 9:00 to 19:00 they cover on average (over all days) — what a
+   * driver weighing the solar-hours price at the town's chargers expects. */
+  solarYear(year: number): { dayShare: number; middayCoverage: number } {
+    let stats = this.yearStats.get(year);
+    if (!stats) {
+      const start = Math.floor(toSimTimeMs(Date.UTC(year, 0, 1)) / DAY_MS);
+      let days = 0;
+      let withSun = 0;
+      let covered = 0;
+      // Every third day is enough.
+      for (let d = start; d < start + 365; d += 3) {
+        days++;
+        const w = this.windowOf(d);
+        if (!w) continue;
+        withSun++;
+        const from = Math.max(w.startMs, d * DAY_MS + 9 * HOUR_MS);
+        const to = Math.min(w.endMs, d * DAY_MS + 19 * HOUR_MS);
+        covered += Math.max(0, to - from) / (10 * HOUR_MS);
+      }
+      stats = { dayShare: withSun / days, middayCoverage: covered / days };
+      this.yearStats.set(year, stats);
+    }
+    return stats;
   }
 }
 

@@ -1,5 +1,5 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { BUILD_SPEC, CARS_PER_POINT, MAX_FILL, QOS_CURVE, QOS_FLOOR, type ChargingKind, type QosKind } from "../config/charging";
+import { BUILD_SPEC, MAX_FILL, QOS_CURVE, QOS_FLOOR, type ChargingKind, type QosKind } from "../config/charging";
 import { COVERAGE_COLOR } from "../map/colorModes";
 import { formatDate, toDateMs, toSimTimeMs } from "../sim/calendar";
 import { simClock } from "../sim/engine";
@@ -14,6 +14,7 @@ import {
   publicCharging,
   siteCapacityAt,
   sitePriceRpPerKWh,
+  sitePriceWindows,
   workChargingShareAt,
   type ChargingSite,
   type VehicleCounts,
@@ -140,27 +141,28 @@ function UsageBar({ used, capacity }: { used: number; capacity: number }) {
   );
 }
 
-/** The cars relying on a site at each of the last New Years, against its room for them then. */
+/** How full a site was at each of the last New Years (against the shaded full mark). */
 function UsageHistory({ site, now }: { site: ChargingSite; now: number }) {
   const year = new Date(toDateMs(now)).getUTCFullYear();
   const columns = [];
   for (let y = year - HISTORY_YEARS + 1; y <= year; y++) {
     const at = y === year ? now : toSimTimeMs(Date.UTC(y + 1, 0, 1)) - 1;
     if (at < 0 && y !== year) continue; // before the game started
-    columns.push({ year: y, users: publicCharging.usersAt(site.id, at), capacity: siteCapacityAt(site, at) });
+    const capacity = siteCapacityAt(site, at);
+    columns.push({ year: y, fill: capacity > 0 ? publicCharging.usersAt(site.id, at) / capacity : 0, open: capacity > 0 });
   }
-  const max = Math.max(1, ...columns.map((c) => Math.max(c.users, c.capacity)));
+  const max = Math.max(1, ...columns.map((c) => c.fill));
   return (
     <div className="ev-history">
       {columns.map((c) => (
         <div
           className="ev-history-col"
           key={c.year}
-          title={`${c.year === year ? "Now" : `End of ${c.year}`}: ${c.users} cars, room for ${c.capacity}`}
+          title={`${c.year === year ? "Now" : `End of ${c.year}`}: ${c.open ? `${Math.round(c.fill * 100)}% full` : "not open"}`}
         >
           <div className="ev-history-plot">
-            <div className="ev-history-capacity" style={{ height: `${(c.capacity / max) * 100}%` }} />
-            <div className="ev-history-users" style={{ height: `${(c.users / max) * 100}%` }} />
+            <div className="ev-history-capacity" style={{ height: c.open ? `${(1 / max) * 100}%` : 0 }} />
+            <div className="ev-history-users" style={{ height: `${(c.fill / max) * 100}%` }} />
           </div>
           <span className="ev-history-year">{String(c.year).slice(2)}</span>
         </div>
@@ -187,6 +189,52 @@ export function ChargerCard() {
   );
 }
 
+const WINDOW_LABEL = { night: "At night", solar: "In solar hours" } as const;
+
+/** A site's price — at the municipality's own, by window once they differ, with the share of its
+ * energy in each. */
+function PriceRows({ site, now }: { site: ChargingSite; now: number }) {
+  if (site.owner !== "municipal") {
+    return (
+      <div className="info-row">
+        <span>Price</span>
+        <span className="info-value">{sitePriceRpPerKWh(site, now)} Rp/kWh</span>
+      </div>
+    );
+  }
+  const { prices, shares } = sitePriceWindows(site, now);
+  if (prices.night === prices.standard && prices.solar === prices.standard) {
+    return (
+      <div className="info-row" title="Set in the tariff, under Prices. A cheaper price at night or in the town's solar hours moves charging there.">
+        <span>Price</span>
+        <span className="info-value">{prices.standard} Rp/kWh</span>
+      </div>
+    );
+  }
+  const sheet = tariffStore.sheetFor(new Date(toDateMs(now)).getUTCFullYear());
+  const hours = { night: `${sheet.offPeakStartHour}:00–${sheet.offPeakEndHour}:00`, solar: "when the town's own solar makes more than it uses" };
+  return (
+    <>
+      <div className="info-row" title="Set in the tariff, under Prices: the price outside the night and solar hours, and the share of this charger's energy sold at it">
+        <span>Price by day</span>
+        <span className="info-value">
+          {prices.standard} Rp/kWh · {percent(shares.standard, 1)} of its energy
+        </span>
+      </div>
+      {(["night", "solar"] as const)
+        .filter((w) => prices[w] !== prices.standard)
+        .map((w) => (
+          <div className="info-row" key={w} title={`${hours[w]} — and the share of this charger's energy sold at that price`}>
+            <span>{WINDOW_LABEL[w]}</span>
+            <span className="info-value">
+              {prices[w]} Rp/kWh · {percent(shares[w], 1)}
+            </span>
+          </div>
+        ))}
+    </>
+  );
+}
+
 function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
   const stats = publicCharging.stats(site, now);
   const building = now < site.openedAtMs;
@@ -207,10 +255,7 @@ function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
           {building ? site.points : stats.points} × {site.powerKw} kW
         </span>
       </div>
-      <div className="info-row">
-        <span>Price</span>
-        <span className="info-value">{sitePriceRpPerKWh(site)} Rp/kWh</span>
-      </div>
+      <PriceRows site={site} now={now} />
       {site.kind !== "fleet" && (
         <div
           className="info-row"
@@ -230,12 +275,10 @@ function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
           </div>
           <div
             className="info-row"
-            title={`Each charge point serves about ${CARS_PER_POINT[site.kind]} cars that rely on it fully (one charging half its needs here takes half that room); a van takes about two cars' room, a lorry about twenty. The fuller it gets, the less use it is to anyone — a busy charger means hunting for a free spot — and past ${Math.round(MAX_FILL * 100)}% it takes nobody new.`}
+            title={`How much of its room the vehicles relying on it take: one charging all its needs here takes more than one charging part of them here, a van about twice a car's, a lorry many times. The fuller it gets, the less use it is to anyone — a busy charger means hunting for a free spot — and past ${Math.round(MAX_FILL * 100)}% it takes nobody new.${site.owner === "municipal" && site.kind !== "ac" ? " Cheaper prices at night or in solar hours spread its use out of the busy hours and give it room for more." : ""}`}
           >
-            <span>Room taken</span>
-            <span className="info-value">
-              {Math.round(stats.users)} / {stats.capacity} cars' worth ({percent(stats.users, stats.capacity)})
-            </span>
+            <span>How full</span>
+            <span className="info-value">{percent(stats.users, stats.capacity)}</span>
           </div>
           <UsageBar used={stats.users} capacity={stats.capacity} />
           <div
@@ -272,7 +315,7 @@ function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
               </div>
             </>
           )}
-          <h4 className="ev-history-title">Room taken, year by year (cars' worth)</h4>
+          <h4 className="ev-history-title">How full, year by year</h4>
           <UsageHistory site={site} now={now} />
         </>
       )}
@@ -382,11 +425,9 @@ export function EvChargingPanel() {
         <span>Charging publicly</span>
         <span className="info-value">{vehicleList(town.usage.vehicles)}</span>
       </div>
-      <div className="info-row" title="A van takes about two cars' room at a charger, a lorry about twenty">
-        <span>Room taken (cars' worth)</span>
-        <span className="info-value">
-          {Math.round(town.usage.users)} / {town.usage.capacity}
-        </span>
+      <div className="info-row" title="How much of the public chargers' room is taken, all of them together: a van needs about twice a car's, a lorry many times">
+        <span>How full</span>
+        <span className="info-value">{percent(town.usage.users, town.usage.capacity)}</span>
       </div>
       <UsageBar used={town.usage.users} capacity={town.usage.capacity} />
 

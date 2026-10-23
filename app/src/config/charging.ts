@@ -174,6 +174,23 @@ export const SESSION_POWER_KW: Record<ChargingVehicle, Record<ChargingKind, numb
   truck: { ac: 22, dc: 150, fleet: 300 },
 };
 
+// --- Price windows at the municipality's own chargers (sim/chargerPricing.ts) ---
+
+// Who moves their charging to a cheaper window: on the street every car (it is parked overnight; the
+// charger simply charges it in the cheapest hours of that time); at a hub or a shop's car park the
+// drivers who choose to stop then; at a lorry park the lorries that can charge at their midday break
+// or overnight.
+export const PRICE_RESPONSIVE_SHARE = { street: 1, hub: 0.4, fleet: 0.5 };
+// How much more room a site has once use is spread out: at most this much more, if all its charging
+// moved out of the busy hours (on the street the cars are parked overnight whenever they charge, so
+// none there).
+export const SPREAD_ROOM_BONUS = 0.5;
+// When a hub's or lorry park's night-time stop starts (hours): from the night rate's start, within this.
+export const NIGHT_STOP_SPREAD_HOURS = { hub: 2, fleet: 7 };
+// Drivers welcome cheaper hours at your chargers: this much goodwill once those prices are half the
+// standard ones, on average over the kinds of charger (sim/tariffApproval.ts).
+export const CHARGER_WINDOW_DRIVER_GOODWILL = 0.06;
+
 // --- Building sites (the municipality) ---
 
 export interface SiteSpec {

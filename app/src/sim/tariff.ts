@@ -27,6 +27,13 @@ export interface TariffSheet {
   publicChargingAcRpKWh: number; // at the municipality's own on-street chargers — see publicCharging.ts
   publicChargingDcRpKWh: number; // at the municipality's own fast-charging hubs
   publicChargingFleetRpKWh: number; // at the municipality's own lorry charging parks
+  // ...the same at night (the night rate's hours) and in the town's solar hours (chargerPricing.ts)
+  publicChargingAcNightRpKWh: number;
+  publicChargingDcNightRpKWh: number;
+  publicChargingFleetNightRpKWh: number;
+  publicChargingAcSolarRpKWh: number;
+  publicChargingDcSolarRpKWh: number;
+  publicChargingFleetSolarRpKWh: number;
   dynamicMarginRpKWh: number; // the dynamic tariff's margin on the day-ahead price; 0: not offered — see dynamicTariff.ts
   // The charging tariff: a wallbox on its own meter, at its own price (chargingTariff.ts).
   chargingTariffOffered: boolean;
@@ -57,6 +64,33 @@ export interface Tariff extends TariffSheet {
   petrolPriceRpPerLiter: number; // per liter of petrol/diesel burned by an ICE car — see mobility.ts
   wholesalePriceRpKWh: number; // what the DSO pays upstream per net kWh purchased — see finances.ts
   gridMaintenanceRpKWh: number; // the DSO's own wires/upkeep cost per kWh delivered — see finances.ts
+}
+
+/** Each kind's standard price on the sheet, and its night and solar-hours prices. */
+export const WINDOW_FIELDS = {
+  publicChargingAcRpKWh: ["publicChargingAcNightRpKWh", "publicChargingAcSolarRpKWh"],
+  publicChargingDcRpKWh: ["publicChargingDcNightRpKWh", "publicChargingDcSolarRpKWh"],
+  publicChargingFleetRpKWh: ["publicChargingFleetNightRpKWh", "publicChargingFleetSolarRpKWh"],
+} as const satisfies Record<string, readonly (keyof TariffSheet)[]>;
+
+/** A sheet with a standard price changed: its night and solar-hours prices follow, unless set apart. */
+export function withStandardPrice(sheet: TariffSheet, key: keyof TariffSheet, value: number): TariffSheet {
+  const next = { ...sheet, [key]: value };
+  if (key in WINDOW_FIELDS) {
+    for (const w of WINDOW_FIELDS[key as keyof typeof WINDOW_FIELDS]) if (sheet[w] === sheet[key]) next[w] = value;
+  }
+  return next;
+}
+
+/** A saved sheet from before the price windows: none set apart. */
+export function withWindowDefaults(sheet: Partial<TariffSheet>): Partial<TariffSheet> {
+  const out = { ...sheet };
+  for (const [standard, windows] of Object.entries(WINDOW_FIELDS) as [keyof typeof WINDOW_FIELDS, readonly (keyof TariffSheet)[]][]) {
+    const price = sheet[standard];
+    if (price === undefined) continue;
+    for (const w of windows) if (out[w] === undefined) (out as Record<string, unknown>)[w] = price;
+  }
+  return out;
 }
 
 export { DEFAULT_SHEET } from "../config/tariff";
