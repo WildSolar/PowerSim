@@ -25,6 +25,7 @@ export const CHANGELOG: Release[] = [
     version: "0.10.0",
     date: null,
     added: [
+      "Solar hours: the hours your town's own solar and wind are forecast to make more than it uses. Utility-controlled wallboxes charge in them when the car is at home — every weekend, some weekdays — and so do staff cars charging with the sun at work. A cheaper charging price in solar hours can make the charging tariff worth more.",
       "A charging tariff (Town hall → Prices): households put their wallbox on its own meter at a charging price you set, with a monthly meter fee, and charge at night only — or whenever the utility decides, for a discount on the network fee that the rest of the town makes up. Those with a wallbox and an electric car sign up on 1 January if it pays for them; the evening peak falls, and electric cars get cheaper to run.",
       "Charging at work in the town: every building has its jobs (from the federal business statistics), and the staff who drive an electric car to an employer with chargers charge there on working days — residents and commuters alike. A morning hump around 8, shown on the building's card, in the statistics and on the grid. The workplace charging programme can now also spread it over the middle of the day, with the sun.",
       "Ten more towns in the canton of Zürich: Winterthur, Dietikon, Dübendorf, Opfikon, Kloten, Bülach, Küsnacht, Hinwil, Wald and Stammheim — from a city of over a hundred thousand to a handful of wine-growing villages. Winterthur is big: it takes longer to load.",

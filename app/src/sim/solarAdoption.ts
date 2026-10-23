@@ -1170,6 +1170,12 @@ function extraPlants(cutoffMs: number): PowerPlant[] {
   return [...extraPlantSources.values()].flatMap((f) => f(cutoffMs));
 }
 
+/** effectivePowerPlantsAt from the decisions already taken, never settling any: for the town's
+ * solar-hours forecast (townSurplus.ts), which must not make owners decide before their month. */
+export function decidedPowerPlantsAt(buildings: Building[], realPlants: PowerPlant[], simTimeMs: number): PowerPlant[] {
+  return [...realPlantsWithDemolitions(buildings, realPlants, simTimeMs), ...synthesizedPlants(buildings, simTimeMs), ...extraPlants(simTimeMs)];
+}
+
 /** Real Pronovo plants plus every adoption already reached as of the exact
  * simulated instant `simTimeMs` — for live state (a building/dwelling panel,
  * the map's live layers, City stats). Processing a year's adoptions happens

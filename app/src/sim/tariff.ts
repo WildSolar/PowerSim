@@ -34,6 +34,7 @@ export interface TariffSheet {
   chargingMeterFeeChfPerMonth: number; // what the second meter costs a month
   chargingControlled: boolean; // false: power only in the night rate; true: the utility decides when
   chargingNetworkDiscount: number; // 0-0.6: off the network fee for a utility-controlled wallbox
+  chargingSolarEnergyRpKWh: number; // the energy price in the town's solar hours, for a utility-controlled wallbox (townSurplus.ts)
 }
 
 /** Every price at one moment: the year's sheet plus the month's market prices and the grid upkeep —
@@ -44,6 +45,7 @@ export interface Tariff extends TariffSheet {
   networkAvgRpKWh: number; // ...flat through the day, as on the dynamic tariff
   chargingNetworkRpKWh: number; // ...on the charging meter: the night rate's, or (utility-controlled) the flat one less the discount
   chargingPriceRpKWh: number; // what a kWh costs on the charging meter, energy and network fee together
+  chargingSolarPriceRpKWh: number; // ...in the town's solar hours, on a utility-controlled one
   peakPriceRpKWh: number; // energy and network together, peak — what a kWh costs a consumer in basic supply
   offPeakPriceRpKWh: number; // ...off-peak
   baseFeeRpPerMonth: number; // the base fee, per meter and month

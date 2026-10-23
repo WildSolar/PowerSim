@@ -6,8 +6,8 @@
  * the building stands), the region's share of electric cars (commuters' cars are other towns', so the
  * town's own measures don't move it), and the share of employers with chargers
  * (publicCharging.workChargingShareAt — the workplace charging programme raises it). Most charge as
- * soon as they arrive; load management spreads the rest over the sunny hours — most of it, with the
- * programme set to charge with the sun.
+ * soon as they arrive; load management spreads the rest over the town's solar hours (townSurplus.ts),
+ * or the sunny middle of a day without — most of it, with the programme set to charge with the sun.
  *
  * Residents' own charging at work (publicCharging.ts) is another matter: it lowers what they charge
  * at home or in public, and happens wherever they work, mostly elsewhere — it isn't drawn here.
@@ -22,6 +22,7 @@ import {
   WORK_CHARGE_KWH_PER_DAY,
   WORK_CHARGER_KW,
   WORK_CHARGING_WITH_SUN_SHARE,
+  WORK_DAY_HOURS,
   WORK_SUN_HOURS,
   WORK_WEEKEND_FACTOR,
 } from "../config/charging";
@@ -31,6 +32,7 @@ import { dayOfWeek, toDateMs } from "./calendar";
 import { existsAt } from "./lifetime";
 import { policyStore } from "./policy";
 import { workChargingShareAt } from "./publicCharging";
+import { townSurplus } from "./townSurplus";
 import { transit } from "./transit";
 
 const HOUR_MS = 3_600_000;
@@ -68,9 +70,21 @@ function perCarKwAt(atMs: number): number {
   const duration = WORK_CHARGE_KWH_PER_DAY / WORK_CHARGER_KW;
   const arrived = Math.max(0, Math.min(hour, a1) - Math.max(hour - duration, a0)) / (a1 - a0);
   const onArrivalKw = WORK_CHARGER_KW * arrived;
-  // With the sun: the day's energy over the sunny hours, most at midday (a half sine).
+  // With the sun: the day's energy over the town's solar hours (within the working day), evenly —
+  // or, on a day without, over the sunny middle of the day, most at noon (a half sine).
   const [s0, s1] = WORK_SUN_HOURS;
-  const sunKw = hour > s0 && hour < s1 ? (WORK_CHARGE_KWH_PER_DAY * Math.sin((Math.PI * (hour - s0)) / (s1 - s0)) * Math.PI) / (2 * (s1 - s0)) : 0;
+  const window = townSurplus.windowOf(Math.floor(atMs / DAY_MS));
+  const dayStartMs = Math.floor(atMs / DAY_MS) * DAY_MS;
+  const w0 = window ? Math.max(WORK_DAY_HOURS[0], (window.startMs - dayStartMs) / HOUR_MS) : 0;
+  const w1 = window ? Math.min(WORK_DAY_HOURS[1], (window.endMs - dayStartMs) / HOUR_MS) : 0;
+  const sunKw =
+    w1 - w0 >= 1
+      ? hour >= w0 && hour < w1
+        ? WORK_CHARGE_KWH_PER_DAY / (w1 - w0)
+        : 0
+      : hour > s0 && hour < s1
+        ? (WORK_CHARGE_KWH_PER_DAY * Math.sin((Math.PI * (hour - s0)) / (s1 - s0)) * Math.PI) / (2 * (s1 - s0))
+        : 0;
   return day * ((1 - withSun) * onArrivalKw + withSun * sunKw);
 }
 

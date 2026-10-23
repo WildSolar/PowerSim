@@ -171,6 +171,7 @@ class TariffStore {
       networkAvgRpKWh: prices.networkAvgRpKWh,
       chargingNetworkRpKWh: chargingNetworkRpKWh(sheet, prices),
       chargingPriceRpKWh: sheet.chargingEnergyRpKWh + chargingNetworkRpKWh(sheet, prices),
+      chargingSolarPriceRpKWh: sheet.chargingSolarEnergyRpKWh + chargingNetworkRpKWh(sheet, prices),
       peakPriceRpKWh: prices.peakRpKWh,
       offPeakPriceRpKWh: prices.offPeakRpKWh,
       baseFeeRpPerMonth: prices.baseFeeRpPerMonth,

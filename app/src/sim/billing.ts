@@ -41,6 +41,7 @@
 
 import { commercialCategory } from "./commercial";
 import { chargingTariff } from "./chargingTariff";
+import { townSurplus } from "./townSurplus";
 import { dynamicPriceRpKWh, dynamicTariff } from "./dynamicTariff";
 import type { Building, Dwelling } from "../data/types";
 import { toDateMs } from "./calendar";
@@ -122,7 +123,8 @@ export function electricityCostRp(times: number[], powerW: number[], tariff: Tar
     const chargingKWh = chargingW ? (((chargingW[i] + chargingW[i - 1]) / 2) * dtHours) / 1000 : 0;
     const midMs = (times[i] + times[i - 1]) / 2;
     const rate = isOffPeakHour(tariff, hourOfDayAt(midMs)) ? tariff.offPeakPriceRpKWh : tariff.peakPriceRpKWh;
-    costRp += (kWh - dynamicKWh - chargingKWh) * rate + (dynamicKWh > 0 ? dynamicKWh * dynamicPriceRpKWh(tariff, midMs) : 0) + chargingKWh * tariff.chargingPriceRpKWh;
+    const chargingRate = chargingKWh > 0 && solarHourOnMeter(tariff, midMs) ? tariff.chargingSolarPriceRpKWh : tariff.chargingPriceRpKWh;
+    costRp += (kWh - dynamicKWh - chargingKWh) * rate + (dynamicKWh > 0 ? dynamicKWh * dynamicPriceRpKWh(tariff, midMs) : 0) + chargingKWh * chargingRate;
   }
   return costRp;
 }
@@ -156,7 +158,7 @@ export function electricityCostSplitRp(
     energyRp +=
       timed * energy +
       (dynamicKWh > 0 ? dynamicKWh * (dynamicPriceRpKWh(tariff, midMs) - tariff.networkAvgRpKWh) : 0) +
-      chargingKWh * tariff.chargingEnergyRpKWh;
+      chargingKWh * (chargingKWh > 0 && solarHourOnMeter(tariff, midMs) ? tariff.chargingSolarEnergyRpKWh : tariff.chargingEnergyRpKWh);
   }
   return { energyRp, networkRp, offPeakKWh };
 }
@@ -165,6 +167,12 @@ export function electricityCostSplitRp(
 function baseFeeFor(meters: number, times: number[], tariff: Tariff): number {
   const months = times.length > 1 ? (times[times.length - 1] - times[0]) / MONTH_MS : 0;
   return meters * tariff.baseFeeRpPerMonth * months;
+}
+
+/** Whether a charging meter's power at `midMs` is billed at the solar-hours price: a
+ * utility-controlled meter, in the town's solar hours. */
+function solarHourOnMeter(tariff: Tariff, midMs: number): boolean {
+  return tariff.chargingControlled && tariff.chargingSolarEnergyRpKWh !== tariff.chargingEnergyRpKWh && townSurplus.isSolarHour(midMs);
 }
 
 /** The charging meters' own fee, for `meters` of them over the period the sample times span. */

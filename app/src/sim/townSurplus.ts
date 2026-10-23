@@ -6,9 +6,13 @@
  * responds to it (utility-controlled wallboxes, employers charging with the sun, the solar-hours price)
  * can plan by it, and the same day always gives the same hours.
  *
- * The expected use is the town's typical draw: its homes and businesses as they stand on 1 January,
- * spread over the day and the year by a typical profile. Pure functions of the town and the weather:
- * nothing to save.
+ * The plants are those in service at the end of the year before: a year's forecasts count the
+ * arrays of the year as they come only from the next January. The forecast never makes an owner
+ * decide (solar decisions themselves look at a year of the town's use, its cars charging in solar
+ * hours included): it reads the decisions already taken, and the year before's are always settled by
+ * the time anyone asks about a day — so a day's hours are the same whoever asks first. The expected use is the town's typical draw: its homes and businesses as
+ * they stand on 1 January, spread over the day and the year by a typical profile. Pure functions of
+ * the town and the weather: nothing to save.
  */
 
 import {
@@ -23,7 +27,7 @@ import { dayOfYear, toDateMs, toSimTimeMs } from "./calendar";
 import { commercialCategory, totalFloorAreaM2 } from "./commercial";
 import { existsAt } from "./lifetime";
 import { irradianceWm2 } from "./pv";
-import { effectivePowerPlantsAt } from "./solarAdoption";
+import { decidedPowerPlantsAt } from "./solarAdoption";
 import { windPowerW } from "./windPower";
 
 const HOUR_MS = 3_600_000;
@@ -41,12 +45,26 @@ class TownSurplus {
   private realPlants: PowerPlant[] = [];
   private windows = new Map<number, SolarWindow | null>();
   private useByYear = new Map<number, number>();
+  private plantsByYear = new Map<number, PowerPlant[]>();
 
   init(buildingsProvider: () => Building[], realPlants: PowerPlant[]): void {
     this.buildingsProvider = buildingsProvider;
     this.realPlants = realPlants;
     this.windows.clear();
     this.useByYear.clear();
+    this.plantsByYear.clear();
+  }
+
+  /** The plants in service at the end of the year before `year` (or at `atMs`, if earlier). */
+  private plantsFor(year: number, atMs = Infinity): PowerPlant[] {
+    const endOfYearBefore = toSimTimeMs(Date.UTC(year, 0, 1)) - 1;
+    if (atMs < endOfYearBefore) return decidedPowerPlantsAt(this.buildingsProvider(), this.realPlants, atMs);
+    let plants = this.plantsByYear.get(year);
+    if (!plants) {
+      plants = decidedPowerPlantsAt(this.buildingsProvider(), this.realPlants, endOfYearBefore);
+      this.plantsByYear.set(year, plants);
+    }
+    return plants;
   }
 
   /** The town's typical draw in `year`, on average (W): its homes and businesses on 1 January. */
@@ -85,10 +103,10 @@ class TownSurplus {
     return solarKw * 1000 * (irradianceWm2(simMs) / 1000) * SURPLUS_PV_PERFORMANCE + windW;
   }
 
-  /** The day's solar hours (simDay: days since the epoch), with the plants in service that day. */
-  windowOf(simDay: number, plantsAt: (simMs: number) => PowerPlant[] = (t) => effectivePowerPlantsAt(this.buildingsProvider(), this.realPlants, t)): SolarWindow | null {
+  /** The day's solar hours (simDay: days since the epoch). */
+  windowOf(simDay: number): SolarWindow | null {
     if (this.windows.has(simDay)) return this.windows.get(simDay) ?? null;
-    const plants = plantsAt(simDay * DAY_MS + 12 * HOUR_MS);
+    const plants = this.plantsFor(new Date(toDateMs(simDay * DAY_MS + 12 * HOUR_MS)).getUTCFullYear());
     let first = -1;
     let last = -1;
     for (let h = 5; h < 21; h++) {
@@ -110,10 +128,11 @@ class TownSurplus {
     return w !== null && simMs >= w.startMs && simMs < w.endMs;
   }
 
-  /** The share of `year`'s days with solar hours, with the plants in service at `atMs` — what a
-   * household weighing the solar-hours price expects. */
+  /** The share of `year`'s days with solar hours — with the plants it will count, or, for a year
+   * still ahead, those in service at `atMs` — what a household weighing the solar-hours price
+   * expects. */
   solarDayShare(year: number, atMs: number): number {
-    const plants = effectivePowerPlantsAt(this.buildingsProvider(), this.realPlants, atMs);
+    const plants = this.plantsFor(year, atMs);
     const start = Math.floor(toSimTimeMs(Date.UTC(year, 0, 1)) / DAY_MS);
     let days = 0;
     let withSun = 0;

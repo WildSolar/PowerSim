@@ -28,6 +28,8 @@ import { existsAt } from "./lifetime";
 import { currentMobilityMode, currentVehicleType, mobilityChargingPowerW, mobilitySlotCount } from "./mobility";
 import { publicCharging } from "./publicCharging";
 import { hashSeed, mulberry32 } from "./rng";
+import { HOME_WEEKDAY_SHARE } from "../config/townSurplus";
+import { townSurplus } from "./townSurplus";
 import type { Tariff, TariffSheet } from "./tariff";
 import { chargingNetworkRpKWh, sheetPrices, tariffStore } from "./tariffStore";
 
@@ -43,6 +45,19 @@ export function offersCharging(sheet: TariffSheet): boolean {
 /** What a kWh costs on a sheet's charging meter in `year`, energy and network fee together. */
 export function chargingAllInRpKWh(sheet: TariffSheet, year: number): number {
   return sheet.chargingEnergyRpKWh + chargingNetworkRpKWh(sheet, sheetPrices(sheet, year));
+}
+
+/** ...and in the town's solar hours, on a utility-controlled meter. */
+export function chargingSolarAllInRpKWh(sheet: TariffSheet, year: number): number {
+  return sheet.chargingSolarEnergyRpKWh + chargingNetworkRpKWh(sheet, sheetPrices(sheet, year));
+}
+
+/** The share of a utility-controlled car's charging that falls in solar hours, as a household
+ * expects it: the days it is at home (weekends, and some weekdays) that have solar hours, with the
+ * town's solar as it stands at `atMs`. */
+export function expectedSolarChargingShare(year: number, atMs: number): number {
+  const homeDays = (2 + 5 * HOME_WEEKDAY_SHARE) / 7;
+  return homeDays * townSurplus.solarDayShare(year, atMs);
 }
 
 /** What a household with a wallbox expects charging at home to cost per kWh: its electricity price,
@@ -78,7 +93,9 @@ const EMPTY: ChargingUptake = { households: new Map(), eligible: 0 };
 export function estimateChargingUptake(buildings: Building[], sheet: TariffSheet, year: number, atMs: number): ChargingUptake {
   if (!offersCharging(sheet)) return EMPTY;
   const prices = sheetPrices(sheet, year);
-  const meterRp = chargingAllInRpKWh(sheet, year);
+  // Under control, part of it at the solar-hours price, if that's any different.
+  const solarShare = sheet.chargingControlled && sheet.chargingSolarEnergyRpKWh !== sheet.chargingEnergyRpKWh ? expectedSolarChargingShare(year, atMs) : 0;
+  const meterRp = (1 - solarShare) * chargingAllInRpKWh(sheet, year) + solarShare * chargingSolarAllInRpKWh(sheet, year);
   const out: ChargingUptake = { households: new Map(), eligible: 0 };
   for (const building of buildings) {
     if (!existsAt(building, atMs)) continue;

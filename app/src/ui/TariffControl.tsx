@@ -4,7 +4,8 @@ import { WHOLESALE_HEDGED_SHARE, type Commodity } from "../config/market";
 import { approval } from "../sim/approval";
 import { toDateMs } from "../sim/calendar";
 import { estimateUptake } from "../sim/dynamicTariff";
-import { chargingAllInRpKWh, estimateChargingUptake } from "../sim/chargingTariff";
+import { chargingAllInRpKWh, chargingSolarAllInRpKWh, estimateChargingUptake } from "../sim/chargingTariff";
+import { townSurplus } from "../sim/townSurplus";
 import { MAX_CHARGING_NETWORK_DISCOUNT } from "../config/chargingTariff";
 import { market } from "../sim/market";
 import { stock } from "../sim/stock";
@@ -24,8 +25,15 @@ import "./tariffControl.css";
 const YEAR_MS = 365.25 * 24 * 3_600_000;
 
 // The charging tariff's fields have a card of their own (ChargingTariffDraft).
-type ChargingField = "chargingTariffOffered" | "chargingEnergyRpKWh" | "chargingMeterFeeChfPerMonth" | "chargingControlled" | "chargingNetworkDiscount";
-const CHARGING_FIELDS: ChargingField[] = ["chargingTariffOffered", "chargingEnergyRpKWh", "chargingMeterFeeChfPerMonth", "chargingControlled", "chargingNetworkDiscount"];
+type ChargingField = "chargingTariffOffered" | "chargingEnergyRpKWh" | "chargingMeterFeeChfPerMonth" | "chargingControlled" | "chargingNetworkDiscount" | "chargingSolarEnergyRpKWh";
+const CHARGING_FIELDS: ChargingField[] = [
+  "chargingTariffOffered",
+  "chargingEnergyRpKWh",
+  "chargingMeterFeeChfPerMonth",
+  "chargingControlled",
+  "chargingNetworkDiscount",
+  "chargingSolarEnergyRpKWh",
+];
 type SheetField = Exclude<keyof TariffSheet, "offPeakStartHour" | "offPeakEndHour" | "dynamicMarginRpKWh" | ChargingField>;
 type FieldGroup = "energy" | "network" | "solar" | "other";
 
@@ -387,6 +395,7 @@ function ChargingTariffDraft({
       draft.chargingMeterFeeChfPerMonth,
       draft.chargingControlled,
       draft.chargingNetworkDiscount,
+      draft.chargingSolarEnergyRpKWh,
       draft.energyOffPeakRpKWh,
       draft.energyPeakRpKWh,
       draft.baseFeeChfPerMonth,
@@ -397,7 +406,12 @@ function ChargingTariffDraft({
   );
   const prices = sheetPrices(draft, year);
   const allIn = chargingAllInRpKWh(draft, year);
-  const number = (key: "chargingEnergyRpKWh" | "chargingMeterFeeChfPerMonth", min: number, max: number, step: number) => (
+  // Days of the year with solar hours, at the town's solar today (worked out once a day).
+  const solarDays = useMemo(
+    () => (offered && draft.chargingControlled ? Math.round(townSurplus.solarDayShare(year, atMs) * 365) : 0),
+    [offered, draft.chargingControlled, year, Math.floor(atMs / 86_400_000)],
+  );
+  const number = (key: "chargingEnergyRpKWh" | "chargingMeterFeeChfPerMonth" | "chargingSolarEnergyRpKWh", min: number, max: number, step: number) => (
     <input
       type="number"
       min={min}
@@ -460,6 +474,26 @@ function ChargingTariffDraft({
               />
               <span className="tariff-unit">%</span>
             </div>
+          )}
+          {draft.chargingControlled && (
+            <>
+              <div className="dyn-draft-spread">
+                <span
+                  className="tariff-label"
+                  title="For what controlled wallboxes draw in the town's solar hours — when its own solar and wind are forecast to make more than it uses. Cars at home then charge in them: every weekend, and some on weekdays."
+                >
+                  Energy price in solar hours
+                </span>
+                {number("chargingSolarEnergyRpKWh", 0, Math.floor(capRpKWh * 2) / 2, 0.5)}
+                <span className="tariff-unit">Rp/kWh</span>
+              </div>
+              <div className="tariff-preview-line">
+                <span>Solar hours, at the town&apos;s solar today</span>
+                <span>
+                  {solarDays === 0 ? "none yet — the town makes less than it uses even at noon" : `on about ${solarDays} days a year`} · all in {chargingSolarAllInRpKWh(draft, year).toFixed(1)} Rp/kWh
+                </span>
+              </div>
+            </>
           )}
           <div className="tariff-preview-line">
             <span>All in, per kWh on the charging meter</span>

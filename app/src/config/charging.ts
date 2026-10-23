@@ -144,6 +144,8 @@ export const WORK_ARRIVAL_HOURS: [number, number] = [7, 9];
 // most of it with the workplace charging programme set to charge with the sun.
 export const WORK_CHARGING_WITH_SUN_SHARE = { base: 0.2, programme: 0.8 };
 export const WORK_SUN_HOURS: [number, number] = [9, 16];
+// The staff's working day: charging with the sun stays within it.
+export const WORK_DAY_HOURS: [number, number] = [8, 17];
 // How much of a weekday's charging happens on a Saturday and a Sunday.
 export const WORK_WEEKEND_FACTOR = { saturday: 0.2, sunday: 0.05 };
 

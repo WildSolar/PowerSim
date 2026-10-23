@@ -34,6 +34,7 @@ export const DEFAULT_SHEET: TariffSheet = {
   chargingMeterFeeChfPerMonth: 5,
   chargingControlled: false,
   chargingNetworkDiscount: 0,
+  chargingSolarEnergyRpKWh: 8,
 };
 
 // The network fee, regulated cost-plus (sim/networkTariff.ts): what the grid costs to run (config/

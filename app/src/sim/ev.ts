@@ -25,6 +25,9 @@
 import { CONTROLLED_EARLIEST_HOUR } from "../config/chargingTariff";
 import { ANNUAL_CAR_KM, EV_CAR_KWH_PER_100KM } from "../config/mobility";
 import type { ChargingMeter } from "./chargingTariff";
+import { HOME_WEEKDAY_SHARE } from "../config/townSurplus";
+import { dayOfWeek, toDateMs } from "./calendar";
+import { townSurplus } from "./townSurplus";
 import { hashSeed, hashSeedFrom, mulberry32 } from "./rng";
 import type { Tariff } from "./tariff";
 import { smartChargeStartMs } from "./dynamicTariff";
@@ -88,6 +91,18 @@ function evDailySessionFrom(seed: number, dayIndex: number, responsive: boolean,
   const deadlineMs = dayStartMs + DAY_MS + deadlineHour * 3_600_000;
   if (!plugsIn) return { plugsIn, startMs: plugInMs, endMs: plugInMs };
 
+  if (meter === "controlled") {
+    // Under the utility's control, a car that is at home in the day's solar hours — at weekends, and
+    // on weekdays for some (home office, part-time, retired) — charges in them, while the town's own
+    // solar and wind have power to spare.
+    const weekend = [0, 6].includes(dayOfWeek(toDateMs(dayStartMs)));
+    const atHome = rng() < (weekend ? 1 : HOME_WEEKDAY_SHARE);
+    const sun = atHome ? townSurplus.windowOf(dayIndex) : null;
+    if (sun) {
+      const startMs = sun.startMs + rng() * Math.max(0, sun.endMs - sun.startMs - durationMs);
+      return { plugsIn, startMs, endMs: startMs + durationMs };
+    }
+  }
   if (meter) {
     // On the charging meter: power only in the night rate, the charge starting some time in it that
     // still has the car full when it ends — or, under the utility's control, in the night's quietest

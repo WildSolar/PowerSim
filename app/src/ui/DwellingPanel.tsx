@@ -187,9 +187,12 @@ export function DwellingPanel({ building, dwelling, allBuildings, realPlants, on
             {charging && <ChargingNote charging={charging} />}
             {session && session.plugsIn && (
               <div className="ev-session-note">
-                Tonight: {formatHourOfDay(session.startMs)}–{formatHourOfDay(session.endMs)}
+                {session.startMs % 86_400_000 < 18 * 3_600_000 && session.startMs % 86_400_000 > 6 * 3_600_000 ? "Today" : "Tonight"}: {formatHourOfDay(session.startMs)}–
+                {formatHourOfDay(session.endMs)}
                 {meter === "controlled"
-                  ? " (when the utility chooses)"
+                  ? session.startMs % 86_400_000 < 18 * 3_600_000 && session.startMs % 86_400_000 > 6 * 3_600_000
+                    ? " (the town's solar hours)"
+                    : " (when the utility chooses)"
                   : meter === "night"
                     ? " (night rate)"
                     : onDynamic
