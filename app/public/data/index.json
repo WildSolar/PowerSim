@@ -84,12 +84,6 @@
     "buildingCount": 5069
   },
   {
-    "slug": "winterthur",
-    "name": "Winterthur",
-    "bfsNumber": 230,
-    "buildingCount": 22189
-  },
-  {
     "slug": "wadenswil",
     "name": "Wädenswil",
     "bfsNumber": 293,
