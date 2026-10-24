@@ -919,6 +919,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "The municipality: pick a zoned field no one has taken up — on the map, or in the tool's Build tab — ask its farmer from the card, choose the kind of installation, and with a yes apply for the permit; once the permit stands, order the panels. Both are paid from the treasury. The field is the utility's own: it pays no feed-in for the power and buys that much less, at the market price of the hours it comes, while the upkeep and the farmer's rent show in its accounts.",
       ]),
       p("A business or a cooperative builds as soon as its permit stands; you decide when to build yours. For your own fields the town clerk writes how the permit fares (Inbox → Advisors & projects)."),
+      p(
+        "The Agri-PV tool's Overview starts with where things stand: the power in service, the fields under way, the zoned land no one has taken up yet, and acceptance. Below that, ‘Needs you’ lists what waits on you: your permitted fields to build, zoned fields whose farmer said yes, and the next vote on a zone. Then come the zones and every field taken up, by stage, which you can narrow to yours, businesses' or cooperatives'. The Build tab lists the free zoned fields, those whose farmer agreed first.",
+      ),
       p("A field can take up to three kinds of installation. They differ in how much the field holds, what they cost, and when in the day and the year they make their power:"),
       list([
         "Vertical rows — bifacial panels standing on edge between the crops in north–south rows, one face to the east, the other to the west, with wide gaps for the machines: about 0.3 MWp per hectare. They make most in the morning and the late afternoon and little at noon, a little less over the year than a good roof. The cheapest to build (about a fifth less than fixed rows) and to keep up, and snow can't settle on them.",
