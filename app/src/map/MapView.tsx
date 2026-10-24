@@ -2033,8 +2033,12 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
       const now = simClock.getSimTimeMs();
       const project = agriPv.projectOn(id);
       const state = agriPv.stateAt(id, now);
-      const suits = agriPv.installationFor(id);
-      const kind = `${AGRI_PV_SYSTEMS[suits.system].label.toLowerCase()}, ${(suits.capacityKw / 1000).toFixed(1)} MWp`;
+      const kind = project
+        ? `${AGRI_PV_SYSTEMS[project.system].label.toLowerCase()}, ${(project.capacityKw / 1000).toFixed(1)} MWp`
+        : `${agriPv
+            .systemsFor(id)
+            .map((s) => AGRI_PV_SYSTEMS[s].label.toLowerCase())
+            .join(" or ")}, up to ${(agriPv.largestCapacityKw(id) / 1000).toFixed(1)} MWp`;
       const status =
         project && state === "field"
           ? `Agri-PV: ${kind}`
@@ -2043,7 +2047,7 @@ export function MapView({ dataset, selectedEgid, onSelectBuilding, colorMode, ke
             : project && state === "underWay"
               ? `Agri-PV: ${AGRI_PV_PHASE_LABEL[project.phase].toLowerCase()}`
               : state === "zoned"
-                ? `zoned for Agri-PV (suits ${kind})`
+                ? `zoned for Agri-PV (takes ${kind})`
                 : state === "refused"
                   ? "zoned for Agri-PV — the farmer said no, for now"
                 : state === "planned"

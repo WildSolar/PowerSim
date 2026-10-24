@@ -67,6 +67,7 @@ import { contractArrays, municipalArrays } from "./solarAdoption";
 import { grid } from "./grid";
 import { monthRecords } from "./monthRecords";
 import { powerFlows } from "./spotMarket";
+import { dayAheadPriceRpKWh } from "./dynamicTariff";
 
 export interface MunicipalFinances {
   year: number;
@@ -79,7 +80,7 @@ export interface MunicipalFinances {
   feedInMarketRp: number; // ...and what that power was worth on the market
   networkOffPeakKWh: number; // ...of it in off-peak hours
   feedInPaidRp: number; // paid out to solar owners (real or adopted) for exported generation — never for the utility's own arrays on rented roofs
-  wholesaleCostRp: number; // paid upstream, over the contracts, for what the town drew beyond its own generation in each hour (spotMarket.ts)
+  wholesaleCostRp: number; // paid upstream, over the contracts, for what the town drew beyond its own generation in each hour (spotMarket.ts) — less what the timing of the utility's own power was worth (ownPowerTimingRp)
   surplusSoldRp: number; // what the town's surplus fetched on the spot market — below zero when sunny middays drive the price under it
   gridMaintenanceCostRp: number; // wires/upkeep cost, scaled to gross electricity delivered to consumers
   districtHeatRevenueRp: number; // district heat sold to connected buildings, at the tariff's district heating price
@@ -266,6 +267,22 @@ export function settleUtilityMonth(buildings: Building[], realPlants: PowerPlant
   return inFlight;
 }
 
+/** What the timing of the utility's own power was worth over a month, beyond the month's price (Rp):
+ * each kWh it made that the town used saves power bought at that hour's market price — dearer in the
+ * morning and evening, cheaper at a sunny noon when every roof makes it — against the month's average
+ * hour. Positive when its power came at dearer hours than the average, negative at cheaper ones. Power
+ * beyond what the town drew is sold at its hour's price already (spotMarket.ts). */
+function ownPowerTimingRp(times: number[], ownW: number[], drawW: number[], generationW: number[], wholesaleRpKWh: number): number {
+  const prices = times.map((t) => dayAheadPriceRpKWh(t));
+  const mean = prices.reduce((a, b) => a + b, 0) / Math.max(1, prices.length);
+  if (mean <= 0) return 0;
+  const weighted = times.map((_, i) => {
+    const used = generationW[i] > 0 ? Math.min(1, Math.max(0, drawW[i]) / generationW[i]) : 1;
+    return ownW[i] * used * (prices[i] / mean - 1);
+  });
+  return energyKWh(times, weighted) * wholesaleRpKWh;
+}
+
 /** The wind turbines turning by `atMs` (wind.ts's plants). */
 function effectivePowerPlantsAtWind(atMs: number) {
   return wind.turbinesAt(atMs);
@@ -352,7 +369,8 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
   const ownFieldsKWh = energyKWh(times, ownFieldsW);
   // And the utility's wind turbines: no feed-in for what they make.
   const turbines = effectivePowerPlantsAtWind(midMonthMs);
-  const windKWh = energyKWh(times, times.map((t) => turbines.reduce((sum, p) => sum + windPowerW(p, t), 0)));
+  const windW = times.map((t) => turbines.reduce((sum, p) => sum + windPowerW(p, t), 0));
+  const windKWh = energyKWh(times, windW);
   const arrays = contractArrays();
   const contractW = times.map((t) => {
     const sun = irradianceWm2(t);
@@ -388,7 +406,17 @@ async function computeUtilityMonth(buildings: Building[], realPlants: PowerPlant
     feedInPaidRp: feedInKWh * feedInRpKWh,
     feedInKWh,
     feedInMarketRp: feedInKWh * referencePriceAtRpKWh(midMonthMs),
-    wholesaleCostRp: flows.boughtKWh * (tariff.wholesalePriceRpKWh + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare),
+    // The utility's own power — its fields, turbines and arrays on rented roofs — saves what it buys
+    // at the hours it comes: worth more or less than the month's average price.
+    wholesaleCostRp:
+      flows.boughtKWh * (tariff.wholesalePriceRpKWh + GREEN_POWER_PREMIUM_RP_PER_KWH * greenShare) -
+      ownPowerTimingRp(
+        times,
+        times.map((_, i) => ownFieldsW[i] + windW[i] + contractW[i]),
+        withHeatPumpsW,
+        series.solarW,
+        tariff.wholesalePriceRpKWh,
+      ),
     surplusSoldRp: flows.soldRp,
     gridMaintenanceCostRp: grossKWh * tariff.gridMaintenanceRpKWh,
     districtHeatRevenueRp: districtHeatKWh * tariff.districtHeatingPriceRpKWh,

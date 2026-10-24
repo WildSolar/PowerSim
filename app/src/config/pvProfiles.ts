@@ -17,6 +17,8 @@ export interface PvProfile {
   mount: PvMount;
   /** How common it is on the town's roofs (relative); 0: not on roofs (Agri-PV only). */
   roofWeight: number;
+  /** Snow can't stay on it: panels on edge, or rows that turn steep to shed it (sim/pv.ts). */
+  shedsSnow?: boolean;
 }
 
 export const PV_PROFILES: PvProfile[] = [
@@ -37,9 +39,9 @@ export const PV_PROFILES: PvProfile[] = [
   { id: "ew10", label: "east and west, 10° (flat roof)", mount: { kind: "eastWest", tiltDeg: 10 }, roofWeight: 2 },
   { id: "s60", label: "south, 60°", mount: { kind: "fixed", tiltDeg: 60, azimuthDeg: 180 }, roofWeight: 0.3 },
   // Agri-PV (config/agriPv.ts):
-  { id: "vertical", label: "vertical rows facing east and west", mount: { kind: "vertical" }, roofWeight: 0 },
-  { id: "overhead", label: "fixed rows facing south, 20°", mount: { kind: "fixed", tiltDeg: 20, azimuthDeg: 180 }, roofWeight: 0 },
-  { id: "tracking", label: "rows tracking the sun", mount: { kind: "tracking", maxAngleDeg: 45 }, roofWeight: 0 },
+  { id: "vertical", label: "vertical rows facing east and west", mount: { kind: "vertical" }, roofWeight: 0, shedsSnow: true },
+  { id: "overhead", label: "fixed rows facing south, 30°", mount: { kind: "fixed", tiltDeg: 30, azimuthDeg: 180 }, roofWeight: 0 },
+  { id: "tracking", label: "rows tracking the sun", mount: { kind: "tracking", maxAngleDeg: 45 }, roofWeight: 0, shedsSnow: true },
 ];
 
 // Light: the share of the sky's light that comes diffuse rather than straight from the sun — little on

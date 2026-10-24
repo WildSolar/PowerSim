@@ -24,21 +24,43 @@ export const AGRI_PV_ACCEPTANCE_PER_YEAR_DIALOGUE = 0.15;
 export const AGRI_PV_ACCEPTANCE_PER_FIELD = 0.03;
 export const AGRI_PV_ACCEPTANCE_MAX = 0.8;
 
-// The installations, in three kinds, each covering its whole field: vertical bifacial rows running
-// north–south between the crops (one face to the east, the other to the west; wide gaps for the
-// machines, so the least power per hectare); fixed rows high over orchards, vines and berries (the
-// panels shelter the crop, so the most); and rows over fields that turn to follow the sun from east
-// to west. Power per hectare and the build cost relative to vertical rows; informed placeholders.
+// The installations, in three kinds, each covering its whole field (how each faces the sun:
+// config/pvProfiles.ts): vertical bifacial rows running north–south between the crops (one face to
+// the east, the other to the west — power in the morning and the late afternoon; wide gaps for the
+// machines, so the least power per hectare; a light frame, so the cheapest); fixed rows high over
+// orchards, vines and berries, facing south like a good roof (the panels shelter the crop, so the
+// most per hectare; snow stays on them until it melts); and rows that turn to follow the sun from
+// east to west (steady from morning to evening, the most per kWp; the motors and bearings make them
+// the dearest, and the dearest to keep up). Power per hectare, the build cost relative to fixed rows,
+// and the upkeep a year; informed placeholders.
 export type AgriPvSystem = "vertical" | "overhead" | "tracking";
-export const AGRI_PV_SYSTEMS: Record<AgriPvSystem, { label: string; kwpPerHa: number; capexFactor: number }> = {
-  vertical: { label: "Vertical rows", kwpPerHa: 300, capexFactor: 1 },
-  overhead: { label: "Fixed rows over orchards and vines", kwpPerHa: 800, capexFactor: 1.15 },
-  tracking: { label: "Tracking rows", kwpPerHa: 500, capexFactor: 1.2 },
+export const AGRI_PV_SYSTEMS: Record<AgriPvSystem, { label: string; kwpPerHa: number; capexFactor: number; upkeepChfPerKwpYear: number; blurb: string }> = {
+  vertical: {
+    label: "Vertical rows",
+    kwpPerHa: 300,
+    capexFactor: 0.8,
+    upkeepChfPerKwpYear: 12,
+    blurb: "Panels on edge between the crops, facing east and west: power in the morning and the late afternoon, little at noon. The cheapest, but the fewest per hectare. Snow can't settle on them.",
+  },
+  overhead: {
+    label: "Fixed rows",
+    kwpPerHa: 800,
+    capexFactor: 1,
+    upkeepChfPerKwpYear: 15,
+    blurb: "Panels high over orchards, vines or berries, facing south like a good roof: most at noon, and the most per hectare. Not on cropland — the machines can't work under them. Snow stays on them until it melts.",
+  },
+  tracking: {
+    label: "Tracking rows",
+    kwpPerHa: 500,
+    capexFactor: 1.35,
+    upkeepChfPerKwpYear: 22,
+    blurb: "Rows that turn with the sun from east to west: steady from morning to evening, and the most from each panel. The dearest; they turn steep to shed snow.",
+  },
 };
-// Which a field gets, drawn per field: cropland (its prime share) takes vertical or tracking rows,
-// which leave the machines room; other farmland — meadows, orchards, vines — any of the three.
-export const AGRI_PV_SYSTEM_WEIGHTS_CROPLAND: Record<AgriPvSystem, number> = { vertical: 0.5, overhead: 0, tracking: 0.5 };
-export const AGRI_PV_SYSTEM_WEIGHTS_OTHER: Record<AgriPvSystem, number> = { vertical: 0.35, overhead: 0.4, tracking: 0.25 };
+// Which kinds a field takes: cropland (at least this share of it prime cropland) only rows that leave
+// the machines room; other farmland — meadows, orchards, vines — any of the three.
+export const AGRI_PV_CROPLAND_SHARE = 0.5;
+export const AGRI_PV_CROPLAND_SYSTEMS: AgriPvSystem[] = ["vertical", "tracking"];
 // Build cost per kWp: CHF 1,000 for a 0.5 MWp field, falling with size to CHF 600 for 10 MWp.
 export const AGRI_PV_CAPEX_CHF_PER_KWP_AT_500KWP = 1_000;
 export const AGRI_PV_CAPEX_SCALE_EXPONENT = 0.17;
@@ -55,7 +77,6 @@ export const AGRI_PV_RENT_SPREAD = 0.35;
 export const AGRI_PV_FARMER_WILLING_SHARE = 0.35;
 export const AGRI_PV_FARMER_ACCEPTANCE_PULL = 0.4;
 export const AGRI_PV_FARMER_RETRY_YEARS = 3;
-export const AGRI_PV_UPKEEP_CHF_PER_KWP_YEAR = 15;
 export const AGRI_PV_LIFETIME_YEARS = 25;
 export const AGRI_PV_BUILD_MONTHS = 12;
 export const AGRI_PV_MIN_KWP = 200;

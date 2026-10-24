@@ -13,7 +13,8 @@
  * on a clear day, since there's nothing passing in front of the sun to begin with).
  * Snow cover (snow.ts) can additionally block generation outright, persisting after
  * a snowfall until a sustained thaw clears it — unlike cloud cover, this doesn't
- * clear the instant the sky does.
+ * clear the instant the sky does — except on panels it can't stay on (vertical rows, and
+ * tracking rows that turn steep to shed it: config/pvProfiles.ts).
  *
  * Arrays face the sun differently (config/pvProfiles.ts): every roof gets one of a basket of
  * orientations, drawn per building, and Agri-PV fields their system's. What reaches a panel is the
@@ -149,6 +150,7 @@ function profileFactors(simTimeMs: number): Float64Array {
   if (simTimeMs === factorsAt) return factors;
   factorsAt = simTimeMs;
   const { ghi, transmittance, sun } = skyAt(simTimeMs);
+  factorsGhi = ghi;
   if (!sun || ghi <= 0) {
     factors.fill(0);
     return factors;
@@ -163,6 +165,16 @@ function profileFactors(simTimeMs: number): Float64Array {
 
 const factors = new Float64Array(PV_PROFILES.length);
 let factorsAt = Number.NaN;
+let factorsGhi = 0;
+const SHEDS_SNOW = PV_PROFILES.map((p) => p.shedsSnow === true);
+
+/** The light on the ground a profile's panels work with at `simTimeMs`: `irradiance` (snow on the
+ * panels already taken off) — or, on panels snow can't stay on, the sky's own. */
+function panelLight(profile: number, simTimeMs: number, irradiance: number): number {
+  if (!SHEDS_SNOW[profile]) return irradiance;
+  profileFactors(simTimeMs);
+  return factorsGhi;
+}
 let scaleMemo: number | null = null;
 const yearFactors = new Map<string, number>();
 
@@ -246,7 +258,8 @@ export function roofOrientationLabel(egid: string): string {
  * `simTimeMs` given the irradiance on the ground (W/m2, snow on the panels already taken off) — as a
  * share of its rating. */
 export function profileShareAt(profile: number, simTimeMs: number, irradiance: number): number {
-  return irradiance > 0 ? (irradiance / PEAK_IRRADIANCE_WM2) * profileFactors(simTimeMs)[profile] : 0;
+  const light = panelLight(profile, simTimeMs, irradiance);
+  return light > 0 ? (light / PEAK_IRRADIANCE_WM2) * profileFactors(simTimeMs)[profile] : 0;
 }
 
 /** What 1 kW of panels on `egid`'s roof makes at `simTimeMs` given the irradiance on the ground
@@ -308,8 +321,10 @@ export function pvPowerWAt(plant: PowerPlant, simTimeMs: number, irradiance: num
   // with a battery generates in full: the battery takes what's over the limit, and homeBattery.ts
   // curtails the rest of the feed-in.
   const limit = plant.battery ? 1 : policyStore.get().feedInLimitPct / 100;
-  if (irradiance <= 0) return 0;
-  const share = (irradiance / PEAK_IRRADIANCE_WM2) * profileFactors(simTimeMs)[plantProfileIndex(plant)];
+  const profile = plantProfileIndex(plant);
+  const light = panelLight(profile, simTimeMs, irradiance);
+  if (light <= 0) return 0;
+  const share = (light / PEAK_IRRADIANCE_WM2) * profileFactors(simTimeMs)[profile];
   return -(plant.capacityKw * 1000 * Math.min(share, limit));
 }
 

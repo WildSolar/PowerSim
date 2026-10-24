@@ -1,11 +1,13 @@
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { ToolListGroup, ToolListRow } from "./ToolList";
 import { FARM_PLOT_COLORS } from "../map/colorModes";
-import { AGRI_PV_BUILD_MONTHS, AGRI_PV_LEAD_MONTHS, AGRI_PV_PERMIT_MONTHS, AGRI_PV_SYSTEMS } from "../config/agriPv";
+import { AGRI_PV_BUILD_MONTHS, AGRI_PV_LEAD_MONTHS, AGRI_PV_PERMIT_MONTHS, AGRI_PV_SYSTEMS, type AgriPvSystem } from "../config/agriPv";
+import { agriPvKindYear } from "../sim/agriPvProfile";
+import { AgriPvDayChart } from "./AgriPvDayChart";
 import { mapFocus } from "../map/mapFocus";
 import { AGRI_PV_DEVELOPER_LABEL, AGRI_PV_PHASE_LABEL, agriPv, stopped, partnerName, type AgriPvDesignation, type AgriPvDeveloper, type AgriPvProject } from "../sim/agriPv";
 import { approval, votePct } from "../sim/approval";
-import { formatDate } from "../sim/calendar";
+import { formatDate, toDateMs } from "../sim/calendar";
 import { simClock } from "../sim/engine";
 import { policyStore } from "../sim/policy";
 import { useSimDay } from "../sim/store";
@@ -52,12 +54,21 @@ function DesignationStatus({ d, now }: { d: AgriPvDesignation; now: number }) {
   return <span className="zn-status good">In force since {monthYear(d.effectiveAtMs)}</span>;
 }
 
-/** The card for the field picked on the map or in a list: what it would hold, where it stands, who
- * develops it — and, for a zoned field no one has taken up, the municipality's own permit. */
+/** "+9%", "−4%", "±0%". */
+function signedPercent(x: number): string {
+  const pct = Math.round(x * 100);
+  return pct > 0 ? `+${pct}%` : pct < 0 ? `−${-pct}%` : "±0%";
+}
+
+/** The card for the field picked on the map or in a list: what it would hold — each kind it takes,
+ * to compare, until one is built — where it stands, who develops it, and, for a zoned field no one
+ * has taken up, the municipality's own permit. */
 export function AgriPvFieldCard() {
   useAgriPv();
   const now = useSimDay();
   const buildings = useStockBuildings();
+  // The kind looked at on a field not taken up (UI state, not saved).
+  const [choice, setChoice] = useState<{ plotId: string; system: AgriPvSystem } | null>(null);
   const id = agriPv.getSelectedId();
   const plot = id ? agriPv.getPlot(id) : undefined;
   if (!id || !plot) return null;
@@ -67,7 +78,12 @@ export function AgriPvFieldCard() {
   const free = agriPv.isFree(id, now);
   const answer = agriPv.farmerAnswer(id, now);
   const askAgain = agriPv.askAgainFromMs(id);
-  const e = agriPv.economics(id, now);
+  const systems = agriPv.systemsFor(id);
+  const system = live?.system ?? (choice?.plotId === id && systems.includes(choice.system) ? choice.system : systems[0]);
+  const e = agriPv.economics(id, now, system);
+  const year = new Date(toDateMs(now)).getUTCFullYear();
+  const kinds = agriPvKindYear(year);
+  const kind = kinds[system];
   const wholesale = tariffStore.at(now).wholesalePriceRpKWh;
   const restingUntil = project ? agriPv.restingUntil(project) : null;
 
@@ -91,16 +107,55 @@ export function AgriPvFieldCard() {
           {plot.primeShare >= 0.5 ? " · prime cropland" : ""}
         </span>
       </div>
-      <div className="info-row" title="The kind of installation the field suits, and its size over the whole field">
-        <span>Installation</span>
-        <span className="info-value">
-          {AGRI_PV_SYSTEMS[e.system].label} · {mw(live?.capacityKw ?? e.capacityKw)}
-        </span>
-      </div>
+      {live ? (
+        <div className="info-row" title="The kind of installation, and its size over the whole field">
+          <span>Installation</span>
+          <span className="info-value">
+            {AGRI_PV_SYSTEMS[live.system].label} · {mw(live.capacityKw)}
+          </span>
+        </div>
+      ) : (
+        <>
+          <h4 className="dh-subtitle">{systems.length > 1 ? "The kinds it takes" : "What it takes"}</h4>
+          <div className="ev-filters" role="group" aria-label="Kind of installation">
+            {systems.map((s) => (
+              <button key={s} className={`ev-filter${s === system ? " on" : ""}`} aria-pressed={s === system} onClick={() => setChoice({ plotId: id, system: s })}>
+                {AGRI_PV_SYSTEMS[s].label}
+              </button>
+            ))}
+          </div>
+          <p className="dh-note">
+            {AGRI_PV_SYSTEMS[system].blurb}
+            {plot.primeShare >= 0.5 ? " On cropland, only rows the machines can work between." : ""}
+          </p>
+          <div className="info-row" title="Its size over the whole field">
+            <span>Size</span>
+            <span className="info-value">{mw(e.capacityKw)}</span>
+          </div>
+        </>
+      )}
       <div className="info-row">
         <span>Output</span>
         <span className="info-value">{(e.yearlyKWh / 1e6).toFixed(1)} GWh a year</span>
       </div>
+      <div className="info-row" title="The share of its year's power made from November to February, when the grid's power is dirtiest and dearest">
+        <span>In winter (Nov–Feb)</span>
+        <span className="info-value">{Math.round(kind.winterShare * 100)}%</span>
+      </div>
+      <div
+        className="info-row"
+        title="What the market pays at the hours it makes its power, against the month's average hour: power in the morning and the evening is worth more than at a sunny noon, when every roof makes it. It counts for the utility's own fields; feed-in pays the same whatever the hour."
+      >
+        <span>Its hours on the market</span>
+        <span className="info-value">{signedPercent(kind.valueFactor - 1)} on the average hour</span>
+      </div>
+      <div className="info-row" title="The grid's power it replaces, at the hours it makes its own: dirtier on winter mornings and evenings, cleaner at a sunny noon">
+        <span>CO₂ it saves</span>
+        <span className="info-value">
+          {Math.round((e.yearlyKWh * kind.co2GPerKWh) / 1e6)} t a year · {Math.round(kind.co2GPerKWh)} g/kWh
+        </span>
+      </div>
+      <AgriPvDayChart kind={kind} label={AGRI_PV_SYSTEMS[system].label} year={year} top={Math.max(...Object.values(kinds).flatMap((k) => k.summerDay))} />
       {live && (
         <div className="info-row">
           <span>Developer</span>
@@ -140,9 +195,9 @@ export function AgriPvFieldCard() {
             <span>Upkeep and rent{answer?.yes ? "" : " (typical)"}</span>
             <span className="info-value">{formatCHF(e.upkeepRpPerYear + e.rentRpPerYear)} a year</span>
           </div>
-          <div className="info-row" title="The power the utility needn't buy, at this year's wholesale price">
-            <span>Power, at today&apos;s wholesale price</span>
-            <span className="info-value">{formatCHF(e.yearlyKWh * wholesale)} a year</span>
+          <div className="info-row" title="The power the utility needn't buy, at today's wholesale price and the hours it comes">
+            <span>Power, at today&apos;s market price</span>
+            <span className="info-value">{formatCHF(e.yearlyKWh * wholesale * kind.valueFactor)} a year</span>
           </div>
           <p className="dh-note">
             Businesses and energy cooperatives may take this field up on their own. To develop it yourself, ask the farmer first — a no stands for a few years — then apply for
@@ -150,8 +205,8 @@ export function AgriPvFieldCard() {
           </p>
           <div className="dh-actions">
             {answer?.yes ? (
-              <button className="dh-order" onClick={() => agriPv.applyForPermit(id, simClock.getSimTimeMs())}>
-                Apply for the permit — {formatCHF(agriPv.permitCostRp(id))}
+              <button className="dh-order" onClick={() => agriPv.applyForPermit(id, system, simClock.getSimTimeMs())}>
+                Apply for the permit: {AGRI_PV_SYSTEMS[system].label.toLowerCase()} — {formatCHF(agriPv.permitCostRp(id))}
               </button>
             ) : (
               <button className="dh-order" onClick={() => agriPv.askFarmer(id, simClock.getSimTimeMs())}>
@@ -369,7 +424,7 @@ export function AgriPvPanel() {
                 key={p.id}
                 color={FARM_PLOT_COLORS.zoned}
                 title={p.name ?? "Field"}
-                figure={mw(agriPv.installationFor(p.id).capacityKw)}
+                figure={`up to ${mw(agriPv.largestCapacityKw(p.id))}`}
                 detail={`${hectares(p.areaM2)} · ${agriPv.farmerAnswer(p.id, now)?.yes ? "the farmer has agreed" : "the farmer hasn't been asked"}`}
                 selected={p.id === selectedId}
                 onClick={() => pick(p.id)}

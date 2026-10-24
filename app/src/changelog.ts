@@ -25,6 +25,7 @@ export const CHANGELOG: Release[] = [
     version: "0.10.0",
     date: null,
     added: [
+      "Agri-PV: choose the kind of installation for your own fields, and see what each does. A field's card compares the kinds it takes: size, output, how much comes in winter, what its hours are worth, the CO₂ it saves, and a chart of its average summer and winter day. Businesses and cooperatives now build whichever kind pays best for them.",
       "Cheaper hours at your own chargers (Town hall → Prices): a price at night and one in solar hours, for on-street chargers, hubs and lorry parks. Once cheaper, every on-street car charges overnight instead of in the evening (or in the solar hours, on a day its driver is at home), some drivers stop at a hub in the solar hours or late in the evening, and lorries charge at their midday break or overnight. Use spread out of the busy hours gives a hub or a lorry park room for more; a charger's card shows its prices and how much it sells at each.",
       "Solar hours: the hours your town's own solar and wind are forecast to make more than it uses. Utility-controlled wallboxes charge in them when the car is at home — every weekend, some weekdays — and so do staff cars charging with the sun at work. A cheaper charging price in solar hours can make the charging tariff worth more.",
       "A charging tariff (Town hall → Prices): households put their wallbox on its own meter at a charging price you set, with a monthly meter fee, and charge at night only — or whenever the utility decides, for a discount on the network fee that the rest of the town makes up. Those with a wallbox and an electric car sign up on 1 January if it pays for them; the evening peak falls, and electric cars get cheaper to run.",
@@ -32,6 +33,8 @@ export const CHANGELOG: Release[] = [
       "Nine more towns in the canton of Zürich: Dietikon, Dübendorf, Opfikon, Kloten, Bülach, Küsnacht, Hinwil, Wald and Stammheim — from towns of nearly thirty thousand to a handful of wine-growing villages.",
     ],
     changed: [
+      "Agri-PV kinds now differ more. Fixed rows face south at 30°, like a good roof, and only they hold snow. Vertical rows are the cheapest to build and keep up, tracking rows the dearest.",
+      "The utility's own power — Agri-PV fields, wind turbines, arrays on rented roofs — saves buying power at the market price of the hours it comes, not the month's average. Solar at a sunny noon is worth less, morning and evening power more.",
       "Chargers show how full they are in percent — on their card, year by year, across the town and in the statistics — instead of in ‘cars' worth’.",
       "Electricity's CO₂ depends on when it's used: Swiss power is dirtiest on winter nights, when much is imported, and cleanest at sunny middays. Each kWh now counts at the grid's intensity of the moment — the year's average stays as it was. Solar fed in at a summer noon counts for less, a heat pump's winter power for more, and moving use into sunny hours saves CO₂.",
       "Emissions in more detail: for cars, vans and lorries each, the petrol or diesel they burn and what charging the electric ones emits, taken out of the electricity. In the Year in Review, the Overview and the emissions chart.",

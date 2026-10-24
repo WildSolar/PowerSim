@@ -13,8 +13,10 @@
  *     unknown until asked, and more come round as acceptance grows; a no stands for a few years —
  *     and with the farmer's yes takes the field up and applies for the permit (a year): sometimes
  *     appealed, and now and then struck down in court; then the field rests a few years.
- *  3. The build (a year), over the whole field, of the kind the field suits (config/agriPv.ts —
- *     vertical rows, fixed rows over orchards and vines, or tracking rows; drawn per field).
+ *  3. The build (a year), over the whole field, of one of the kinds the field takes (config/agriPv.ts
+ *     — vertical rows, fixed rows over orchards and vines, or tracking rows; cropland only the first
+ *     and the last): each developer picks the one that pays best for it, the municipality the one
+ *     the player chooses when applying for the permit.
  *
  * Three kinds of developer:
  *  - Businesses with a big electricity use, each now and then looking into the zoned field nearest to
@@ -53,8 +55,8 @@ import {
   AGRI_PV_COOP_MAX_CHF,
   AGRI_PV_COOP_MIN_RETURN,
   AGRI_PV_FULL_SCALE_HA,
-  AGRI_PV_SYSTEM_WEIGHTS_CROPLAND,
-  AGRI_PV_SYSTEM_WEIGHTS_OTHER,
+  AGRI_PV_CROPLAND_SHARE,
+  AGRI_PV_CROPLAND_SYSTEMS,
   AGRI_PV_SYSTEMS,
   type AgriPvSystem,
   AGRI_PV_LASTING_SHARE,
@@ -79,7 +81,6 @@ import {
   AGRI_PV_RETRY_YEARS,
   AGRI_PV_STANCES,
   AGRI_PV_UNCERTAINTY_FRACTION,
-  AGRI_PV_UPKEEP_CHF_PER_KWP_YEAR,
 } from "../config/agriPv";
 import type { Building, FarmPlotData, MunicipalityDataset, PowerPlant } from "../data/types";
 import { approval, setLocalStances, type Stances } from "./approval";
@@ -484,35 +485,33 @@ class AgriPv {
 
   // --- a field's numbers ---
 
-  /** The kind of installation a field suits — drawn per field, by how much of it is cropland. */
-  systemOf(plotId: string): AgriPvSystem {
+  /** The kinds of installation a field takes: on cropland only rows that leave the machines room,
+   * elsewhere any. */
+  systemsFor(plotId: string): AgriPvSystem[] {
     const prime = this.byId.get(plotId)?.primeShare ?? 0;
-    const systems = Object.keys(AGRI_PV_SYSTEMS) as AgriPvSystem[];
-    const weights = systems.map((s) => prime * AGRI_PV_SYSTEM_WEIGHTS_CROPLAND[s] + (1 - prime) * AGRI_PV_SYSTEM_WEIGHTS_OTHER[s]);
-    let u = mulberry32(hashSeed(plotId, "agri-pv-system"))() * weights.reduce((a, w) => a + w, 0);
-    for (let i = 0; i < systems.length; i++) {
-      u -= weights[i];
-      if (u < 0) return systems[i];
-    }
-    return systems[0];
+    return prime >= AGRI_PV_CROPLAND_SHARE ? AGRI_PV_CROPLAND_SYSTEMS : (Object.keys(AGRI_PV_SYSTEMS) as AgriPvSystem[]);
   }
 
-  /** The installation a field would take: its kind and size (kWp). */
-  installationFor(plotId: string): { system: AgriPvSystem; capacityKw: number } {
-    const system = this.systemOf(plotId);
-    return { system, capacityKw: ((this.byId.get(plotId)?.areaM2 ?? 0) / 10_000) * AGRI_PV_SYSTEMS[system].kwpPerHa };
+  /** The size of a field's installation of `system` over the whole field (kWp). */
+  capacityFor(plotId: string, system: AgriPvSystem): number {
+    return ((this.byId.get(plotId)?.areaM2 ?? 0) / 10_000) * AGRI_PV_SYSTEMS[system].kwpPerHa;
   }
 
-  /** A field's installation, output and costs, were it built at `atMs`. */
-  economics(plotId: string, atMs: number): AgriPvEconomics {
-    const { system, capacityKw: kw } = this.installationFor(plotId);
+  /** The largest installation a field takes (kWp). */
+  largestCapacityKw(plotId: string): number {
+    return Math.max(...this.systemsFor(plotId).map((s) => this.capacityFor(plotId, s)));
+  }
+
+  /** A field's installation of `system`, its output and costs, were it built at `atMs`. */
+  economics(plotId: string, atMs: number, system: AgriPvSystem): AgriPvEconomics {
+    const kw = this.capacityFor(plotId, system);
     return {
       system,
       capacityKw: kw,
       yearlyKWh: kw * specificYieldKWhPerKwp(atMs) * profileYearFactor(system),
       buildCostRp: kw * capexRpPerKwp(kw, atMs) * AGRI_PV_SYSTEMS[system].capexFactor,
       rentRpPerYear: this.rentRpPerYear(plotId, atMs),
-      upkeepRpPerYear: kw * AGRI_PV_UPKEEP_CHF_PER_KWP_YEAR * 100,
+      upkeepRpPerYear: kw * AGRI_PV_SYSTEMS[system].upkeepChfPerKwpYear * 100,
     };
   }
 
@@ -527,7 +526,7 @@ class AgriPv {
     let rp = 0;
     for (const p of this.projects) {
       if (p.developer !== "municipality" || p.installedAtMs === undefined || p.installedAtMs > atMs) continue;
-      rp += p.capacityKw * AGRI_PV_UPKEEP_CHF_PER_KWP_YEAR * 100 + this.rentRpPerYear(p.plotId, atMs);
+      rp += p.capacityKw * AGRI_PV_SYSTEMS[p.system].upkeepChfPerKwpYear * 100 + this.rentRpPerYear(p.plotId, atMs);
     }
     return rp;
   }
@@ -598,50 +597,59 @@ class AgriPv {
     return best?.plot ?? null;
   }
 
-  /** A business weighs a field, once its farmer has said yes: an installation over the whole field, its power taken up to a share
-   * of its own use and the rest sold to the utility, against doing nothing. */
+  /** A business weighs a field, once its farmer has said yes: an installation over the whole field —
+   * of the kind that costs it least a year — its power taken up to a share of its own use and the rest
+   * sold to the utility, against doing nothing. */
   private businessConsiders(b: Building, plot: Plot, atMs: number): boolean {
     const useKWh = this.yearlyUseKWh(b, atMs);
     if (useKWh < AGRI_PV_MIN_CONSUMER_MWH * 1000) return false;
-    if (this.installationFor(plot.id).capacityKw < AGRI_PV_MIN_KWP || !this.askFarmer(plot.id, atMs)) return false;
-    const e = this.economics(plot.id, atMs);
-    const ppaShare = Math.min(1, (useKWh * AGRI_PV_PPA_COVER_SHARE) / e.yearlyKWh);
-    const savedRp = e.yearlyKWh * (ppaShare * this.ppaEnergyValueRpPerKWh(atMs) + (1 - ppaShare) * this.feedInRpKWh(e.capacityKw, atMs));
+    const systems = this.systemsFor(plot.id).filter((s) => this.capacityFor(plot.id, s) >= AGRI_PV_MIN_KWP);
+    if (systems.length === 0 || !this.askFarmer(plot.id, atMs)) return false;
+    let best: { system: AgriPvSystem; ppaShare: number; annualizedCostRp: number } | null = null;
+    for (const system of systems) {
+      const e = this.economics(plot.id, atMs, system);
+      const ppaShare = Math.min(1, (useKWh * AGRI_PV_PPA_COVER_SHARE) / e.yearlyKWh);
+      const savedRp = e.yearlyKWh * (ppaShare * this.ppaEnergyValueRpPerKWh(atMs) + (1 - ppaShare) * this.feedInRpKWh(e.capacityKw, atMs));
+      const annualizedCostRp = e.buildCostRp / AGRI_PV_LIFETIME_YEARS + e.rentRpPerYear + e.upkeepRpPerYear - savedRp;
+      if (!best || annualizedCostRp < best.annualizedCostRp) best = { system, ppaShare, annualizedCostRp };
+    }
+    if (!best) return false;
     type Choice = "none" | "field";
     const candidates: RenewalCandidate<Choice>[] = [
       { id: "none", available: true, annualizedCostRp: 0, lifetimeMeanYears: AGRI_PV_LIFETIME_YEARS, greenness: 0 },
-      {
-        id: "field",
-        available: true,
-        annualizedCostRp: e.buildCostRp / AGRI_PV_LIFETIME_YEARS + e.rentRpPerYear + e.upkeepRpPerYear - savedRp,
-        lifetimeMeanYears: AGRI_PV_LIFETIME_YEARS,
-        greenness: 1,
-      },
+      { id: "field", available: true, annualizedCostRp: best.annualizedCostRp, lifetimeMeanYears: AGRI_PV_LIFETIME_YEARS, greenness: 1 },
     ];
     const policy = policyStore.get();
     const { chosen } = chooseNext(candidates, "none", AGRI_PV_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier, policy.progressiveNudgeRp);
     if (chosen === "none") return false;
-    this.start(plot.id, "business", atMs, { partnerEgid: b.egid, ppaShare });
+    this.start(plot.id, "business", atMs, best.system, { partnerEgid: b.egid, ppaShare: best.ppaShare });
     return true;
   }
 
   /** An energy cooperative weighs a field: all its power sold at the feed-in price, enough to pay
-   * the build, the rent and the upkeep with a little to spare — if it can raise the money, and the
-   * farmer agrees. */
+   * the build, the rent and the upkeep with a little to spare — of the kind that earns the most for
+   * what it costs, of those it can raise the money for — and the farmer agrees. */
   private cooperativeConsiders(plot: Plot, atMs: number): boolean {
-    const e0 = this.economics(plot.id, atMs);
-    if (e0.capacityKw < AGRI_PV_MIN_KWP || e0.buildCostRp > AGRI_PV_COOP_MAX_CHF * 100 || !this.askFarmer(plot.id, atMs)) return false;
-    const e = this.economics(plot.id, atMs); // with the farmer's own rent
-    const costRp = e.buildCostRp / AGRI_PV_LIFETIME_YEARS + e.rentRpPerYear + e.upkeepRpPerYear;
-    const earnsRp = e.yearlyKWh * this.feedInRpKWh(e.capacityKw, atMs);
-    if (earnsRp < costRp * (1 + AGRI_PV_COOP_MIN_RETURN)) return false;
-    this.start(plot.id, "cooperative", atMs, {});
+    const affordable = this.systemsFor(plot.id).filter((s) => {
+      const e = this.economics(plot.id, atMs, s);
+      return e.capacityKw >= AGRI_PV_MIN_KWP && e.buildCostRp <= AGRI_PV_COOP_MAX_CHF * 100;
+    });
+    if (affordable.length === 0 || !this.askFarmer(plot.id, atMs)) return false;
+    let best: { system: AgriPvSystem; ratio: number } | null = null;
+    for (const system of affordable) {
+      const e = this.economics(plot.id, atMs, system); // with the farmer's own rent
+      const costRp = e.buildCostRp / AGRI_PV_LIFETIME_YEARS + e.rentRpPerYear + e.upkeepRpPerYear;
+      const ratio = (e.yearlyKWh * this.feedInRpKWh(e.capacityKw, atMs)) / costRp;
+      if (!best || ratio > best.ratio) best = { system, ratio };
+    }
+    if (!best || best.ratio < 1 + AGRI_PV_COOP_MIN_RETURN) return false;
+    this.start(plot.id, "cooperative", atMs, best.system, {});
     return true;
   }
 
-  /** A developer takes up a field: its permit procedure begins. */
-  private start(plotId: string, developer: AgriPvDeveloper, atMs: number, extra: { partnerEgid?: string; ppaShare?: number }, costRp = 0): AgriPvProject {
-    const { system, capacityKw } = this.installationFor(plotId);
+  /** A developer takes up a field, for an installation of `system`: its permit procedure begins. */
+  private start(plotId: string, developer: AgriPvDeveloper, atMs: number, system: AgriPvSystem, extra: { partnerEgid?: string; ppaShare?: number }, costRp = 0): AgriPvProject {
+    const capacityKw = this.capacityFor(plotId, system);
     const p: AgriPvProject = {
       id: this.nextId++,
       plotId,
@@ -661,13 +669,13 @@ class AgriPv {
     return p;
   }
 
-  /** The municipality takes up a free zoned field whose farmer has said yes: the permit is paid
-   * now, from the treasury. */
-  applyForPermit(plotId: string, atMs: number): boolean {
-    if (!this.isFree(plotId, atMs) || !this.farmerAnswer(plotId, atMs)?.yes || spendingFrozen(atMs)) return false;
+  /** The municipality takes up a free zoned field whose farmer has said yes, for an installation of
+   * `system` (one the field takes): the permit is paid now, from the treasury. */
+  applyForPermit(plotId: string, system: AgriPvSystem, atMs: number): boolean {
+    if (!this.isFree(plotId, atMs) || !this.farmerAnswer(plotId, atMs)?.yes || spendingFrozen(atMs) || !this.systemsFor(plotId).includes(system)) return false;
     const costRp = this.permitCostRp(plotId);
     if (cannotPay(costRp, atMs)) return false;
-    const p = this.start(plotId, "municipality", atMs, {}, costRp);
+    const p = this.start(plotId, "municipality", atMs, system, {}, costRp);
     treasury.recordPayout("infrastructure", atMs, costRp, `agri-pv-permit:${p.id}`);
     this.notify();
     return true;
@@ -677,7 +685,7 @@ class AgriPv {
   build(plotId: string, atMs: number): boolean {
     const p = this.projectOn(plotId);
     if (!p || p.developer !== "municipality" || p.phase !== "permitted") return false;
-    const costRp = this.economics(plotId, atMs).buildCostRp;
+    const costRp = this.economics(plotId, atMs, p.system).buildCostRp;
     if (cannotPay(costRp, atMs)) return false;
     p.costRp += costRp;
     this.startBuilding(p, atMs);
@@ -687,7 +695,7 @@ class AgriPv {
   }
 
   private startBuilding(p: AgriPvProject, atMs: number): void {
-    if (p.developer !== "municipality") p.costRp = this.economics(p.plotId, atMs).buildCostRp;
+    if (p.developer !== "municipality") p.costRp = this.economics(p.plotId, atMs, p.system).buildCostRp;
     p.phase = "building";
     p.phaseFromMs = atMs;
     p.phaseUntilMs = atMs + AGRI_PV_BUILD_MONTHS * MONTH_MS;
