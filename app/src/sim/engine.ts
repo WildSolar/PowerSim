@@ -7,6 +7,7 @@
  */
 
 import { crashes, setCrashPause } from "./crash";
+import { setDecisionHorizon } from "./decisionHorizon";
 
 const DEFAULT_MULTIPLIER = 3600; // "Medium": 1 real second = 1 simulated hour (see timeControls.ts)
 
@@ -36,6 +37,7 @@ export class SimClock {
       if (this.lastFrameTime !== null) {
         const realDeltaMs = now - this.lastFrameTime;
         this.simTimeMs = Math.min(this.simTimeMs + realDeltaMs * this.multiplier, MAX_SIM_TIME_MS);
+        setDecisionHorizon(this.simTimeMs);
         this.notify();
       }
       this.lastFrameTime = now;
@@ -69,6 +71,7 @@ export class SimClock {
    * noticing after the fact. */
   pauseAt(simTimeMs: number): void {
     this.simTimeMs = Math.min(simTimeMs, MAX_SIM_TIME_MS);
+    setDecisionHorizon(this.simTimeMs);
     this.multiplier = 0;
     this.notify();
   }
@@ -92,4 +95,6 @@ export class SimClock {
 }
 
 export const simClock = new SimClock();
+// Decisions follow the clock (decisionHorizon.ts): none before it has started.
+setDecisionHorizon(simClock.getSimTimeMs());
 setCrashPause(() => simClock.setSpeed(0));

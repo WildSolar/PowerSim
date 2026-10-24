@@ -218,6 +218,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       list([
         "Lead time: nothing happens the day you decide. A subsidy takes a month or two to set up; a law can take one to three years. Changing a measure starts a new lead time, and the old settings stay in force until then. Repealing is immediate.",
         "Cost: a subsidy costs money only when someone actually takes it up; a campaign costs a little every month it runs; infrastructure costs what it costs when it is built.",
+        "How much: people's goodwill follows how strongly a measure acts — half the grant earns half the goodwill, and a bigger one more, though less and less. Cutting a measure back works like part of a repeal: people lose some of what they liked, and it looks indecisive in proportion. Set to nothing — a grant of zero, a programme reaching no one — a measure is repealed (see \"Public approval\").",
         "Subsidies buy speed: a grant tips owners who were undecided, and brings replacements forward (see \"Switching early\"). But it is also paid to everyone who would have acted anyway.",
         "Laws are cheap, but act only when something is replaced anyway — and they can be voted down. A strict standard can even backfire: a demanding minimum for renovations puts off owners who would have done a smaller upgrade.",
         "Information measures help people judge their options more sharply, so they act on clear savings and stop chasing marginal ones.",

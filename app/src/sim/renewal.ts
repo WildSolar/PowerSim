@@ -30,6 +30,7 @@ import { logCandidateDecision, type DecisionCandidateLog, type DecisionLogKind }
 import { hashSeed, mulberry32 } from "./rng";
 import { weibullAgedRemainder, weibullConditionalRemainder, weibullSample } from "./weibull";
 import { recordSubsidisedDecision } from "./additionality";
+import { decisionHorizon } from "./decisionHorizon";
 
 export interface RenewalCandidate<T extends string> {
   id: T;
@@ -146,10 +147,11 @@ export function renewalChainEntry<T extends string>(entityKey: string): RenewalC
   return chains.get(entityKey) as RenewalChainEntry<T> | undefined;
 }
 
-/** The cached chain for `entityKey` if it is already complete up to `uptoMs`, else null. */
+/** The cached chain for `entityKey` if it is already complete up to `uptoMs` (or the decision
+ * horizon, if that comes first), else null. */
 export function peekRenewalChain<T extends string>(entityKey: string, uptoMs: number): RenewalEvent<T>[] | null {
   const entry = chains.get(entityKey);
-  return entry && uptoMs < entry.nextDueMs ? (entry.events as RenewalEvent<T>[]) : null;
+  return entry && Math.min(uptoMs, decisionHorizon()) < entry.nextDueMs ? (entry.events as RenewalEvent<T>[]) : null;
 }
 
 /** Exported for solarAdoption.ts, which reuses this exact four-factor
@@ -216,8 +218,10 @@ function firstRemainingLifetimeMs(entityKey: string, shape: number, meanYears: n
 /** Every event for this entity up to and including `uptoMs`, extending and
  * permanently caching the chain as needed. Cheap and side-effect-free to call
  * repeatedly with the same or a larger `uptoMs` (the common case — every
- * render just asks "up to right now"). */
-export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, uptoMs: number): RenewalEvent<T>[] {
+ * render just asks "up to right now"). Never beyond the decision horizon
+ * (decisionHorizon.ts): asked about a later moment, the chain stands as it is. */
+export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, askedUptoMs: number): RenewalEvent<T>[] {
+  const uptoMs = Math.min(askedUptoMs, decisionHorizon());
   let entry = chains.get(params.entityKey) as RenewalChainEntry<T> | undefined;
   if (entry && uptoMs < entry.nextDueMs) return entry.events;
   if (!entry) {

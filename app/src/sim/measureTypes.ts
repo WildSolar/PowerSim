@@ -77,6 +77,12 @@ export interface MeasureDef {
   /** How each voter bloc feels about the measure at these settings, -1 (bitterly opposed) to +1 (delighted).
    * Blocs not listed don't care. Hidden from the player. */
   approval?(params: MeasureParams): Partial<Record<Bloc, number>>;
+  /** How strongly the measure acts at these settings against its defaults (1): a grant's amount, a
+   * programme's reach, a law's stringency. At 0 it does nothing, and setting it there repeals it.
+   * The blocs' feelings follow it (approval.ts), unless `approvalFollowsSettings`. */
+  strength?(params: MeasureParams): number;
+  /** Its approval already depends on the settings: strength doesn't scale it again. */
+  approvalFollowsSettings?: boolean;
   /** A subsidy programme: which kind of household decision it pays for — what its uptake counts
    * and an evaluation study looks at (studies.ts). */
   subsidyCategory?: SubsidyCategory;

@@ -233,6 +233,8 @@ class MeasureEngine {
     const existing = this.states.get(id);
     const latest = existing?.pending?.params ?? existing?.active ?? null;
     if (latest && sameParams(latest, params)) return false;
+    // Set to nothing (a grant of zero), a measure is repealed; a new one isn't enacted at all.
+    if (def.strength && def.strength(params) <= 0) return existing ? this.repeal(id, atMsOverride) : false;
 
     const ctx = { residents: this.dwellingCount(now) * RESIDENTS_PER_DWELLING };
     const oneOffRp = def.oneOffCostRp?.(params, ctx) ?? 0;
@@ -249,13 +251,13 @@ class MeasureEngine {
     return true;
   }
 
-  /** Repeals a measure — immediately, and it stops costing. */
-  repeal(id: string): boolean {
+  /** Repeals a measure — immediately, and it stops costing. `atMsOverride` as for enact. */
+  repeal(id: string, atMsOverride?: number): boolean {
     const def = MEASURE_BY_ID.get(id);
     const state = this.states.get(id);
     if (!def || !state || this.frozen) return false;
     this.states.delete(id);
-    const now = simClock.getSimTimeMs();
+    const now = atMsOverride ?? simClock.getSimTimeMs();
     this.log(now, `Repealed: ${def.title}.`);
     this.emit({ kind: "repealed", id, def, params: state.pending?.params ?? (state.active as MeasureParams), atMs: now });
     this.recompute();

@@ -21,6 +21,7 @@ import { groupByBuilding, ungroup, type ChainsByBuilding } from "./chainKeys";
 import { logWeightedDecision, type DecisionCandidateLog } from "./decisionLog";
 import { hashSeed, mulberry32 } from "./rng";
 import { weibullAgedRemainder, weibullSample } from "./weibull";
+import { decisionHorizon } from "./decisionHorizon";
 
 const YEAR_MS = 365.25 * 24 * 60 * 60_000;
 const MAX_EVENTS_PER_CALL = 2000; // higher than renewal.ts's — mode changes are on a shorter mean cadence than heating's
@@ -86,7 +87,8 @@ function firstRemainingLifetimeMs(entityKey: string, shape: number, meanYears: n
 
 /** Every event for this entity up to and including `uptoMs` — see
  * renewal.ts's renewalEventsUpTo for the identical caching contract. */
-export function modeEventsUpTo<T extends string>(params: ModeRenewalParams<T>, uptoMs: number): ModeEvent<T>[] {
+export function modeEventsUpTo<T extends string>(params: ModeRenewalParams<T>, askedUptoMs: number): ModeEvent<T>[] {
+  const uptoMs = Math.min(askedUptoMs, decisionHorizon()); // never decided ahead (decisionHorizon.ts)
   let entry = chains.get(params.entityKey) as ModeChainEntry<T> | undefined;
   if (entry && uptoMs < entry.nextDueMs) return entry.events;
   if (!entry) {

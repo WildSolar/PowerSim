@@ -29,6 +29,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     ],
     leadTimeMonths: 1,
     effects: (p) => ({ solarSubsidyRpPerKwp: num(p, "perKwp") * CHF, solarSubsidyFixedRp: num(p, "fixed") * CHF }),
+    strength: (p) => num(p, "perKwp") / 300 + num(p, "fixed") / 3000,
     approval: () => ({ homeowners: 0.5, tenants: 0.1, business: 0.2, climate: 0.6 }),
   },
   {
@@ -45,6 +46,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     ],
     leadTimeMonths: 1,
     effects: (p) => ({ fleetEvVanSubsidyRp: num(p, "van") * CHF, fleetEvTruckSubsidyRp: num(p, "truck") * CHF }),
+    strength: (p) => (num(p, "van") / 6000 + num(p, "truck") / 40000) / 2,
     approval: () => ({ business: 0.5, climate: 0.4, homeowners: -0.05 }),
   },
   {
@@ -70,6 +72,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     leadTimeMonths: 6,
     effects: (p) => ({ solarCoopSupport: true, solarCoopGrantRpPerKwp: num(p, "perKwp") * CHF }),
     oneOffCostRp: () => 50_000 * CHF,
+    strength: (p) => num(p, "perKwp") / 200,
     approval: () => ({ climate: 0.3, tenants: 0.15, homeowners: 0.1 }),
   },
   {
@@ -83,6 +86,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [{ kind: "slider", key: "perKwp", label: "Per kWp", min: 0, max: 1000, step: 50, unit: "CHF/kWp", default: 300 }],
     leadTimeMonths: 1,
     effects: (p) => ({ carParkSolarSubsidyRpPerKwp: num(p, "perKwp") * CHF }),
+    strength: (p) => num(p, "perKwp") / 300,
     approval: () => ({ business: 0.4, homeowners: 0.05, climate: 0.5 }),
   },
   {
@@ -108,6 +112,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     ],
     leadTimeMonths: 1,
     effects: (p) => ({ homeBatterySubsidyRpPerKwh: num(p, "perKwh") * CHF, homeBatterySubsidyGridFriendly: p.condition !== "none" }),
+    strength: (p) => num(p, "perKwh") / 300,
     approval: (p) => ({ homeowners: p.condition === "none" ? 0.4 : 0.3, business: 0.1, climate: 0.4 }),
   },
   {
@@ -133,6 +138,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     ],
     leadTimeMonths: 1,
     effects: (p) => ({ heatPumpSubsidyRp: num(p, "amount") * CHF, heatPumpGrantEarlyOnly: p.target === "early" }),
+    strength: (p) => num(p, "amount") / 5000,
     approval: (p) => (p.target === "early" ? { homeowners: 0.35, tenants: 0.05, business: 0.05, climate: 0.6 } : { homeowners: 0.6, tenants: 0.1, business: 0.1, climate: 0.6 }),
   },
   {
@@ -146,6 +152,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [{ kind: "slider", key: "amount", label: "Grant", min: 0, max: 20000, step: 500, unit: "CHF each", default: 5000 }],
     leadTimeMonths: 1,
     effects: (p) => ({ dhConnectionSubsidyRp: num(p, "amount") * CHF }),
+    strength: (p) => num(p, "amount") / 5000,
     approval: () => ({ homeowners: 0.45, tenants: 0.05, business: 0.1, climate: 0.4 }),
   },
   {
@@ -171,6 +178,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     ],
     leadTimeMonths: 1,
     effects: (p) => ({ evSubsidyRp: num(p, "amount") * CHF, evGrantEarlyOnly: p.target === "early" }),
+    strength: (p) => num(p, "amount") / 3000,
     approval: (p) => (p.target === "early" ? { drivers: 0.3, homeowners: 0.1, climate: 0.5 } : { drivers: 0.5, homeowners: 0.2, climate: 0.5 }),
   },
   {
@@ -183,6 +191,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [{ kind: "slider", key: "perM2", label: "Top-up", min: 0, max: 200, step: 5, unit: "CHF/m²", default: 40 }],
     leadTimeMonths: 2,
     effects: (p) => ({ retrofitSubsidyRpPerM2: num(p, "perM2") * CHF }),
+    strength: (p) => num(p, "perM2") / 40,
     approval: () => ({ homeowners: 0.6, tenants: 0.2, climate: 0.5 }),
   },
 
@@ -197,6 +206,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [{ kind: "slider", key: "perYear", label: "Buildings per year", min: 0, max: 20, step: 1, unit: "per year", default: 3 }],
     leadTimeMonths: 6,
     effects: (p) => ({ municipalSolarBuildingsPerYear: num(p, "perYear") }),
+    strength: (p) => num(p, "perYear") / 3,
     approval: () => ({ climate: 0.6, tenants: 0.1, homeowners: 0.1, business: -0.1 }),
   },
   {
@@ -209,6 +219,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [{ kind: "slider", key: "perYear", label: "Car parks per year", min: 0, max: 6, step: 1, unit: "per year", default: 2 }],
     leadTimeMonths: 6,
     effects: (p) => ({ carParkSolarMunicipalPerYear: num(p, "perYear") }),
+    strength: (p) => num(p, "perYear") / 2,
     approval: () => ({ climate: 0.5, drivers: 0.1, tenants: 0.05 }),
   },
 
@@ -225,6 +236,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     ],
     leadTimeMonths: 6,
     effects: (p) => ({ publicBuildingChargerSitesPerYear: num(p, "perYear"), publicBuildingChargerPoints: Number(p.points ?? 4) }),
+    strength: (p) => num(p, "perYear") / 2,
     approval: () => ({ climate: 0.4, drivers: 0.2, tenants: 0.15 }),
   },
   {
@@ -250,6 +262,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     leadTimeMonths: 12,
     effects: (p) => ({ workChargingBoost: num(p, "reach") / 100, workChargingWithSun: p.timing !== "arrival" }),
     annualCostRp: (p, ctx) => (num(p, "reach") / 100) * ctx.residents * (p.timing === "arrival" ? 6 : 8) * CHF,
+    strength: (p) => Math.max(num(p, "reach") / 30, p.timing !== "arrival" ? 0.2 : 0),
     approval: () => ({ climate: 0.25, drivers: 0.15, business: 0.1 }),
   },
 
@@ -264,6 +277,8 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     leadTimeMonths: 12,
     effects: (p) => ({ heatPumpLoadControlShare: num(p, "share") / 100 }),
     annualCostRp: (p) => (num(p, "share") / 100) * 60_000 * CHF,
+    strength: (p) => num(p, "share") / 60,
+    approvalFollowsSettings: true,
     approval: (p) => ({ homeowners: -0.15 * (num(p, "share") / 100), climate: 0.1 }),
   },
   {
@@ -277,6 +292,8 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     leadTimeMonths: 6,
     effects: (p) => ({ smartChargingShare: num(p, "share") / 100 }),
     annualCostRp: (p) => (num(p, "share") / 100) * 80_000 * CHF,
+    strength: (p) => num(p, "share") / 50,
+    approvalFollowsSettings: true,
     approval: (p) => ({ climate: 0.15, drivers: -0.05 * (num(p, "share") / 100) }),
   },
 
@@ -291,6 +308,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     leadTimeMonths: 3,
     effects: (p) => ({ solarOutreachLevel: num(p, "level") }),
     annualCostRp: (p, ctx) => (num(p, "level") / 100) * ctx.residents * 6 * CHF,
+    strength: (p) => num(p, "level") / 50,
     approval: () => ({ climate: 0.3, homeowners: 0.1 }),
   },
   {
@@ -346,6 +364,8 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     ],
     leadTimeMonths: 12,
     effects: (p) => ({ newBuildSolarMandatePct: num(p, "share"), newBuildSolarMandateMinFootprintM2: num(p, "minFootprint") }),
+    strength: (p) => num(p, "share") / 60,
+    approvalFollowsSettings: true,
     approval: (p) => {
       const share = num(p, "share") / 100;
       return { homeowners: -0.1 - 0.4 * share, business: -0.05 - 0.25 * share, climate: 0.3 + 0.4 * share };
@@ -361,6 +381,8 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [{ kind: "slider", key: "level", label: "Standard", min: 0, max: 100, step: 10, unit: "% toward passive house", default: 50 }],
     leadTimeMonths: 12,
     effects: (p) => ({ newBuildInsulationLevel: num(p, "level") }),
+    strength: (p) => num(p, "level") / 50,
+    approvalFollowsSettings: true,
     approval: (p) => {
       const level = num(p, "level") / 100;
       return { homeowners: -0.1 - 0.3 * level, tenants: -0.05 - 0.15 * level, business: -0.1 - 0.2 * level, climate: 0.3 + 0.4 * level };
@@ -459,6 +481,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [{ kind: "slider", key: "amount", label: "Bonus", min: 0, max: 10000, step: 500, unit: "CHF each", default: 2000 }],
     leadTimeMonths: 2,
     effects: (p) => ({ iceScrappageBonusRp: num(p, "amount") * CHF }),
+    strength: (p) => num(p, "amount") / 2000,
     approval: () => ({ drivers: 0.3, climate: 0.5, homeowners: 0.1 }),
   },
   {
@@ -471,6 +494,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     leadTimeMonths: 24,
     effects: (p) => ({ modeShiftToBikePts: (num(p, "level") / 100) * 9 }),
     annualCostRp: (p, ctx) => (num(p, "level") / 100) * ctx.residents * 25 * CHF,
+    strength: (p) => num(p, "level") / 50,
     approval: () => ({ climate: 0.4, tenants: 0.2, homeowners: 0.1, drivers: -0.15 }),
   },
   {
@@ -483,6 +507,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     leadTimeMonths: 12,
     effects: (p) => ({ modeShiftToOtherPts: (num(p, "level") / 100) * 7 }),
     annualCostRp: (p, ctx) => (num(p, "level") / 100) * ctx.residents * 90 * CHF,
+    strength: (p) => num(p, "level") / 50,
     approval: () => ({ tenants: 0.4, climate: 0.4, drivers: 0.1, business: 0.1 }),
   },
   {
@@ -494,6 +519,8 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [{ kind: "slider", key: "strictness", label: "Strictness", min: 0, max: 100, step: 10, unit: "%", default: 50 }],
     leadTimeMonths: 12,
     effects: (p) => ({ modeShiftToBikePts: (num(p, "strictness") / 100) * 3.5, modeShiftToOtherPts: (num(p, "strictness") / 100) * 4.5 }),
+    strength: (p) => num(p, "strictness") / 50,
+    approvalFollowsSettings: true,
     approval: (p) => {
       const s = num(p, "strictness") / 100;
       return { drivers: -0.2 - 0.5 * s, business: -0.05 - 0.25 * s, climate: 0.15 + 0.25 * s, homeowners: -0.05 * s };
@@ -535,6 +562,8 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [{ kind: "slider", key: "coverage", label: "Households it reaches", min: 0, max: 80, step: 10, unit: "% of those who can't charge at home", default: 50 }],
     leadTimeMonths: 12,
     effects: (p) => ({ homeChargingBoost: num(p, "coverage") / 100 }),
+    strength: (p) => num(p, "coverage") / 50,
+    approvalFollowsSettings: true,
     approval: (p) => {
       const c = num(p, "coverage") / 100;
       return { tenants: 0.1 + 0.3 * c, drivers: 0.1 + 0.2 * c, climate: 0.3, homeowners: -0.1 - 0.3 * c };
@@ -551,6 +580,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     params: [{ kind: "slider", key: "share", label: "Share of supply", min: 0, max: 100, step: 10, unit: "%", default: 50 }],
     leadTimeMonths: 6,
     effects: (p) => ({ greenPowerShare: num(p, "share") }),
+    strength: (p) => num(p, "share") / 50,
     approval: () => ({ climate: 0.4, homeowners: 0.05, tenants: 0.05 }),
   },
   {
@@ -576,6 +606,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     leadTimeMonths: 3,
     effects: (p) => ({ progressiveNudgeRp: (num(p, "level") / 100) * 30_000 }),
     annualCostRp: (p, ctx) => (num(p, "level") / 100) * ctx.residents * 5 * CHF,
+    strength: (p) => num(p, "level") / 50,
     approval: () => ({ climate: 0.3, homeowners: 0.05, drivers: -0.05 }),
   },
 
@@ -643,6 +674,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     leadTimeMonths: 6,
     effects: (p) => ({ removalShareOfBaseline: num(p, "share") }),
     costCategory: "removals",
+    strength: (p) => num(p, "share") / 10,
     approval: () => ({ climate: 0.25, business: -0.05 }),
   },
 ];

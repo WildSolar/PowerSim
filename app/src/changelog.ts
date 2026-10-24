@@ -46,6 +46,8 @@ export const CHANGELOG: Release[] = [
       "Not every lorry can go electric yet: its route has to suit an electric one — about one in seven today, most by the mid-2030s, nearly all by 2045. Electric lorries now catch on more slowly at first, and then steadily.",
     ],
     fixed: [
+      "Repealing a grant (the electric car grant, the scrappage bonus, any other) now stops it at once: owners weighing solar for the year ahead had settled some later purchases early, under the grants of the day, so those kept being paid until the game was reloaded. Nothing is decided ahead of time any more.",
+      "Setting a grant or a programme to zero no longer dodges the cost of repealing it: it is a repeal. And people's goodwill now follows how big a measure is — half the grant earns half the goodwill, and cutting one back costs part of what a repeal would.",
       "Winning a public vote on a small Agri-PV zone no longer gives the same approval boost as a vote on a law: a vote now counts as much as what is at stake, so a field of a few hectares hardly moves approval, either way. Putting many small fields forward one by one no longer pays.",
       "Households weighing the dynamic tariff reckon with what their electric car actually charges (about 2,200 kWh a year), not nearly twice that.",
       "Electric cars charge at home as they're actually driven: about 2,200 kWh a year at 12,000 km, where they used to draw nearly twice that. They plug in two or three nights a week rather than every night, and those who wait for the night rate charge at some time in the night instead of all at 21:00 — so home charging no longer stops dead at midnight. Less power for the town, a smaller evening peak.",

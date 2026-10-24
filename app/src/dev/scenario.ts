@@ -41,6 +41,7 @@ import { market } from "../sim/market";
 import { dynamicTariff } from "../sim/dynamicTariff";
 import { initTariffApproval } from "../sim/tariffApproval";
 import { initOutcomeApproval } from "../sim/approvalOutcomes";
+import { setDecisionHorizon } from "../sim/decisionHorizon";
 import { setCostTrendsEnabled } from "../sim/costTrends";
 import { bookInitialPublicCharging } from "../sim/mobility";
 import { PAYOUT_CATEGORIES, treasury } from "../sim/treasury";
@@ -54,6 +55,8 @@ export interface ScenarioSpec {
   difficulty?: Difficulty;
   /** Measures to enact, and in which calendar year (1 January; 2026 = at the start). */
   enact: { id: string; params?: Record<string, number | boolean | string>; year?: number }[];
+  /** Measures to repeal, and when (the first of the month, 0-based; January if not given). */
+  repeal?: { id: string; year: number; month?: number }[];
   /** Calendar years to report on (each read as of 1 January). */
   reportYears: number[];
   /** Municipal public chargers to build, and in which calendar year (1 January). */
@@ -221,6 +224,14 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
       pending.splice(pending.indexOf(e), 1);
     }
   };
+  const pendingRepeals = [...(spec.repeal ?? [])];
+  const repealDue = (atMs: number) => {
+    const d = new Date(toDateMs(atMs));
+    for (const r of pendingRepeals.filter((p) => p.year * 12 + (p.month ?? 0) <= d.getUTCFullYear() * 12 + d.getUTCMonth())) {
+      measures.repeal(r.id, atMs);
+      pendingRepeals.splice(pendingRepeals.indexOf(r), 1);
+    }
+  };
   const pendingChargers = [...(spec.chargers ?? [])];
   const buildDue = (year: number, atMs: number) => {
     for (const c of pendingChargers.filter((p) => (p.year ?? startYear) <= year)) {
@@ -233,9 +244,11 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   enactDue(startYear, 0);
   buildDue(startYear, 0);
 
+  setDecisionHorizon(t); // decisions as the scripted run reaches them, as the clock would (decisionHorizon.ts)
   for (;;) {
     const previous = new Date(toDateMs(t));
     t += MONTH_MS;
+    setDecisionHorizon(t);
     const now = new Date(toDateMs(t));
     const year = now.getUTCFullYear();
     measures.advance(t);
@@ -256,6 +269,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
       }
     }
     enactDue(year, t);
+    repealDue(t);
     buildDue(year, t);
 
     const newYear = now.getUTCFullYear() !== previous.getUTCFullYear();

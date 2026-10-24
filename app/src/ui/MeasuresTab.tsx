@@ -135,6 +135,8 @@ function MeasureDetail({ def, nowMs, onClose }: { def: MeasureDef; nowMs: number
   const reaction = approval.reaction(def, draft);
   const vote = approval.getVoteInfo(def.id, def, nowMs);
   const changed = latest === null || !sameParams(latest, draft);
+  // A grant of zero, a programme reaching no one: it does nothing, so it is a repeal.
+  const setToNothing = def.strength ? def.strength(draft) <= 0 : false;
   // Nothing left for it to do (every public building already has what it would build).
   const unavailable = measureUnavailableReason(def.id, nowMs);
 
@@ -224,9 +226,17 @@ function MeasureDetail({ def, nowMs, onClose }: { def: MeasureDef; nowMs: number
         </div>
       )}
 
+      {setToNothing && changed && (
+        <div className="measure-note">{latest === null ? "Set this way it would do nothing." : "Set this way it does nothing: applying it repeals the measure."}</div>
+      )}
       <div className="measure-actions">
-        <button className="measure-enact" data-tour="measure-enact" disabled={!changed || unavailable !== null || moratoriumUntil !== null} onClick={() => measures.enact(def.id, draft)}>
-          {latest === null ? "Enact" : "Apply change"}
+        <button
+          className="measure-enact"
+          data-tour="measure-enact"
+          disabled={!changed || unavailable !== null || moratoriumUntil !== null || (latest === null && setToNothing)}
+          onClick={() => measures.enact(def.id, draft)}
+        >
+          {latest === null ? "Enact" : setToNothing ? "Repeal" : "Apply change"}
         </button>
         {latest !== null && unavailable === null && (
           <button className="measure-repeal" onClick={() => measures.repeal(def.id)}>

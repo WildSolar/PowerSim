@@ -140,6 +140,7 @@ import {
 import { interpolateCurve } from "../config/curve";
 import { priceFactor } from "./costTrends";
 import { cannotPay, spendingFrozen } from "./fiscalRules";
+import { decisionHorizon } from "./decisionHorizon";
 
 const DAY_MS = 24 * 60 * 60_000;
 const YEAR_MS = 365.25 * DAY_MS;
@@ -1071,7 +1072,10 @@ function registeredCapacityByEgid(realPlants: PowerPlant[]): Map<string, { kw: n
 
 /** Decides every month up to and including `targetMonth` (year * 12 + month) not yet decided —
  * each when it is first reached, so a measure changed mid-year counts from the next month. */
-function ensureAdvancedThroughMonth(buildings: Building[], realPlants: PowerPlant[], targetMonth: number): void {
+function ensureAdvancedThroughMonth(buildings: Building[], realPlants: PowerPlant[], askedMonth: number): void {
+  // Never a month beyond the decision horizon's (decisionHorizon.ts): later ones are decided when they come.
+  const horizon = decisionHorizon();
+  const targetMonth = Number.isFinite(horizon) ? Math.min(askedMonth, monthIndexAt(horizon)) : askedMonth;
   if (watermarkMonth === null) watermarkMonth = targetMonth - 1;
   for (let m = watermarkMonth + 1; m <= targetMonth; m++) {
     timed("solar adoption month", () => processMonth(buildings, realPlants, Math.floor(m / 12), m % 12));

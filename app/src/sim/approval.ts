@@ -67,6 +67,18 @@ import { treasury } from "./treasury";
 
 const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
 
+/** How strongly people feel a measure acting at `strength` (1: its defaults): in proportion below
+ * that — half the grant, half the goodwill — and with diminishing returns above. */
+export function perceivedStrength(strength: number): number {
+  return strength <= 1 ? Math.max(0, strength) : 1 + 0.5 * Math.log(strength);
+}
+
+/** How much of a measure a change cuts back (0-1): none if it grows. */
+function strengthCut(before: number, after: number): number {
+  const b = perceivedStrength(before);
+  return b > 0 ? Math.max(0, 1 - perceivedStrength(after) / b) : 0;
+}
+
 /** A vote's or a poll's share, for the player: one decimal, always rounded down — so a measure that
  * fell just short never reads "50% voted yes". */
 export function votePct(share: number): string {
@@ -391,8 +403,13 @@ class ApprovalEngine {
     return BLOC_ORDER.reduce((sum, b) => sum + BLOC_WEIGHT[b] * this.levels[b], 0);
   }
 
+  /** How the blocs feel about a measure at these settings: scaled by how strongly it acts, unless its
+   * approval already follows the settings. */
   private stancesOf(def: MeasureDef, params: MeasureParams): Stances {
-    return def.approval?.(params) ?? {};
+    const stances = def.approval?.(params) ?? {};
+    if (!def.strength || def.approvalFollowsSettings) return stances;
+    const k = perceivedStrength(def.strength(params));
+    return Object.fromEntries(Object.entries(stances).map(([b, v]) => [b, v * k]));
   }
 
   /** The electorate-weighted stance, -1 to +1. */
@@ -473,7 +490,12 @@ class ApprovalEngine {
     if (event.kind === "enacted" || event.kind === "changed") {
       const now = this.stancesOf(event.def, event.params);
       const before = event.previousParams ? this.stancesOf(event.def, event.previousParams) : {};
-      for (const b of BLOC_ORDER) this.shift(b, ((now[b] ?? 0) - (before[b] ?? 0)) * ENACT_SHOCK_POINTS * sens);
+      // Cutting a measure back is part of a repeal: people get back less than they lose, and it looks
+      // indecisive in proportion.
+      const cut = event.previousParams && event.def.strength ? strengthCut(event.def.strength(event.previousParams), event.def.strength(event.params)) : 0;
+      const factor = cut > 0 ? REPEAL_RECOVERY_FRACTION : 1;
+      for (const b of BLOC_ORDER) this.shift(b, ((now[b] ?? 0) - (before[b] ?? 0)) * ENACT_SHOCK_POINTS * sens * factor);
+      if (cut > 0) this.shiftAll(-REPEAL_PENALTY_POINTS * sens * cut);
       this.scheduleVoteIfNeeded(event.id, event.def, event.params, event.atMs);
     } else if (event.kind === "repealed") {
       const stances = this.stancesOf(event.def, event.params);
