@@ -18,6 +18,7 @@
  */
 
 import { BLOC_ORDER, type Bloc } from "../config/approval";
+import { strongestOutcome } from "./approvalOutcomes";
 import { DEMAND_RADIUS_M } from "../config/charging";
 import {
   BLOC_SENDERS,
@@ -306,8 +307,12 @@ class Letters {
       if (mood !== "pleased" && debt.debtYears(start) > 2.5 && (b === "homeowners" || b === "business") && rng() < 0.6) cause = { kind: "debt" };
       else if (mood !== "pleased" && fiscal > 3 && (b === "homeowners" || b === "business") && rng() < 0.6) cause = { kind: "spending" };
       else {
-        const feeling = approval.strongestFeeling(b, mood === "pleased" ? 1 : -1);
-        if (feeling) cause = { kind: "measure", title: feeling.def.title, likes: feeling.stance > 0 };
+        // What weighs most: a measure in force, or how the town is doing (its own power, charging).
+        const sign = mood === "pleased" ? 1 : -1;
+        const feeling = approval.strongestFeeling(b, sign);
+        const outcome = strongestOutcome(b, sign, start);
+        if (outcome && (!feeling || Math.abs(outcome.stance) > Math.abs(feeling.stance))) cause = { kind: "outcome", outcome: outcome.outcome, likes: outcome.stance > 0 };
+        else if (feeling) cause = { kind: "measure", title: feeling.def.title, likes: feeling.stance > 0 };
       }
       this.post({ atMs: start + Math.floor(rng() * 26) * DAY_MS, kind: "mood", ...this.organisation(b), ...moodText(b, mood, cause, rng()) });
       this.lastMood.set(b, month);

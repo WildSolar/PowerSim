@@ -153,7 +153,12 @@ export function voteResultText(title: string, accepted: boolean, yesShare: numbe
 // --- Moods ---
 
 export type Mood = "angry" | "unhappy" | "pleased";
-export type MoodCause = { kind: "measure"; title: string; likes: boolean } | { kind: "spending" } | { kind: "debt" } | null;
+export type MoodCause =
+  | { kind: "measure"; title: string; likes: boolean }
+  | { kind: "outcome"; outcome: "selfSufficiency" | "charging"; likes: boolean }
+  | { kind: "spending" }
+  | { kind: "debt" }
+  | null;
 
 const MOOD_OPENING: Record<Mood, string[]> = {
   angry: [
@@ -179,6 +184,16 @@ export function moodText(bloc: Bloc, mood: Mood, cause: MoodCause, u: number): L
       cause.likes
         ? `"${cause.title}" in particular has been well received${mood === "pleased" ? "" : " — but it is not enough on its own"}.`
         : `"${cause.title}" in particular keeps coming up. It weighs on people${mood === "pleased" ? ", even if they accept the rest" : ""}.`,
+    );
+  } else if (cause?.kind === "outcome") {
+    paragraphs.push(
+      cause.outcome === "selfSufficiency"
+        ? cause.likes
+          ? `People have noticed how much of its own power the town makes these days — on the roofs, over the car parks, out in the fields. They are proud of it${mood === "pleased" ? "" : ", even if it doesn't make up for the rest"}.`
+          : "People notice that the town makes less of its own power than it used to, while it uses ever more."
+        : cause.likes
+          ? `Drivers say it has become much easier to find a free charger in town${mood === "pleased" ? "" : " — but it is not enough on its own"}.`
+          : "Drivers complain that they can never find a free charger: there are ever more electric cars, and the chargers haven't kept up.",
     );
   } else if (cause?.kind === "spending") {
     paragraphs.push("Above all, people are worried about the spending. The energy department is spending well beyond what it has been given, and taxpayers notice.");

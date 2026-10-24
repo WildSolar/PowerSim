@@ -33,6 +33,7 @@ export const CHANGELOG: Release[] = [
       "Nine more towns in the canton of Zürich: Dietikon, Dübendorf, Opfikon, Kloten, Bülach, Küsnacht, Hinwil, Wald and Stammheim — from towns of nearly thirty thousand to a handful of wine-growing villages.",
     ],
     changed: [
+      "Approval now also follows how the town is doing, slowly and a little: how much of its own electricity it makes (the climate-minded, homeowners and businesses notice), and how easy public charging is for those without a wallbox (drivers and tenants) — against when you took office, either way. Chargers that fall behind the spread of electric cars now cost you some goodwill with drivers.",
       "How a decision is likely to be received is now one clear scale of five steps, with a gauge: very unpopular, unpopular, neutral, popular, very popular. When some groups feel strongly for it and others strongly against, ‘splits opinion’ comes on top, instead of a ‘Divisive’ that said nothing about which way the balance tipped.",
       "The Agri-PV drawer is easier to keep track of in towns with a lot of farmland. Four figures at the top. A ‘Needs you’ list: your permitted fields, fields whose farmer said yes, and the next vote. The zones are summed up in a line. Your own fields, businesses' or cooperatives' can be shown on their own. The Build tab lists fields whose farmer agreed first.",
       "Agri-PV kinds now differ more. Fixed rows face south at 30°, like a good roof, and only they hold snow. Vertical rows are the cheapest to build and keep up, tracking rows the dearest.",

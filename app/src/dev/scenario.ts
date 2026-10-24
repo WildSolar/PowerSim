@@ -40,6 +40,7 @@ import { tariffStore } from "../sim/tariffStore";
 import { market } from "../sim/market";
 import { dynamicTariff } from "../sim/dynamicTariff";
 import { initTariffApproval } from "../sim/tariffApproval";
+import { initOutcomeApproval } from "../sim/approvalOutcomes";
 import { setCostTrendsEnabled } from "../sim/costTrends";
 import { bookInitialPublicCharging } from "../sim/mobility";
 import { PAYOUT_CATEGORIES, treasury } from "../sim/treasury";
@@ -185,6 +186,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   if (spec.withApproval) {
     approval.init(difficulty, `approval:${dataset.bfsNumber}`);
     initTariffApproval();
+    initOutcomeApproval();
   }
   streets.init(dataset);
   districtHeat.init(dataset);

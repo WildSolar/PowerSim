@@ -89,6 +89,7 @@ import { approval } from "./sim/approval";
 import { market } from "./sim/market";
 import { dynamicTariff } from "./sim/dynamicTariff";
 import { initTariffApproval } from "./sim/tariffApproval";
+import { initOutcomeApproval } from "./sim/approvalOutcomes";
 import { tariffStore } from "./sim/tariffStore";
 import { measures } from "./sim/measures";
 import { treasury } from "./sim/treasury";
@@ -269,6 +270,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         dynamicTariff.init(() => stock.getAll());
         approval.init(difficulty, `approval:${loaded.bfsNumber}`);
         initTariffApproval();
+        initOutcomeApproval();
         studies.init(`studies:${loaded.bfsNumber}`);
         streets.init(loaded); // before the stock: new buildings are linked to their street, and to the district heating network
         districtHeat.init(loaded);

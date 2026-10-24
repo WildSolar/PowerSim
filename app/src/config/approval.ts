@@ -30,6 +30,12 @@ export const BLOC_WEIGHT: Record<Bloc, number> = {
 export const BASE_APPROVAL = 55; // where every bloc rests when nothing contentious is in force: a new department starts with modest trust
 export const START_JITTER = 5; // each bloc starts within +-this of the base, by seed
 export const MAX_SWING = 30; // a bloc's resting level moves at most this far from the base
+// How the town is doing, as people notice it (sim/approvalOutcomes.ts): each bloc's lasting stance per
+// unit of change since the start (a share, 0-1) — of the electricity the town makes itself, and of
+// how good public charging is for households without a wallbox. Small: +0.4 of self-sufficiency is
+// about +2.5 points with the climate-minded; charging falling from good to nothing about -3 with drivers.
+export const OUTCOME_SELF_SUFFICIENCY_STANCE: Partial<Record<Bloc, number>> = { climate: 0.4, homeowners: 0.15, business: 0.1, tenants: 0.1, drivers: 0.05 };
+export const OUTCOME_CHARGING_STANCE: Partial<Record<Bloc, number>> = { drivers: 0.3, tenants: 0.15, climate: 0.05 };
 export const STANCE_SATURATION = 0.5; // tanh steepness: piling up popular measures has diminishing returns
 export const RELAXATION_MONTHS = 10; // how fast a bloc drifts toward its resting level
 // People take what they like for granted: a measure's goodwill fades to this share of itself, with

@@ -14,6 +14,9 @@
  *    Winning one lifts everyone a little, losing one costs more — in proportion to what was at stake
  *    (a ballot's weight: a small Agri-PV zone hardly counts, a law fully).
  *
+ * Besides, how the town is doing pulls a little, slowly (approvalOutcomes.ts): the electricity it makes
+ * itself, and how good public charging is, against when the player took office.
+ *
  * Very low approval ends the game: a recall after months in the basement, or a lost election
  * (every four years). Approval also scales the government's yearly allocation a little.
  */
