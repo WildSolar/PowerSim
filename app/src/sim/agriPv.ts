@@ -448,6 +448,8 @@ class AgriPv {
       stances: q.stances,
       referendum: "mandatory",
       leadTimeMonths: AGRI_PV_LEAD_MONTHS,
+      // A small zone is a small question: the vote counts as much as its area against a full one.
+      weight: Math.min(1, q.areaM2 / 10_000 / AGRI_PV_FULL_SCALE_HA),
       atMs,
       onVote: (accepted) => this.voteResult(d.id, accepted),
     });

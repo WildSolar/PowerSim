@@ -43,6 +43,7 @@ export const CHANGELOG: Release[] = [
       "Not every lorry can go electric yet: its route has to suit an electric one — about one in seven today, most by the mid-2030s, nearly all by 2045. Electric lorries now catch on more slowly at first, and then steadily.",
     ],
     fixed: [
+      "Winning a public vote on a small Agri-PV zone no longer gives the same approval boost as a vote on a law: a vote now counts as much as what is at stake, so a field of a few hectares hardly moves approval, either way. Putting many small fields forward one by one no longer pays.",
       "Households weighing the dynamic tariff reckon with what their electric car actually charges (about 2,200 kWh a year), not nearly twice that.",
       "Electric cars charge at home as they're actually driven: about 2,200 kWh a year at 12,000 km, where they used to draw nearly twice that. They plug in two or three nights a week rather than every night, and those who wait for the night rate charge at some time in the night instead of all at 21:00 — so home charging no longer stops dead at midnight. Less power for the town, a smaller evening peak.",
       "Businesses' electric vans and lorries charge at their depot during the night rate they pay for, spread through the night, instead of all as soon as they're back in the evening.",

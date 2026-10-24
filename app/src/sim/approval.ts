@@ -11,6 +11,8 @@
  *  - Votes. Laws can go to a referendum — always for the big bans, and for others when they are
  *    contested. The voters' verdict comes from the blocs' feelings and the general mood plus some
  *    campaign luck; a rejected measure is struck down. Beforehand there is a poll, with its own error.
+ *    Winning one lifts everyone a little, losing one costs more — in proportion to what was at stake
+ *    (a ballot's weight: a small Agri-PV zone hardly counts, a law fully).
  *
  * Very low approval ends the game: a recall after months in the basement, or a lost election
  * (every four years). Approval also scales the government's yearly allocation a little.
@@ -100,6 +102,8 @@ interface Ballot {
   atMs: number;
   title: string;
   stances: Stances;
+  /** How much is at stake (0-1): what winning or losing it does to approval. */
+  weight: number;
   resolve: (accepted: boolean, atMs: number, yesShare: number) => void;
 }
 
@@ -112,6 +116,9 @@ export interface PublicDecision {
   referendum?: "optional" | "mandatory";
   /** Months until it takes effect: a vote is held before then. */
   leadTimeMonths: number;
+  /** How much is at stake, should it go to a vote (0-1; 1 if not given): winning or losing it moves
+   * approval this much of a law's. */
+  weight?: number;
   atMs: number;
   /** Called with the verdict once voters decide (not called if there's no vote). */
   onVote?: (accepted: boolean, atMs: number) => void;
@@ -316,7 +323,13 @@ class ApprovalEngine {
     if (this.wouldGoToVote(decision.stances, decision.referendum)) {
       const delayMonths = Math.max(1, Math.min(VOTE_DELAY_MONTHS, decision.leadTimeMonths - 1));
       voteAt = decision.atMs + delayMonths * MONTH_MS;
-      this.votes.set(decision.key, { atMs: voteAt, title: decision.title, stances: decision.stances, resolve: (accepted, atMs) => decision.onVote?.(accepted, atMs) });
+      this.votes.set(decision.key, {
+        atMs: voteAt,
+        title: decision.title,
+        stances: decision.stances,
+        weight: decision.weight ?? 1,
+        resolve: (accepted, atMs) => decision.onVote?.(accepted, atMs),
+      });
       const when = new Date(toDateMs(voteAt)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
       this.addLog(decision.atMs, `${decision.title} goes to a public vote in ${when}.`);
       this.emit({ kind: "voteScheduled", key: decision.key, title: decision.title, atMs: decision.atMs, voteAtMs: voteAt, stances: decision.stances });
@@ -464,7 +477,7 @@ class ApprovalEngine {
     if (!this.wouldGoToVote(this.stancesOf(def, params), def.referendum)) return;
     const delayMonths = Math.max(1, Math.min(VOTE_DELAY_MONTHS, def.leadTimeMonths - 1));
     const voteAt = atMs + delayMonths * MONTH_MS;
-    this.votes.set(id, { atMs: voteAt, title: def.title, stances: this.stancesOf(def, params), resolve: (accepted, when, yes) => measures.resolveVote(id, accepted, when, yes) });
+    this.votes.set(id, { atMs: voteAt, title: def.title, stances: this.stancesOf(def, params), weight: 1, resolve: (accepted, when, yes) => measures.resolveVote(id, accepted, when, yes) });
     measures.setVote(id, voteAt);
     const when = new Date(toDateMs(voteAt)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
     this.addLog(atMs, `${def.title} goes to a public vote in ${when}.`);
@@ -482,11 +495,11 @@ class ApprovalEngine {
     const yes = this.yesShare(vote.stances, hashSeed(this.seed, "vote", id, String(vote.atMs | 0)), VOTE_NOISE_POINTS);
     const accepted = yes >= 50;
     if (accepted) {
-      this.shiftAll(VOTE_WON_POINTS * this.sensitivity);
+      this.shiftAll(VOTE_WON_POINTS * vote.weight * this.sensitivity);
       this.addLog(nowMs, `Voters approved ${vote.title} (${votePct(yes)}% in favour).`);
     } else {
       for (const b of BLOC_ORDER) this.shift(b, -(vote.stances[b] ?? 0) * ENACT_SHOCK_POINTS * this.sensitivity * REPEAL_RECOVERY_FRACTION);
-      this.shiftAll(-VOTE_LOST_POINTS * this.sensitivity);
+      this.shiftAll(-VOTE_LOST_POINTS * vote.weight * this.sensitivity);
       this.addLog(nowMs, `Voters rejected ${vote.title} (${votePct(yes)}% in favour). It is struck down.`);
     }
     vote.resolve(accepted, nowMs, yes);
@@ -538,7 +551,7 @@ class ApprovalEngine {
       history: this.history,
       log: this.log,
       // A ballot's verdict handler is rebuilt from its key on load.
-      votes: [...this.votes].map(([key, b]) => ({ key, atMs: b.atMs, title: b.title, stances: b.stances })),
+      votes: [...this.votes].map(([key, b]) => ({ key, atMs: b.atMs, title: b.title, stances: b.stances, weight: b.weight })),
       gameOver: this.gameOver,
       lowMonths: this.lowMonths,
       warned: this.warned,
@@ -552,7 +565,8 @@ class ApprovalEngine {
     this.levels = s.levels;
     this.history = s.history;
     this.log = s.log;
-    this.votes = new Map(s.votes.map((v) => [v.key, { atMs: v.atMs, title: v.title, stances: v.stances, resolve: resolverFor(v.key) }]));
+    // A save from before ballots had weights: each a law's.
+    this.votes = new Map(s.votes.map((v) => [v.key, { atMs: v.atMs, title: v.title, stances: v.stances, weight: v.weight ?? 1, resolve: resolverFor(v.key) }]));
     this.gameOver = s.gameOver;
     this.lowMonths = s.lowMonths;
     this.warned = s.warned;
