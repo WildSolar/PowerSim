@@ -162,13 +162,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.measure-reaction.good {
-  color: var(--good);
-}
 
-.measure-reaction.bad {
-  color: var(--bad);
-}
 
 .measure-vote {
   margin: 0 0 8px;

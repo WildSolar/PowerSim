@@ -15,7 +15,7 @@ import {
   type MeasureParams,
   type MeasureTopic,
 } from "../sim/measureTypes";
-import { approval, votePct } from "../sim/approval";
+import { approval, reactionText, votePct } from "../sim/approval";
 import { measures } from "../sim/measures";
 import { measureUnavailableReason } from "../sim/measureAvailability";
 import { subsidisedDecisions, type SubsidyCategory } from "../sim/additionality";
@@ -29,6 +29,7 @@ import { formatCHF, formatCHFCompact } from "./format";
 import "./measures.css";
 import "./measuresPage.css";
 import { SupervisionNotice } from "./SupervisionNotice";
+import { ReactionBadge } from "./ReactionBadge";
 
 // The advisors are retained and let go on their own page (Town hall → Advisors).
 const MEASURE_CATALOG = ALL_MEASURES.filter((d) => d.topic !== "advisors");
@@ -203,7 +204,9 @@ function MeasureDetail({ def, nowMs, onClose }: { def: MeasureDef; nowMs: number
         </span>
         {cost.oneOffRp > 0 && <span>One-off cost {formatCHF(cost.oneOffRp)}</span>}
         {cost.annualRp > 0 && <span>Running cost {formatCHF(cost.annualRp)} / year</span>}
-        <span className={`measure-reaction ${reaction.tone}`}>Public reaction: {reaction.label}</span>
+        <span>
+          Public reaction: <ReactionBadge reaction={reaction} />
+        </span>
         {def.referendum === "mandatory" && <span>Goes to a public vote</span>}
         {def.referendum === "optional" && <span>May go to a public vote if contested</span>}
       </div>
@@ -290,7 +293,7 @@ function cardFooter(def: MeasureDef, nowMs: number): { text: string; tone?: "goo
   if (state?.active && cost.annualRp > 0) return { text: `Running cost ${formatCHF(cost.annualRp)} a year` };
   if (state?.active) return { text: "In force" };
   const reaction = approval.reaction(def, defaultParams(def));
-  return { text: `Public reaction: ${reaction.label}`, tone: reaction.tone === "good" ? "good" : reaction.tone === "bad" ? "bad" : undefined };
+  return { text: `Public reaction: ${reactionText(reaction)}`, tone: reaction.tone === "good" ? "good" : reaction.tone === "bad" ? "bad" : undefined };
 }
 
 function MeasureTile({ def, nowMs, selected, onSelect }: { def: MeasureDef; nowMs: number; selected: boolean; onSelect: () => void }) {

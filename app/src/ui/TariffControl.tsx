@@ -21,6 +21,7 @@ import { feedInYearBaseRpKWh } from "../sim/feedIn";
 import { FEED_IN_MINIMUM_RP_KWH } from "../config/feedIn";
 import { DynamicPriceChart } from "./DynamicPriceChart";
 import "./tariffControl.css";
+import { ReactionBadge } from "./ReactionBadge";
 
 const YEAR_MS = 365.25 * 24 * 3_600_000;
 
@@ -210,7 +211,9 @@ export function TariffControl() {
         </div>
         <div className="tariff-preview-line">
           <span>Expected reaction</span>
-          <span className={`tariff-reaction ${reaction.tone}`}>{reaction.label}</span>
+          <span className="tariff-reaction">
+            <ReactionBadge reaction={reaction} />
+          </span>
         </div>
       </div>
 

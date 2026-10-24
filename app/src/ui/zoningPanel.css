@@ -43,17 +43,8 @@
   font-size: 11px;
 }
 
-.zn-reaction.good {
-  color: var(--good);
-}
 
-.zn-reaction.bad {
-  color: var(--bad);
-}
 
-.zn-reaction.neutral {
-  color: var(--ink-2);
-}
 
 .zn-change {
   display: flex;

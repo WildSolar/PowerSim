@@ -1,0 +1,46 @@
+/* How the public is likely to take a decision (ReactionBadge.tsx): a five-dot gauge and the step. */
+.reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-2);
+}
+
+.reaction.good {
+  color: var(--good);
+}
+
+.reaction.bad {
+  color: var(--bad);
+}
+
+.reaction-gauge {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.reaction-gauge i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.reaction-gauge.level-1 i.on,
+.reaction-gauge.level-2 i.on {
+  background: var(--bad);
+}
+
+.reaction-gauge.level-3 i.on {
+  background: var(--ink-3);
+}
+
+.reaction-gauge.level-4 i.on,
+.reaction-gauge.level-5 i.on {
+  background: var(--good);
+}
+
+.reaction-split {
+  font-weight: 400;
+  color: var(--ink-2);
+}

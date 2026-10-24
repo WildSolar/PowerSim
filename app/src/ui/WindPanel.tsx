@@ -14,6 +14,7 @@ import "./zoningPanel.css";
 import { InspectCard } from "./InspectCard";
 import { ToolPanel } from "./ToolPanel";
 import { PlotLink } from "./PlotLink";
+import { ReactionBadge } from "./ReactionBadge";
 
 function monthYear(ms: number): string {
   return formatDate(ms).replace(/^\d+ /, "");
@@ -84,7 +85,9 @@ function SiteCard({ site, now }: { site: WindSite; now: number }) {
           )}
           <div className="info-row">
             <span>Public reaction</span>
-            <span className={`zn-reaction ${reaction.tone}`}>{reaction.label}</span>
+            <span className="zn-reaction">
+              <ReactionBadge reaction={reaction} />
+            </span>
           </div>
           <p className="dh-note">
             A zoning plan takes {WIND_ZONING_MONTHS} months and always goes to a public vote. Then a permit ({WIND_PERMIT_MONTHS} months, likely appealed), then the build.

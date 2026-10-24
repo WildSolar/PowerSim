@@ -90,9 +90,28 @@ export type ApprovalEvent =
   | { kind: "election"; atMs: number; reelected: boolean; approval: number }
   | { kind: "warning"; atMs: number; approval: number };
 
+/** How the public is likely to take a decision: on balance, one of five steps — and, apart from that,
+ * whether it splits opinion. */
 export interface MeasureReaction {
+  /** 1 (very unpopular) to 5 (very popular). */
+  level: 1 | 2 | 3 | 4 | 5;
   label: string;
   tone: "good" | "neutral" | "bad";
+  /** Some group feels strongly for it and another strongly against, whichever way the balance tips. */
+  divisive: boolean;
+}
+
+const REACTION_STEPS: Record<MeasureReaction["level"], { label: string; tone: MeasureReaction["tone"] }> = {
+  5: { label: "Very popular", tone: "good" },
+  4: { label: "Popular", tone: "good" },
+  3: { label: "Neutral", tone: "neutral" },
+  2: { label: "Unpopular", tone: "bad" },
+  1: { label: "Very unpopular", tone: "bad" },
+};
+
+/** A reaction in words: "Popular", "Unpopular · splits opinion". */
+export function reactionText(r: MeasureReaction): string {
+  return r.divisive ? `${r.label} · splits opinion` : r.label;
 }
 
 export type Stances = Partial<Record<Bloc, number>>;
@@ -296,16 +315,13 @@ class ApprovalEngine {
     return this.reactionTo(this.stancesOf(def, params));
   }
 
-  /** The same, for any set of stances (a zoning change). */
+  /** The same, for any set of stances (a zoning change): the balance of the blocs' feelings on a
+   * five-step scale, and whether one bloc feels strongly for and another strongly against. */
   reactionTo(stances: Stances): MeasureReaction {
     const values = BLOC_ORDER.map((b) => stances[b] ?? 0);
     const net = this.net(stances);
-    if (Math.max(...values) >= 0.3 && Math.min(...values) <= -0.3) return { label: "Divisive", tone: "bad" };
-    if (net >= 0.2) return { label: "Widely welcomed", tone: "good" };
-    if (net >= 0.05) return { label: "Mostly welcomed", tone: "good" };
-    if (net > -0.05) return { label: "Little reaction", tone: "neutral" };
-    if (net > -0.2) return { label: "Unpopular with some", tone: "bad" };
-    return { label: "Widely resented", tone: "bad" };
+    const level: MeasureReaction["level"] = net >= 0.2 ? 5 : net >= 0.05 ? 4 : net > -0.05 ? 3 : net > -0.2 ? 2 : 1;
+    return { level, ...REACTION_STEPS[level], divisive: Math.max(...values) >= 0.3 && Math.min(...values) <= -0.3 };
   }
 
   /** Whether a decision with these stances would go to a vote. */

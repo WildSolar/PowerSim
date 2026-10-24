@@ -4,6 +4,7 @@ import { FARM_PLOT_COLORS } from "../map/colorModes";
 import { AGRI_PV_BUILD_MONTHS, AGRI_PV_LEAD_MONTHS, AGRI_PV_PERMIT_MONTHS, AGRI_PV_SYSTEMS, type AgriPvSystem } from "../config/agriPv";
 import { agriPvKindYear } from "../sim/agriPvProfile";
 import { AgriPvDayChart } from "./AgriPvDayChart";
+import { ReactionBadge } from "./ReactionBadge";
 import { mapFocus } from "../map/mapFocus";
 import { AGRI_PV_DEVELOPER_LABEL, AGRI_PV_PHASE_LABEL, agriPv, stopped, partnerName, type AgriPvDesignation, type AgriPvDeveloper, type AgriPvProject } from "../sim/agriPv";
 import { approval, votePct } from "../sim/approval";
@@ -523,7 +524,9 @@ export function AgriPvPanel() {
           </div>
           <div className="info-row">
             <span>Public reaction</span>
-            <span className={`zn-reaction ${reaction.tone}`}>{reaction.label}</span>
+            <span className="zn-reaction">
+              <ReactionBadge reaction={reaction} />
+            </span>
           </div>
           <p className="dh-note">
             Always goes to a public vote, which can strike it down; in force {AGRI_PV_LEAD_MONTHS} months after it&apos;s put forward. Some of the opposition stays for as long
