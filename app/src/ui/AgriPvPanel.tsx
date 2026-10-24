@@ -46,12 +46,13 @@ function pick(plotId: string): void {
   if (plot) mapFocus.request({ lon: plot.lon, lat: plot.lat, minZoom: 14.5 });
 }
 
-function DesignationStatus({ d, now }: { d: AgriPvDesignation; now: number }) {
-  if (d.rejected) return <span className="zn-status bad">Struck down by the voters</span>;
+/** Where a zone stands, in words. */
+function designationStatus(d: AgriPvDesignation, now: number): string {
+  if (d.rejected) return "Struck down by the voters";
   const vote = approval.getVoteInfo(`agriPv:${d.id}`, null, now);
-  if (vote) return <span className="zn-status">Public vote {monthYear(vote.atMs)} · poll {votePct(vote.pollYes)}% yes</span>;
-  if (d.effectiveAtMs > now) return <span className="zn-status">In force from {monthYear(d.effectiveAtMs)}</span>;
-  return <span className="zn-status good">In force since {monthYear(d.effectiveAtMs)}</span>;
+  if (vote) return `Public vote ${monthYear(vote.atMs)} · poll ${votePct(vote.pollYes)}% yes`;
+  if (d.effectiveAtMs > now) return `In force from ${monthYear(d.effectiveAtMs)}`;
+  return `In force since ${monthYear(d.effectiveAtMs)}`;
 }
 
 /** "+9%", "−4%", "±0%". */
@@ -245,6 +246,14 @@ export function AgriPvFieldCard() {
 
 const DEVELOPER_SHORT: Record<AgriPvDeveloper, string> = { business: "A business (PPA)", cooperative: "An energy cooperative", municipality: "Yours" };
 
+type DeveloperFilter = "all" | AgriPvDeveloper;
+const DEVELOPER_FILTERS: { id: DeveloperFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "municipality", label: "Yours" },
+  { id: "business", label: "Businesses" },
+  { id: "cooperative", label: "Cooperatives" },
+];
+
 /** A field taken up, in the list: its colour on the map, its size, who develops it and where it stands. */
 function projectRow(p: AgriPvProject, now: number, selectedId: string | null) {
   const state = agriPv.stateAt(p.plotId, now);
@@ -273,8 +282,34 @@ function projectRow(p: AgriPvProject, now: number, selectedId: string | null) {
   );
 }
 
-/** The Agri-PV layer's panel: the farmland, the zones and the fields and how people take them (the
- * Overview), or zoning the picked fields and taking up a free zoned field (Build). */
+/** "vertical 0.3 · fixed 0.9 · tracking 0.5 MWp": how big a field's installation would be, of each kind it takes. */
+function kindSizes(plotId: string): string {
+  return `${agriPv
+    .systemsFor(plotId)
+    .map((s) => `${AGRI_PV_SYSTEMS[s].label.split(" ")[0].toLowerCase()} ${(agriPv.capacityFor(plotId, s) / 1000).toFixed(1)}`)
+    .join(" · ")} MWp`;
+}
+
+/** "37%", or "34–42%" for several polls. */
+function pollRange(polls: number[]): string {
+  const lo = Math.min(...polls);
+  const hi = Math.max(...polls);
+  return votePct(lo) === votePct(hi) ? `${votePct(lo)}%` : `${votePct(lo)}–${votePct(hi)}%`;
+}
+
+/** A summary figure at the top of the drawer. */
+function Tile({ label, value, sub, title }: { label: string; value: string; sub?: string; title: string }) {
+  return (
+    <div className="tool-tile" title={title}>
+      <span className="tool-tile-label">{label}</span>
+      <span className="tool-tile-value">{value}</span>
+      {sub && <span className="tool-tile-sub">{sub}</span>}
+    </div>
+  );
+}
+
+/** The Agri-PV layer's panel: where the town stands at a glance, what needs the player, the zones and
+ * the fields (the Overview), or zoning the picked fields and the free zoned fields to take up (Build). */
 export function AgriPvPanel() {
   const version = useAgriPv();
   useSyncExternalStore(
@@ -285,27 +320,43 @@ export function AgriPvPanel() {
   const plots = agriPv.getPlots();
   const selection = agriPv.getSelection();
   const selectedId = agriPv.getSelectedId();
+  const [developer, setDeveloper] = useState<DeveloperFilter>("all");
   const summary = useMemo(() => {
     const projects = agriPv.getProjects();
     const live = projects.filter((p) => !stopped(p) || (agriPv.restingUntil(p) ?? 0) > now);
+    const free = plots.filter((p) => agriPv.isFree(p.id, now));
+    const designations = agriPv.getDesignations();
+    const votes = designations
+      .filter((d) => !d.rejected && d.voteAtMs !== null && d.voteAtMs > now)
+      .map((d) => ({ d, vote: approval.getVoteInfo(`agriPv:${d.id}`, null, now) }))
+      .filter((v): v is { d: AgriPvDesignation; vote: { atMs: number; pollYes: number } } => v.vote !== null)
+      .sort((a, b) => a.vote.atMs - b.vote.atMs);
+    const inForce = designations.filter((d) => !d.rejected && d.effectiveAtMs <= now);
     return {
-      farmM2: plots.reduce((sum, p) => sum + p.areaM2, 0),
-      zonedM2: agriPv.zonedAreaM2(now),
       inServiceKw: agriPv.capacityAtKw(now),
       inService: projects.filter((p) => p.installedAtMs !== undefined && p.installedAtMs <= now).length,
+      underWay: live.filter((p) => !stopped(p) && p.phase !== "operating").length,
+      building: live.filter((p) => p.phase === "building").length,
       // Newest first; struck-down fields drop off once they may be taken up again.
       projects: [...live].reverse(),
-      free: plots.filter((p) => agriPv.isFree(p.id, now)),
+      // The free zoned fields: those whose farmer agreed first, then the biggest.
+      free: free
+        .map((p) => ({ p, agreed: agriPv.farmerAnswer(p.id, now)?.yes === true, kw: agriPv.largestCapacityKw(p.id) }))
+        .sort((a, b) => Number(b.agreed) - Number(a.agreed) || b.kw - a.kw),
+      freeM2: free.reduce((sum, p) => sum + p.areaM2, 0),
       refused: plots.filter((p) => agriPv.stateAt(p.id, now) === "refused").length,
-      asked: plots.filter((p) => agriPv.farmerAnswer(p.id, now) !== undefined || agriPv.askAgainFromMs(p.id) !== null).length,
       agreed: plots.filter((p) => agriPv.farmerAnswer(p.id, now)?.yes).length,
+      votes,
+      inForceM2: agriPv.zonedAreaM2(now),
+      inForceCount: inForce.length,
+      // Zones: those still to be voted on first, then the rest, newest first.
+      designations: [...designations].reverse().sort((a, b) => Number(votes.some((v) => v.d === b)) - Number(votes.some((v) => v.d === a))),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now, version, plots]);
   const quote = useMemo(() => agriPv.quote(), [version]); // eslint-disable-line react-hooks/exhaustive-deps
   const reaction = approval.reactionTo(quote.stances);
   const dialogue = policyStore.get().agriPvDialogue > 0;
-  const designations = [...agriPv.getDesignations()].reverse();
 
   if (plots.length === 0) {
     return (
@@ -316,63 +367,139 @@ export function AgriPvPanel() {
     );
   }
 
+  const fresh = agriPv.getDesignations().length === 0 && summary.projects.length === 0;
+  const yoursPermitted = summary.projects.filter((p) => p.developer === "municipality" && p.phase === "permitted");
+  const agreedFree = summary.free.filter((f) => f.agreed);
+  const nextVotes = summary.votes.filter((v) => monthYear(v.vote.atMs) === monthYear(summary.votes[0]?.vote.atMs ?? 0));
+  const needsYou = [
+    ...yoursPermitted.map((p) => (
+      <ToolListRow
+        key={`build-${p.id}`}
+        color={FARM_PLOT_COLORS.underWay}
+        title={agriPv.fieldName(p)}
+        figure={formatCHF(agriPv.economics(p.plotId, now, p.system).buildCostRp)}
+        detail="Permitted — order the panels on its card"
+        selected={p.plotId === selectedId}
+        onClick={() => pick(p.plotId)}
+      />
+    )),
+    ...agreedFree.map(({ p, kw }) => (
+      <ToolListRow
+        key={`permit-${p.id}`}
+        color={FARM_PLOT_COLORS.zoned}
+        title={p.name ?? "Field"}
+        figure={`up to ${mw(kw)}`}
+        detail="The farmer agreed — apply for the permit on its card"
+        selected={p.id === selectedId}
+        onClick={() => pick(p.id)}
+      />
+    )),
+    // The next voting day, once — the zones it decides, and how their polls stand; the rest wait in the zone list.
+    ...(nextVotes.length === 0
+      ? []
+      : [
+          <ToolListRow
+            key="vote"
+            color={FARM_PLOT_COLORS.planned}
+            title={nextVotes.length === 1 ? nextVotes[0].d.title : `${nextVotes.length} zones to the vote`}
+            figure={monthYear(nextVotes[0].vote.atMs)}
+            detail={`Public vote · ${pollRange(nextVotes.map((v) => v.vote.pollYes))} yes in the polls`}
+            selected={nextVotes.some((v) => v.d.plotIds.includes(selectedId ?? ""))}
+            onClick={() => pick(nextVotes[0].d.plotIds[0])}
+          />,
+        ]),
+  ];
+  const shown = summary.projects.filter((p) => developer === "all" || p.developer === developer);
+  const nextVote = summary.votes[0];
+
   const overview = (
     <>
-      <p className="dh-note">
-        Solar over fields that stay farmed. You zone the fields; a business with a big electricity use, an energy cooperative or the municipality itself then takes one up,
-        applies for the permit and builds.
-      </p>
-      <div className="info-row">
-        <span>Farmland fields</span>
-        <span className="info-value">
-          {plots.length} · {hectares(summary.farmM2)}
-        </span>
+      {fresh && (
+        <p className="dh-note">
+          Solar over fields that stay farmed. You zone the fields; a business with a big electricity use, an energy cooperative or the municipality itself then takes one up,
+          applies for the permit and builds.
+        </p>
+      )}
+      <div className="tool-tiles">
+        <Tile label="In service" value={mw(summary.inServiceKw)} sub={`${summary.inService} field${summary.inService === 1 ? "" : "s"}`} title="The Agri-PV fields making power, whoever built them" />
+        <Tile
+          label="Under way"
+          value={String(summary.underWay)}
+          sub={summary.building > 0 ? `${summary.building} being built` : "in permits or the courts"}
+          title="Fields taken up and not yet in service: in the permit procedure, in the courts, permitted, or being built"
+        />
+        <Tile
+          label="Zoned, free"
+          value={hectares(summary.freeM2)}
+          sub={`${summary.free.length} field${summary.free.length === 1 ? "" : "s"} · ${summary.agreed} farmer${summary.agreed === 1 ? "" : "s"} agreed`}
+          title={`Zoned fields no one has taken up yet, of ${plots.length} fields of farmland (${hectares(plots.reduce((s, p) => s + p.areaM2, 0))}). Whoever farms a field has the last word; a no stands for a few years${summary.refused > 0 ? ` — ${summary.refused} said no, for now` : ""}.`}
+        />
+        <Tile
+          label="Acceptance"
+          value={`${Math.round(agriPv.getAcceptance() * 100)}%`}
+          sub={dialogue ? "dialogue running" : "grows with each field"}
+          title={`How far people have come round to solar over farmland: it softens the opposition to Agri-PV zones, new and in force, and brings farmers round. ${
+            dialogue ? "The Agri-PV dialogue is running: it grows year by year." : "It grows a little with every field people get to see; the Agri-PV dialogue (Town hall → Measures, Advice) builds it faster."
+          }`}
+        />
       </div>
-      <div className="info-row">
-        <span>Zoned for Agri-PV</span>
-        <span className="info-value">{hectares(summary.zonedM2)}</span>
-      </div>
-      <div className="info-row">
-        <span>Fields in service</span>
-        <span className="info-value">
-          {summary.inService} · {mw(summary.inServiceKw)}
-        </span>
-      </div>
-      <div className="info-row" title="Farmers on zoned fields asked so far, by whoever wanted to build: how many agreed, and how many said no (a no stands for a few years)">
-        <span>Farmers asked · agreed</span>
-        <span className="info-value">
-          {summary.asked} · {summary.agreed}
-        </span>
-      </div>
-      <div className="info-row" title="How far people have come round to solar over farmland: it softens the opposition to Agri-PV zones, new and in force, and brings farmers round">
-        <span>Acceptance</span>
-        <span className="info-value">{Math.round(agriPv.getAcceptance() * 100)}%</span>
-      </div>
-      <p className="dh-note">
-        {dialogue
-          ? "The Agri-PV dialogue is running: acceptance grows year by year."
-          : "Acceptance grows a little with every field people get to see. The Agri-PV dialogue (Town hall → Measures, Advice) builds it faster."}
-      </p>
 
-      {designations.length > 0 && (
+      <ToolListGroup title="Needs you" limit={5}>
+        {needsYou}
+      </ToolListGroup>
+
+      {summary.designations.length > 0 && (
         <>
-          <h4 className="dh-subtitle">Zones</h4>
-          {designations.map((d) => (
-            <div className="zn-change" key={d.id}>
-              <span className="zn-change-title">{d.title}</span>
-              <DesignationStatus d={d} now={now} />
-            </div>
-          ))}
+          <ToolListGroup
+            title="Zones"
+            limit={3}
+            summary={`${hectares(summary.inForceM2)} in force in ${summary.inForceCount} zone${summary.inForceCount === 1 ? "" : "s"}${
+              nextVote ? ` · ${summary.votes.length} to the vote, next ${monthYear(nextVote.vote.atMs)} (poll ${votePct(nextVote.vote.pollYes)}% yes)` : ""
+            }`}
+          >
+            {summary.designations.map((d) => {
+              const s = designationStatus(d, now);
+              return (
+                <ToolListRow
+                  key={d.id}
+                  color={d.rejected ? FARM_PLOT_COLORS.refused : d.effectiveAtMs <= now ? FARM_PLOT_COLORS.zoned : FARM_PLOT_COLORS.planned}
+                  title={d.title}
+                  detail={s}
+                  selected={d.plotIds.includes(selectedId ?? "")}
+                  onClick={() => pick(d.plotIds[0])}
+                />
+              );
+            })}
+          </ToolListGroup>
         </>
       )}
 
-      {summary.projects.length > 0 && <p className="dh-note tool-list-hint">Click a field here or on the map: its card shows where it stands.</p>}
-      <ToolListGroup title="In service">{summary.projects.filter((p) => p.phase === "operating").map((p) => projectRow(p, now, selectedId))}</ToolListGroup>
-      <ToolListGroup title="Being built">{summary.projects.filter((p) => p.phase === "building").map((p) => projectRow(p, now, selectedId))}</ToolListGroup>
-      <ToolListGroup title="Permit, or in the courts">
-        {summary.projects.filter((p) => p.phase === "permitting" || p.phase === "appeal" || p.phase === "permitted").map((p) => projectRow(p, now, selectedId))}
-      </ToolListGroup>
-      <ToolListGroup title="Refused, or struck down in court">{summary.projects.filter(stopped).map((p) => projectRow(p, now, selectedId))}</ToolListGroup>
+      {summary.projects.length > 0 && (
+        <>
+          <h4 className="tool-list-heading">Fields</h4>
+          <div className="ev-filters" role="group" aria-label="Whose fields">
+            {DEVELOPER_FILTERS.map((f) => (
+              <button key={f.id} className={`ev-filter${developer === f.id ? " on" : ""}`} aria-pressed={developer === f.id} onClick={() => setDeveloper(f.id)}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          {shown.length === 0 && <p className="dh-note">None.</p>}
+          <ToolListGroup title="In service" limit={3}>
+            {shown.filter((p) => p.phase === "operating").map((p) => projectRow(p, now, selectedId))}
+          </ToolListGroup>
+          <ToolListGroup title="Being built" limit={3}>
+            {shown.filter((p) => p.phase === "building").map((p) => projectRow(p, now, selectedId))}
+          </ToolListGroup>
+          <ToolListGroup title="Permit, or in the courts" limit={3}>
+            {shown.filter((p) => p.phase === "permitting" || p.phase === "appeal" || p.phase === "permitted").map((p) => projectRow(p, now, selectedId))}
+          </ToolListGroup>
+          <ToolListGroup title="Refused, or struck down" limit={0}>
+            {shown.filter(stopped).map((p) => projectRow(p, now, selectedId))}
+          </ToolListGroup>
+          <p className="dh-note tool-list-hint">Click a field here or on the map: its card shows where it stands.</p>
+        </>
+      )}
     </>
   );
 
@@ -419,27 +546,25 @@ export function AgriPvPanel() {
       ) : (
         <>
           <ToolListGroup title="Zoned, no one has taken them up" limit={8}>
-            {summary.free.map((p) => (
+            {summary.free.map(({ p, agreed, kw }) => (
               <ToolListRow
                 key={p.id}
                 color={FARM_PLOT_COLORS.zoned}
                 title={p.name ?? "Field"}
-                figure={`up to ${mw(agriPv.largestCapacityKw(p.id))}`}
-                detail={`${hectares(p.areaM2)} · ${agriPv.farmerAnswer(p.id, now)?.yes ? "the farmer has agreed" : "the farmer hasn't been asked"}`}
+                figure={`up to ${mw(kw)}`}
+                detail={`${hectares(p.areaM2)} · ${agreed ? "the farmer agreed" : "farmer not asked"} · ${kindSizes(p.id)}`}
                 selected={p.id === selectedId}
                 onClick={() => pick(p.id)}
               />
             ))}
           </ToolListGroup>
-          <p className="dh-note tool-list-hint">Pick a field: its card asks the farmer, and has the permit, to develop it yourself.</p>
+          <p className="dh-note tool-list-hint">Those whose farmer agreed first, then the biggest. Pick a field: its card compares the kinds, asks the farmer, and has the permit.</p>
         </>
       )}
       {summary.refused > 0 && (
-        <>
-          <p className="dh-note">
-            {summary.refused} zoned field{summary.refused === 1 ? "" : "s"} where the farmer said no, for now.
-          </p>
-        </>
+        <p className="dh-note">
+          {summary.refused} zoned field{summary.refused === 1 ? "" : "s"} where the farmer said no, for now.
+        </p>
       )}
     </>
   );

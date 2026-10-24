@@ -33,6 +33,7 @@ export const CHANGELOG: Release[] = [
       "Nine more towns in the canton of Zürich: Dietikon, Dübendorf, Opfikon, Kloten, Bülach, Küsnacht, Hinwil, Wald and Stammheim — from towns of nearly thirty thousand to a handful of wine-growing villages.",
     ],
     changed: [
+      "The Agri-PV drawer is easier to keep track of in towns with a lot of farmland. Four figures at the top. A ‘Needs you’ list: your permitted fields, fields whose farmer said yes, and the next vote. The zones are summed up in a line. Your own fields, businesses' or cooperatives' can be shown on their own. The Build tab lists fields whose farmer agreed first.",
       "Agri-PV kinds now differ more. Fixed rows face south at 30°, like a good roof, and only they hold snow. Vertical rows are the cheapest to build and keep up, tracking rows the dearest.",
       "The utility's own power — Agri-PV fields, wind turbines, arrays on rented roofs — saves buying power at the market price of the hours it comes, not the month's average. Solar at a sunny noon is worth less, morning and evening power more.",
       "Chargers show how full they are in percent — on their card, year by year, across the town and in the statistics — instead of in ‘cars' worth’.",

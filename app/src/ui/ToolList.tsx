@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from "react";
 
 /** One group of a tool's list — the town's car parks, the fields being built, a wind site's phase —
- * under a heading with how many there are. A long group shows its first few, the rest on request. */
-export function ToolListGroup({ title, limit = 6, children }: { title: string; limit?: number; children: ReactNode[] }) {
+ * under a heading with how many there are, and a line summing them up if given. A long group shows
+ * its first few, the rest on request. */
+export function ToolListGroup({ title, limit = 6, summary, children }: { title: string; limit?: number; summary?: ReactNode; children: ReactNode[] }) {
   const [open, setOpen] = useState(false);
   if (children.length === 0) return null;
   return (
@@ -11,6 +12,7 @@ export function ToolListGroup({ title, limit = 6, children }: { title: string; l
         {title}
         <span className="tool-list-count">{children.length}</span>
       </h4>
+      {summary && <p className="dh-note tool-list-summary">{summary}</p>}
       {open ? children : children.slice(0, limit)}
       {children.length > limit && (
         <button className="tool-list-more" onClick={() => setOpen(!open)}>
