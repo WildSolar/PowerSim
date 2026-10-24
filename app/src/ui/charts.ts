@@ -29,6 +29,11 @@ export interface ChartSeries {
   /** Stacked areas (or bars, for a chart in bars), a line on top, or only in the tooltip. */
   kind: "stack" | "line" | "hidden";
   dashed?: boolean;
+  /** A stack drawn below the zero line (its values given as they are, drawn downward): the other
+   * side of a balance (where power came from, under where it went). */
+  below?: boolean;
+  /** Its name in the legend, if not its label; false: not in the legend (another entry speaks for it). */
+  legend?: string | false;
   values: (number | null)[];
 }
 
@@ -47,8 +52,11 @@ export interface ChartData {
   integer?: boolean;
   /** Fixed y range (shares: 0–100). */
   yMax?: number;
-  /** The tooltip adds up the stack. */
+  /** The tooltip adds up the stack — and, for a balance, the stack below the line. */
   total?: string;
+  totalBelow?: string;
+  /** The plot's height (viewBox units, 320 if not given). */
+  height?: number;
   /** The first and last year on the axis. */
   from: number;
   to: number;

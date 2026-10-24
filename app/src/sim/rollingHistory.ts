@@ -14,17 +14,26 @@
  *
  * A first look (or one after a long jump) needs the whole window: warmLast24h fills it a sample at a
  * time, yielding between them, so the page shows at once and the chart follows.
+ *
+ * Next to the categories, each sample keeps what the town's home batteries did at that instant —
+ * charging (positive) or discharging (negative), each against its own building's solar and use — and
+ * the solar their grid-friendly feed-in caps held back (homeBattery.ts).
  */
 
 import type { Building, PowerPlant } from "../data/types";
+import { buildingLoadW } from "./buildingPower";
 import { HISTORY_WINDOW_MS, sampleMunicipalityCategorySeries, type CategorySeries } from "./history";
+import { solarAndBatteryAt } from "./homeBattery";
+import { existsAt } from "./lifetime";
+import { snowDepthCm } from "./snow";
 import { effectivePowerPlantsAt } from "./solarAdoption";
 import { tariffKey, type Tariff } from "./tariff";
 
 export const ROLLING_GRID_MS = 30 * 60_000;
 
 type CategoryKey = keyof CategorySeries;
-type CategorySample = Record<CategoryKey, number>;
+type SampleKey = CategoryKey | "homeBatteryW" | "curtailedW";
+type CategorySample = Record<SampleKey, number>;
 
 const CATEGORY_KEYS: CategoryKey[] = [
   "fridgeW",
@@ -40,13 +49,41 @@ const CATEGORY_KEYS: CategoryKey[] = [
   "solarW",
 ];
 
+const SAMPLE_KEYS: SampleKey[] = [...CATEGORY_KEYS, "homeBatteryW", "curtailedW"];
+
 let cacheTariffKey: string | null = null;
 const gridSamples = new Map<number, CategorySample>();
 
+/** The buildings by EGID, once per building list (the stock hands out a new list when it changes). */
+const byEgidOf = new WeakMap<Building[], Map<string, Building>>();
+
 function sampleAt(buildings: Building[], realPlants: PowerPlant[], t: number, tariff: Tariff): CategorySample {
-  const series = sampleMunicipalityCategorySeries(buildings, [t], tariff, effectivePowerPlantsAt(buildings, realPlants, t));
+  const plants = effectivePowerPlantsAt(buildings, realPlants, t);
+  const series = sampleMunicipalityCategorySeries(buildings, [t], tariff, plants);
   const sample = {} as CategorySample;
   for (const key of CATEGORY_KEYS) sample[key] = series[key][0];
+  // The home batteries, building by building (only those with one).
+  let byEgid = byEgidOf.get(buildings);
+  if (!byEgid) {
+    byEgid = new Map(buildings.map((b) => [b.egid, b]));
+    byEgidOf.set(buildings, byEgid);
+  }
+  const withBattery = new Set<string>();
+  for (const p of plants) if (p.battery && p.egid && (p.activeToMs === undefined || t < p.activeToMs)) withBattery.add(p.egid);
+  let batteryW = 0;
+  let curtailedW = 0;
+  if (withBattery.size > 0) {
+    const snow = snowDepthCm(t);
+    for (const egid of withBattery) {
+      const b = byEgid.get(egid);
+      if (!b || !existsAt(b, t)) continue;
+      const r = solarAndBatteryAt(egid, plants, t, buildingLoadW(b, t), snow);
+      batteryW += r.batteryW;
+      curtailedW += r.curtailedW;
+    }
+  }
+  sample.homeBatteryW = batteryW;
+  sample.curtailedW = curtailedW;
   return sample;
 }
 
@@ -84,7 +121,7 @@ export function sampleMunicipalityLast24h(
   realPlants: PowerPlant[],
   nowMs: number,
   tariff: Tariff,
-): { times: number[]; series: CategorySeries } {
+): { times: number[]; series: CategorySeries; homeBatteryW: number[]; curtailedW: number[] } {
   const { startMs, gridBeforeStart } = prepare(nowMs, tariff);
 
   const gridSample = (t: number): CategorySample => {
@@ -110,7 +147,7 @@ export function sampleMunicipalityLast24h(
     const after = gridSample(gridBeforeStart + ROLLING_GRID_MS);
     const f = (startMs - gridBeforeStart) / ROLLING_GRID_MS;
     const start = {} as CategorySample;
-    for (const k of CATEGORY_KEYS) start[k] = before[k] + (after[k] - before[k]) * f;
+    for (const k of SAMPLE_KEYS) start[k] = before[k] + (after[k] - before[k]) * f;
     push(startMs, start);
   }
   for (let t = Math.ceil(startMs / ROLLING_GRID_MS) * ROLLING_GRID_MS; t <= nowMs; t += ROLLING_GRID_MS) push(t, gridSample(t));
@@ -118,5 +155,5 @@ export function sampleMunicipalityLast24h(
 
   const series = {} as CategorySeries;
   for (const k of CATEGORY_KEYS) series[k] = samples.map((s) => s[k]);
-  return { times, series };
+  return { times, series, homeBatteryW: samples.map((s) => s.homeBatteryW), curtailedW: samples.map((s) => s.curtailedW) };
 }

@@ -5,8 +5,8 @@ import { RESIDENTS_PER_DWELLING } from "../config/treasury";
 import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
 import { BASELINE_YEAR, MONTH_NAMES, formatDate, toDateMs } from "../sim/calendar";
 import { cachedEmissionsForYear } from "../sim/emissions";
-import { simClock } from "../sim/engine";
 import { fleets } from "../sim/fleet";
+import { GRID_BATTERY_ROUND_TRIP } from "../config/spotMarket";
 import { grid } from "../sim/grid";
 import { currentHeatingSystemId } from "../sim/heatingRenewal";
 import type { CategorySeries } from "../sim/history";
@@ -330,9 +330,29 @@ function Energy() {
   );
 }
 
-// --- the last 24 hours ---
+// --- the last day ---
 
-function liveChart(times: number[], series: CategorySeries, windW: number[], nowMs: number): ChartData {
+const DAY_HOURS = 24;
+// The other side of the balance: where the town's power came from, and what it did beyond its use.
+const WIND_COLOR = "#2a78d6";
+const BATTERY_COLOR = "#eb6834";
+const BOUGHT_COLOR = "#6f6d66";
+const SENT_OUT_COLOR = "#b4b2a9";
+
+/** The day's power as a balance: above the line where it went — each use, the batteries charging,
+ * what was sent out of town — and below it where it came from — the town's own solar and wind, the
+ * batteries, and the wider grid. The neighbourhood batteries are run through the day as the
+ * utility's accounts run them (spotMarket.ts): filling from the town's surplus, giving it back
+ * when the town draws more than it makes, empty at midnight. */
+function dayChart(
+  times: number[],
+  series: CategorySeries,
+  windW: number[],
+  homeBatteryW: number[],
+  curtailedW: number[],
+  gridBattery: { kw: number; kwh: number },
+  startMs: number,
+): ChartData {
   const toMW = (w: number) => w / 1e6;
   const stacks = ELECTRICITY_GROUPS.map((g) => ({
     key: g.key,
@@ -341,50 +361,93 @@ function liveChart(times: number[], series: CategorySeries, windW: number[], now
     kind: "stack" as const,
     values: times.map((_, i) => toMW(g.of.reduce((s, k) => s + series[`${k}W` as keyof CategorySeries][i], 0))),
   }));
-  // The series' generation is everything the plants made, wind turbines included.
-  const solar = times.map((_, i) => toMW(Math.max(0, series.solarW[i] - windW[i])));
-  const wind = windW.map(toMW);
-  const hour = (t: number) => {
+  const usedW = times.map((_, i) => ELECTRICITY_GROUPS.reduce((sum, g) => sum + g.of.reduce((s, k) => s + series[`${k}W` as keyof CategorySeries][i], 0), 0));
+  // The series' generation is everything the plants made, wind turbines included; less what the
+  // home batteries' feed-in caps held back.
+  const solarW = times.map((_, i) => Math.max(0, series.solarW[i] - windW[i] - curtailedW[i]));
+  const intoW: number[] = [];
+  const outOfW: number[] = [];
+  const boughtW: number[] = [];
+  const sentW: number[] = [];
+  let storedKWh = 0;
+  for (let i = 0; i < times.length; i++) {
+    const dtHours = i > 0 ? (times[i] - times[i - 1]) / HOUR_MS : 0;
+    const home = homeBatteryW[i];
+    // What the town still needs after its own plants and its home batteries (negative: a surplus).
+    const residualW = usedW[i] + home - solarW[i] - windW[i];
+    let chargeW = 0;
+    let dischargeW = 0;
+    if (gridBattery.kw > 0 && dtHours > 0) {
+      if (residualW < 0) {
+        const roomKWh = Math.max(0, gridBattery.kwh - storedKWh);
+        chargeW = Math.min(gridBattery.kw * 1000, -residualW, (roomKWh / dtHours) * 1000);
+        storedKWh += (chargeW / 1000) * dtHours;
+      } else {
+        dischargeW = Math.min(gridBattery.kw * 1000, residualW, ((storedKWh * GRID_BATTERY_ROUND_TRIP) / dtHours) * 1000);
+        storedKWh -= (dischargeW / 1000 / GRID_BATTERY_ROUND_TRIP) * dtHours;
+      }
+    }
+    intoW.push(Math.max(0, home) + chargeW);
+    outOfW.push(Math.max(0, -home) + dischargeW);
+    const net = residualW + chargeW - dischargeW;
+    boughtW.push(Math.max(0, net));
+    sentW.push(Math.max(0, -net));
+  }
+  const clock = (t: number) => {
     const d = new Date(toDateMs(t));
     return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
   };
-  // Ticks at 0, 6, 12 and 18 o'clock.
-  const ticks: { x: number; label: string }[] = [];
-  const startDate = toDateMs(nowMs - 24 * HOUR_MS);
-  for (let d = Math.ceil(startDate / (6 * HOUR_MS)) * 6 * HOUR_MS; d <= toDateMs(nowMs); d += 6 * HOUR_MS) ticks.push({ x: (d - toDateMs(nowMs)) / HOUR_MS, label: `${String(new Date(d).getUTCHours()).padStart(2, "0")}:00` });
+  const any = (w: number[]) => w.some((v) => v > 1);
   return {
-    xs: times.map((t) => (t - nowMs) / HOUR_MS),
-    xLabels: times.map(hour),
-    xTicks: ticks,
-    from: -24,
-    to: 0,
+    xs: times.map((t) => (t - startMs) / HOUR_MS),
+    xLabels: times.map(clock),
+    xTicks: [0, 6, 12, 18, 24].map((h) => ({ x: h, label: `${String(h).padStart(2, "0")}:00` })),
+    from: 0,
+    to: DAY_HOURS,
     unit: "MW",
-    total: "Used",
+    total: "Went to",
+    totalBelow: "Came from",
+    height: 400,
     series: [
       ...stacks,
-      { key: "solar", label: "Made by solar", color: deviceColor("solar"), kind: "line", values: solar },
-      ...(wind.some((w) => w > 0) ? [{ key: "wind", label: "Made by wind", color: "#5b6b7a", kind: "line" as const, dashed: true, values: wind }] : []),
+      ...(any(intoW) || any(outOfW)
+        ? [{ key: "into", label: "Into batteries", legend: "Batteries: in (above), out (below)", color: BATTERY_COLOR, kind: "stack" as const, values: intoW.map(toMW) }]
+        : []),
+      ...(any(sentW) ? [{ key: "sent", label: "Sent out of town", color: SENT_OUT_COLOR, kind: "stack" as const, values: sentW.map(toMW) }] : []),
+      { key: "solar", label: "Own solar", color: deviceColor("solar"), kind: "stack", below: true, values: solarW.map(toMW) },
+      ...(any(windW) ? [{ key: "wind", label: "Own wind", color: WIND_COLOR, kind: "stack" as const, below: true, values: windW.map(toMW) }] : []),
+      ...(any(intoW) || any(outOfW)
+        ? [{ key: "outOf", label: "Out of batteries", legend: false as const, color: BATTERY_COLOR, kind: "stack" as const, below: true, values: outOfW.map(toMW) }]
+        : []),
+      { key: "bought", label: "Bought from the grid", color: BOUGHT_COLOR, kind: "stack", below: true, values: boughtW.map(toMW) },
     ],
   };
 }
 
+/** "a, b and c", leaving out what's false. */
+function inWords(parts: (string | false)[]): string {
+  const p = parts.filter((x): x is string => !!x);
+  return p.length > 1 ? `${p.slice(0, -1).join(", ")} and ${p[p.length - 1]}` : (p[0] ?? "");
+}
+
+/** The day before today, midnight to midnight: what the town's power went to, and where it came from. */
 function LastDay({ dataset }: { dataset: MunicipalityDataset }) {
   const tariff = useTariff();
-  const day = useSimDay();
+  const today = useSimDay(); // midnight today
   const [data, setData] = useState<ChartData | null>(null);
-  const key = `${tariffKey(tariff)}:${day}`;
+  const key = `${tariffKey(tariff)}:${today}`;
 
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      const nowMs = simClock.getSimTimeMs();
       // Sampled a little at a time first, so the page never stalls on it.
-      await warmLast24h(dataset.buildings, dataset.powerPlants, nowMs, tariff, () => cancelled);
+      await warmLast24h(dataset.buildings, dataset.powerPlants, today, tariff, () => cancelled);
       if (cancelled) return;
-      const { times, series } = sampleMunicipalityLast24h(dataset.buildings, dataset.powerPlants, nowMs, tariff);
-      const turbines = effectivePowerPlantsAt(dataset.buildings, dataset.powerPlants, nowMs).filter((p) => p.technology === "Wind");
+      const { times, series, homeBatteryW, curtailedW } = sampleMunicipalityLast24h(dataset.buildings, dataset.powerPlants, today, tariff);
+      const startMs = today - DAY_HOURS * HOUR_MS;
+      const turbines = effectivePowerPlantsAt(dataset.buildings, dataset.powerPlants, today).filter((p) => p.technology === "Wind");
       const windW = times.map((t) => turbines.reduce((s, p) => s + (p.activeToMs === undefined || p.activeToMs > t ? windPowerW(p, t) : 0), 0));
-      setData(liveChart(times, series, windW, nowMs));
+      setData(dayChart(times, series, windW, homeBatteryW, curtailedW, grid.batteriesInService(startMs), startMs));
     };
     run();
     return () => {
@@ -393,18 +456,22 @@ function LastDay({ dataset }: { dataset: MunicipalityDataset }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, dataset]);
 
+  const has = (key: string) => data?.series.some((s) => s.key === key) ?? false;
   return (
     <section className="glance-card">
-      <h4>Power over the last 24 hours</h4>
-      <p className="glance-sub">What the town's homes, businesses and cars draw, by use, and what its solar{data?.series.some((s) => s.key === "wind") ? " and wind" : ""} makes.</p>
-      {data ? <TimeChart data={data} emptyText="" /> : <p className="glance-empty">Reading the last day…</p>}
+      <h4>Power yesterday, {formatDate(today - DAY_HOURS * HOUR_MS)}</h4>
+      <p className="glance-sub">
+        Above the line, what the town&apos;s power went to: {inWords(["its homes, businesses and cars by use", has("into") && "its batteries charging", has("sent") && "what it sent out of town"])}.
+        Below it, where the power came from: {inWords([has("wind") ? "its own solar and wind" : "its own solar", has("outOf") && "its batteries", "the wider grid"])}.
+      </p>
+      {data ? <TimeChart data={data} emptyText="" /> : <p className="glance-empty">Reading yesterday…</p>}
     </section>
   );
 }
 
 /** The Statistics page's first entry: where the town stands now — then and now, its energy over the
- * last month or year, and the last 24 hours. Everything but the last 24 hours reads what the game
- * already keeps; those are sampled a little at a time. */
+ * last month or year, and yesterday's power. Everything but yesterday reads what the game already
+ * keeps; that is sampled a little at a time. */
 export function GlanceView({ dataset }: { dataset: MunicipalityDataset }) {
   const nowMs = useSimDay();
   return (

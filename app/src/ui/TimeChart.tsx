@@ -3,7 +3,6 @@ import type { ChartData } from "./charts";
 import "./timeChart.css";
 
 const W = 960;
-const H = 320;
 const PAD = { left: 56, right: 16, top: 26, bottom: 28 };
 
 /** A round step for about `count` ticks over `span`. */
@@ -21,19 +20,24 @@ export function formatValue(v: number): string {
 }
 
 /** A chart over time, in the style of the end-of-game score chart: stacked areas (or bars, for
- * yearly values) with lines on top, a crosshair and a tooltip on hover, and a legend. */
+ * yearly values) with lines on top, a crosshair and a tooltip on hover, and a legend. A balance has a
+ * second stack below the zero line (`below` series), drawn downward. */
 export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: string }) {
   const [hover, setHover] = useState<number | null>(null);
+  const H = data.height ?? 320;
   const n = data.xs.length;
-  const stacks = data.series.filter((s) => s.kind === "stack");
+  const stacks = data.series.filter((s) => s.kind === "stack" && !s.below);
+  const belowStacks = data.series.filter((s) => s.kind === "stack" && s.below);
   const lines = data.series.filter((s) => s.kind === "line");
 
-  // Cumulative tops of the stack, per point.
+  // Cumulative tops of the stack, per point — and the stack below the line, downward.
   const tops: number[][] = [];
   stacks.forEach((s, j) => tops.push(data.xs.map((_, i) => (j > 0 ? tops[j - 1][i] : 0) + (s.values[i] ?? 0))));
+  const depths: number[][] = [];
+  belowStacks.forEach((s, j) => depths.push(data.xs.map((_, i) => (j > 0 ? depths[j - 1][i] : 0) - (s.values[i] ?? 0))));
   const lineValues = lines.flatMap((s) => s.values.filter((v): v is number => v !== null));
   const maxData = Math.max(0, ...(tops.length ? tops[tops.length - 1] : []), ...lineValues, data.reference?.value ?? 0);
-  const minData = Math.min(0, ...lineValues, ...stacks.flatMap((s) => s.values.filter((v): v is number => v !== null)));
+  const minData = Math.min(0, ...lineValues, ...stacks.flatMap((s) => s.values.filter((v): v is number => v !== null)), ...(depths.length ? depths[depths.length - 1] : []));
   const range = (data.yMax ?? maxData) - minData;
   const step = Math.max(data.integer ? 1 : 0, niceStep(range > 0 ? range : 1, 5));
   const yMin = Math.floor(minData / step) * step;
@@ -51,9 +55,9 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
   if (data.xTicks) yearTicks.push(...data.xTicks);
   else for (let t = Math.ceil(data.from); t <= data.to; t++) if (t === data.from || t === data.to || t % yearStep === 0) yearTicks.push({ x: t, label: String(t) });
 
-  const areaPath = (j: number) => {
-    const top = tops[j];
-    const bottom = j > 0 ? tops[j - 1] : data.xs.map(() => 0);
+  const areaPath = (j: number, layers = tops) => {
+    const top = layers[j];
+    const bottom = j > 0 ? layers[j - 1] : data.xs.map(() => 0);
     const up = data.xs.map((xv, i) => `${i ? "L" : "M"}${x(xv).toFixed(1)},${y(top[i]).toFixed(1)}`).join(" ");
     const down = [...data.xs.keys()].reverse().map((i) => `L${x(data.xs[i]).toFixed(1)},${y(bottom[i]).toFixed(1)}`).join(" ");
     return `${up} ${down} Z`;
@@ -85,11 +89,11 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
     <figure className="time-chart">
       <div className="time-chart-legend">
         {data.series
-          .filter((s) => s.kind !== "hidden")
+          .filter((s) => s.kind !== "hidden" && s.legend !== false)
           .map((s) => (
             <span key={s.key}>
               <i className={s.kind === "stack" ? "swatch" : s.dashed ? "line dashed" : "line"} style={s.kind === "stack" ? { background: s.color } : { borderColor: s.color }} />
-              {s.label}
+              {s.legend ?? s.label}
             </span>
           ))}
         {data.reference && (
@@ -114,7 +118,7 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
             <g key={t}>
               <line className={t === 0 ? "zero" : "grid"} x1={PAD.left} x2={W - PAD.right} y1={y(t)} y2={y(t)} />
               <text className="tick" x={PAD.left - 8} y={y(t) + 3} textAnchor="end">
-                {t.toLocaleString("de-CH", { maximumFractionDigits: stepDigits })}
+                {(belowStacks.length > 0 ? Math.abs(t) : t).toLocaleString("de-CH", { maximumFractionDigits: stepDigits })}
               </text>
             </g>
           ))}
@@ -132,6 +136,7 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
                 <path key={s.key} className="area" d={areaPath(j)} style={{ fill: s.color }} />
               ),
             )}
+          {n > 1 && !data.bars && belowStacks.map((s, j) => <path key={s.key} className="area" d={areaPath(j, depths)} style={{ fill: s.color }} />)}
           {data.bars &&
             data.xs.map((xv, i) =>
               stacks.map((s, j) => {
@@ -166,7 +171,7 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
           <div className="time-chart-tip" style={{ left: `${tipLeft}%` }}>
             <strong>{data.xLabels[hovered]}</strong>
             {[...data.series]
-              .filter((s) => s.values[hovered] !== null && (s.kind === "line" || s.values[hovered] !== 0))
+              .filter((s) => !s.below && s.values[hovered] !== null && (s.kind === "line" || s.values[hovered] !== 0))
               .sort((a, b) => (a.kind === "stack" && b.kind === "stack" ? stacks.indexOf(b) - stacks.indexOf(a) : 0))
               .map((s) => (
                 <span key={s.key}>
@@ -177,6 +182,19 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
             {data.total && stacks.length > 1 && (
               <span className="total">
                 {data.total}: {formatValue(tops[tops.length - 1][hovered])} {data.unit}
+              </span>
+            )}
+            {belowStacks
+              .filter((s) => (s.values[hovered] ?? 0) !== 0)
+              .map((s) => (
+                <span key={s.key}>
+                  <i style={{ background: s.color }} />
+                  {s.label}: {formatValue(s.values[hovered]!)} {data.unit}
+                </span>
+              ))}
+            {data.totalBelow && belowStacks.length > 1 && (
+              <span className="total">
+                {data.totalBelow}: {formatValue(-depths[depths.length - 1][hovered])} {data.unit}
               </span>
             )}
             {hoveredEvents.map((e, i) => (
