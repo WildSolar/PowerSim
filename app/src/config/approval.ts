@@ -36,6 +36,12 @@ export const MAX_SWING = 30; // a bloc's resting level moves at most this far fr
 // about +2.5 points with the climate-minded; charging falling from good to nothing about -3 with drivers.
 export const OUTCOME_SELF_SUFFICIENCY_STANCE: Partial<Record<Bloc, number>> = { climate: 0.4, homeowners: 0.15, business: 0.1, tenants: 0.1, drivers: 0.05 };
 export const OUTCOME_CHARGING_STANCE: Partial<Record<Bloc, number>> = { drivers: 0.3, tenants: 0.15, climate: 0.05 };
+// ...and, as long as it lasts, the share of the town's buildings where the grid turns away heat pumps,
+// wallboxes or solar (a full transformer station): a third of the town blocked is about -2 points
+// with homeowners. And the climate-minded watch the cut in emissions against what doing nothing
+// would have made of it (par): 20 points ahead is about +1.5 with them.
+export const OUTCOME_GRID_BLOCKED_STANCE: Partial<Record<Bloc, number>> = { homeowners: -0.4, business: -0.25, climate: -0.15, tenants: -0.1 };
+export const OUTCOME_AHEAD_OF_PAR_STANCE: Partial<Record<Bloc, number>> = { climate: 0.5 };
 export const STANCE_SATURATION = 0.5; // tanh steepness: piling up popular measures has diminishing returns
 export const RELAXATION_MONTHS = 10; // how fast a bloc drifts toward its resting level
 // People take what they like for granted: a measure's goodwill fades to this share of itself, with

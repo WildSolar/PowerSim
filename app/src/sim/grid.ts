@@ -450,6 +450,25 @@ class Grid {
     return !!area && this.effectivePeaks(area, atMs).feedInKw > this.capacityAt(area, atMs);
   }
 
+  /** The share of the town's buildings standing at `atMs` in an area whose grid is closed to more
+   * draw or more feed-in — where heat pumps, wallboxes or solar are turned away. */
+  blockedShare(atMs: number): number {
+    const blocked = this.areas.map((a) => {
+      const { drawKw, feedInKw } = this.effectivePeaks(a, atMs);
+      const capacity = this.capacityAt(a, atMs);
+      return drawKw > capacity || feedInKw > capacity;
+    });
+    if (!blocked.some((x) => x)) return 0;
+    let all = 0;
+    let inBlocked = 0;
+    for (const b of this.buildingsProvider()) {
+      if (!existsAt(b, atMs)) continue;
+      all++;
+      if (blocked[this.areaIdOf(b)]) inBlocked++;
+    }
+    return all > 0 ? inBlocked / all : 0;
+  }
+
   /** The same for a place off any building (a car park's canopy feeds in where it stands). */
   feedInBlockedAtPlace(lon: number, lat: number, atMs: number): boolean {
     const area = this.areas[this.siteAreaId(lon, lat)];

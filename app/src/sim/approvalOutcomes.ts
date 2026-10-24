@@ -6,25 +6,44 @@
  *    solar, car-park canopies, Agri-PV fields, wind) over the last twelve months.
  *  - Public charging: how good charging is around the households without a wallbox, on average
  *    (publicCharging.ts) — falling as electric cars outgrow the chargers, rising as chargers are built.
+ *  - The grid turning people away: the share of the town's buildings where a full transformer
+ *    station refuses heat pumps, wallboxes or solar (grid.ts), for as long as it lasts.
+ *  - For the climate-minded, the cut in emissions per resident in the last year counted, against what
+ *    doing nothing would have made of it (par.ts) — none without par for this game.
  *
- * Both are measured against how things stood when the player took office, so the change is what
- * counts, either way: each bloc that cares leans toward approval (or away) in proportion, through
+ * The first two are measured against how things stood when the player took office, so the change is
+ * what counts, either way. Each bloc that cares leans toward approval (or away) in proportion, through
  * the level it drifts toward, like a measure in force. Read off the month records (monthRecords.ts)
- * as each month is counted, so they lag a month or so. Nothing to save: the records are.
+ * and the counted years as they come in, so they lag a little. Nothing to save: the records are.
  */
 
-import { OUTCOME_CHARGING_STANCE, OUTCOME_SELF_SUFFICIENCY_STANCE, type Bloc } from "../config/approval";
+import {
+  OUTCOME_AHEAD_OF_PAR_STANCE,
+  OUTCOME_CHARGING_STANCE,
+  OUTCOME_GRID_BLOCKED_STANCE,
+  OUTCOME_SELF_SUFFICIENCY_STANCE,
+  type Bloc,
+} from "../config/approval";
 import { setLocalStances, type Stances } from "./approval";
 import { toDateMs } from "./calendar";
+import { grid } from "./grid";
 import { monthRecords, type MonthRecord } from "./monthRecords";
+import { parYears } from "./par";
+import { scoreSoFar } from "./score";
 
-export type Outcome = "selfSufficiency" | "charging";
+export type Outcome = "selfSufficiency" | "charging" | "gridBlocked" | "aheadOfPar";
 
-/** How each outcome has changed since the start (shares, -1 to 1). */
-export interface OutcomeChanges {
-  selfSufficiency: number;
-  charging: number;
-}
+/** Where each outcome stands (shares, -1 to 1): self-sufficiency and charging as changes since the
+ * start, the share of buildings the grid turns away, and how far the last counted year's cut is ahead
+ * of par's (points / 100). */
+export type OutcomeChanges = Record<Outcome, number>;
+
+const STANCE: Record<Outcome, Partial<Record<Bloc, number>>> = {
+  selfSufficiency: OUTCOME_SELF_SUFFICIENCY_STANCE,
+  charging: OUTCOME_CHARGING_STANCE,
+  gridBlocked: OUTCOME_GRID_BLOCKED_STANCE,
+  aheadOfPar: OUTCOME_AHEAD_OF_PAR_STANCE,
+};
 
 function monthOf(atMs: number): number {
   const d = new Date(toDateMs(atMs));
@@ -46,7 +65,8 @@ let memo: { key: string; changes: OutcomeChanges } | null = null;
  * counted before it). */
 export function outcomeChanges(atMs: number): OutcomeChanges {
   const month = monthOf(atMs);
-  const key = `${monthRecords.getVersion()}:${month}`;
+  // The grid's readings and the counted years change with the records' months; a month is close enough.
+  const key = `${monthRecords.getVersion()}:${month}:${grid.getVersion()}`;
   if (memo?.key === key) return memo.changes;
   const records = monthRecords.all().filter((r) => r.month < month);
 
@@ -74,7 +94,16 @@ export function outcomeChanges(atMs: number): OutcomeChanges {
   const withAssets = records.filter((r) => r.assets);
   const charging = withAssets.length > 1 ? withAssets[withAssets.length - 1].assets!.chargingQos - withAssets[0].assets!.chargingQos : 0;
 
-  const changes = { selfSufficiency, charging };
+  // The grid: where it turns people away now.
+  const gridBlocked = grid.blockedShare(atMs);
+
+  // The last year counted, against par's cut that year.
+  const scored = scoreSoFar().years.filter((y) => !y.projected);
+  const last = scored[scored.length - 1];
+  const par = last ? parYears()?.find((p) => p.year === last.year) : undefined;
+  const aheadOfPar = last && par ? (last.points - par.points) / 100 : 0;
+
+  const changes = { selfSufficiency, charging, gridBlocked, aheadOfPar };
   memo = { key, changes };
   return changes;
 }
@@ -83,21 +112,20 @@ export function outcomeChanges(atMs: number): OutcomeChanges {
 export function outcomeStances(atMs: number): Stances {
   const c = outcomeChanges(atMs);
   const out: Stances = {};
-  for (const [bloc, k] of Object.entries(OUTCOME_SELF_SUFFICIENCY_STANCE) as [Bloc, number][]) out[bloc] = (out[bloc] ?? 0) + k * c.selfSufficiency;
-  for (const [bloc, k] of Object.entries(OUTCOME_CHARGING_STANCE) as [Bloc, number][]) out[bloc] = (out[bloc] ?? 0) + k * c.charging;
+  for (const outcome of Object.keys(STANCE) as Outcome[])
+    for (const [bloc, k] of Object.entries(STANCE[outcome]) as [Bloc, number][]) out[bloc] = (out[bloc] ?? 0) + k * c[outcome];
   return out;
 }
 
 /** The outcome a bloc feels most strongly about, in the direction given (+1 pleased, -1 annoyed), with
- * its stance; null if neither moves it noticeably. */
+ * its stance; null if none moves it noticeably. */
 export function strongestOutcome(bloc: Bloc, sign: 1 | -1, atMs: number): { outcome: Outcome; stance: number } | null {
   const c = outcomeChanges(atMs);
-  const candidates: { outcome: Outcome; stance: number }[] = [
-    { outcome: "selfSufficiency", stance: (OUTCOME_SELF_SUFFICIENCY_STANCE[bloc] ?? 0) * c.selfSufficiency },
-    { outcome: "charging", stance: (OUTCOME_CHARGING_STANCE[bloc] ?? 0) * c.charging },
-  ];
   let best: { outcome: Outcome; stance: number } | null = null;
-  for (const x of candidates) if (x.stance * sign > 0.02 && (!best || x.stance * sign > best.stance * sign)) best = x;
+  for (const outcome of Object.keys(STANCE) as Outcome[]) {
+    const stance = (STANCE[outcome][bloc] ?? 0) * c[outcome];
+    if (stance * sign > 0.02 && (!best || stance * sign > best.stance * sign)) best = { outcome, stance };
+  }
   return best;
 }
 

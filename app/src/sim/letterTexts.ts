@@ -155,7 +155,7 @@ export function voteResultText(title: string, accepted: boolean, yesShare: numbe
 export type Mood = "angry" | "unhappy" | "pleased";
 export type MoodCause =
   | { kind: "measure"; title: string; likes: boolean }
-  | { kind: "outcome"; outcome: "selfSufficiency" | "charging"; likes: boolean }
+  | { kind: "outcome"; outcome: "selfSufficiency" | "charging" | "gridBlocked" | "aheadOfPar"; likes: boolean }
   | { kind: "spending" }
   | { kind: "debt" }
   | null;
@@ -177,6 +177,28 @@ const MOOD_OPENING: Record<Mood, string[]> = {
   ],
 };
 
+/** What a group says about how the town is doing (approvalOutcomes.ts), pleased or not. */
+const OUTCOME_TEXT: Record<"selfSufficiency" | "charging" | "gridBlocked" | "aheadOfPar", Record<"likes" | "dislikes", (mood: Mood) => string>> = {
+  selfSufficiency: {
+    likes: (mood) =>
+      `People have noticed how much of its own power the town makes these days — on the roofs, over the car parks, out in the fields. They are proud of it${mood === "pleased" ? "" : ", even if it doesn't make up for the rest"}.`,
+    dislikes: () => "People notice that the town makes less of its own power than it used to, while it uses ever more.",
+  },
+  charging: {
+    likes: (mood) => `Drivers say it has become much easier to find a free charger in town${mood === "pleased" ? "" : " — but it is not enough on its own"}.`,
+    dislikes: () => "Drivers complain that they can never find a free charger: there are ever more electric cars, and the chargers haven't kept up.",
+  },
+  gridBlocked: {
+    likes: () => "People appreciate that the grid keeps up with what they ask of it.",
+    dislikes: () =>
+      "Above all, people are fed up with the grid: in parts of town the utility turns away heat pumps, wallboxes and solar panels because the transformer station is full. They are told to wait, and nobody says for how long.",
+  },
+  aheadOfPar: {
+    likes: (mood) => `We see the town's emissions falling well faster than they would have on their own${mood === "pleased" ? ". Keep going" : " — that much is to your credit"}.`,
+    dislikes: () => "The town's emissions are falling no faster than they would have if the council had done nothing at all.",
+  },
+};
+
 export function moodText(bloc: Bloc, mood: Mood, cause: MoodCause, u: number): LetterText {
   const paragraphs = [pick(MOOD_OPENING[mood], u)];
   if (cause?.kind === "measure") {
@@ -186,15 +208,7 @@ export function moodText(bloc: Bloc, mood: Mood, cause: MoodCause, u: number): L
         : `"${cause.title}" in particular keeps coming up. It weighs on people${mood === "pleased" ? ", even if they accept the rest" : ""}.`,
     );
   } else if (cause?.kind === "outcome") {
-    paragraphs.push(
-      cause.outcome === "selfSufficiency"
-        ? cause.likes
-          ? `People have noticed how much of its own power the town makes these days — on the roofs, over the car parks, out in the fields. They are proud of it${mood === "pleased" ? "" : ", even if it doesn't make up for the rest"}.`
-          : "People notice that the town makes less of its own power than it used to, while it uses ever more."
-        : cause.likes
-          ? `Drivers say it has become much easier to find a free charger in town${mood === "pleased" ? "" : " — but it is not enough on its own"}.`
-          : "Drivers complain that they can never find a free charger: there are ever more electric cars, and the chargers haven't kept up.",
-    );
+    paragraphs.push(OUTCOME_TEXT[cause.outcome][cause.likes ? "likes" : "dislikes"](mood));
   } else if (cause?.kind === "spending") {
     paragraphs.push("Above all, people are worried about the spending. The energy department is spending well beyond what it has been given, and taxpayers notice.");
   } else if (cause?.kind === "debt") {
