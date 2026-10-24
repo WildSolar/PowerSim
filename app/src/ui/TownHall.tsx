@@ -9,7 +9,7 @@ import { DecisionLogTab } from "./DecisionLogTab";
 import { MeasuresTab } from "./MeasuresTab";
 import { OverviewTab } from "./OverviewTab";
 import { TreasuryTab } from "./TreasuryTab";
-import { TariffControl } from "./TariffControl";
+import { MarketPrices, TariffControl } from "./TariffControl";
 import { TechnologyPrices } from "./TechnologyPrices";
 import { usePauseWhileOpen } from "./usePauseWhileOpen";
 import "./townHall.css";
@@ -74,7 +74,11 @@ export function TownHall({ dataset, transparency, section, onSection, onClose, o
           {current.id === "prices" && (
             <div className="prices-columns">
               <TariffControl />
-              <TechnologyPrices />
+              <div className="prices-context">
+                <MarketPrices />
+                <div className="tariff-divider" />
+                <TechnologyPrices />
+              </div>
             </div>
           )}
           {current.id === "overview" && <OverviewTab dataset={dataset} onOpen={onSection} />}

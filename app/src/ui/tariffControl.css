@@ -2,7 +2,6 @@
   font-family: var(--font);
   font-size: 13px;
   color: var(--ink);
-  max-width: 360px;
 }
 
 .tariff-title {
@@ -411,4 +410,167 @@
 
 .tariff-computed-next.changed {
   font-weight: 600;
+}
+
+/* The tariff in sections (TariffControl.tsx), under a summary bar that stays in view. */
+.tariff-summary {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -20px -20px 12px;
+  padding: 14px 20px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--r-3) var(--r-3) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.tariff-summary .tariff-title {
+  margin-bottom: 0;
+}
+
+.tariff-summary-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tariff-summary-changes {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.tariff-reset {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.tariff-summary-bill {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.tariff-summary-bill strong {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tariff-summary .tariff-publish {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.tariff-summary .tariff-deadline {
+  flex: 1;
+}
+
+.tariff-section {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.tariff-section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tariff-section-note {
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.tariff-computed-group {
+  color: var(--ink-3);
+}
+
+.charger-price-grid {
+  display: grid;
+  grid-template-columns: 1fr repeat(3, 56px);
+  column-gap: 10px;
+  row-gap: 4px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.charger-price-grid input {
+  width: 56px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-2);
+  padding: 3px 5px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.charger-price-grid input.changed {
+  border-color: var(--selected);
+  box-shadow: inset 0 0 0 1px var(--selected);
+}
+
+.charger-price-unit {
+  grid-column: 2 / -1;
+  text-align: right;
+}
+
+.tariff-section .dyn-draft:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.dyn-draft-fold {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink-3);
+  cursor: pointer;
+  text-align: right;
+}
+
+.dyn-draft-fold:hover {
+  color: var(--ink);
+}
+
+.dyn-draft-chevron {
+  font-size: 10px;
+}
+
+.tariff-how {
+  margin: 6px 0 8px;
+}
+
+.tariff-how summary {
+  font-size: 11px;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.tariff-how p {
+  margin: 4px 0 0;
 }
