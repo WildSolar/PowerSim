@@ -1044,7 +1044,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Your own chargers can charge less at some hours (Town hall → Prices, under your public chargers): at night — the night rate's hours — and in solar hours, when the town's own solar and wind are forecast to make more than it uses (see \"The charging tariff\"). While all three prices are the same, nothing changes. Once one is cheaper, drivers move to it:",
       ),
       list([
-        "On the street, every car: it is parked from the evening anyway, so the charger charges it in the night hours before the morning, the cars spread through the night. A cheaper night takes charging out of the evening peak.",
+        "On the street, every car: it is parked from the evening anyway, so the charger charges it in the night hours before the morning, the cars spread through the night. A cheaper night takes charging out of the evening peak. If the solar hours are cheaper still, drivers who are at home on a day that has them — at weekends, and about one weekday in four — plug in then instead.",
         "At a hub, about four drivers in ten stop by when it's cheaper instead: in the solar hours on a day that has them, or late in the evening. At a shop's car park only in solar hours — the shop is closed at night.",
         "At a lorry park, about half the lorries: at their midday break in solar hours, or overnight.",
       ]),

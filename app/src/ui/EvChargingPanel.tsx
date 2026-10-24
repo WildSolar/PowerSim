@@ -202,7 +202,7 @@ function PriceRows({ site, now }: { site: ChargingSite; now: number }) {
       </div>
     );
   }
-  const { prices, shares } = sitePriceWindows(site, now);
+  const { prices, shares, solarDays } = sitePriceWindows(site, now);
   if (prices.night === prices.standard && prices.solar === prices.standard) {
     return (
       <div className="info-row" title="Set in the tariff, under Prices. A cheaper price at night or in the town's solar hours moves charging there.">
@@ -213,6 +213,17 @@ function PriceRows({ site, now }: { site: ChargingSite; now: number }) {
   }
   const sheet = tariffStore.sheetFor(new Date(toDateMs(now)).getUTCFullYear());
   const hours = { night: `${sheet.offPeakStartHour}:00–${sheet.offPeakEndHour}:00`, solar: "when the town's own solar makes more than it uses" };
+  // Why a window sells nothing, where that isn't plain.
+  const street = site.kind === "ac" && !site.shop;
+  const why: Record<"night" | "solar", string | null> = {
+    night: site.shop ? "The shop is closed at night." : prices.night > prices.standard ? "Dearer than by day, so nobody charges then." : null,
+    solar:
+      solarDays === 0
+        ? "No solar hours this year yet: on no day are your town's own solar and wind forecast to make more than it uses."
+        : street && prices.solar > Math.min(prices.standard, prices.night)
+          ? "Cars here charge in the evening or overnight; only drivers at home by day would come in solar hours, and only if they were the cheapest."
+          : null,
+  };
   return (
     <>
       <div className="info-row" title="Set in the tariff, under Prices: the price outside the night and solar hours, and the share of this charger's energy sold at it">
@@ -224,11 +235,14 @@ function PriceRows({ site, now }: { site: ChargingSite; now: number }) {
       {(["night", "solar"] as const)
         .filter((w) => prices[w] !== prices.standard)
         .map((w) => (
-          <div className="info-row" key={w} title={`${hours[w]} — and the share of this charger's energy sold at that price`}>
-            <span>{WINDOW_LABEL[w]}</span>
-            <span className="info-value">
-              {prices[w]} Rp/kWh · {percent(shares[w], 1)}
-            </span>
+          <div key={w}>
+            <div className="info-row" title={`${hours[w]} — and the share of this charger's energy sold at that price`}>
+              <span>{WINDOW_LABEL[w]}</span>
+              <span className="info-value">
+                {prices[w]} Rp/kWh · {percent(shares[w], 1)}
+              </span>
+            </div>
+            {shares[w] < 0.005 && why[w] && <p className="dh-note">{why[w]}</p>}
           </div>
         ))}
     </>

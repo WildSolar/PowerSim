@@ -82,7 +82,7 @@ import {
 import { interpolateCurve } from "../config/curve";
 import { ANNUAL_CAR_KM, EV_CAR_KWH_PER_100KM } from "../config/mobility";
 import type { Building, Dwelling, MunicipalityDataset } from "../data/types";
-import { toDateMs, toSimTimeMs } from "./calendar";
+import { dayOfWeek, toDateMs, toSimTimeMs } from "./calendar";
 import { simClock } from "./engine";
 import { LocalProjection } from "./localGeo";
 import { policyStore } from "./policy";
@@ -98,6 +98,7 @@ import { priceFactor } from "./costTrends";
 import type { CostTrendId } from "../config/costTrends";
 import { cannotPay, spendingFrozen } from "./fiscalRules";
 import { chosenWindow, expectedMix, responsiveShare, roomFactor, siteGroup, windowPrices, type PriceWindow } from "./chargerPricing";
+import { HOME_WEEKDAY_SHARE } from "../config/townSurplus";
 import type { TariffSheet } from "./tariff";
 import { townSurplus } from "./townSurplus";
 
@@ -371,11 +372,12 @@ export function sitePriceRpPerKWh(site: ChargingSite, atMs: number): number {
   return expectedMix(site, tariffStore.sheetFor(year), year).priceRpKWh;
 }
 
-/** A municipal site's prices by window in the year of `atMs`, and the share of its energy expected in each. */
-export function sitePriceWindows(site: ChargingSite, atMs: number): { prices: Record<PriceWindow, number>; shares: Record<PriceWindow, number> } {
+/** A municipal site's prices by window in the year of `atMs`, the share of its energy expected in
+ * each, and the share of the year's days with solar hours. */
+export function sitePriceWindows(site: ChargingSite, atMs: number): { prices: Record<PriceWindow, number>; shares: Record<PriceWindow, number>; solarDays: number } {
   const year = yearOf(atMs);
-  const { prices, shares } = expectedMix(site, tariffStore.sheetFor(year), year);
-  return { prices, shares };
+  const { prices, shares, solarDays } = expectedMix(site, tariffStore.sheetFor(year), year);
+  return { prices, shares, solarDays };
 }
 
 function yearStartMs(year: number): number {
@@ -765,8 +767,9 @@ class PublicCharging {
    * that day: when it plugs in, when it starts charging and is charged, and when it gives the point
    * up — on the street the next morning (it stays parked overnight), elsewhere a few minutes after
    * it's charged. At the municipality's own chargers a cheaper window moves it (chargerPricing.ts):
-   * on the street the charging, into the night hours of the time the car is parked; elsewhere, for
-   * the drivers who respond, the stop itself, into the day's solar hours or the night. */
+   * on the street the charging, into the night hours of the time the car is parked — or, on a day
+   * its driver is at home, the stop itself, into the day's solar hours; elsewhere, for the drivers
+   * who respond, the stop itself, into the day's solar hours or the night. */
   private sessionOn(a: Assignment, site: ChargingSite, day: number): { startMs: number; chargeFromMs: number; chargedMs: number; leavesMs: number; powerKw: number } | null {
     const kind = site.kind;
     const seed = hashSeedFrom(a.seed, String(day), site.id);
@@ -782,13 +785,15 @@ class PublicCharging {
     const leave = firstRandom(seed ^ 0x27d4eb2f);
     const morningMs = (day + 1) * DAY_MS + (6.5 + leave * 2) * 3_600_000; // off to work, 6:30–8:30
     let startMs = plugInMs;
-    const moved = site.owner === "municipal" ? this.movedWindow(a, site, day) : "standard";
+    const moved = site.owner === "municipal" ? this.movedWindow(a, site, day, seed) : "standard";
+    // A car on the street charging in the day's solar hours plugs in for them, and drives off once charged.
+    const parkedOvernight = overnight && moved !== "solar";
     if (moved !== "standard") {
       const spread = firstRandom(seed ^ 0x1b873593);
       const sheet = this.sheetOfDay(day);
       const nightMs = day * DAY_MS + sheet.offPeakStartHour * 3_600_000;
       const nightEndMs = (day + 1) * DAY_MS + sheet.offPeakEndHour * 3_600_000;
-      if (overnight) {
+      if (parkedOvernight) {
         // Plugged in as ever; charged in the night hours before the morning, the cars spread out.
         const from = Math.max(plugInMs, nightMs);
         startMs = from + spread * Math.max(0, morningMs - durationMs - from);
@@ -801,8 +806,8 @@ class PublicCharging {
       }
     }
     const chargedMs = startMs + durationMs;
-    const leavesMs = overnight ? Math.max(chargedMs, morningMs) : chargedMs + (5 + leave * 10) * 60_000;
-    return { startMs: overnight ? plugInMs : startMs, chargeFromMs: startMs, chargedMs, leavesMs, powerKw };
+    const leavesMs = parkedOvernight ? Math.max(chargedMs, morningMs) : chargedMs + (5 + leave * 10) * 60_000;
+    return { startMs: parkedOvernight ? plugInMs : startMs, chargeFromMs: startMs, chargedMs, leavesMs, powerKw };
   }
 
   /** The tariff sheet in force on `day` (kept for the day: sessions ask for it often). */
@@ -816,15 +821,20 @@ class PublicCharging {
     return this.daySheet;
   }
 
-  /** Where a booking at a municipal site charges on `day`: at its usual time, or — if its driver
-   * moves for the price and a window is cheaper — in that window. */
-  private movedWindow(a: Assignment, site: ChargingSite, day: number): PriceWindow {
+  /** Where a booking at a municipal site charges on `day` (`seed`: the day's session randomness): at
+   * its usual time, or — if its driver moves for the price and a window open to them is cheaper — in
+   * that window. On the street the solar hours are open only on a day the driver is at home. */
+  private movedWindow(a: Assignment, site: ChargingSite, day: number, seed: number): PriceWindow {
     const prices = windowPrices(this.sheetOfDay(day), site.kind);
     if (prices.night >= prices.standard && prices.solar >= prices.standard) return "standard";
     const responsive = responsiveShare(site);
     if (responsive < 1 && firstRandom(hashSeedFrom(a.seed, site.id, "price-responsive")) >= responsive) return "standard";
-    const group = siteGroup(site);
-    return chosenWindow(prices, group, !!site.shop, group !== "street" && townSurplus.windowOf(day) !== null);
+    let solar = prices.solar < prices.standard && townSurplus.windowOf(day) !== null;
+    if (solar && siteGroup(site) === "street") {
+      const weekend = [0, 6].includes(dayOfWeek(toDateMs(day * DAY_MS)));
+      solar = weekend || firstRandom(seed ^ 0x2545f491) < HOME_WEEKDAY_SHARE;
+    }
+    return chosenWindow(prices, { solar, night: !site.shop });
   }
 
   private assignmentLoadW(a: Assignment, site: ChargingSite, atMs: number): number {

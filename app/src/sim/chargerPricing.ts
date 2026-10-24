@@ -3,7 +3,8 @@
  * a standard price and two more: one at night (the night rate's hours) and one in the town's solar
  * hours (townSurplus.ts). While they are all the same nothing changes; once one is cheaper, drivers
  * move their charging to it: on the street every car (it stays parked overnight, and the charger
- * charges it in the cheapest hours of that time), at a hub or a shop's car park some of the drivers
+ * charges it in the cheapest hours of that time — or, on a day its driver is at home, in the day's
+ * solar hours, if they are cheaper still), at a hub or a shop's car park some of the drivers
  * (they choose when to stop by — a shop only while it's open), at a lorry park some of the lorries
  * (at their midday break, or overnight). Use moved out of the busy hours leaves a hub or a lorry park
  * room for more vehicles. Private operators' chargers keep one price all day.
@@ -14,6 +15,7 @@
  */
 
 import { PRICE_RESPONSIVE_SHARE, SPREAD_ROOM_BONUS, type ChargingKind } from "../config/charging";
+import { HOME_WEEKDAY_SHARE } from "../config/townSurplus";
 import type { TariffSheet } from "./tariff";
 import { townSurplus } from "./townSurplus";
 
@@ -52,42 +54,56 @@ export function responsiveShare(site: PricedSite): number {
   return site.owner === "municipal" ? PRICE_RESPONSIVE_SHARE[siteGroup(site)] : 0;
 }
 
-/** Where a driver who moves charges on a day (`solarDay`: the day has solar hours): the cheapest
- * window open to them, if it is cheaper than the standard price — on the street only the night (the
- * car is parked from the evening), at a shop only the solar hours (it's closed at night). */
-export function chosenWindow(prices: Record<PriceWindow, number>, group: SiteGroup, shop: boolean, solarDay: boolean): PriceWindow {
+/** The share of days an on-street car's driver is at home by day: every weekend, and some weekdays
+ * (home office, part-time, retired) — the days it can charge in the solar hours. */
+export const STREET_HOME_DAY_SHARE = (2 + 5 * HOME_WEEKDAY_SHARE) / 7;
+
+/** Where a driver who moves charges on a day: the cheapest window open to them that day, if it is
+ * cheaper than the standard price. The solar hours are open on a day that has them — on the street
+ * only if the driver is at home by day; the night everywhere but at a shop (it's closed). */
+export function chosenWindow(prices: Record<PriceWindow, number>, open: { solar: boolean; night: boolean }): PriceWindow {
   let best: PriceWindow = "standard";
-  if (group !== "street" && solarDay && prices.solar < prices[best]) best = "solar";
-  if (!shop && prices.night < prices[best]) best = "night";
+  if (open.solar && prices.solar < prices[best]) best = "solar";
+  if (open.night && prices.night < prices[best]) best = "night";
   return best;
 }
 
 /** What a site's drivers expect to pay over `year`, and how its energy splits over the windows:
- * those who move, on days with solar hours and without, and those who keep to their usual time —
- * in the solar hours now and then. */
-export function expectedMix(site: PricedSite, sheet: TariffSheet, year: number): { priceRpKWh: number; shares: Record<PriceWindow, number>; prices: Record<PriceWindow, number>; moved: number } {
+ * those who move, on days the solar hours are open to them and the others, and those who keep to
+ * their usual time — in the solar hours now and then, except on the street (in the evening). Also
+ * the share of the year's days with solar hours at all. */
+export function expectedMix(
+  site: PricedSite,
+  sheet: TariffSheet,
+  year: number,
+): { priceRpKWh: number; shares: Record<PriceWindow, number>; prices: Record<PriceWindow, number>; moved: number; solarDays: number } {
   const prices = windowPrices(sheet, site.kind);
   const group = siteGroup(site);
   const responsive = responsiveShare(site);
   const shares: Record<PriceWindow, number> = { standard: 0, night: 0, solar: 0 };
   let moved = 0;
+  let solarDays = 0;
   if (prices.night === prices.standard && prices.solar === prices.standard) {
     shares.standard = 1;
   } else {
-    // On the street the car charges on arrival in the evening, never in the day's solar hours.
-    const { dayShare, middayCoverage } = group === "street" ? { dayShare: 0, middayCoverage: 0 } : townSurplus.solarYear(year);
+    const { dayShare, middayCoverage } = townSurplus.solarYear(year);
+    solarDays = dayShare;
     const usual = (weight: number, coverage: number) => {
       shares.standard += weight * (1 - coverage);
       shares.solar += weight * coverage;
     };
-    const shop = !!site.shop;
-    for (const [days, solarDay] of [
-      [dayShare, true],
-      [1 - dayShare, false],
+    const street = group === "street";
+    // On the street the solar hours are open only on the days the driver is at home, and a car
+    // charging at its usual time does so in the evening, never in them.
+    const solarOpen = street ? dayShare * STREET_HOME_DAY_SHARE : dayShare;
+    const night = !site.shop;
+    for (const [days, solar] of [
+      [solarOpen, true],
+      [1 - solarOpen, false],
     ] as const) {
       if (days <= 0) continue;
-      const coverage = solarDay ? middayCoverage / dayShare : 0;
-      const w = chosenWindow(prices, group, shop, solarDay);
+      const coverage = solar && !street ? middayCoverage / dayShare : 0;
+      const w = chosenWindow(prices, { solar, night });
       if (w === "standard") usual(days * responsive, coverage);
       else {
         shares[w] += days * responsive;
@@ -97,7 +113,7 @@ export function expectedMix(site: PricedSite, sheet: TariffSheet, year: number):
     }
   }
   const priceRpKWh = PRICE_WINDOWS.reduce((sum, w) => sum + shares[w] * prices[w], 0);
-  return { priceRpKWh, shares, prices, moved };
+  return { priceRpKWh, shares, prices, moved, solarDays };
 }
 
 /** How much more room a site has with its use spread out: none on the street (the cars are parked
