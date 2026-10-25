@@ -23,7 +23,7 @@ export interface Release {
 export const CHANGELOG: Release[] = [
   {
     version: "0.10.0",
-    date: null,
+    date: "2026-10-25",
     added: [
       "Agri-PV: choose the kind of installation for your own fields, and see what each does. A field's card compares the kinds it takes: size, output, how much comes in winter, what its hours are worth, the CO₂ it saves, and a chart of its average summer and winter day. Businesses and cooperatives now build whichever kind pays best for them.",
       "Cheaper hours at your own chargers (Town hall → Prices): a price at night and one in solar hours, for on-street chargers, hubs and lorry parks. Once cheaper, every on-street car charges overnight instead of in the evening (or in the solar hours, on a day its driver is at home), some drivers stop at a hub in the solar hours or late in the evening, and lorries charge at their midday break or overnight. Use spread out of the busy hours gives a hub or a lorry park room for more; a charger's card shows its prices and how much it sells at each.",
