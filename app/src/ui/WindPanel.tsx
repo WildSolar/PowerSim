@@ -15,6 +15,7 @@ import { InspectCard } from "./InspectCard";
 import { ToolPanel } from "./ToolPanel";
 import { PlotLink } from "./PlotLink";
 import { ReactionBadge } from "./ReactionBadge";
+import { CardKind, Facts, Folded } from "./CardParts";
 
 function monthYear(ms: number): string {
   return formatDate(ms).replace(/^\d+ /, "");
@@ -50,29 +51,31 @@ function SiteCard({ site, now }: { site: WindSite; now: number }) {
   const reaction = approval.reactionTo(stances);
   const canRestart = (phase === "rejected" || phase === "struckDown") && wind.canStartZoning(site.id, now);
 
+  const vote = phase === "zoning" && p?.voteKey ? approval.getVoteInfo(p.voteKey, null, now) : null;
+  const actions = phase === "found" || canRestart || phase === "zoning" || phase === "zoned" || phase === "permitted" || phase === "rejected" || phase === "struckDown";
   return (
     <div>
-      <div className="dh-note">
+      <CardKind>
         {WIND_PHASE_LABEL[phase]}
         {p?.phaseUntilMs ? ` · until ${monthYear(p.phaseUntilMs)}` : ""}
-      </div>
-      <div className="info-row">
-        <span>Turbines</span>
-        <span className="info-value">
-          {n} × {(TURBINE_KW / 1000).toFixed(1)} MW
-        </span>
-      </div>
-      <div className="info-row" title="Mean wind at 125 m (the hub height), from the federal wind atlas, and the year's output it gives">
-        <span>Wind · output</span>
-        <span className="info-value">
-          {meanWind.toFixed(1)} m/s · {gwh.toFixed(1)} GWh a year
-        </span>
-      </div>
-      <div className="info-row" title={`Homes within ${WIND_LOCAL_RADIUS_M / 1000} km of a turbine: they mind most`}>
-        <span>Homes within {WIND_LOCAL_RADIUS_M / 1000} km</span>
-        <span className="info-value">{homes.near}</span>
-      </div>
+      </CardKind>
+      <Facts
+        facts={[
+          { label: "Turbines", value: `${n} × ${(TURBINE_KW / 1000).toFixed(1)} MW` },
+          {
+            label: "Wind · output",
+            value: (
+              <>
+                {meanWind.toFixed(1)} m/s<span className="bp-sub"> · {gwh.toFixed(1)} GWh a year</span>
+              </>
+            ),
+            title: "Mean wind at 125 m (the hub height), from the federal wind atlas, and the year's output it gives",
+          },
+          { label: `Homes within ${WIND_LOCAL_RADIUS_M / 1000} km`, value: homes.near, title: `Homes within ${WIND_LOCAL_RADIUS_M / 1000} km of a turbine: they mind most` },
+        ]}
+      />
 
+      {actions && <h3 className="section-heading">What could change here</h3>}
       {(phase === "found" || canRestart) && (
         <>
           {site.turbines.length > 1 && (
@@ -99,11 +102,7 @@ function SiteCard({ site, now }: { site: WindSite; now: number }) {
           </div>
         </>
       )}
-      {phase === "zoning" &&
-        (() => {
-          const vote = p?.voteKey ? approval.getVoteInfo(p.voteKey, null, now) : null;
-          return vote ? <p className="dh-note">Public vote {monthYear(vote.atMs)} · poll {votePct(vote.pollYes)}% yes</p> : null;
-        })()}
+      {phase === "zoning" && <p className="dh-note">{vote ? `Public vote ${monthYear(vote.atMs)} · poll ${votePct(vote.pollYes)}% yes.` : "The zoning plan is on its way."}</p>}
       {phase === "zoned" && (
         <div className="dh-actions">
           <button className="dh-order" onClick={() => wind.applyForPermit(site.id, simClock.getSimTimeMs())}>
@@ -125,14 +124,13 @@ function SiteCard({ site, now }: { site: WindSite; now: number }) {
         <p className="dh-note">Can be taken up again from {monthYear(p.phaseFromMs + 4 * 365.25 * 24 * 3_600_000)}.</p>
       )}
       {p && p.log.length > 0 && (
-        <details className="wind-log">
-          <summary className="dh-note">History</summary>
+        <Folded summary={`What happened here (${p.log.length})`}>
           {p.log.map((l, i) => (
             <div className="dh-note" key={i}>
               {monthYear(l.atMs)}: {l.text}
             </div>
           ))}
-        </details>
+        </Folded>
       )}
     </div>
   );

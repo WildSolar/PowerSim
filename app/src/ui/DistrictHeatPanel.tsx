@@ -21,6 +21,7 @@ import "./districtHeatPanel.css";
 import { InspectCard } from "./InspectCard";
 import { ToolPanel } from "./ToolPanel";
 import { PlotLink } from "./PlotLink";
+import { CardKind, Facts } from "./CardParts";
 
 function percent(part: number, share: CoverageShare): string {
   return share.total > 0 ? `${Math.round((part / share.total) * 100)}%` : "–";
@@ -95,66 +96,66 @@ function formatMWh(kWh: number): string {
   return kWh >= 10_000_000 ? `${Math.round(kWh / 1_000_000)} GWh` : kWh >= 1_000_000 ? `${(kWh / 1_000_000).toFixed(1)} GWh` : `${Math.round(kWh / 1000).toLocaleString("de-CH")} MWh`;
 }
 
-/** One network: what feeds it, against its winter peak — how much room the clean sources leave
- * before the boilers start, and if they don't carry it all, the boilers' share at the peak and over
- * a year. */
+/** One network's card: how many buildings it serves and its winter peak in a line, then what feeds
+ * it — each clean source, the boilers for the rest — and how far the clean sources carry the peak, and
+ * the boilers' heat over a year. */
 function NetworkCard({ network, peakW, connected, year }: { network: DhNetworkInfo; peakW: number; connected: number; year: { heatKWh: number; boilerKWh: number } | null }) {
   const clean = network.sources.filter((s) => s.kind && s.cleanW > 0);
   const cleanW = clean.reduce((sum, s) => sum + s.cleanW, 0);
   const cover = peakW > 0 ? Math.min(1, cleanW / peakW) : 1;
   const spareW = cleanW - peakW;
+  if (network.id < 0) {
+    return (
+      <>
+        <CardKind>No pipes reach it yet: extend the network to it, or from it.</CardKind>
+        <Facts facts={clean.map((s) => ({ label: s.label, value: formatMW(s.cleanW), title: s.existing ? "There when the game started" : `In service since ${monthYear(s.fromMs)}` }))} />
+      </>
+    );
+  }
   return (
-    <div>
-      <div className="dh-note">
-        {network.id < 0 ? "No pipes reach it yet: extend the network to it, or from it." : `${connected} building${connected === 1 ? "" : "s"} connected · winter peak ${formatMW(peakW)}`}
-      </div>
-      {clean.map((s) => (
-        <div className="info-row" key={s.id} title={s.existing ? "There when the game started" : `In service since ${monthYear(s.fromMs)}`}>
-          <span>
-            {s.label}
-            {s.name !== network.name && <span className="dh-dim"> · {s.name}</span>}
-          </span>
-          <span className="info-value">{formatMW(s.cleanW)}</span>
-        </div>
-      ))}
-      {network.id >= 0 && (
-        <>
-          <div className="info-row">
-            <span>{network.fossil === "gas" ? "Gas" : "Oil"} boilers</span>
-            <span className="info-value">for the rest</span>
-          </div>
-          <div className="info-row dh-total" title="The clean sources together, against the winter peak of the buildings connected now">
-            <span>Clean capacity</span>
-            <span className="info-value">
-              {formatMW(cleanW)}
-              {peakW > 0 && ` · ${Math.round((cleanW / peakW) * 100)}% of the peak`}
-            </span>
-          </div>
-          <div className="info-row" title={spareW >= 0 ? "How much more peak load the clean sources can take before the boilers start on the coldest days" : "How much of the winter peak the boilers have to make"}>
-            <span>{spareW >= 0 ? "Room before the boilers start" : "Boilers at the winter peak"}</span>
-            <span className="info-value">{spareW >= 0 ? formatMW(spareW) : `${formatMW(-spareW)} (${Math.round((1 - cover) * 100)}%)`}</span>
-          </div>
-          {year && year.boilerKWh > 0 && (
-            <div className="info-row" title="Projected over the coming year: on each day, the heat the connected buildings need above what the clean sources carry">
-              <span>Boiler heat a year (projected)</span>
-              <span className="info-value">
-                {formatMWh(year.boilerKWh)} · {Math.round((year.boilerKWh / Math.max(1, year.heatKWh)) * 100)}%
-              </span>
-            </div>
-          )}
-          <div className="dh-bar" title="How much of the winter peak the clean sources can carry; the boilers make the rest">
-            <div className="dh-bar-fill" style={{ width: `${cover * 100}%` }} />
-          </div>
-        </>
-      )}
-      <div className="dh-note" hidden={network.id < 0}>
-        {cleanW === 0
-          ? "All of its heat comes from the boilers."
-          : cover >= 1
-            ? "The clean sources carry the whole winter peak; the boilers only stand by."
-            : `The clean sources carry ${Math.round(cover * 100)}% of the winter peak; the boilers make the rest on cold days.`}
-      </div>
-    </div>
+    <>
+      <CardKind>
+        {connected} building{connected === 1 ? "" : "s"} connected · winter peak {formatMW(peakW)}
+      </CardKind>
+      <Facts
+        facts={[
+          ...clean.map((s) => ({
+            label: s.label,
+            value: (
+              <>
+                {formatMW(s.cleanW)}
+                {s.name !== network.name && <span className="bp-sub"> · {s.name}</span>}
+              </>
+            ),
+            title: s.existing ? "There when the game started" : `In service since ${monthYear(s.fromMs)}`,
+          })),
+          { label: `${network.fossil === "gas" ? "Gas" : "Oil"} boilers`, value: cleanW >= peakW && peakW > 0 ? "stand by" : "for the rest" },
+          {
+            label: "Clean share of the peak",
+            value: (
+              <>
+                {Math.round(cover * 100)}%<span className="bp-sub"> · {formatMW(cleanW)} clean</span>
+                <div className="dh-bar">
+                  <div className="dh-bar-fill" style={{ width: `${cover * 100}%` }} />
+                </div>
+              </>
+            ),
+            title: "How much of the winter peak of the buildings connected now the clean sources can carry; the boilers make the rest",
+          },
+          {
+            label: spareW >= 0 ? "Room before the boilers" : "Boilers at the peak",
+            value: spareW >= 0 ? formatMW(spareW) : `${formatMW(-spareW)} (${Math.round((1 - cover) * 100)}%)`,
+            title: spareW >= 0 ? "How much more peak load the clean sources can take before the boilers start on the coldest days" : "How much of the winter peak the boilers have to make",
+          },
+          year &&
+            year.boilerKWh > 0 && {
+              label: "Boiler heat a year",
+              value: `${formatMWh(year.boilerKWh)} · ${Math.round((year.boilerKWh / Math.max(1, year.heatKWh)) * 100)}%`,
+              title: "Projected over the coming year: on each day, the heat the connected buildings need above what the clean sources carry",
+            },
+        ]}
+      />
+    </>
   );
 }
 

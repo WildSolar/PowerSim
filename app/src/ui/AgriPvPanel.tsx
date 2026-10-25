@@ -4,6 +4,7 @@ import { FARM_PLOT_COLORS } from "../map/colorModes";
 import { AGRI_PV_BUILD_MONTHS, AGRI_PV_LEAD_MONTHS, AGRI_PV_PERMIT_MONTHS, AGRI_PV_SYSTEMS, type AgriPvSystem } from "../config/agriPv";
 import { agriPvKindYear } from "../sim/agriPvProfile";
 import { AgriPvDayChart } from "./AgriPvDayChart";
+import { CardKind, CardSection, Facts, Folded } from "./CardParts";
 import { ReactionBadge } from "./ReactionBadge";
 import { mapFocus } from "../map/mapFocus";
 import { AGRI_PV_DEVELOPER_LABEL, AGRI_PV_PHASE_LABEL, agriPv, stopped, partnerName, type AgriPvDesignation, type AgriPvDeveloper, type AgriPvProject } from "../sim/agriPv";
@@ -91,34 +92,22 @@ export function AgriPvFieldCard() {
 
   return (
     <InspectCard kicker="Agri-PV field" title={plot.name ?? "Field"} onClose={() => agriPv.select(null)}>
-      <div className="dh-note">
+      <CardKind>
         {live
-          ? `${AGRI_PV_PHASE_LABEL[live.phase]}${live.phaseUntilMs ? ` · until ${monthYear(live.phaseUntilMs)}` : ""}`
+          ? `${AGRI_PV_PHASE_LABEL[live.phase]}${live.phaseUntilMs ? ` until ${monthYear(live.phaseUntilMs)}` : ""}`
           : state === "zoned"
             ? "Zoned for Agri-PV"
             : state === "refused"
-              ? "Zoned for Agri-PV — the farmer said no"
-            : state === "planned"
-              ? "Agri-PV zone on its way"
-              : "Farmland"}
-      </div>
-      <div className="info-row">
-        <span>Area</span>
-        <span className="info-value">
-          {hectares(plot.areaM2)}
-          {plot.primeShare >= 0.5 ? " · prime cropland" : ""}
-        </span>
-      </div>
-      {live ? (
-        <div className="info-row" title="The kind of installation, and its size over the whole field">
-          <span>Installation</span>
-          <span className="info-value">
-            {AGRI_PV_SYSTEMS[live.system].label} · {mw(live.capacityKw)}
-          </span>
-        </div>
-      ) : (
+              ? "Zoned — the farmer said no"
+              : state === "planned"
+                ? "Agri-PV zone on its way"
+                : "Farmland"}{" "}
+        · {hectares(plot.areaM2)}
+        {plot.primeShare >= 0.5 ? " · prime cropland" : ""}
+      </CardKind>
+
+      {!live && (
         <>
-          <h4 className="dh-subtitle">{systems.length > 1 ? "The kinds it takes" : "What it takes"}</h4>
           <div className="ev-filters" role="group" aria-label="Kind of installation">
             {systems.map((s) => (
               <button key={s} className={`ev-filter${s === system ? " on" : ""}`} aria-pressed={s === system} onClick={() => setChoice({ plotId: id, system: s })}>
@@ -130,106 +119,121 @@ export function AgriPvFieldCard() {
             {AGRI_PV_SYSTEMS[system].blurb}
             {plot.primeShare >= 0.5 ? " On cropland, only rows the machines can work between." : ""}
           </p>
-          <div className="info-row" title="Its size over the whole field">
-            <span>Size</span>
-            <span className="info-value">{mw(e.capacityKw)}</span>
-          </div>
         </>
       )}
-      <div className="info-row">
-        <span>Output</span>
-        <span className="info-value">{(e.yearlyKWh / 1e6).toFixed(1)} GWh a year</span>
-      </div>
-      <div className="info-row" title="The share of its year's power made from November to February, when the grid's power is dirtiest and dearest">
-        <span>In winter (Nov–Feb)</span>
-        <span className="info-value">{Math.round(kind.winterShare * 100)}%</span>
-      </div>
-      <div
-        className="info-row"
-        title="What the market pays at the hours it makes its power, against the month's average hour: power in the morning and the evening is worth more than at a sunny noon, when every roof makes it. It counts for the utility's own fields; feed-in pays the same whatever the hour."
-      >
-        <span>Its hours on the market</span>
-        <span className="info-value">{signedPercent(kind.valueFactor - 1)} on the average hour</span>
-      </div>
-      <div className="info-row" title="The grid's power it replaces, at the hours it makes its own: dirtier on winter mornings and evenings, cleaner at a sunny noon">
-        <span>CO₂ it saves</span>
-        <span className="info-value">
-          {Math.round((e.yearlyKWh * kind.co2GPerKWh) / 1e6)} t a year · {Math.round(kind.co2GPerKWh)} g/kWh
-        </span>
-      </div>
-      <AgriPvDayChart kind={kind} label={AGRI_PV_SYSTEMS[system].label} year={year} top={Math.max(...Object.values(kinds).flatMap((k) => k.summerDay))} />
-      {live && (
-        <div className="info-row">
-          <span>Developer</span>
-          <span className="info-value">
-            {AGRI_PV_DEVELOPER_LABEL[live.developer]}
-            {live.partnerEgid ? ` · ${partnerName(live.partnerEgid, buildings)}` : ""}
-          </span>
-        </div>
-      )}
-      {live?.developer === "business" && (
-        <p className="dh-note">The business takes {Math.round(live.ppaShare * 100)}% of the power as it comes; the utility buys the rest at the feed-in price.</p>
-      )}
-      {live?.developer === "cooperative" && <p className="dh-note">The cooperative sells all the power to the utility at the feed-in price.</p>}
-      {live?.developer === "municipality" && <p className="dh-note">The utility&apos;s own: it pays no feed-in for the power, and buys that much less.</p>}
+      <Facts
+        facts={[
+          live
+            ? { label: "Installation", value: `${AGRI_PV_SYSTEMS[live.system].label} · ${mw(live.capacityKw)}`, title: "The kind of installation, and its size over the whole field" }
+            : { label: "Size", value: mw(e.capacityKw), title: "Its size over the whole field, of this kind" },
+          live && {
+            label: "Developer",
+            value: (
+              <>
+                {AGRI_PV_DEVELOPER_LABEL[live.developer]}
+                {live.partnerEgid ? ` · ${partnerName(live.partnerEgid, buildings)}` : ""}
+                <span className="bp-sub">
+                  {" "}
+                  ·{" "}
+                  {live.developer === "business"
+                    ? `takes ${Math.round(live.ppaShare * 100)}% of the power as it comes; the utility buys the rest at the feed-in price`
+                    : live.developer === "cooperative"
+                      ? "sells all the power to the utility at the feed-in price"
+                      : "the utility's own: no feed-in paid, that much less power bought"}
+                </span>
+              </>
+            ),
+          },
+          {
+            label: "Output",
+            value: (
+              <>
+                {(e.yearlyKWh / 1e6).toFixed(1)} GWh a year<span className="bp-sub"> · {Math.round(kind.winterShare * 100)}% in winter</span>
+              </>
+            ),
+            title: "A year's output, and the share of it made from November to February, when the grid's power is dirtiest and dearest",
+          },
+          {
+            label: "Its hours on the market",
+            value: `${signedPercent(kind.valueFactor - 1)} on the average hour`,
+            title:
+              "What the market pays at the hours it makes its power, against the month's average hour: power in the morning and the evening is worth more than at a sunny noon, when every roof makes it. It counts for the utility's own fields; feed-in pays the same whatever the hour.",
+          },
+          {
+            label: "CO₂ it saves",
+            value: (
+              <>
+                {Math.round((e.yearlyKWh * kind.co2GPerKWh) / 1e6)} t a year<span className="bp-sub"> · {Math.round(kind.co2GPerKWh)} g/kWh</span>
+              </>
+            ),
+            title: "The grid's power it replaces, at the hours it makes its own: dirtier on winter mornings and evenings, cleaner at a sunny noon",
+          },
+        ]}
+      />
+      <CardSection title="Its day">
+        <AgriPvDayChart kind={kind} label={AGRI_PV_SYSTEMS[system].label} year={year} top={Math.max(...Object.values(kinds).flatMap((k) => k.summerDay))} />
+      </CardSection>
 
-      {state === "refused" && answer && (
-        <p className="dh-note">
-          Asked in {monthYear(answer.atMs)}, the farmer didn&apos;t want panels over the field. They may be asked again from {monthYear(askAgain ?? now)} — farmers come round as
-          acceptance grows.
-        </p>
-      )}
-      {free && (
-        <>
-          <h4 className="dh-subtitle">Develop it yourself</h4>
-          <div className="info-row" title="Whoever farms the field has the last word: no one knows beforehand whether they'd have panels over it">
-            <span>The farmer</span>
-            <span className="info-value">{answer?.yes ? `Agreed (${monthYear(answer.atMs)})` : "Not asked yet"}</span>
-          </div>
-          <div className="info-row">
-            <span>Panels</span>
-            <span className="info-value">{formatCHF(e.buildCostRp)}</span>
-          </div>
-          <div
-            className="info-row"
-            title={answer?.yes ? "Paid by the utility each year: the upkeep, and the rent the farmer asks for the land under the panels" : "Paid by the utility each year: the upkeep, and a typical rent for the land — the farmer names their own once asked"}
-          >
-            <span>Upkeep and rent{answer?.yes ? "" : " (typical)"}</span>
-            <span className="info-value">{formatCHF(e.upkeepRpPerYear + e.rentRpPerYear)} a year</span>
-          </div>
-          <div className="info-row" title="The power the utility needn't buy, at today's wholesale price and the hours it comes">
-            <span>Power, at today&apos;s market price</span>
-            <span className="info-value">{formatCHF(e.yearlyKWh * wholesale * kind.valueFactor)} a year</span>
-          </div>
-          <p className="dh-note">
-            Businesses and energy cooperatives may take this field up on their own. To develop it yourself, ask the farmer first — a no stands for a few years — then apply for
-            the permit ({AGRI_PV_PERMIT_MONTHS} months; sometimes refused, often appealed); the panels are paid when you order them, in service {AGRI_PV_BUILD_MONTHS} months on.
-          </p>
-          <div className="dh-actions">
-            {answer?.yes ? (
-              <button className="dh-order" onClick={() => agriPv.applyForPermit(id, system, simClock.getSimTimeMs())}>
-                Apply for the permit: {AGRI_PV_SYSTEMS[system].label.toLowerCase()} — {formatCHF(agriPv.permitCostRp(id))}
+      {(state === "refused" || free || (live?.developer === "municipality" && live.phase === "permitted") || (restingUntil !== null && restingUntil > now)) && (
+        <CardSection title="What could change here">
+          {state === "refused" && answer && (
+            <p className="dh-note">
+              Asked in {monthYear(answer.atMs)}, the farmer didn&apos;t want panels over the field. They may be asked again from {monthYear(askAgain ?? now)} — farmers come round as
+              acceptance grows.
+            </p>
+          )}
+          {free && (
+            <>
+              <Facts
+                facts={[
+                  {
+                    label: "The farmer",
+                    value: answer?.yes ? `Agreed (${monthYear(answer.atMs)})` : "Not asked yet",
+                    title: "Whoever farms the field has the last word: no one knows beforehand whether they'd have panels over it",
+                  },
+                  { label: "Panels", value: formatCHF(e.buildCostRp) },
+                  {
+                    label: `Upkeep and rent${answer?.yes ? "" : " (typical)"}`,
+                    value: `${formatCHF(e.upkeepRpPerYear + e.rentRpPerYear)} a year`,
+                    title: answer?.yes
+                      ? "Paid by the utility each year: the upkeep, and the rent the farmer asks for the land under the panels"
+                      : "Paid by the utility each year: the upkeep, and a typical rent for the land — the farmer names their own once asked",
+                  },
+                  { label: "Its power, at today's price", value: `${formatCHF(e.yearlyKWh * wholesale * kind.valueFactor)} a year`, title: "The power the utility needn't buy, at today's wholesale price and the hours it comes" },
+                ]}
+              />
+              <Folded summary="How developing it works">
+                <p className="dh-note">
+                  Businesses and energy cooperatives may take this field up on their own. To develop it yourself, ask the farmer first — a no stands for a few years — then apply for
+                  the permit ({AGRI_PV_PERMIT_MONTHS} months; sometimes refused, often appealed); the panels are paid when you order them, in service {AGRI_PV_BUILD_MONTHS} months on.
+                </p>
+              </Folded>
+              <div className="dh-actions">
+                {answer?.yes ? (
+                  <button className="dh-order" onClick={() => agriPv.applyForPermit(id, system, simClock.getSimTimeMs())}>
+                    Apply for the permit: {AGRI_PV_SYSTEMS[system].label.toLowerCase()} — {formatCHF(agriPv.permitCostRp(id))}
+                  </button>
+                ) : (
+                  <button className="dh-order" onClick={() => agriPv.askFarmer(id, simClock.getSimTimeMs())}>
+                    Ask the farmer
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+          {live?.developer === "municipality" && live.phase === "permitted" && (
+            <div className="dh-actions">
+              <button className="dh-order" onClick={() => agriPv.build(id, simClock.getSimTimeMs())}>
+                Build for {formatCHF(e.buildCostRp)}
               </button>
-            ) : (
-              <button className="dh-order" onClick={() => agriPv.askFarmer(id, simClock.getSimTimeMs())}>
-                Ask the farmer
-              </button>
-            )}
-          </div>
-        </>
+            </div>
+          )}
+          {restingUntil !== null && restingUntil > now && <p className="dh-note">Struck down in court; can be taken up again from {monthYear(restingUntil)}.</p>}
+        </CardSection>
       )}
-      {live?.developer === "municipality" && live.phase === "permitted" && (
-        <div className="dh-actions">
-          <button className="dh-order" onClick={() => agriPv.build(id, simClock.getSimTimeMs())}>
-            Build for {formatCHF(e.buildCostRp)}
-          </button>
-        </div>
-      )}
-      {restingUntil !== null && restingUntil > now && <p className="dh-note">Struck down in court; can be taken up again from {monthYear(restingUntil)}.</p>}
 
       {project && project.log.length > 0 && (
-        <details className="wind-log">
-          <summary className="dh-note">History</summary>
+        <Folded summary="What happened here">
           {agriPv
             .getProjects()
             .filter((p) => p.plotId === id)
@@ -239,7 +243,7 @@ export function AgriPvFieldCard() {
                 {monthYear(l.atMs)}: {l.text}
               </div>
             ))}
-        </details>
+        </Folded>
       )}
     </InspectCard>
   );

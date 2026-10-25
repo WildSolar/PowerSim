@@ -15,6 +15,7 @@ import "./districtHeatPanel.css";
 import { InspectCard } from "./InspectCard";
 import { PlotLink } from "./PlotLink";
 import { ToolPanel } from "./ToolPanel";
+import { CardKind, CardSection, Facts } from "./CardParts";
 
 function monthYear(ms: number): string {
   return formatDate(ms).replace(/^\d+ /, "");
@@ -63,56 +64,38 @@ export function CarParkCard() {
   const subsidyPerKwp = policyStore.get().carParkSolarSubsidyRpPerKwp;
   return (
     <InspectCard kicker={lot.owner === "municipal" ? "The town's car park" : "Private car park"} title={lotName(lot)} onClose={() => carParks.select(null)}>
-      <div className="info-row">
-        <span>Size</span>
-        <span className="info-value">
-          {lot.spaces} spaces · {Math.round(lot.areaM2).toLocaleString("de-CH")} m²
-        </span>
-      </div>
-      {host && (
-        <div className="info-row" title="The building the car park goes with: it would take part of the canopy's power">
-          <span>Goes with</span>
-          <span className="info-value">{host.address ?? host.egid}</span>
-        </div>
-      )}
-      <div className="info-row" title="Panels over the parking spaces (not the aisles), facing as the canopy is laid out">
-        <span>{canopy ? "Canopy" : "A canopy"}</span>
-        <span className="info-value">
-          {Math.round(lot.canopyKw)} kWp · {(o.kWh / 1000).toFixed(0)} MWh a year
-        </span>
-      </div>
-      {canopy ? (
-        <>
-          <div className="info-row">
-            <span>{canopy.installedAtMs <= now ? "Generating since" : "Generating from"}</span>
-            <span className="info-value">{monthYear(canopy.installedAtMs)}</span>
-          </div>
-          <p className="dh-note">
-            {canopy.owner === "municipal"
-              ? canopy.mandated
-                ? "Built under the solar duty, paid by the treasury."
-                : "Built by the municipality."
-              : canopy.mandated
-                ? `Built by its owner under the solar duty${canopy.subsidyRp > 0 ? `, with ${formatCHF(canopy.subsidyRp)} of municipal subsidy` : ""}.`
-                : `Built by its owner${canopy.subsidyRp > 0 ? `, with ${formatCHF(canopy.subsidyRp)} of municipal subsidy` : ""}.`}
-          </p>
-        </>
-      ) : (
-        <>
-          <div className="info-row" title="The build cost, less the federal one-off payment every installation gets">
-            <span>Cost</span>
-            <span className="info-value">{formatCHF(q.netRp)}</span>
-          </div>
-          <div className="info-row" title="What its building would no longer buy, and the rest at the feed-in price, less the upkeep">
-            <span>Worth a year</span>
-            <span className="info-value">{formatCHF(o.valueRp - o.upkeepRp)}</span>
-          </div>
-          {due !== null && (
-            <div className="info-row" title="The solar duty: this car park must have its canopy by then">
-              <span>Due under the duty</span>
-              <span className="info-value">{monthYear(due)}</span>
-            </div>
-          )}
+      <CardKind>
+        {lot.spaces} spaces · {Math.round(lot.areaM2).toLocaleString("de-CH")} m²
+        {host && !lotName(lot).includes(host.address ?? host.egid) ? ` · goes with ${host.address ?? host.egid}` : ""}
+      </CardKind>
+      <Facts
+        facts={[
+          {
+            label: canopy ? "Canopy" : "A canopy",
+            value: (
+              <>
+                {Math.round(lot.canopyKw)} kWp<span className="bp-sub"> · {(o.kWh / 1000).toFixed(0)} MWh a year</span>
+              </>
+            ),
+            title: "Panels over the parking spaces (not the aisles), facing as the canopy is laid out",
+          },
+          canopy && { label: canopy.installedAtMs <= now ? "Generating since" : "Generating from", value: monthYear(canopy.installedAtMs) },
+          canopy && {
+            label: "Built by",
+            value:
+              canopy.owner === "municipal"
+                ? canopy.mandated
+                  ? "the municipality, under the solar duty"
+                  : "the municipality"
+                : `its owner${canopy.mandated ? ", under the solar duty" : ""}${canopy.subsidyRp > 0 ? `, with ${formatCHF(canopy.subsidyRp)} of your subsidy` : ""}`,
+          },
+          !canopy && { label: "Cost", value: formatCHF(q.netRp), title: "The build cost, less the federal one-off payment every installation gets" },
+          !canopy && { label: "Worth a year", value: formatCHF(o.valueRp - o.upkeepRp), title: host ? "What the building next door would no longer buy, and the rest at the feed-in price, less the upkeep" : "What it earns feeding in, less the upkeep" },
+          !canopy && due !== null && { label: "Due under the duty", value: monthYear(due), title: "The solar duty: this car park must have its canopy by then" },
+        ]}
+      />
+      {!canopy && (
+        <CardSection title="What could change here">
           {lot.owner === "municipal" && carParks.gridFull(lot, now) ? (
             <p className="dh-note grid-full">{GRID_FULL_FOR_SOLAR}</p>
           ) : lot.owner === "municipal" ? (
@@ -132,7 +115,7 @@ export function CarParkCard() {
               {subsidyPerKwp > 0 ? ` Your subsidy would pay ${formatCHF(subsidyPerKwp * lot.canopyKw)} of it.` : " A subsidy or a solar duty can tip it."}
             </p>
           )}
-        </>
+        </CardSection>
       )}
     </InspectCard>
   );

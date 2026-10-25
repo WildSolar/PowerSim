@@ -1,4 +1,5 @@
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { CardKind, CardSection, Facts, NowLine } from "./CardParts";
 import { BUILD_SPEC, MAX_FILL, QOS_CURVE, QOS_FLOOR, type ChargingKind, type QosKind } from "../config/charging";
 import { COVERAGE_COLOR } from "../map/colorModes";
 import { formatDate, toDateMs, toSimTimeMs } from "../sim/calendar";
@@ -35,7 +36,7 @@ const YEAR_MS = 365.25 * 24 * 60 * 60_000;
 const QUARTER_HOUR_MS = 15 * 60_000;
 const HISTORY_YEARS = 8;
 
-const KIND_LABEL: Record<ChargingKind, string> = { ac: "On-street", dc: "Fast charging", fleet: "Lorries and vans only" };
+const SITE_KIND_NAME: Record<ChargingKind, string> = { ac: "On-street charger", dc: "Fast-charging hub", fleet: "Lorry charging park" };
 /** "200 m", "1 km", "1.5 km". */
 function distanceLabel(m: number): string {
   return m >= 1000 ? `${Number((m / 1000).toFixed(1))} km` : `${m} m`;
@@ -183,175 +184,143 @@ export function ChargerCard() {
   const site = selectedId ? publicCharging.getSite(selectedId) : undefined;
   if (!site) return null;
   return (
-    <InspectCard kicker={site.shop ? "Charger in a shop's car park" : `${KIND_LABEL[site.kind]} charger`} title={site.name} onClose={() => publicCharging.select(null)}>
+    <InspectCard kicker={site.shop ? "Charger in a shop's car park" : SITE_KIND_NAME[site.kind]} title={site.name} onClose={() => publicCharging.select(null)}>
       <SiteDetails site={site} now={now} />
     </InspectCard>
   );
 }
 
-const WINDOW_LABEL = { night: "At night", solar: "In solar hours" } as const;
+const WINDOW_LABEL = { night: "at night", solar: "in solar hours" } as const;
 
-/** A site's price — at the municipality's own, by window once they differ, with the share of its
- * energy in each. */
-function PriceRows({ site, now }: { site: ChargingSite; now: number }) {
-  if (site.owner !== "municipal") {
-    return (
-      <div className="info-row">
-        <span>Price</span>
-        <span className="info-value">{sitePriceRpPerKWh(site, now)} Rp/kWh</span>
-      </div>
-    );
-  }
+/** A site's price, as a fact: one price — or, at the municipality's own once the windows differ, each
+ * window's with the share of its energy sold at it (and why a window sells nothing, where that isn't
+ * plain). */
+function priceFact(site: ChargingSite, now: number): ReactNode {
+  if (site.owner !== "municipal") return `${sitePriceRpPerKWh(site, now)} Rp/kWh`;
   const { prices, shares, solarDays } = sitePriceWindows(site, now);
-  if (prices.night === prices.standard && prices.solar === prices.standard) {
-    return (
-      <div className="info-row" title="Set in the tariff, under Prices. A cheaper price at night or in the town's solar hours moves charging there.">
-        <span>Price</span>
-        <span className="info-value">{prices.standard} Rp/kWh</span>
-      </div>
-    );
-  }
-  const sheet = tariffStore.sheetFor(new Date(toDateMs(now)).getUTCFullYear());
-  const hours = { night: `${sheet.offPeakStartHour}:00–${sheet.offPeakEndHour}:00`, solar: "when the town's own solar makes more than it uses" };
-  // Why a window sells nothing, where that isn't plain.
+  if (prices.night === prices.standard && prices.solar === prices.standard) return `${prices.standard} Rp/kWh`;
   const street = site.kind === "ac" && !site.shop;
   const why: Record<"night" | "solar", string | null> = {
-    night: site.shop ? "The shop is closed at night." : prices.night > prices.standard ? "Dearer than by day, so nobody charges then." : null,
+    night: site.shop ? "the shop is closed at night" : prices.night > prices.standard ? "dearer than by day" : null,
     solar:
       solarDays === 0
-        ? "No solar hours this year yet: on no day are your town's own solar and wind forecast to make more than it uses."
+        ? "no solar hours this year yet"
         : street && prices.solar > Math.min(prices.standard, prices.night)
-          ? "Cars here charge in the evening or overnight; only drivers at home by day would come in solar hours, and only if they were the cheapest."
+          ? "cars here charge in the evening or overnight"
           : null,
   };
   return (
     <>
-      <div className="info-row" title="Set in the tariff, under Prices: the price outside the night and solar hours, and the share of this charger's energy sold at it">
-        <span>Price by day</span>
-        <span className="info-value">
-          {prices.standard} Rp/kWh · {percent(shares.standard, 1)} of its energy
-        </span>
+      <div>
+        {prices.standard} Rp/kWh by day<span className="bp-sub"> · {percent(shares.standard, 1)} of its energy</span>
       </div>
       {(["night", "solar"] as const)
         .filter((w) => prices[w] !== prices.standard)
         .map((w) => (
           <div key={w}>
-            <div className="info-row" title={`${hours[w]} — and the share of this charger's energy sold at that price`}>
-              <span>{WINDOW_LABEL[w]}</span>
-              <span className="info-value">
-                {prices[w]} Rp/kWh · {percent(shares[w], 1)}
-              </span>
-            </div>
-            {shares[w] < 0.005 && why[w] && <p className="dh-note">{why[w]}</p>}
+            {prices[w]} Rp/kWh {WINDOW_LABEL[w]}
+            <span className="bp-sub">
+              {" "}
+              · {percent(shares[w], 1)}
+              {shares[w] < 0.005 && why[w] ? ` — ${why[w]}` : ""}
+            </span>
           </div>
         ))}
     </>
   );
 }
 
+/** A charger's card: what it is in a line, its facts (price, reach, who relies on it, how full, what it
+ * sells), who is plugged in this moment, how full it was year by year, and — the municipality's own —
+ * enlarging it. */
 function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
   const stats = publicCharging.stats(site, now);
   const building = now < site.openedAtMs;
   const pending = site.expansions.filter((e) => e.atMs > now);
   const planned = publicCharging.plannedPoints(site);
-  const owner = site.owner === "municipal" ? "The municipality" : site.id.startsWith("real-") ? "Private (in the federal register)" : "Private operator";
+  const owner = site.owner === "municipal" ? "run by the municipality" : site.id.startsWith("real-") ? "run privately" : "run by a private operator";
   const inUse = building ? { pluggedIn: 0, charging: 0 } : publicCharging.pointsInUseAt(site, now);
+  const sizes = site.owner === "municipal" ? sizesFor(site.kind).filter((s) => s.points > planned) : [];
 
   return (
     <>
-      <div className="info-row">
-        <span>Run by</span>
-        <span className="info-value">{owner}</span>
-      </div>
-      <div className="info-row">
-        <span>{KIND_LABEL[site.kind]}</span>
-        <span className="info-value">
-          {building ? site.points : stats.points} × {site.powerKw} kW
-        </span>
-      </div>
-      <PriceRows site={site} now={now} />
-      {site.kind !== "fleet" && (
-        <div
-          className="info-row"
-          title={`How much of a household's charging it can do at best: ${Math.round(QOS_CURVE[qosKindOf(site)].ceiling * 100)}%, less the further away along the streets, and less as it fills up. The blue lines on the map show how far it reaches.`}
-        >
-          <span>Reach</span>
-          <span className="info-value">{reachLabel(qosKindOf(site))}</span>
-        </div>
+      <CardKind>
+        {building ? site.points : stats.points} points × {site.powerKw} kW · {owner}
+        {building ? ` · opens ${formatDate(site.openedAtMs)}` : ""}
+      </CardKind>
+      <Facts
+        facts={[
+          { label: "Price", value: priceFact(site, now), title: site.owner === "municipal" ? "Set in the tariff, under Prices. A cheaper price at night or in the town's solar hours moves charging there." : undefined },
+          site.kind !== "fleet" && {
+            label: "Reach",
+            value: reachLabel(qosKindOf(site)),
+            title: `How much of a household's charging it can do at best: ${Math.round(QOS_CURVE[qosKindOf(site)].ceiling * 100)}%, less the further away along the streets, and less as it fills up. The blue lines on the map show how far it reaches.`,
+          },
+          !building && { label: "Relying on it", value: vehicleList(stats.vehicles), title: "Vehicles that do some or all of their charging here" },
+          !building && {
+            label: "How full",
+            value: (
+              <>
+                {percent(stats.users, stats.capacity)}
+                <UsageBar used={stats.users} capacity={stats.capacity} />
+              </>
+            ),
+            title: `How much of its room the vehicles relying on it take: one charging all its needs here takes more than one charging part of them here, a van about twice a car's, a lorry many times. The fuller it gets, the less use it is to anyone — a busy charger means hunting for a free spot — and past ${Math.round(MAX_FILL * 100)}% it takes nobody new.${site.owner === "municipal" && site.kind !== "ac" ? " Cheaper prices at night or in solar hours spread its use out of the busy hours and give it room for more." : ""}`,
+          },
+          !building && { label: "Busiest", value: busiestLabel(site) },
+          !building && {
+            label: "Sells",
+            value: (
+              <>
+                {Math.round(stats.kWhPerDay)} kWh a day
+                {stats.kWhLastYear >= 1000 && <span className="bp-sub"> · {formatMWh(stats.kWhLastYear)} in the last 12 months</span>}
+              </>
+            ),
+          },
+          !building &&
+            site.owner === "municipal" && {
+              label: "Earns",
+              value: (
+                <>
+                  {formatCHF(stats.revenueLastYearRp)} in the last 12 months<span className="bp-sub"> · upkeep {formatCHF(stats.upkeepPerYearRp)} a year</span>
+                </>
+              ),
+            },
+        ]}
+      />
+      {!building && (
+        <NowLine title="Vehicles at a charge point right now. Those relying on a charger don't charge there every day: on the street a car plugs in in the evening and stays until morning, at a hub it stops for about half an hour. So even a charger with no room left stands empty much of the day.">
+          {inUse.pluggedIn} of {stats.points} points in use{inUse.pluggedIn > 0 ? ` · ${inUse.charging} charging` : ""}
+        </NowLine>
       )}
-      {building ? (
-        <p className="dh-note">Being built — opens {formatDate(site.openedAtMs)}.</p>
-      ) : (
-        <>
-          <div className="info-row" title="Vehicles that do some or all of their charging here">
-            <span>Relying on it</span>
-            <span className="info-value">{vehicleList(stats.vehicles)}</span>
-          </div>
-          <div
-            className="info-row"
-            title={`How much of its room the vehicles relying on it take: one charging all its needs here takes more than one charging part of them here, a van about twice a car's, a lorry many times. The fuller it gets, the less use it is to anyone — a busy charger means hunting for a free spot — and past ${Math.round(MAX_FILL * 100)}% it takes nobody new.${site.owner === "municipal" && site.kind !== "ac" ? " Cheaper prices at night or in solar hours spread its use out of the busy hours and give it room for more." : ""}`}
-          >
-            <span>How full</span>
-            <span className="info-value">{percent(stats.users, stats.capacity)}</span>
-          </div>
-          <UsageBar used={stats.users} capacity={stats.capacity} />
-          <div
-            className="info-row"
-            style={{ marginTop: 6 }}
-            title="Vehicles at a charge point right now. Those relying on a charger don't charge there every day: on the street a car plugs in in the evening and stays until morning, at a hub it stops for about half an hour. So even a charger with no room left stands empty much of the day."
-          >
-            <span>Plugged in right now</span>
-            <span className="info-value">
-              {inUse.pluggedIn} of {stats.points} points{inUse.pluggedIn > 0 ? ` · ${inUse.charging} charging` : ""}
-            </span>
-          </div>
-          <div className="info-row">
-            <span>Busiest</span>
-            <span className="info-value">{busiestLabel(site)}</span>
-          </div>
-          <div className="info-row">
-            <span>Energy per day</span>
-            <span className="info-value">{Math.round(stats.kWhPerDay)} kWh</span>
-          </div>
-          <div className="info-row">
-            <span>Last 12 months</span>
-            <span className="info-value">{formatMWh(stats.kWhLastYear)}</span>
-          </div>
-          {site.owner === "municipal" && (
+
+      {!building && (
+        <CardSection title="How full, year by year">
+          <UsageHistory site={site} now={now} />
+        </CardSection>
+      )}
+
+      {(pending.length > 0 || sizes.length > 0) && (
+        <CardSection title="What could change here">
+          {pending.map((e) => (
+            <p className="dh-note" key={e.atMs}>
+              {site.owner === "municipal" ? "Adding" : "The operator is adding"} {e.points} points — ready {monthYear(e.atMs)}.
+            </p>
+          ))}
+          {sizes.length > 0 && (
             <>
-              <div className="info-row">
-                <span>Sales, last 12 months</span>
-                <span className="info-value">{formatCHF(stats.revenueLastYearRp)}</span>
-              </div>
-              <div className="info-row">
-                <span>Upkeep per year</span>
-                <span className="info-value">{formatCHF(stats.upkeepPerYearRp)}</span>
+              <p className="dh-note">Enlarge it — ready in some months:</p>
+              <div className="ev-sizes">
+                {sizes.map(({ points }) => (
+                  <button key={points} onClick={() => publicCharging.upgrade(site.id, points, simClock.getSimTimeMs())}>
+                    <span className="ev-build-name">To {points} points</span>
+                    <span className="ev-build-detail">{shortPriceTag(upgradeCostRp(site.kind, planned, points, now))}</span>
+                  </button>
+                ))}
               </div>
             </>
           )}
-          <h4 className="ev-history-title">How full, year by year</h4>
-          <UsageHistory site={site} now={now} />
-        </>
-      )}
-      {pending.map((e) => (
-        <p className="dh-note" key={e.atMs}>
-          {site.owner === "municipal" ? "Adding" : "The operator is adding"} {e.points} points — ready {monthYear(e.atMs)}.
-        </p>
-      ))}
-      {site.owner === "municipal" && sizesFor(site.kind).some((s) => s.points > planned) && (
-        <>
-          <h4 className="ev-history-title">Enlarge (ready in some months)</h4>
-          <div className="ev-sizes">
-            {sizesFor(site.kind)
-              .filter((size) => size.points > planned)
-              .map(({ points }) => (
-                <button key={points} onClick={() => publicCharging.upgrade(site.id, points, simClock.getSimTimeMs())}>
-                  <span className="ev-build-name">To {points} points</span>
-                  <span className="ev-build-detail">{shortPriceTag(upgradeCostRp(site.kind, planned, points, now))}</span>
-                </button>
-              ))}
-          </div>
-        </>
+        </CardSection>
       )}
     </>
   );

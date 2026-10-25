@@ -1,5 +1,6 @@
 import { BatteryCharging, Wrench } from "lucide-react";
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore, type ReactNode } from "react";
+import { CardKind, CardSection, Facts } from "./CardParts";
 import { BATTERY_MONTHS, GRID_BATTERY_SIZES, REINFORCE_MONTHS } from "../config/grid";
 import { GRID_LEGEND } from "../map/colorModes";
 import { mapFocus } from "../map/mapFocus";
@@ -72,30 +73,25 @@ export function StationCard() {
   );
 }
 
-/** A peak as read, and — with a battery in the area — what is left of it on the station. */
-function PeakRows({ label, title, measuredKw, onStationKw, batteryKw, capacityKw, top = false }: { label: string; title: string; measuredKw: number; onStationKw: number; batteryKw: number; capacityKw: number; top?: boolean }) {
+/** A peak as a fact: as read, its share of the station — and with a battery in the area, what is left
+ * of it on the station — over a bar against the station. */
+function peakValue(measuredKw: number, onStationKw: number, batteryKw: number, capacityKw: number): ReactNode {
   const share = Math.round((onStationKw / capacityKw) * 100);
   return (
     <>
-      <div className="info-row" title={title} style={top ? { marginTop: 6 } : undefined}>
-        <span>{label}</span>
-        <span className="info-value">
-          {Math.round(measuredKw)} kW{batteryKw > 0 ? "" : ` · ${share}%`}
-        </span>
-      </div>
-      {batteryKw > 0 && (
-        <div className="info-row" title={`The battery's ${batteryKw} kW take ${Math.round(measuredKw - onStationKw)} kW off this peak — as much as its storage lasts through it`}>
-          <span>…on the station, with the battery</span>
-          <span className="info-value">
-            {Math.round(onStationKw)} kW · {share}%
-          </span>
-        </div>
-      )}
+      {Math.round(measuredKw)} kW
+      <span className="bp-sub">
+        {batteryKw > 0 ? ` · ${Math.round(onStationKw)} kW on the station with the battery` : ""} · {share}% of the station
+      </span>
       <LoadBar kw={onStationKw} capacityKw={capacityKw} />
     </>
   );
 }
 
+const BUCKET_WORDS: Record<string, string> = { ok: "room to spare", tight: "getting tight", full: "nearly full", over: "overloaded" };
+
+/** A transformer area's card: its station and how loaded it is in a line, its two peaks against it,
+ * and what could change — a reinforcement or a neighbourhood battery, and those on their way. */
 function AreaDetails({ area, now }: { area: GridArea; now: number }) {
   const capacity = grid.capacityAt(area, now);
   const options = grid.reinforceOptions(area, now);
@@ -107,30 +103,9 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
   const feedInBlocked = feedInKw > capacity;
   return (
     <>
-      <div className="info-row">
-        <span>Station</span>
-        <span className="info-value">
-          {capacity} kVA{battery > 0 ? ` + ${battery} kW battery` : ""}
-        </span>
-      </div>
-      <PeakRows
-        label={`Winter peak draw${area.winter ? ` (${area.winter.year})` : ""}`}
-        title="The highest draw on the coldest evenings of the last winter (read on 1 March)"
-        measuredKw={area.winter?.peakKw ?? 0}
-        onStationKw={drawKw}
-        batteryKw={battery}
-        capacityKw={capacity}
-      />
-      <PeakRows
-        label={`Summer solar feed-in${area.summer ? ` (${area.summer.year})` : ""}`}
-        title="The highest feed-in from rooftop solar on the sunniest middays of the last summer (read on 1 September)"
-        measuredKw={area.summer?.exportKw ?? 0}
-        onStationKw={feedInKw}
-        batteryKw={battery}
-        capacityKw={capacity}
-        top
-      />
-      <p className="dh-note">Peaks are read twice a year; a reinforcement or a battery changes what they are measured against straight away, not the readings themselves.</p>
+      <CardKind>
+        {capacity} kVA station{battery > 0 ? ` + ${battery} kW battery` : ""} · {BUCKET_WORDS[grid.bucket(area, now)]}
+      </CardKind>
       {(drawBlocked || feedInBlocked) && (
         <p className="dh-warning">
           Overloaded:{" "}
@@ -142,49 +117,65 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
           can't connect here until it's reinforced or a battery takes the edge off.
         </p>
       )}
-      {pendingUpgrade.map((u) => (
-        <p className="dh-note" key={u.atMs}>
-          Reinforcing to {u.capacityKw} kVA — in service {monthYear(u.atMs)}
-          {u.auto ? " (ordered automatically)" : ""}.
-        </p>
-      ))}
-      {pendingBatteries.length > 0 && (
-        <p className="dh-note">
-          {pendingBatteries.length === 1 ? "1 battery" : `${pendingBatteries.length} batteries`} ({pendingBatteries.map(batterySize).join(", ")}) being installed — in service{" "}
-          {monthYear(pendingBatteries[pendingBatteries.length - 1].atMs)}.
-        </p>
-      )}
-      {options.length > 0 && (
-        <>
-          <div
-            className="dh-note"
-            style={{ marginTop: 6 }}
-            title="A new station replaces the old one, cables included: going straight to the size you need costs less than two steps"
-          >
-            Reinforce the station ({REINFORCE_MONTHS} months):
-          </div>
-          <div className="ev-sizes">
-            {options.map((o) => (
-              <button key={o.kw} onClick={() => grid.reinforce(area.id, simClock.getSimTimeMs(), o.kw)}>
-                <span className="ev-build-name">{o.kw} kVA</span>
-                <span className="ev-build-detail">{compactCHF(o.costRp)}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-      <div className="dh-note" style={{ marginTop: 6 }} title="A battery takes the top off the area's peaks — the winter evening draw and the summer midday feed-in alike: at most its power, and only as much as its storage lasts through the peak">
-        Add a neighbourhood battery ({BATTERY_MONTHS} months): <PlotLink chart="trade" title="Power bought, sold and shifted by batteries" />
-      </div>
-      <div className="ev-sizes">
-        {GRID_BATTERY_SIZES.map((size, i) => (
-          <button key={size.kw} title={formatCHF(gridBatteryCostRp(i, now))} onClick={() => grid.addBattery(area.id, simClock.getSimTimeMs(), i)}>
-            <span className="ev-build-name">{size.kwh >= 1000 ? `${size.kwh / 1000} MWh` : `${size.kwh} kWh`}</span>
-            <span className="ev-build-detail">{size.kw >= 1000 ? `${size.kw / 1000} MW` : `${size.kw} kW`}</span>
-            <span className="ev-build-detail">{compactCHF(gridBatteryCostRp(i, now))}</span>
-          </button>
+      <Facts
+        facts={[
+          {
+            label: `Winter peak${area.winter ? ` (${area.winter.year})` : ""}`,
+            value: peakValue(area.winter?.peakKw ?? 0, drawKw, battery, capacity),
+            title: "The highest draw on the coldest evenings of the last winter, read on 1 March. A reinforcement or a battery changes what it is measured against straight away, not the reading itself.",
+          },
+          {
+            label: `Summer feed-in${area.summer ? ` (${area.summer.year})` : ""}`,
+            value: peakValue(area.summer?.exportKw ?? 0, feedInKw, battery, capacity),
+            title: "The highest feed-in from rooftop solar on the sunniest middays of the last summer, read on 1 September. A reinforcement or a battery changes what it is measured against straight away, not the reading itself.",
+          },
+        ]}
+      />
+      <CardSection title="What could change here">
+        {pendingUpgrade.map((u) => (
+          <p className="dh-note" key={u.atMs}>
+            Reinforcing to {u.capacityKw} kVA — in service {monthYear(u.atMs)}
+            {u.auto ? " (ordered automatically)" : ""}.
+          </p>
         ))}
-      </div>
+        {pendingBatteries.length > 0 && (
+          <p className="dh-note">
+            {pendingBatteries.length === 1 ? "1 battery" : `${pendingBatteries.length} batteries`} ({pendingBatteries.map(batterySize).join(", ")}) being installed — in service{" "}
+            {monthYear(pendingBatteries[pendingBatteries.length - 1].atMs)}.
+          </p>
+        )}
+        {options.length > 0 && (
+          <>
+            <p className="dh-note" title="A new station replaces the old one, cables included: going straight to the size you need costs less than two steps">
+              Reinforce the station ({REINFORCE_MONTHS} months):
+            </p>
+            <div className="ev-sizes">
+              {options.map((o) => (
+                <button key={o.kw} onClick={() => grid.reinforce(area.id, simClock.getSimTimeMs(), o.kw)}>
+                  <span className="ev-build-name">{o.kw} kVA</span>
+                  <span className="ev-build-detail">{compactCHF(o.costRp)}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        <p
+          className="dh-note"
+          style={{ marginTop: 8 }}
+          title="A battery takes the top off the area's peaks — the winter evening draw and the summer midday feed-in alike: at most its power, and only as much as its storage lasts through the peak"
+        >
+          Add a neighbourhood battery ({BATTERY_MONTHS} months): <PlotLink chart="trade" title="Power bought, sold and shifted by batteries" />
+        </p>
+        <div className="ev-sizes">
+          {GRID_BATTERY_SIZES.map((size, i) => (
+            <button key={size.kw} title={formatCHF(gridBatteryCostRp(i, now))} onClick={() => grid.addBattery(area.id, simClock.getSimTimeMs(), i)}>
+              <span className="ev-build-name">{size.kwh >= 1000 ? `${size.kwh / 1000} MWh` : `${size.kwh} kWh`}</span>
+              <span className="ev-build-detail">{size.kw >= 1000 ? `${size.kw / 1000} MW` : `${size.kw} kW`}</span>
+              <span className="ev-build-detail">{compactCHF(gridBatteryCostRp(i, now))}</span>
+            </button>
+          ))}
+        </div>
+      </CardSection>
     </>
   );
 }
