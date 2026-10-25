@@ -227,3 +227,85 @@
   font-weight: 600;
   color: var(--ink);
 }
+
+/* The building card (BuildingPanel.tsx): what it is in a line, what it has as a list of facts, this
+ * moment in a line, and the rest in sections, the longer ones folded. */
+.bp-kind {
+  margin: -4px 0 8px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.bp-note {
+  margin: 0 0 6px;
+  font-size: 12px;
+}
+
+.panel dl.bp-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 5px;
+  margin: 10px 0 4px;
+  font-size: 12.5px;
+}
+
+.panel dl.bp-facts dt {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.panel dl.bp-facts dd {
+  margin: 0;
+}
+
+.bp-sub {
+  color: var(--ink-3);
+}
+
+.bp-now {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 10px 0 0;
+  padding: 6px 8px;
+  border-radius: var(--r-2);
+  background: var(--fill);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bp-now-label {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.bp-subheading {
+  margin: 10px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bp-more {
+  margin: 10px 0 0;
+}
+
+.bp-more > summary {
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.bp-more[open] > summary {
+  margin-bottom: 6px;
+}
+
+.bp-empty {
+  color: var(--ink-3);
+  font-size: 13px;
+}

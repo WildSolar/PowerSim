@@ -1,18 +1,17 @@
 import { roofOrientationLabel } from "../sim/pv";
-import { workChargingCars, workChargingPowerW } from "../sim/workCharging";
-import { useState } from "react";
+import { workChargingCars } from "../sim/workCharging";
+import { useMemo, useState } from "react";
 import { ENERGY_CLASS_CATALOG } from "../sim/energyClass";
 import { energyClassAt, retrofitLog } from "../sim/retrofit";
 import { buildingThermalProfile } from "../sim/spaceHeating";
 import { existsAt } from "../sim/lifetime";
 import { lifecycleNotes } from "./lifecycleNotes";
 import type { Building, PowerPlant } from "../data/types";
-import { acPowerW, cooledAreaM2, coolingKind } from "../sim/ac";
-import { buildingEnvelopeAreaM2 } from "../sim/buildingGeometry";
-import { commercialCategory, commercialPowerW, totalFloorAreaM2 } from "../sim/commercial";
+import { cooledAreaM2, coolingKind } from "../sim/ac";
+import { commercialCategory, totalFloorAreaM2 } from "../sim/commercial";
+import { toDateMs } from "../sim/calendar";
 import { simClock } from "../sim/engine";
 import { categoryEnergyFromSeries } from "../sim/energy";
-import { hasHeatPump, heatPumpPowerW } from "../sim/heatPump";
 import { currentHeatingSystemId, heatingRenewalLog } from "../sim/heatingRenewal";
 import { HEATING_SYSTEM_CATALOG } from "../sim/heatingSystems";
 import {
@@ -25,12 +24,15 @@ import {
 } from "../sim/history";
 import { buildingLoadW } from "../sim/buildingPower";
 import { solarAndBatteryAt } from "../sim/homeBattery";
+import { mobilitySlotSummaries } from "../sim/mobility";
+import { publicCharging } from "../sim/publicCharging";
 import { solarAdoptionLog } from "../sim/solarAdoption";
 import { snowDepthCm } from "../sim/snow";
 import { useLiveSimTime, useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
-import { hasElectricWaterHeating, waterHeatingPowerW } from "../sim/waterHeating";
+import { waterHeatingKind } from "../sim/waterHeating";
 import { BillSection } from "./BillSection";
+import { buildingKindLabel, isMixedUse } from "./buildingLabels";
 import { COMMERCIAL_CATEGORY_ICON, COMMERCIAL_CATEGORY_LABEL } from "./commercialDisplay";
 import { EnergyBreakdown } from "./EnergyBreakdown";
 import { FleetSection } from "./FleetSection";
@@ -50,6 +52,8 @@ import { useLivePowerPlants } from "./useLivePowerPlants";
 import { formatWatts } from "./format";
 import "./panels.css";
 
+const DAY_MS = 24 * 3_600_000;
+
 export interface BuildingPanelProps {
   building: Building;
   allBuildings: Building[];
@@ -58,33 +62,63 @@ export interface BuildingPanelProps {
   onClose: () => void;
 }
 
+/** "Apartment building · 4 homes · 6 floors · built 1961 · 11 jobs". */
+function describe(building: Building): string {
+  const homes = building.dwellings.length;
+  const parts = [
+    buildingKindLabel(building.buildingClass) + (homes > 0 && isMixedUse(building.category) ? ", with shops or offices" : ""),
+    homes > 0 ? `${homes} home${homes === 1 ? "" : "s"}` : null,
+    building.floorCount ? `${building.floorCount} floor${building.floorCount === 1 ? "" : "s"}` : null,
+    building.constructionYear ? `built ${building.constructionYear}` : null,
+    (building.jobs ?? 0) >= 1 ? `${Math.round(building.jobs ?? 0)} job${Math.round(building.jobs ?? 0) === 1 ? "" : "s"}` : null,
+  ];
+  return parts.filter((p): p is string => !!p).join(" · ");
+}
+
+/** The households' cars, the electric ones among them, and the wallboxes (counted once a day). */
+function useHomeCars(building: Building, day: number): { cars: number; electric: number; wallboxes: number } {
+  return useMemo(() => {
+    let cars = 0;
+    let electric = 0;
+    let wallboxes = 0;
+    for (const d of building.dwellings) {
+      for (const s of mobilitySlotSummaries(building.egid, d, day)) {
+        if (s.mode !== "car" || !s.vehicleType) continue;
+        cars++;
+        if (s.vehicleType === "carEV") electric++;
+      }
+      if (publicCharging.hasWallboxAt(building, d, day)) wallboxes++;
+    }
+    return { cars, electric, wallboxes };
+  }, [building, day]);
+}
+
+/** The card for a building picked on the map: what it is and what it has now, what's live this
+ * moment, what could change here (the player's own options and the owner's), its energy and bill,
+ * what happened here over the years, and its homes. */
 export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwelling, onClose }: BuildingPanelProps) {
   const simTimeMs = useLiveSimTime();
+  const day = Math.floor(simTimeMs / DAY_MS) * DAY_MS;
   const tariff = useTariff();
   const [, setOrders] = useState(0); // re-read after ordering solar or chargers here
   const plants = useLivePowerPlants(allBuildings, realPlants, simTimeMs);
-  const hasHp = hasHeatPump(building, simTimeMs);
-  const heatPumpW = hasHp ? heatPumpPowerW(building, simTimeMs) : 0;
   const heatingSystemId = currentHeatingSystemId(building, simTimeMs);
   const heatingLog = heatingRenewalLog(building, simTimeMs);
+  const insulationLog = retrofitLog(building, simTimeMs);
   const cooling = coolingKind(building, simTimeMs);
-  const acW = cooling ? acPowerW(building, simTimeMs) : 0;
-  const coolingAreaM2 = cooling ? cooledAreaM2(building, simTimeMs) : 0;
-  const envelopeAreaM2 = hasHp ? buildingEnvelopeAreaM2(building) : null;
-  const hasElectricWater = hasElectricWaterHeating(building, simTimeMs);
-  const waterHeatingW = hasElectricWater ? waterHeatingPowerW(building, simTimeMs) : 0;
+  const water = waterHeatingKind(building, simTimeMs);
   const commCategory = commercialCategory(building);
   const commFloorAreaM2 = commCategory ? totalFloorAreaM2(building) : null;
-  const commercialW = commCategory ? commercialPowerW(building, simTimeMs) : 0;
   const staffCars = workChargingCars(building, simTimeMs);
-  const staffChargingW = workChargingPowerW(building, simTimeMs);
+  const homeCars = useHomeCars(building, day);
 
   const buildingPlants = plants.filter((p) => p.egid === building.egid && p.technology === "Photovoltaic");
   const hasSolar = buildingPlants.length > 0;
-  const snowCoverCm = hasSolar ? snowDepthCm(simTimeMs) : 0;
-  const solarState = hasSolar ? solarAndBatteryAt(building.egid, plants, simTimeMs, buildingLoadW(building, simTimeMs), snowCoverCm) : null;
-  const solarGenerationW = solarState?.generationW ?? 0;
-  const battery = solarState?.battery ?? null;
+  const snowCoverCm = snowDepthCm(simTimeMs);
+  const loadW = buildingLoadW(building, simTimeMs);
+  const solarState = solarAndBatteryAt(building.egid, plants, simTimeMs, loadW, snowCoverCm);
+  const battery = solarState.battery;
+  const netW = loadW + solarState.netW;
   const solarCapacityKw = buildingPlants.reduce((sum, p) => sum + (p.capacityKw ?? 0), 0);
   const solarLog = solarAdoptionLog(building, simTimeMs);
 
@@ -114,20 +148,22 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
           ×
         </button>
         <h2>{building.address ?? `Building ${building.egid}`}</h2>
+        <p className="bp-kind">{describe(building)}</p>
         {notes.map((note) => (
           <p key={note} style={{ fontSize: 12 }}>
             {note}
           </p>
         ))}
-        <dl>
-          <dt>Planned</dt>
-          <dd>
-            {building.floorCount ?? "?"} floors, {building.dwellings.length} dwelling{building.dwellings.length === 1 ? "" : "s"}
-          </dd>
-        </dl>
       </div>
     );
   }
+
+  const heating = heatingSystemId ? HEATING_SYSTEM_CATALOG[heatingSystemId] : null;
+  // When the heating went in, if it happened in the game.
+  const heatingSince = heatingLog.length > 0 ? new Date(toDateMs(heatingLog[heatingLog.length - 1].installedAtMs)).getUTCFullYear() : null;
+  const thermal = buildingThermalProfile(building, simTimeMs);
+  const roofContract = !isPublicBuilding(building) && (building.footprintAreaM2 ?? 0) >= ROOF_CONTRACT_MIN_FOOTPRINT_M2;
+  const pastEvents = heatingLog.length + insulationLog.length + solarLog.length;
 
   return (
     <div className="panel" data-tour="building-panel">
@@ -135,190 +171,147 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
         ×
       </button>
       <h2>{building.address ?? `Building ${building.egid}`}</h2>
+      <p className="bp-kind">{describe(building)}</p>
       {notes.map((note) => (
-        <p key={note} style={{ fontSize: 12, margin: "0 0 6px" }}>
+        <p key={note} className="bp-note">
           {note}
         </p>
       ))}
-      <dl>
-        <dt>Category</dt>
-        <dd>{building.category ?? "Unknown"}</dd>
-        <dt>Use</dt>
-        <dd>{building.buildingClass ?? "Unknown"}</dd>
-        <dt>Built</dt>
-        <dd>{building.constructionYear ?? "Unknown"}</dd>
-        <dt>Floors</dt>
-        <dd>{building.floorCount ?? "Unknown"}</dd>
-        <dt>Insulation</dt>
-        <dd>
-          {ENERGY_CLASS_CATALOG[energyClassAt(building, simTimeMs)].label} (U {buildingThermalProfile(building, simTimeMs).uValueWPerM2K.toFixed(2)} W/m²K)
-        </dd>
+
+      {/* What the building has now. */}
+      <dl className="bp-facts">
         <dt>Heating</dt>
         <dd>
-          {heatingSystemId ? (
-            `${HEATING_SYSTEM_CATALOG[heatingSystemId].icon} ${HEATING_SYSTEM_CATALOG[heatingSystemId].label}`
-          ) : (
+          {heating ? `${heating.icon} ${heating.label}` : `${building.heatingGenerator ?? "Unknown"}${building.heatingEnergySource ? ` (${building.heatingEnergySource})` : ""}`}
+          {heatingSince && <span className="bp-sub"> · since {heatingSince}</span>}
+        </dd>
+        <dt>Hot water</dt>
+        <dd>{water === "heatPump" ? "From a heat pump" : water === "direct" ? "Electric boiler" : energySourceLabel(building.hotWaterEnergySource)}</dd>
+        <dt title="How well the building keeps its heat: its energy class, and how much heat its walls, roof and windows let through on average">Insulation</dt>
+        <dd>
+          {ENERGY_CLASS_CATALOG[energyClassAt(building, simTimeMs)].label}
+          <span className="bp-sub"> · U {thermal.uValueWPerM2K.toFixed(2)} W/m²K</span>
+        </dd>
+        <dt>Solar</dt>
+        <dd title={hasSolar ? "How the panels face the sun: it sets when in the day they make the most" : undefined}>
+          {hasSolar ? (
             <>
-              {building.heatingGenerator ?? "Unknown"}
-              {building.heatingEnergySource ? ` (${building.heatingEnergySource})` : ""}
+              {solarCapacityKw.toFixed(1)} kWp<span className="bp-sub"> · facing {roofOrientationLabel(building.egid)}</span>
+              {battery && (
+                <span className="bp-sub">
+                  {" "}
+                  · battery {battery.kwh.toFixed(0)} kWh{battery.feedInCap !== null ? `, feed-in held to ${Math.round(battery.feedInCap * 100)}%` : ""}
+                </span>
+              )}
             </>
+          ) : (
+            "None"
           )}
         </dd>
+        {cooling && (
+          <>
+            <dt>Cooling</dt>
+            <dd>
+              {cooling === "ground" ? "Through the ground probes" : "Air conditioning"}
+              {cooledAreaM2(building, simTimeMs) > 0 && <span className="bp-sub"> · {Math.round(cooledAreaM2(building, simTimeMs))} m²</span>}
+            </dd>
+          </>
+        )}
+        {homeCars.cars > 0 && (
+          <>
+            <dt title="The households' cars, the electric ones among them, and the homes with a wallbox">Cars</dt>
+            <dd>
+              {homeCars.cars} · {homeCars.electric} electric
+              <span className="bp-sub">
+                {" "}
+                · {homeCars.wallboxes} wallbox{homeCars.wallboxes === 1 ? "" : "es"}
+              </span>
+            </dd>
+          </>
+        )}
+        {commCategory && (
+          <>
+            <dt>Business</dt>
+            <dd>
+              {COMMERCIAL_CATEGORY_ICON[commCategory]} {COMMERCIAL_CATEGORY_LABEL[commCategory]}
+              {commFloorAreaM2 ? <span className="bp-sub"> · {Math.round(commFloorAreaM2).toLocaleString("en-GB")} m²</span> : null}
+            </dd>
+          </>
+        )}
+        {(building.jobs ?? 0) >= 1 && staffCars >= 0.5 && (
+          <>
+            <dt title="Staff who come by car, drive an electric one and have an employer with chargers — residents of the town and commuters alike — charge here on working days">Staff charging</dt>
+            <dd>~{Math.round(staffCars)} cars on a working day</dd>
+          </>
+        )}
       </dl>
 
+      <FleetSection building={building} simTimeMs={simTimeMs} />
+
+      {/* This moment. */}
+      <div className="bp-now" title="What the building draws from the grid this moment, its own solar and battery taken off (negative: it feeds in)">
+        <span className="bp-now-label">Right now</span>
+        <span>
+          {netW >= 0 ? `drawing ${formatWatts(netW)}` : `feeding in ${formatWatts(-netW)}`}
+          {hasSolar && ` · solar ${formatWatts(solarState.generationW)}`}
+          {battery && solarState.batteryW !== 0 && ` · battery ${solarState.batteryW > 0 ? "charging" : "supplying"} ${formatWatts(Math.abs(solarState.batteryW))}`}
+          {hasSolar && snowCoverCm > 0 && ` · ❄️ ${snowCoverCm.toFixed(0)} cm snow`}
+          {solarState.curtailedW > 0 && ` · ${formatWatts(solarState.curtailedW)} held back`}
+        </span>
+      </div>
+
+      {/* What could change here: the player's own options, and what the owner could do. */}
+      {(isPublicBuilding(building) || heatingSystemId || roofContract) && <h3 className="section-heading">What could change here</h3>}
       {isPublicBuilding(building) && (
         <>
-          <h3 className="section-heading">Municipal building · {publicBuildingKind(building)}</h3>
+          <h4 className="bp-subheading">Municipal building · {publicBuildingKind(building)}</h4>
           <SupervisionNotice />
           <div className="public-orders">
             <PublicBuildingOrders building={building} realPlants={realPlants} now={simTimeMs} onOrdered={() => setOrders((n) => n + 1)} withName={false} />
           </div>
         </>
       )}
-
-      {!isPublicBuilding(building) && (building.footprintAreaM2 ?? 0) >= ROOF_CONTRACT_MIN_FOOTPRINT_M2 && (
+      {heatingSystemId && <HeatPumpSiteSection building={building} simTimeMs={simTimeMs} />}
+      {roofContract && (
         <>
-          <h3 className="section-heading">Roof contract</h3>
+          <h4 className="bp-subheading">Renting the roof for solar</h4>
           <RoofContractCard building={building} now={simTimeMs} />
         </>
       )}
 
-      <h3 className="section-heading">Climate control</h3>
-      <div className={`device-row${hasHp ? "" : " inactive"}`}>
-        <span className="device-name">
-          🌡️ Space heating
-          {envelopeAreaM2 && hasHp && <span className="ev-badge">{Math.round(envelopeAreaM2)} m² envelope</span>}
-        </span>
-        {hasHp ? (
-          <span className={`device-watts${heatPumpW === 0 ? " off" : ""}`}>{formatWatts(heatPumpW)}</span>
-        ) : (
-          <span className="device-status">
-            {heatingSystemId ? HEATING_SYSTEM_CATALOG[heatingSystemId].label : energySourceLabel(building.heatingEnergySource)}
-          </span>
-        )}
-      </div>
-      <div className={`device-row${cooling ? "" : " inactive"}`}>
-        <span className="device-name">
-          ❄️ {cooling === "ground" ? "Cooling through the ground probes" : "Air conditioning"}
-          {cooling && coolingAreaM2 > 0 && <span className="ev-badge">{Math.round(coolingAreaM2)} m² cooled</span>}
-        </span>
-        {cooling ? (
-          <span className={`device-watts${acW === 0 ? " off" : ""}`}>{formatWatts(acW)}</span>
-        ) : (
-          <span className="device-status">Not installed</span>
-        )}
-      </div>
-      <RenewalLogSection title="Heating history" entries={heatingLog} />
-      {heatingSystemId && <HeatPumpSiteSection building={building} simTimeMs={simTimeMs} />}
-      <RenewalLogSection title="Insulation history" entries={retrofitLog(building, simTimeMs)} />
-
-      <h3 className="section-heading">Hot water</h3>
-      <div className={`device-row${hasElectricWater ? "" : " inactive"}`}>
-        <span className="device-name">🚿 Water heating</span>
-        {hasElectricWater ? (
-          <span className={`device-watts${waterHeatingW === 0 ? " off" : ""}`}>{formatWatts(waterHeatingW)}</span>
-        ) : (
-          <span className="device-status">{energySourceLabel(building.hotWaterEnergySource)}</span>
-        )}
-      </div>
-
-      {commCategory && (
-        <>
-          <h3 className="section-heading">Commercial</h3>
-          <div className="device-row">
-            <span className="device-name">
-              {COMMERCIAL_CATEGORY_ICON[commCategory]} {COMMERCIAL_CATEGORY_LABEL[commCategory]}
-              {commFloorAreaM2 && <span className="ev-badge">{Math.round(commFloorAreaM2)} m² floor area</span>}
-            </span>
-            <span className={`device-watts${commercialW === 0 ? " off" : ""}`}>{formatWatts(commercialW)}</span>
-          </div>
-        </>
-      )}
-
-      {(building.jobs ?? 0) > 0 && (
-        <>
-          <h3 className="section-heading">Staff</h3>
-          <div
-            className="device-row"
-            title="Full-time jobs here (federal business statistics, by hectare), and the staff cars charging at work on a working day: those who come by car, drive an electric one and have an employer with chargers — residents of the town and commuters alike."
-          >
-            <span className="device-name">
-              🅿️ {Math.round(building.jobs ?? 0)} jobs
-              {staffCars >= 0.5 && <span className="ev-badge">🔌 ~{Math.round(staffCars)} cars charge here on a working day</span>}
-            </span>
-            <span className={`device-watts${staffChargingW === 0 ? " off" : ""}`}>{formatWatts(staffChargingW)}</span>
-          </div>
-        </>
-      )}
-
-      <FleetSection building={building} simTimeMs={simTimeMs} />
-
-      <h3 className="section-heading">Solar</h3>
-      <div className={`device-row${hasSolar ? "" : " inactive"}`}>
-        <span className="device-name">
-          ☀️ Generation
-          {hasSolar && (
-            <span className="ev-badge responsive" title="How the panels face the sun: it sets when in the day they make the most">
-              {solarCapacityKw.toFixed(1)} kWp installed · facing {roofOrientationLabel(building.egid)}
-            </span>
-          )}
-          {snowCoverCm > 0 && <span className="ev-badge">❄️ {snowCoverCm.toFixed(1)} cm snow</span>}
-        </span>
-        {hasSolar ? (
-          <span className={`device-watts${solarGenerationW === 0 ? " off" : ""}`}>{formatWatts(solarGenerationW)}</span>
-        ) : (
-          <span className="device-status">Not installed</span>
-        )}
-      </div>
-      {battery && solarState && (
-        <div className="device-row" title="Charges from the solar surplus, and covers the building's own use from the late afternoon for as long as the day's charge lasts">
-          <span className="device-name">
-            🔋 Battery
-            <span className="ev-badge responsive">{battery.kwh.toFixed(0)} kWh</span>
-            {battery.feedInCap !== null && <span className="ev-badge">grid-friendly · feed-in ≤ {Math.round(battery.feedInCap * 100)}%</span>}
-          </span>
-          <span className={`device-watts${solarState.batteryW === 0 ? " off" : ""}`}>
-            {solarState.batteryW > 0 ? `charging ${formatWatts(solarState.batteryW)}` : solarState.batteryW < 0 ? `supplying ${formatWatts(-solarState.batteryW)}` : "idle"}
-          </span>
-        </div>
-      )}
-      {solarState && solarState.curtailedW > 0 && (
-        <p className="dh-note" style={{ margin: "2px 0 0" }}>
-          {formatWatts(solarState.curtailedW)} curtailed to keep the feed-in under its cap.
-        </p>
-      )}
-      <RenewalLogSection title="Solar history" entries={solarLog} />
-
-      <h3 className="section-heading">Daily energy — last 24h</h3>
-      <EnergyBreakdown energy={history.energy} />
+      {/* Energy and money. */}
+      <h3 className="section-heading">Power, last 24 hours</h3>
+      <HistoryChart
+        times={history.times}
+        series={[
+          { key: "total", label: "Drawn from the grid", color: "#2a78d6", values: history.totalW },
+          ...(hasSolar ? [{ key: "pv", label: "Solar", color: "#eda100", values: history.pvW }] : []),
+        ]}
+      />
+      <details className="bp-more">
+        <summary>Energy by use, last 24 hours</summary>
+        <EnergyBreakdown energy={history.energy} />
+      </details>
 
       <h3 className="section-heading">Bill</h3>
       <BillSection summary={billSummary} />
 
-      <h3 className="section-heading">Net power — last 24h</h3>
-      <HistoryChart
-        times={history.times}
-        series={[{ key: "total", label: "Net", color: "#2a78d6", values: history.totalW }]}
-      />
+      <details className="bp-more">
+        <summary>Earlier days, weeks and months</summary>
+        <HistoricalEnergySection entityId={building.egid} sampler={(times) => sampleBuildingCategorySeries(building, times, tariff, plants)} tariffKey={tariffKey(tariff)} title={null} />
+      </details>
 
-      {hasSolar && (
-        <>
-          <h3 className="section-heading">Solar generation — last 24h</h3>
-          <HistoryChart
-            times={history.times}
-            series={[{ key: "pv", label: "Solar", color: "#eda100", values: history.pvW }]}
-          />
-        </>
+      {pastEvents > 0 && (
+        <details className="bp-more">
+          <summary>What happened here ({pastEvents})</summary>
+          <RenewalLogSection title="Heating" entries={heatingLog} />
+          <RenewalLogSection title="Insulation" entries={insulationLog} />
+          <RenewalLogSection title="Solar" entries={solarLog} />
+        </details>
       )}
 
-      <HistoricalEnergySection
-        entityId={building.egid}
-        sampler={(times) => sampleBuildingCategorySeries(building, times, tariff, plants)}
-        tariffKey={tariffKey(tariff)}
-      />
-
-      <h3 className="section-heading">Dwellings ({building.dwellings.length})</h3>
-      <ul>
+      <h3 className="section-heading">Homes ({building.dwellings.length})</h3>
+      <ul className="bp-homes">
         {building.dwellings.map((dwelling) => (
           <li key={dwelling.ewid}>
             <button onClick={() => onSelectDwelling(dwelling.ewid)}>
@@ -328,7 +321,7 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
             </button>
           </li>
         ))}
-        {building.dwellings.length === 0 && <li style={{ color: "var(--ink-3)", fontSize: 13 }}>No dwellings on record.</li>}
+        {building.dwellings.length === 0 && <li className="bp-empty">No homes on record.</li>}
       </ul>
     </div>
   );

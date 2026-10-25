@@ -19,6 +19,8 @@ export interface HistoricalEnergySectionProps {
    * dwelling's `egid:ewid` — so this view's cached bars never collide with
    * another view's (see historyLong.ts). */
   entityId: string;
+  /** The section's heading (null: none, where the caller titles it). */
+  title?: string | null;
   /** Produces this view's CategorySeries for a set of timestamps — the caller
    * binds whichever of history.ts's sample*CategorySeries functions fits what's
    * being shown (municipality/building/dwelling) via a closure. */
@@ -29,7 +31,7 @@ export interface HistoricalEnergySectionProps {
 /** Day/week/month bar-chart history — shared by the town hall's Statistics
  * (municipality-wide), BuildingPanel, and DwellingPanel, the only difference
  * between them being which sampler (and entityId) they pass in. */
-export function HistoricalEnergySection({ entityId, sampler, tariffKey }: HistoricalEnergySectionProps) {
+export function HistoricalEnergySection({ entityId, sampler, tariffKey, title = "Historical energy" }: HistoricalEnergySectionProps) {
   const [tier, setTier] = useState<PeriodTier>("day");
   const [categorySelection, setCategorySelection] = useState<CategorySelection>("total");
 
@@ -58,7 +60,7 @@ export function HistoricalEnergySection({ entityId, sampler, tariffKey }: Histor
 
   return (
     <>
-      <h3 className="section-heading">Historical energy</h3>
+      {title && <h3 className="section-heading">{title}</h3>}
       <div className="tier-buttons">
         {TIERS.map((t) => (
           <button key={t.value} className={t.value === tier ? "active" : ""} onClick={() => setTier(t.value)}>
