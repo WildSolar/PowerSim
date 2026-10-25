@@ -309,3 +309,8 @@
   color: var(--ink-3);
   font-size: 13px;
 }
+
+/* A fact that comes and goes with its own condition (a car's charging) inside the facts grid. */
+.bp-fact-pair {
+  display: contents;
+}

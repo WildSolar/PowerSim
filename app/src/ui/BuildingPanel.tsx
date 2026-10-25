@@ -315,7 +315,7 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
         {building.dwellings.map((dwelling) => (
           <li key={dwelling.ewid}>
             <button onClick={() => onSelectDwelling(dwelling.ewid)}>
-              Dwelling {dwelling.ewid}
+              Home {dwelling.ewid}
               {dwelling.roomCount ? ` — ${dwelling.roomCount} rooms` : ""}
               {dwelling.areaM2 ? `, ${dwelling.areaM2} m²` : ""}
             </button>
