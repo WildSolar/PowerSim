@@ -12,14 +12,21 @@ import { prefillMonthSample } from "../sim/yearReport";
 import { grid } from "../sim/grid";
 import { stock } from "../sim/stock";
 import { treasury } from "../sim/treasury";
-import { buildingPowerW } from "../sim/buildingPower";
+import { buildingLoadW, buildingPowerW } from "../sim/buildingPower";
+import { acPowerW } from "../sim/ac";
+import { commercialPowerW } from "../sim/commercial";
+import { fleets } from "../sim/fleet";
+import { heatPumpPowerW } from "../sim/heatPump";
+import { dwellingDevicePowerW } from "../sim/devices";
+import { waterHeatingPowerW } from "../sim/waterHeating";
+import { workChargingPowerW } from "../sim/workCharging";
 import { snowDepthCm } from "../sim/snow";
-import { sampleMunicipalityLast24h } from "../sim/rollingHistory";
+import { clearLast24h, sampleMunicipalityLast24h } from "../sim/rollingHistory";
 import { simClock } from "../sim/engine";
 import { tariffDeadline } from "../sim/tariffDeadline";
 import { startDevTiming, stopDevTiming } from "../sim/devTiming";
 import { tariffStore } from "../sim/tariffStore";
-import { historyTimeSteps, sampleMunicipalityCategorySeries, type CategorySeries } from "../sim/history";
+import { historyTimeSteps, municipalityCategorySteps, timeDwellingDevices, sampleMunicipalityCategorySeries, type CategorySeries } from "../sim/history";
 import {
   computeHeatingRenewalTally,
   computeHeatingTechnologyBreakdown,
@@ -251,6 +258,58 @@ export async function timeRollingChart(): Promise<Record<string, number | string
   out.spanHours = (result.times[result.times.length - 1] - result.times[0]) / 3_600_000;
   out.mismatches = mismatches;
   return out;
+}
+
+/** Statistics → At a glance's day chart from cold: yesterday's 49 samples, with a profile of where
+ * the time goes and a checksum to compare A/B. */
+export async function timeLastDay(atMs?: number): Promise<Record<string, unknown>> {
+  const buildings = stock.getAll();
+  const plants = (await (await fetch(dataUrl("schlieren.json"))).json()).powerPlants;
+  const tariff = tariffStore.get();
+  const now = atMs ?? Math.floor(simClock.getSimTimeMs() / 86_400_000) * 86_400_000;
+  clearLast24h();
+  const profiler = startProfiler();
+  const t0 = performance.now();
+  const r = sampleMunicipalityLast24h(buildings, plants, now, tariff);
+  const ms = Math.round(performance.now() - t0);
+  const profile = await summarizeProfile(profiler);
+  const sum = (Object.values(r.series) as number[][]).flat().concat(r.homeBatteryW, r.curtailedW).reduce((a, b) => a + b, 0);
+  // The pieces of one sample, each over the day's instants.
+  const pieces: Record<string, number> = {};
+  const plantsAt = r.times.map((t) => effectivePowerPlantsAt(buildings, plants, t));
+  pieces.plantsMs = await timed(() => r.times.forEach((t) => effectivePowerPlantsAt(buildings, plants, t)));
+  pieces.seriesOneByOneMs = await timed(() => r.times.forEach((t, i) => sampleMunicipalityCategorySeries(buildings, [t], tariff, plantsAt[i])));
+  pieces.seriesBatchedMs = await timed(() => sampleMunicipalityCategorySeries(buildings, r.times, tariff, plantsAt[plantsAt.length - 1]));
+  {
+    const { steps } = municipalityCategorySteps(buildings, r.times, tariff, plantsAt[plantsAt.length - 1]);
+    const names = ["homes", "away charging", "heating and cooling", "water heating", "businesses", "solar"];
+    for (let i = 0; i < steps.length; i++) pieces[`step ${names[i] ?? i} ms`] = await timed(steps[i]);
+  }
+  Object.assign(pieces, timeDwellingDevices(buildings, r.times, tariff));
+  {
+    // The home-battery pass's building loads, by part.
+    const byEgid = new Map(buildings.map((b) => [b.egid, b]));
+    const withBattery = [...new Set(plantsAt[plantsAt.length - 1].filter((p) => p.battery && p.egid).map((p) => p.egid as string))]
+      .map((e) => byEgid.get(e))
+      .filter((b): b is (typeof buildings)[number] => !!b);
+    pieces.batteryBuildings = withBattery.length;
+    pieces.batteryHomes = withBattery.reduce((s, b) => s + b.dwellings.length, 0);
+    const parts: [string, (b: (typeof buildings)[number], t: number) => number][] = [
+      ["load: whole first", (b, t) => buildingLoadW(b, t)],
+      ["load: heat pump", (b, t) => heatPumpPowerW(b, t)],
+      ["load: cooling", (b, t) => acPowerW(b, t)],
+      ["load: water", (b, t) => waterHeatingPowerW(b, t)],
+      ["load: business", (b, t) => commercialPowerW(b, t)],
+      ["load: depot", (b, t) => fleets.depotPowerW(b, t)],
+      ["load: work charging", (b, t) => workChargingPowerW(b, t)],
+      ["load: homes", (b, t) => b.dwellings.reduce((s, d) => { const x = dwellingDevicePowerW(b.egid, d, t); return s + x.fridgeW + x.lightingW + x.cookingW + x.laundryW + x.plugLoadW; }, 0)],
+      ["load: cars", (b, t) => b.dwellings.reduce((s, d) => s + mobilityChargingPowerW(b.egid, d, t, tariff), 0)],
+      ["load: whole", (b, t) => buildingLoadW(b, t)],
+    ];
+    for (const [name, f] of parts) pieces[name] = await timed(() => r.times.forEach((t) => withBattery.forEach((b) => f(b, t))));
+  }
+  pieces.batteryPlants = plantsAt[plantsAt.length - 1].filter((p) => p.battery).length;
+  return { now, ms, points: r.times.length, perSampleMs: Math.round(ms / r.times.length), checksum: Math.round(sum), pieces, profile };
 }
 
 export async function runPerf(year?: number): Promise<Record<string, number>> {

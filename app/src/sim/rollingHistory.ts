@@ -12,8 +12,8 @@
  * that instant, so a cached sample reads the same however the window happened to reach it.
  * Samples depend on the tariff (EV charging responds to it), so a tariff change starts afresh.
  *
- * A first look (or one after a long jump) needs the whole window: warmLast24h fills it a sample at a
- * time, yielding between them, so the page shows at once and the chart follows.
+ * A first look (or one after a long jump) needs the whole window: warmLast24h fills it in slices of
+ * a few samples, handing the page back between them, so the page shows at once and the chart follows.
  *
  * Next to the categories, each sample keeps what the town's home batteries did at that instant —
  * charging (positive) or discharging (negative), each against its own building's solar and use — and
@@ -77,7 +77,7 @@ function sampleAt(buildings: Building[], realPlants: PowerPlant[], t: number, ta
     for (const egid of withBattery) {
       const b = byEgid.get(egid);
       if (!b || !existsAt(b, t)) continue;
-      const r = solarAndBatteryAt(egid, plants, t, buildingLoadW(b, t), snow);
+      const r = solarAndBatteryAt(egid, plants, t, () => buildingLoadW(b, t), snow);
       batteryW += r.batteryW;
       curtailedW += r.curtailedW;
     }
@@ -85,6 +85,11 @@ function sampleAt(buildings: Building[], realPlants: PowerPlant[], t: number, ta
   sample.homeBatteryW = batteryW;
   sample.curtailedW = curtailedW;
   return sample;
+}
+
+/** Forgets every kept sample (dev/perf.ts: timing a cold chart). */
+export function clearLast24h(): void {
+  gridSamples.clear();
 }
 
 /** Every category over the 24h up to `nowMs`: the window's two ends plus every half-hour grid
@@ -103,16 +108,43 @@ function prepare(nowMs: number, tariff: Tariff): { startMs: number; gridBeforeSt
   return { startMs, gridBeforeStart };
 }
 
-/** Samples the window's grid instants not yet kept, one at a time with a yield between them, so
- * sampleMunicipalityLast24h then only has "now" left to do. Stops when `cancelled()` says so. */
-export async function warmLast24h(buildings: Building[], realPlants: PowerPlant[], nowMs: number, tariff: Tariff, cancelled: () => boolean): Promise<void> {
+// How long one slice of warmLast24h may work before handing the page back (ms): a frame's worth.
+const WARM_SLICE_MS = 12;
+
+/** Hands the page back for a moment — through a message rather than setTimeout(0), which browsers
+ * hold back by 4 ms or more once it repeats, and by a second in a background tab. */
+function yieldToPage(): Promise<void> {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => resolve();
+    channel.port2.postMessage(null);
+  });
+}
+
+/** Samples the window's grid instants not yet kept, in slices of WARM_SLICE_MS with the page handed
+ * back between them, so sampleMunicipalityLast24h then only has "now" left to do. Reports how far
+ * it has got (0–1) through `progress`; stops when `cancelled()` says so. */
+export async function warmLast24h(
+  buildings: Building[],
+  realPlants: PowerPlant[],
+  nowMs: number,
+  tariff: Tariff,
+  cancelled: () => boolean,
+  progress?: (share: number) => void,
+): Promise<void> {
   const { gridBeforeStart } = prepare(nowMs, tariff);
-  for (let t = gridBeforeStart; t <= nowMs; t += ROLLING_GRID_MS) {
-    if (gridSamples.has(t)) continue;
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    if (cancelled()) return;
-    if (tariffKey(tariff) !== cacheTariffKey) return;
-    gridSamples.set(t, sampleAt(buildings, realPlants, t, tariff));
+  const missing: number[] = [];
+  for (let t = gridBeforeStart; t <= nowMs; t += ROLLING_GRID_MS) if (!gridSamples.has(t)) missing.push(t);
+  let done = 0;
+  while (done < missing.length) {
+    await yieldToPage();
+    if (cancelled() || tariffKey(tariff) !== cacheTariffKey) return;
+    const sliceStart = performance.now();
+    do {
+      const t = missing[done++];
+      gridSamples.set(t, sampleAt(buildings, realPlants, t, tariff));
+    } while (done < missing.length && performance.now() - sliceStart < WARM_SLICE_MS);
+    progress?.(done / missing.length);
   }
 }
 

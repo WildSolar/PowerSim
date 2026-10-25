@@ -77,8 +77,22 @@ export function ghiWm2(simTimeMs: number): number {
 
 /** The sky at an instant: global horizontal irradiance, the weather's transmittance (0-1), and the
  * sun's direction (east, north, up; a unit vector), or null below the horizon. */
-function skyAt(simTimeMs: number): { ghi: number; transmittance: number; sun: [number, number, number] | null } {
+type Sky = { ghi: number; transmittance: number; sun: [number, number, number] | null };
+
+// The last instant asked for, by date: every array in town asks about the same moment.
+let lastSkyDateMs = Number.NaN;
+let lastSky: Sky | null = null;
+
+function skyAt(simTimeMs: number): Sky {
   const dateMs = toDateMs(simTimeMs);
+  if (dateMs === lastSkyDateMs && lastSky) return lastSky;
+  const sky = skyAtDate(simTimeMs, dateMs);
+  lastSkyDateMs = dateMs;
+  lastSky = sky;
+  return sky;
+}
+
+function skyAtDate(simTimeMs: number, dateMs: number): Sky {
   const sun = sunVector(dateMs);
   if (sun[2] <= 0) return { ghi: 0, transmittance: 1, sun: null };
   const clearSky = PEAK_IRRADIANCE_WM2 * sun[2];

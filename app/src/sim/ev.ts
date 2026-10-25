@@ -146,6 +146,48 @@ export function evChargingPowerW(egid: string, sessionKey: string, simTimeMs: nu
   return evChargingPowerWFrom(evSessionSeed(egid, sessionKey), isResponsive(egid, sessionKey), simTimeMs, tariff, smart, meter);
 }
 
+/** A car's sessions of the last few days asked for, under the conditions they were drawn under
+ * (mobility.ts keeps one per car): a pass over the town asks about every car at instant after
+ * instant of the same day, and the day's session is the same draw each time. */
+export interface EvSessionMemo {
+  tariff: Tariff | null;
+  responsive: boolean;
+  smart: boolean;
+  meter: ChargingMeter | null;
+  days: { day: number; session: EvSession }[];
+}
+
+export function newEvSessionMemo(): EvSessionMemo {
+  return { tariff: null, responsive: false, smart: false, meter: null, days: [] };
+}
+
+function rememberedSession(memo: EvSessionMemo, seed: number, day: number, responsive: boolean, tariff: Tariff, smart: boolean, meter: ChargingMeter | null): EvSession {
+  // Under the utility's control the session follows the town's solar surplus of the day: drawn fresh.
+  if (meter === "controlled") return evDailySessionFrom(seed, day, responsive, tariff, smart, meter);
+  if (memo.tariff !== tariff || memo.responsive !== responsive || memo.smart !== smart || memo.meter !== meter) {
+    memo.tariff = tariff;
+    memo.responsive = responsive;
+    memo.smart = smart;
+    memo.meter = meter;
+    memo.days = [];
+  }
+  for (const d of memo.days) if (d.day === day) return d.session;
+  const session = evDailySessionFrom(seed, day, responsive, tariff, smart, meter);
+  memo.days.push({ day, session });
+  if (memo.days.length > 3) memo.days.shift();
+  return session;
+}
+
+/** evChargingPowerWFrom with the car's sessions remembered in `memo` — the same result. */
+export function evChargingPowerWMemo(memo: EvSessionMemo, sessionSeed: number, responsive: boolean, simTimeMs: number, tariff: Tariff, smart = false, meter: ChargingMeter | null = null): number {
+  const dayIndex = Math.floor(simTimeMs / DAY_MS);
+  for (let d = dayIndex - 1; d <= dayIndex; d++) {
+    const session = rememberedSession(memo, sessionSeed, d, responsive, tariff, smart, meter);
+    if (simTimeMs >= session.startMs && simTimeMs < session.endMs) return CHARGING_POWER_KW * 1000;
+  }
+  return 0;
+}
+
 /** The same, for a caller that keeps the car's session seed and (seeded, fixed) responsiveness. */
 export function evChargingPowerWFrom(sessionSeed: number, responsive: boolean, simTimeMs: number, tariff: Tariff, smart = false, meter: ChargingMeter | null = null): number {
   const dayIndex = Math.floor(simTimeMs / DAY_MS);

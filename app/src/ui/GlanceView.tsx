@@ -435,13 +435,15 @@ function LastDay({ dataset }: { dataset: MunicipalityDataset }) {
   const tariff = useTariff();
   const today = useSimDay(); // midnight today
   const [data, setData] = useState<ChartData | null>(null);
+  const [read, setRead] = useState(0);
   const key = `${tariffKey(tariff)}:${today}`;
 
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
       // Sampled a little at a time first, so the page never stalls on it.
-      await warmLast24h(dataset.buildings, dataset.powerPlants, today, tariff, () => cancelled);
+      setRead(0);
+      await warmLast24h(dataset.buildings, dataset.powerPlants, today, tariff, () => cancelled, setRead);
       if (cancelled) return;
       const { times, series, homeBatteryW, curtailedW } = sampleMunicipalityLast24h(dataset.buildings, dataset.powerPlants, today, tariff);
       const startMs = today - DAY_HOURS * HOUR_MS;
@@ -464,7 +466,7 @@ function LastDay({ dataset }: { dataset: MunicipalityDataset }) {
         Above the line, what the town&apos;s power went to: {inWords(["its homes, businesses and cars by use", has("into") && "its batteries charging", has("sent") && "what it sent out of town"])}.
         Below it, where the power came from: {inWords([has("wind") ? "its own solar and wind" : "its own solar", has("outOf") && "its batteries", "the wider grid"])}.
       </p>
-      {data ? <TimeChart data={data} emptyText="" /> : <p className="glance-empty">Reading yesterday…</p>}
+      {data ? <TimeChart data={data} emptyText="" /> : <p className="glance-empty">Reading yesterday… {Math.round(read * 100)}%</p>}
     </section>
   );
 }

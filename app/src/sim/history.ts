@@ -17,7 +17,8 @@ import type { Building, Dwelling, PowerPlant } from "../data/types";
 import {
   cookingPowerW,
   fridgePowerW,
-  laundryPowerWFrom,
+  laundrySessionFrom,
+  LAUNDRY_DAY_MS,
   laundrySeed,
   lightingPowerW,
   makeCookingProfile,
@@ -27,6 +28,7 @@ import {
   plugLoadPowerW,
   type CookingProfile,
   type FridgeProfile,
+  type LaundrySession,
   type LightingProfile,
   type PlugLoadProfile,
 } from "./devices";
@@ -55,6 +57,19 @@ interface DwellingProfiles {
   plugLoad: PlugLoadProfile;
   laundrySeed: number;
   waterHeater: WaterHeaterProfile;
+  /** The home's laundry session on the day last asked for (homeLaundryW). */
+  laundry: { day: number; smart: boolean; session: LaundrySession | null } | null;
+}
+
+/** laundryPowerWFrom for a home, its session drawn once a day rather than at every instant asked
+ * for — the same draw, the same result. */
+function homeLaundryW(p: DwellingProfiles, t: number): number {
+  const smart = dynamicTariff.onDynamicKey(p.key, t);
+  const day = Math.floor(t / LAUNDRY_DAY_MS);
+  let l = p.laundry;
+  if (!l || l.day !== day || l.smart !== smart) l = p.laundry = { day, smart, session: laundrySessionFrom(p.laundrySeed, day, smart) };
+  const s = l.session;
+  return s && t >= s.startMs && t < s.endMs ? s.wattage : 0;
 }
 
 export const HISTORY_WINDOW_MS = 24 * 60 * 60_000;
@@ -79,6 +94,7 @@ function getDwellingProfiles(building: Building, dwelling: Dwelling): DwellingPr
       plugLoad: makePlugLoadProfile(building.egid, dwelling),
       laundrySeed: laundrySeed(building.egid, dwelling),
       waterHeater: dwellingWaterHeaterProfile(building.egid, dwelling),
+      laundry: null,
     };
     profileCache.set(key, profiles);
   }
@@ -107,7 +123,7 @@ export function sampleDwellingSeries(building: Building, dwelling: Dwelling, tim
     fridgeW: times.map((t) => fridgePowerW(p.fridge, t)),
     lightingW: times.map((t) => lightingPowerW(p.lighting, t)),
     cookingW: times.map((t) => cookingPowerW(p.cooking, t)),
-    laundryW: times.map((t) => laundryPowerWFrom(p.laundrySeed, t, dynamicTariff.onDynamicKey(p.key, t))),
+    laundryW: times.map((t) => homeLaundryW(p, t)),
     plugLoadW: times.map((t) => plugLoadPowerW(p.plugLoad, t)),
     evW: times.map((t) => mobilityChargingPowerW(p.egid, p.dwelling, t, tariff)),
   };
@@ -145,7 +161,7 @@ function dwellingCategoryTotals(profileSets: DwellingProfiles[], times: number[]
       fridge += fridgePowerW(p.fridge, t);
       lighting += lightingPowerW(p.lighting, t);
       cooking += cookingPowerW(p.cooking, t);
-      laundry += laundryPowerWFrom(p.laundrySeed, t, dynamicTariff.onDynamicKey(p.key, t));
+      laundry += homeLaundryW(p, t);
       plugLoad += plugLoadPowerW(p.plugLoad, t);
       ev += mobilityChargingPowerW(p.egid, p.dwelling, t, tariff);
     }
@@ -159,6 +175,29 @@ function dwellingCategoryTotals(profileSets: DwellingProfiles[], times: number[]
   return { fridgeW, lightingW, cookingW, laundryW, plugLoadW, evW };
 }
 
+/** Dev only (dev/perf.ts): each home device's time over every home and the given instants, in ms. */
+export function timeDwellingDevices(buildings: Building[], times: number[], tariff: Tariff): Record<string, number> {
+  const sets = dwellingProfileSets(buildings);
+  const devices: [string, (p: DwellingProfiles, t: number) => number][] = [
+    ["exists", (p, t) => (existsAt(p.building, t) ? 1 : 0)],
+    ["fridge", (p, t) => fridgePowerW(p.fridge, t)],
+    ["lighting", (p, t) => lightingPowerW(p.lighting, t)],
+    ["cooking", (p, t) => cookingPowerW(p.cooking, t)],
+    ["laundry", (p, t) => homeLaundryW(p, t)],
+    ["plugLoad", (p, t) => plugLoadPowerW(p.plugLoad, t)],
+    ["ev", (p, t) => mobilityChargingPowerW(p.egid, p.dwelling, t, tariff)],
+  ];
+  const out: Record<string, number> = { homes: sets.length };
+  for (const [name, f] of devices) {
+    const t0 = performance.now();
+    let sink = 0;
+    for (const t of times) for (const p of sets) sink += f(p, t);
+    out[name] = Math.round(performance.now() - t0);
+    if (sink === -1) out.never = 0;
+  }
+  return out;
+}
+
 // Homes per piece when one instant's household totals are worked out in pieces.
 const DWELLINGS_PER_RUN = 10_000;
 
@@ -170,16 +209,19 @@ function dwellingCategoryTotalsInRuns(profileSets: DwellingProfiles[], t: number
   for (let from = 0; from < Math.max(1, profileSets.length); from += DWELLINGS_PER_RUN) {
     steps.push(() => {
       const to = Math.min(profileSets.length, from + DWELLINGS_PER_RUN);
+      // Carried on in locals (faster than the object's fields), in the same order: the same sums.
+      let { fridge, lighting, cooking, laundry, plugLoad, ev } = sum;
       for (let i = from; i < to; i++) {
         const p = profileSets[i];
         if (!existsAt(p.building, t)) continue;
-        sum.fridge += fridgePowerW(p.fridge, t);
-        sum.lighting += lightingPowerW(p.lighting, t);
-        sum.cooking += cookingPowerW(p.cooking, t);
-        sum.laundry += laundryPowerWFrom(p.laundrySeed, t, dynamicTariff.onDynamicKey(p.key, t));
-        sum.plugLoad += plugLoadPowerW(p.plugLoad, t);
-        sum.ev += mobilityChargingPowerW(p.egid, p.dwelling, t, tariff);
+        fridge += fridgePowerW(p.fridge, t);
+        lighting += lightingPowerW(p.lighting, t);
+        cooking += cookingPowerW(p.cooking, t);
+        laundry += homeLaundryW(p, t);
+        plugLoad += plugLoadPowerW(p.plugLoad, t);
+        ev += mobilityChargingPowerW(p.egid, p.dwelling, t, tariff);
       }
+      Object.assign(sum, { fridge, lighting, cooking, laundry, plugLoad, ev });
     });
   }
   const result = (): DwellingCategoryTotals => ({
@@ -233,16 +275,27 @@ function climateControlCategorySeries(buildings: Building[], times: number[]): {
  * doesn't redo the seeded-RNG setup per sample, only the (cheap, cached)
  * ownership check. */
 function waterHeatingCategorySeries(buildings: Building[], times: number[]): number[] {
+  const heaters = waterHeaterProfiles(buildings);
   return times.map((t) => {
     let sum = 0;
-    for (const building of buildings) {
+    for (const { building, profiles } of heaters) {
       if (!existsAt(building, t) || !hasElectricWaterHeating(building, t)) continue;
-      for (const dwelling of building.dwellings) {
-        sum += waterHeaterPowerW(getDwellingProfiles(building, dwelling).waterHeater, t);
-      }
+      for (const profile of profiles) sum += waterHeaterPowerW(profile, t);
     }
     return sum;
   });
+}
+
+// Each building's homes' water heater profiles, per building array (as dwellingProfileSets).
+const municipalityWaterHeaters = new WeakMap<Building[], { building: Building; profiles: WaterHeaterProfile[] }[]>();
+
+function waterHeaterProfiles(buildings: Building[]): { building: Building; profiles: WaterHeaterProfile[] }[] {
+  let list = municipalityWaterHeaters.get(buildings);
+  if (!list) {
+    list = buildings.map((building) => ({ building, profiles: building.dwellings.map((d) => getDwellingProfiles(building, d).waterHeater) }));
+    municipalityWaterHeaters.set(buildings, list);
+  }
+  return list;
 }
 
 const commercialProfileCache = new Map<string, CommercialProfile | null>();

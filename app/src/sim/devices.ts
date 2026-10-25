@@ -58,10 +58,19 @@ function baseProbability(hourOfDay: number): number {
   return Math.min(0.9, 0.15 + 0.75 * Math.max(morning, evening)) * awake;
 }
 
+// The last hour asked for and its probability: a pass over the town asks every home at the same
+// instant, so the curve is worked out once per instant rather than once per home.
+let lightingHour = NaN;
+let lightingProb = 0;
+
 export function lightingPowerW(profile: LightingProfile, simTimeMs: number): number {
   const dayMs = 24 * 60 * 60_000;
   const hourOfDay = ((simTimeMs % dayMs) + dayMs) % dayMs / 60_000 / 60;
-  const prob = baseProbability(hourOfDay);
+  if (hourOfDay !== lightingHour) {
+    lightingHour = hourOfDay;
+    lightingProb = baseProbability(hourOfDay);
+  }
+  const prob = lightingProb;
   const bucket = Math.floor(simTimeMs / profile.bucketMs);
   const draw = bucketRandom(profile.seed, bucket);
   return draw < prob ? profile.fixtureWattage : 0;
@@ -91,16 +100,24 @@ function cookingProbability(hourOfDay: number): number {
   return Math.max(breakfast, lunch, dinner);
 }
 
+// As lightingHour: once per instant.
+let cookingHour = NaN;
+let cookingProb = 0;
+
 export function cookingPowerW(profile: CookingProfile, simTimeMs: number): number {
   const dayMs = 24 * 60 * 60_000;
   const hourOfDay = (((simTimeMs % dayMs) + dayMs) % dayMs) / 60_000 / 60;
-  const prob = cookingProbability(hourOfDay);
+  if (hourOfDay !== cookingHour) {
+    cookingHour = hourOfDay;
+    cookingProb = cookingProbability(hourOfDay);
+  }
+  const prob = cookingProb;
   const bucket = Math.floor(simTimeMs / profile.bucketMs);
   const draw = bucketRandom(profile.seed, bucket);
   return draw < prob ? profile.wattageOn : 0;
 }
 
-const LAUNDRY_DAY_MS = 24 * 60 * 60_000;
+export const LAUNDRY_DAY_MS = 24 * 60 * 60_000;
 const LAUNDRY_DAY_PROBABILITY = 0.35; // roughly one load every ~3 days per dwelling
 
 export interface LaundrySession {
@@ -124,7 +141,7 @@ export function laundrySeed(egid: string, dwelling: Dwelling): number {
 }
 
 /** `smart`: the household is on the dynamic tariff, and a share of its loads wait for the cheapest hour. */
-function laundrySessionFrom(seed: number, dayIndex: number, smart = false): LaundrySession | null {
+export function laundrySessionFrom(seed: number, dayIndex: number, smart = false): LaundrySession | null {
   const rng = mulberry32(hashSeedFrom(seed, String(dayIndex)));
   if (rng() >= LAUNDRY_DAY_PROBABILITY) return null;
   const startHour = 8 + rng() * 12;
@@ -168,12 +185,46 @@ function plugLoadDayNightMultiplier(hourOfDay: number): number {
   return 0.7 + 0.3 * Math.cos((2 * Math.PI * (hourOfDay - 15)) / 24);
 }
 
+// As lightingHour: once per instant.
+let plugLoadHour = NaN;
+let plugLoadMultiplier = 0;
+
 export function plugLoadPowerW(profile: PlugLoadProfile, simTimeMs: number): number {
   const dayMs = 24 * 60 * 60_000;
   const hourOfDay = (((simTimeMs % dayMs) + dayMs) % dayMs) / 60_000 / 60;
-  const multiplier = plugLoadDayNightMultiplier(hourOfDay);
+  if (hourOfDay !== plugLoadHour) {
+    plugLoadHour = hourOfDay;
+    plugLoadMultiplier = plugLoadDayNightMultiplier(hourOfDay);
+  }
+  const multiplier = plugLoadMultiplier;
   const noise = valueNoiseFrom(profile.noiseSeed, simTimeMs, PLUG_LOAD_NOISE_PERIOD_MS);
   return profile.baselineW * multiplier * (1 + noise * 0.25);
+}
+
+interface DeviceProfiles {
+  fridge: FridgeProfile;
+  lighting: LightingProfile;
+  cooking: CookingProfile;
+  plugLoad: PlugLoadProfile;
+}
+
+// A home's device profiles depend on its building and its EWID alone: made once, kept — the map's
+// power layer and the grid's readings ask for every home in town, over and over.
+const deviceProfiles = new Map<string, DeviceProfiles>();
+
+function deviceProfilesOf(egid: string, dwelling: Dwelling): DeviceProfiles {
+  const key = `${egid}:${dwelling.ewid}`;
+  let p = deviceProfiles.get(key);
+  if (!p) {
+    p = {
+      fridge: makeFridgeProfile(hashSeed(egid, dwelling.ewid, "fridge")),
+      lighting: makeLightingProfile(hashSeed(egid, dwelling.ewid, "lighting")),
+      cooking: makeCookingProfile(hashSeed(egid, dwelling.ewid, "cooking")),
+      plugLoad: makePlugLoadProfile(egid, dwelling),
+    };
+    deviceProfiles.set(key, p);
+  }
+  return p;
 }
 
 /** A dwelling's device draw at a point in simulated time — the single place that
@@ -184,15 +235,12 @@ export function dwellingDevicePowerW(
   dwelling: Dwelling,
   simTimeMs: number,
 ): { fridgeW: number; lightingW: number; cookingW: number; laundryW: number; plugLoadW: number } {
-  const fridgeProfile = makeFridgeProfile(hashSeed(egid, dwelling.ewid, "fridge"));
-  const lightingProfile = makeLightingProfile(hashSeed(egid, dwelling.ewid, "lighting"));
-  const cookingProfile = makeCookingProfile(hashSeed(egid, dwelling.ewid, "cooking"));
-  const plugLoadProfile = makePlugLoadProfile(egid, dwelling);
+  const p = deviceProfilesOf(egid, dwelling);
   return {
-    fridgeW: fridgePowerW(fridgeProfile, simTimeMs),
-    lightingW: lightingPowerW(lightingProfile, simTimeMs),
-    cookingW: cookingPowerW(cookingProfile, simTimeMs),
+    fridgeW: fridgePowerW(p.fridge, simTimeMs),
+    lightingW: lightingPowerW(p.lighting, simTimeMs),
+    cookingW: cookingPowerW(p.cooking, simTimeMs),
     laundryW: laundryPowerW(egid, dwelling, simTimeMs),
-    plugLoadW: plugLoadPowerW(plugLoadProfile, simTimeMs),
+    plugLoadW: plugLoadPowerW(p.plugLoad, simTimeMs),
   };
 }

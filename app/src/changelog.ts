@@ -52,6 +52,7 @@ export const CHANGELOG: Release[] = [
       "Not every lorry can go electric yet: its route has to suit an electric one — about one in seven today, most by the mid-2030s, nearly all by 2045. Electric lorries now catch on more slowly at first, and then steadily.",
     ],
     fixed: [
+      "Statistics → At a glance draws yesterday's power much sooner: about two and a half times as fast late in a game (in a town the size of Schlieren, from about four seconds to about one and a half), and it shows how far it has got while it reads the day. The map's Power draw view redraws a little faster too.",
       "Repealing a grant (the electric car grant, the scrappage bonus, any other) now stops it at once: owners weighing solar for the year ahead had settled some later purchases early, under the grants of the day, so those kept being paid until the game was reloaded. Nothing is decided ahead of time any more.",
       "Setting a grant or a programme to zero no longer dodges the cost of repealing it: it is a repeal. And people's goodwill now follows how big a measure is — half the grant earns half the goodwill, and cutting one back costs part of what a repeal would.",
       "Winning a public vote on a small Agri-PV zone no longer gives the same approval boost as a vote on a law: a vote now counts as much as what is at stake, so a field of a few hectares hardly moves approval, either way. Putting many small fields forward one by one no longer pays.",

@@ -185,6 +185,8 @@ class Fleets {
   private scale = 0; // vehicles per unit of expectedVehicles
   private initialEvShareAtDepot: Record<FleetVehicleClass, number> = { van: 0, truck: 0 };
   private byEgid = new Map<string, FleetVehicle[]>();
+  // Each vehicle's depot seed, hashed from its key once (depotSessionW).
+  private readonly depotSeeds = new Map<string, number>();
   /** Every vehicle of a building list, flattened once per list (the stock hands out a new array
    * whenever it changes) — municipality-wide sampling walks this instead of every building. */
   private flat = new WeakMap<Building[], { v: FleetVehicle; b: Building }[]>();
@@ -426,10 +428,15 @@ class Fleets {
   private depotSessionW(v: FleetVehicle, id: FleetVehicleId, simTimeMs: number): number {
     const powerKw = DEPOT_POWER_KW[v.vehicleClass];
     const hours = dailyKWh(id) / powerKw;
+    let vehicleSeed = this.depotSeeds.get(v.key);
+    if (vehicleSeed === undefined) {
+      vehicleSeed = hashSeed(v.key, "depot");
+      this.depotSeeds.set(v.key, vehicleSeed);
+    }
     // The session that started yesterday evening may still be running.
     for (const dayOffset of [0, -1]) {
       const day = Math.floor(simTimeMs / DAY_MS) + dayOffset;
-      const seed = hashSeedFrom(hashSeed(v.key, "depot"), String(day));
+      const seed = hashSeedFrom(vehicleSeed, String(day));
       const backHour = 17 + firstRandom(seed) * 3;
       const tariff = tariffStore.at(day * DAY_MS);
       let startHour = backHour;

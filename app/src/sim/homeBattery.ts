@@ -83,6 +83,28 @@ function dayCurve(dayIndex: number, cap: number, snowCm: number, profile: number
   return curve;
 }
 
+// Each plant list's solar arrays by building, made the first time a building is looked up in it:
+// a pass over the town asks for every building, and scanning the whole list each time made it
+// buildings × plants. The lists aren't changed once handed out (effectivePowerPlantsAt makes a
+// fresh one each call), so an index stays good for as long as its list lives.
+const arraysByEgid = new WeakMap<PowerPlant[], Map<string, PowerPlant[]>>();
+
+function arraysOf(plants: PowerPlant[], egid: string): PowerPlant[] {
+  let index = arraysByEgid.get(plants);
+  if (!index) {
+    index = new Map();
+    for (const plant of plants) {
+      if (!plant.egid || plant.technology !== "Photovoltaic") continue;
+      const list = index.get(plant.egid);
+      if (list) list.push(plant);
+      else index.set(plant.egid, [plant]);
+    }
+    arraysByEgid.set(plants, index);
+  }
+  return index.get(egid) ?? NO_ARRAYS;
+}
+const NO_ARRAYS: PowerPlant[] = [];
+
 export interface SolarAndBattery {
   /** What the panels generate (W, positive). */
   generationW: number;
@@ -95,8 +117,10 @@ export interface SolarAndBattery {
   battery: HomeBattery | null;
 }
 
-/** A building's solar and battery together at `simTimeMs`, against the rest of its use (`loadW`). */
-export function solarAndBatteryAt(egid: string, plants: PowerPlant[], simTimeMs: number, loadW: number, snowCoverCm?: number): SolarAndBattery {
+/** A building's solar and battery together at `simTimeMs`, against the rest of its use (`load`: in W,
+ * or a function that works it out — called only when the answer depends on it: not at night outside
+ * the battery's evening discharge, the building's use being all from the grid then either way). */
+export function solarAndBatteryAt(egid: string, plants: PowerPlant[], simTimeMs: number, load: number | (() => number), snowCoverCm?: number): SolarAndBattery {
   let generationW = 0;
   let batteryGenW = 0;
   let ratedW = 0;
@@ -105,8 +129,7 @@ export function solarAndBatteryAt(egid: string, plants: PowerPlant[], simTimeMs:
   let cap: number | null = null;
   let irradiance: number | null = null;
   let snow = snowCoverCm;
-  for (const plant of plants) {
-    if (plant.egid !== egid || plant.technology !== "Photovoltaic") continue;
+  for (const plant of arraysOf(plants, egid)) {
     snow ??= snowDepthCm(simTimeMs);
     irradiance ??= irradianceWm2(simTimeMs, snow);
     const w = -pvPowerWAt(plant, simTimeMs, irradiance);
@@ -127,8 +150,15 @@ export function solarAndBatteryAt(egid: string, plants: PowerPlant[], simTimeMs:
   const hour = (dateMs - dayIndex * DAY_MS) / HOUR_MS;
   const profile = roofProfileIndex(egid);
   const today = dayCurve(dayIndex, cap ?? 0, snow ?? 0, profile);
-  const surplusW = generationW - loadW;
   const maxW = kw * 1000;
+  if (generationW <= 0 && typeof load === "function") {
+    // Nothing to charge from; without a discharge going on, the battery and the cap do nothing.
+    const yesterday = hour < 12 ? dayCurve(dayIndex - 1, cap ?? 0, snow ?? 0, profile) : null;
+    const discharging = (hour >= today.dischargeFromHour && hour < today.dischargeToHour) || (yesterday !== null && hour < yesterday.dischargeToHour - 24);
+    if (!discharging) return { generationW, batteryW: 0, curtailedW: 0, netW: -generationW, battery };
+  }
+  const loadW = typeof load === "function" ? load() : load;
+  const surplusW = generationW - loadW;
 
   let batteryW = 0;
   if (surplusW > 0) {

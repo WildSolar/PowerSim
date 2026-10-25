@@ -121,8 +121,21 @@ export interface Weather {
   condition: WeatherCondition;
 }
 
+// The last instant asked for, by date: a pass over the town asks every building about the same
+// moment (heat pumps, cooling, solar), and the weather is the same for all of them.
+let lastWeatherDateMs = Number.NaN;
+let lastWeather: Weather | null = null;
+
 export function weatherAt(simTimeMs: number): Weather {
   const dateMs = toDateMs(simTimeMs);
+  if (dateMs === lastWeatherDateMs && lastWeather) return lastWeather;
+  const weather = weatherAtDate(dateMs);
+  lastWeatherDateMs = dateMs;
+  lastWeather = weather;
+  return weather;
+}
+
+function weatherAtDate(dateMs: number): Weather {
   const base = seasonalTempC(dateMs) + diurnalTempC(dateMs) + tempAnomalyC(dateMs);
 
   // Averaging two independent noise channels (the original 0.7/0.3 blend) pulls the

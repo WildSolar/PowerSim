@@ -36,7 +36,7 @@ import {
   VEHICLE_UNCERTAINTY_FRACTION,
   VEHICLE_WEIBULL_SHAPE,
 } from "../config/mobility";
-import { evChargingPowerW, evChargingPowerWFrom, evDailySession, evSessionSeed, isResponsive, responsiveDraw, responsiveShare, type EvSession } from "./ev";
+import { evChargingPowerW, evChargingPowerWMemo, evDailySession, evSessionSeed, isResponsive, newEvSessionMemo, responsiveDraw, responsiveShare, type EvSession, type EvSessionMemo } from "./ev";
 import {
   ANNUAL_BIKE_KM,
   ANNUAL_CAR_KM,
@@ -403,7 +403,7 @@ interface SlotHandle {
   ewid: string;
   slotIndex: number;
   sessionKey: string; // ev.ts's per-car session key
-  ev?: { seed: number; responsiveDraw: number }; // ev.ts's session seed and seeded draw against the off-peak share, on first use
+  ev?: { seed: number; responsiveDraw: number; memo: EvSessionMemo }; // ev.ts's session seed, seeded draw against the off-peak share and remembered sessions, on first use
   mode?: ModeChainEntry<MobilityMode>;
   car?: RenewalChainEntry<VehicleTypeId>;
   bike?: RenewalChainEntry<VehicleTypeId>;
@@ -528,10 +528,10 @@ export function mobilityChargingPowerW(egid: string, dwelling: Dwelling, simTime
     // A car relying on a public charger draws its power there, not at home (publicCharging.ts).
     h.publicCharging ??= publicCharging.assignmentsFor(vehicleEntityKey(egid, h.ewid, h.slotIndex, "car"));
     if (h.publicCharging.length > 0 && publicCharging.chargesPubliclyAt(h.publicCharging, simTimeMs)) continue;
-    h.ev ??= { seed: evSessionSeed(egid, h.sessionKey), responsiveDraw: responsiveDraw(egid, h.sessionKey) };
+    h.ev ??= { seed: evSessionSeed(egid, h.sessionKey), responsiveDraw: responsiveDraw(egid, h.sessionKey), memo: newEvSessionMemo() };
     if (meter === undefined) meter = chargingTariff.meterAt(egid, dwelling.ewid, simTimeMs);
     smart ??= !meter && dynamicTariff.onDynamicDwelling(egid, dwelling.ewid, simTimeMs);
-    totalW += evChargingPowerWFrom(h.ev.seed, h.ev.responsiveDraw < responsiveShare(), simTimeMs, tariff, smart, meter);
+    totalW += evChargingPowerWMemo(h.ev.memo, h.ev.seed, h.ev.responsiveDraw < responsiveShare(), simTimeMs, tariff, smart, meter);
   }
   return totalW;
 }

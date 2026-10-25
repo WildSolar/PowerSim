@@ -71,6 +71,10 @@ class TariffStore {
   private sheets = new Map<number, TariffSheet>([[BASELINE_YEAR, { ...DEFAULT_SHEET }]]);
   private current: Tariff = this.compose(0);
   private currentMonth = Number.NaN;
+  // The last other month asked for (at): a pass over the town asks about the same month for every
+  // vehicle and home, and a month's prices hold for the whole month. Forgotten on every refresh.
+  private otherMonth = Number.NaN;
+  private other: Tariff | null = null;
   private readonly listeners = new Set<() => void>();
   private readonly publishListeners = new Set<(p: TariffPublication) => void>();
   private unsubscribeClock: (() => void) | null = null;
@@ -94,7 +98,13 @@ class TariffStore {
 
   /** Every price in force at `atMs`. */
   at(atMs: number): Tariff {
-    return monthIndex(atMs) === this.currentMonth ? this.current : this.compose(atMs);
+    const month = monthIndex(atMs);
+    if (month === this.currentMonth) return this.current;
+    if (month !== this.otherMonth || !this.other) {
+      this.other = this.compose(atMs);
+      this.otherMonth = month;
+    }
+    return this.other;
   }
 
   /** The sheet in force in a year: the latest published for it or before. */
@@ -194,6 +204,8 @@ class TariffStore {
     const now = simClock.getSimTimeMs();
     this.currentMonth = monthIndex(now);
     this.current = this.compose(now);
+    this.otherMonth = Number.NaN;
+    this.other = null;
     this.listeners.forEach((l) => l());
   }
 }
