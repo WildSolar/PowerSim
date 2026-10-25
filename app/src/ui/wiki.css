@@ -2,7 +2,7 @@
 
 .wiki {
   position: absolute;
-  top: var(--top-bar-h);
+  top: var(--chrome-h);
   left: 0;
   right: 0;
   bottom: 0;

@@ -206,20 +206,15 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
   // --- 6. The Town hall ---
   {
-    id: "openTownHall",
-    chapter: "The Town hall",
-    target: "townhall",
-    task: "Open the Town hall.",
-    done: (s) => s.townHall !== null,
-    say: ["Your decisions are made in the Town hall. The clock stops while you're in there."],
-  },
-  {
     id: "measuresTab",
     chapter: "The Town hall",
     target: "th-measures",
-    task: "Go to Measures.",
+    task: "Open Measures, in the row under the top bar.",
     done: (s) => s.townHall === "measures",
-    say: ["The overview sums up where things stand. But the real work is here."],
+    say: [
+      "Your decisions are made in the Town hall: its pages are in the row under the top bar. The clock stops while one of them is open.",
+      "The Overview sums up where things stand. But the real work is in Measures.",
+    ],
   },
   {
     id: "measuresExplained",
@@ -269,7 +264,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: "closeTownHall",
     chapter: "The Town hall",
     target: "th-close",
-    task: "Close the Town hall.",
+    task: "Back to the map: the ✕, Esc, or Prices once more.",
     done: (s) => s.townHall === null,
     say: ["That's enough paperwork for one day."],
   },

@@ -196,7 +196,7 @@
 .measure-detail-pane {
   position: sticky;
   top: 0;
-  max-height: calc(100vh - var(--top-bar-h) - 80px);
+  max-height: calc(100vh - var(--chrome-h) - 80px);
   overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -306,7 +306,7 @@
   }
   .measure-detail-pane {
     position: fixed;
-    top: calc(var(--top-bar-h) + 60px);
+    top: var(--chrome-h);
     right: 0;
     bottom: 0;
     width: min(420px, 100vw);

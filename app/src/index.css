@@ -51,6 +51,9 @@
   --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.08), 0 18px 48px rgba(0, 0, 0, 0.2);
 
   --top-bar-h: 56px;
+  /* The Town hall's row of pages under it (TownHall.tsx), and the two together. */
+  --th-strip-h: 38px;
+  --chrome-h: calc(var(--top-bar-h) + var(--th-strip-h));
 
   --r-1: 2px;
   --r-2: 4px;

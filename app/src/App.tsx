@@ -11,7 +11,7 @@ import { MapView } from "./map/MapView";
 import { BuildingPanel } from "./ui/BuildingPanel";
 import { openAdvisorPage } from "./ui/AdvisorsTab";
 import { showPickOnMap } from "./ui/openPick";
-import { TownHall, type TownHallSection } from "./ui/TownHall";
+import { TownHall, TownHallStrip, type TownHallSection } from "./ui/TownHall";
 import { clearInspected, InspectSlot, useInspected } from "./ui/InspectSlot";
 import { RefusedPurchaseToast } from "./ui/RefusedPurchaseToast";
 import { chartNav } from "./ui/chartNav";
@@ -426,12 +426,12 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
       <TopBar
         dataset={liveDataset ?? dataset}
         onOpenTreasury={() => setTownHall("treasury")}
-        onOpenTownHall={() => setTownHall((open) => (open ? null : "overview"))}
         onOpenInbox={() => setInboxSelection((open) => (open ? null : { tab: defaultInboxTab(simClock.getSimTimeMs()), id: null }))}
         onOpenWiki={() => setShowWiki((open) => !open)}
         onMenu={() => setShowMenu((open) => !open)}
         onFeedback={() => setShowFeedback(true)}
       />
+      <TownHallStrip section={townHall} transparency={transparency} onSection={setTownHall} />
       <div className="stage">
         <MapView
           dataset={dataset}
@@ -487,7 +487,6 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
           transparency={transparency}
           section={townHall}
           onSection={setTownHall}
-          onClose={() => setTownHall(null)}
           onShowPick={(pick) => {
             setTownHall(null);
             showPickOnMap(pick, (tool) => setColorMode(tool), selectBuilding);

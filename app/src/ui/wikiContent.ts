@@ -68,7 +68,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "A new game opens with a short briefing — the goal, how you stay in office, what you control — and a checklist of first steps in the corner, each with a button that takes you there. Close it once you know your way around; the game menu brings it back.",
       ),
       p(
-        "The bar across the top shows the date and the speed, and the numbers that matter most: the treasury, public approval, last year's emissions and your score. On the left of the map are its layers (see \"Map layers\"). Everything that isn't on the map — measures, the accounts, prices and statistics — is in the Town hall, top right. The game pauses while the Town hall or this wiki is open, and carries on at the same speed when you close them.",
+        "The bar across the top shows the date and the speed, and the numbers that matter most: the treasury, public approval, last year's emissions and your score. On the left of the map are its layers (see \"Map layers\"). Everything that isn't on the map — measures, the accounts, prices and statistics — is in the Town hall, whose pages sit in the row under the top bar: click one to open it, and click it again, the ✕ or Esc to go back to the map. The game pauses while a Town hall page or this wiki is open, and carries on at the same speed when you close them.",
       ),
       note(
         "Where there is no real data — who owns an electric car, when someone runs the dishwasher — the game fills in plausible households. They aren't the people who really live there, but together they behave the way a town does.",

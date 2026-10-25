@@ -26,45 +26,70 @@ const SECTIONS: { id: TownHallSection; title: string; blurb: string }[] = [
   { id: "log", title: "Decision log", blurb: "Every choice households, owners and businesses made, with the options they weighed." },
 ];
 
+export interface TownHallStripProps {
+  /** The page open, or null: the map. */
+  section: TownHallSection | null;
+  /** Transparency mode (start menu): the decision log is open to the player. */
+  transparency: boolean;
+  /** Opens a page; null goes back to the map. */
+  onSection: (section: TownHallSection | null) => void;
+}
+
+/** The Town hall's pages, always in a row under the top bar: a click opens one (the simulation pauses
+ * while it's open); the open one clicked again, the ✕ or Esc goes back to the map. */
+export function TownHallStrip({ section, transparency, onSection }: TownHallStripProps) {
+  const sections = SECTIONS.filter((s) => s.id !== "log" || transparency);
+  const speed = useSimSpeed();
+  return (
+    <nav className={`th-strip${section ? " open" : ""}`} aria-label="Town hall">
+      <span className="th-strip-label">Town hall</span>
+      <div className="th-tabs" data-tour="townhall">
+        {sections.map((s) => (
+          <button
+            key={s.id}
+            data-tour={`th-${s.id}`}
+            className={s.id === section ? "active" : ""}
+            aria-current={s.id === section ? "page" : undefined}
+            title={s.id === section ? "Back to the map (Esc)" : s.blurb}
+            onClick={() => onSection(s.id === section ? null : s.id)}
+          >
+            {s.title}
+          </button>
+        ))}
+      </div>
+      {section && (
+        <>
+          <span className={`th-paused${speed === PAUSE_SPEED ? "" : " running"}`}>{speed === PAUSE_SPEED ? "Simulation paused" : "Simulation running"}</span>
+          <button className="th-close" data-tour="th-close" onClick={() => onSection(null)} aria-label="Back to the map" title="Back to the map (Esc)">
+            <X size={18} strokeWidth={1.75} aria-hidden />
+          </button>
+        </>
+      )}
+    </nav>
+  );
+}
+
 export interface TownHallProps {
   dataset: MunicipalityDataset;
   /** Transparency mode (start menu): the decision log is open to the player. */
   transparency: boolean;
   section: TownHallSection;
   onSection: (section: TownHallSection) => void;
-  onClose: () => void;
   /** Shows an advisor's pick on the map (the Town hall closes). */
   onShowPick: (pick: LetterPick) => void;
 }
 
 /** The town hall: everything that isn't on the map — measures, the accounts, prices and the
- * statistics — full screen below the top bar. The simulation pauses while it's open and
+ * statistics — full screen below its row of pages (TownHallStrip). The simulation pauses while it's open and
  * picks up again at the same speed when it closes (unless the player changed it meanwhile). */
-export function TownHall({ dataset, transparency, section, onSection, onClose, onShowPick }: TownHallProps) {
+export function TownHall({ dataset, transparency, section, onSection, onShowPick }: TownHallProps) {
   const sections = SECTIONS.filter((s) => s.id !== "log" || transparency);
   const current = sections.find((s) => s.id === section) ?? sections[0];
-  const speed = useSimSpeed();
 
   usePauseWhileOpen();
 
   return (
-    <div className="town-hall" role="dialog" aria-label="Town hall">
-      <header className="th-header">
-        <div className="th-heading">
-          <span className="th-kicker">Town hall · {dataset.name}</span>
-          <span className={`th-paused${speed === PAUSE_SPEED ? "" : " running"}`}>{speed === PAUSE_SPEED ? "Simulation paused" : "Simulation running"}</span>
-        </div>
-        <nav className="th-tabs" aria-label="Town hall sections">
-          {sections.map((s) => (
-            <button key={s.id} data-tour={`th-${s.id}`} className={s.id === current.id ? "active" : ""} aria-current={s.id === current.id ? "page" : undefined} onClick={() => onSection(s.id)}>
-              {s.title}
-            </button>
-          ))}
-        </nav>
-        <button className="th-close" data-tour="th-close" onClick={onClose} aria-label="Close the town hall" title="Back to the map (Esc)">
-          <X size={18} strokeWidth={1.75} aria-hidden />
-        </button>
-      </header>
+    <div className="town-hall" role="dialog" aria-label={`Town hall: ${current.title}`}>
       <div className="th-body">
         <div className={`th-page th-page-${current.id}`}>
           <div className="th-page-head">

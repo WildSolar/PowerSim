@@ -189,8 +189,7 @@
   padding: 0 8px;
 }
 
-.tb-icon-button,
-.tb-town-hall {
+.tb-icon-button {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -209,22 +208,10 @@
   background: var(--fill);
 }
 
-.tb-town-hall {
-  margin: 0 4px;
-  padding: 0 14px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 600;
-}
-
-.tb-town-hall:hover {
-  background: var(--accent-strong);
-}
-
-/* The map and everything floating over it sit below the bar. */
+/* The map and everything floating over it sit below the bar and the Town hall's row. */
 .stage {
   position: absolute;
-  top: var(--top-bar-h);
+  top: var(--chrome-h);
   left: 0;
   right: 0;
   bottom: 0;
@@ -252,9 +239,6 @@
   .tb-day {
     display: none;
   }
-  .tb-town-hall span {
-    display: none;
-  }
   .kpi {
     padding: 0 7px;
   }
@@ -273,8 +257,5 @@
   }
   .top-bar > * {
     padding: 0 8px;
-  }
-  .tb-town-hall span {
-    display: none;
   }
 }

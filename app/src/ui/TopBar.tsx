@@ -7,7 +7,7 @@ import {
   CloudRain,
   CloudSnow,
   CloudSun,
-  Landmark,
+  
   Menu,
   Moon,
   Sun,
@@ -235,7 +235,6 @@ function ScoreKpi() {
 export interface TopBarProps {
   dataset: MunicipalityDataset;
   onOpenTreasury: () => void;
-  onOpenTownHall: () => void;
   onOpenInbox: () => void;
   onOpenWiki: () => void;
   onFeedback: () => void;
@@ -244,7 +243,7 @@ export interface TopBarProps {
 
 /** The strip across the top: time and speed, the three numbers that matter, and the way
  * into the town hall, the inbox, the wiki and the menu. */
-export function TopBar({ dataset, onOpenTreasury, onOpenTownHall, onOpenInbox, onOpenWiki, onMenu, onFeedback }: TopBarProps) {
+export function TopBar({ dataset, onOpenTreasury, onOpenInbox, onOpenWiki, onMenu, onFeedback }: TopBarProps) {
   return (
     <header className="top-bar">
       <div className="tb-brand">
@@ -267,10 +266,6 @@ export function TopBar({ dataset, onOpenTreasury, onOpenTownHall, onOpenInbox, o
         <button className="tb-icon-button" onClick={onOpenWiki} title="Wiki: how the simulation works" data-tour="wiki">
           <BookOpen size={17} strokeWidth={1.75} aria-hidden />
           <span>Wiki</span>
-        </button>
-        <button className="tb-town-hall" data-tour="townhall" onClick={onOpenTownHall} title="Measures, prices, the accounts and the statistics (the simulation pauses while it's open)">
-          <Landmark size={17} strokeWidth={1.75} aria-hidden />
-          <span>Town hall</span>
         </button>
         <button className="tb-icon-button" onClick={onMenu} title="Game menu: save, load a save string, main menu" aria-label="Game menu">
           <Menu size={18} strokeWidth={1.75} aria-hidden />

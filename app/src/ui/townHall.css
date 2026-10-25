@@ -1,8 +1,9 @@
-/* The town hall: a full-screen page below the top bar (which stays, with its live numbers). */
+/* The town hall: a full-screen page below the top bar (which stays, with its live numbers) and its
+   row of pages (which stays too, to switch pages or go back to the map). */
 
 .town-hall {
   position: absolute;
-  top: var(--top-bar-h);
+  top: var(--chrome-h);
   left: 0;
   right: 0;
   bottom: 0;
@@ -13,31 +14,36 @@
   z-index: 6;
 }
 
-.th-header {
+/* The Town hall's pages, always in a row under the top bar (TownHallStrip). */
+.th-strip {
+  position: absolute;
+  top: var(--top-bar-h);
+  left: 0;
+  right: 0;
+  height: var(--th-strip-h);
   display: flex;
   align-items: stretch;
-  gap: 24px;
-  padding: 0 16px 0 24px;
+  gap: 16px;
+  padding: 0 12px 0 16px;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
-  flex-shrink: 0;
+  color: var(--ink);
+  z-index: 5;
 }
 
-.th-heading {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 10px 0;
-  line-height: 1.25;
-  white-space: nowrap;
-}
-
-.th-kicker {
+.th-strip-label {
+  align-self: center;
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.th-strip .th-paused {
+  align-self: center;
+  white-space: nowrap;
 }
 
 .th-paused {
@@ -75,7 +81,7 @@
   padding: 0 14px;
   border: none;
   background: none;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--ink-2);
   cursor: pointer;
@@ -106,8 +112,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border: 1px solid var(--line);
   border-radius: var(--r-2);
   background: var(--surface);
@@ -177,15 +183,13 @@
 }
 
 @media (max-width: 720px) {
-  .th-header {
-    flex-wrap: wrap;
-    gap: 0 12px;
-    padding: 0 12px;
+  .th-strip {
+    gap: 8px;
+    padding: 0 8px;
   }
-  .th-tabs {
-    order: 3;
-    flex-basis: 100%;
-    height: 40px;
+  .th-strip-label,
+  .th-strip .th-paused {
+    display: none;
   }
   .th-page {
     padding: 20px 16px 40px;

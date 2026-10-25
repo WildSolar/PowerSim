@@ -85,7 +85,7 @@
 /* The target is low on the screen: the card goes up top, under the bar. */
 .tour-card.high {
   bottom: auto;
-  top: calc(var(--top-bar-h, 64px) + 16px);
+  top: calc(var(--chrome-h, 100px) + 16px);
 }
 
 .tour-head {
