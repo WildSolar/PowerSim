@@ -50,3 +50,53 @@ export function ToolListRow({
     </button>
   );
 }
+
+/** A figure at the top of a tool's drawer: what it counts, the figure, a line under it; what it means
+ * on hover. */
+export function ToolTile({ label, value, sub, title }: { label: string; value: string; sub?: string; title: string }) {
+  return (
+    <div className="tool-tile" title={title}>
+      <span className="tool-tile-label">{label}</span>
+      <span className="tool-tile-value">{value}</span>
+      {sub && <span className="tool-tile-sub">{sub}</span>}
+    </div>
+  );
+}
+
+export interface Share {
+  label: string;
+  value: number;
+  color: string;
+  /** A hover explanation. */
+  title?: string;
+}
+
+/** How a whole splits up — the town's households by how they could charge, its buildings by whether
+ * they're connected — as one bar in the map's colours, with each part's share named under it. Parts
+ * with nothing in them are left out. */
+export function ShareBar({ shares, label }: { shares: Share[]; label: string }) {
+  const total = shares.reduce((s, x) => s + x.value, 0);
+  const shown = shares.filter((s) => s.value > 0);
+  if (total <= 0) return null;
+  const pct = (v: number) => {
+    const p = (v / total) * 100;
+    return p > 0 && p < 1 ? "<1%" : `${Math.round(p)}%`;
+  };
+  return (
+    <div className="tool-share" role="img" aria-label={`${label}: ${shown.map((s) => `${s.label} ${pct(s.value)}`).join(", ")}`}>
+      <div className="tool-share-bar">
+        {shown.map((s) => (
+          <span key={s.label} style={{ flexGrow: s.value, background: s.color }} title={`${s.label}: ${pct(s.value)}`} />
+        ))}
+      </div>
+      <div className="tool-share-legend">
+        {shown.map((s) => (
+          <span key={s.label} className="tool-share-item" title={s.title}>
+            <span className="tool-list-dot" style={{ background: s.color }} aria-hidden />
+            {s.label} <b>{pct(s.value)}</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}

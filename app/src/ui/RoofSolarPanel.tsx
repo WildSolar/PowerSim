@@ -10,6 +10,9 @@ import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
 import "./districtHeatPanel.css";
 import { ToolPanel } from "./ToolPanel";
+import { ToolListGroup, ToolListRow, ToolTile } from "./ToolList";
+import { Facts } from "./CardParts";
+import { ROOF_SOLAR_LEGEND } from "../map/colorModes";
 import { PlotLink } from "./PlotLink";
 
 function monthYear(ms: number): string {
@@ -134,6 +137,8 @@ export function RoofContractCard({ building, now }: { building: Building; now: n
   );
 }
 
+const ROOF_COLOR = Object.fromEntries(ROOF_SOLAR_LEGEND.map((l) => [l.bucket, l.color]));
+
 function nameOf(b: Building | undefined, egid: string): string {
   return b?.address ?? `Building ${egid}`;
 }
@@ -154,7 +159,7 @@ export function RoofSolarPanel({ buildings, onSelectBuilding }: { buildings: Bui
     const built = all.filter((c) => c.status === "built");
     return {
       eligible,
-      pending: all.filter((c) => c.status === "offered").length,
+      pending: all.filter((c) => c.status === "offered"),
       accepted: all.filter((c) => c.status === "accepted"),
       built,
       inService: built.filter((c) => (c.installedAtMs ?? Infinity) <= now),
@@ -172,85 +177,107 @@ export function RoofSolarPanel({ buildings, onSelectBuilding }: { buildings: Bui
     if (b) mapFocus.focusBuilding(b);
   };
 
+  const share = estimate.roofs > 0 ? Math.round((estimate.accepting / estimate.roofs) * 10) : 0;
+  const contractRow = (c: RoofContract, color: string, figure: string, detail: string) => (
+    <ToolListRow key={c.id} color={color} title={nameOf(lookup.get(c.egid), c.egid)} figure={figure} detail={detail} selected={false} onClick={() => select(c.egid)} />
+  );
+  const acceptedRows = stats.accepted.map((c) => {
+    const b = lookup.get(c.egid);
+    const q = b ? roofContracts.quote(b, now, c.rentChfPerM2) : null;
+    return contractRow(
+      c,
+      ROOF_COLOR.accepted,
+      q?.gridFull ? "grid full" : q ? formatCHF(q.costRp) : "",
+      q?.gridFull
+        ? "Accepted — waits for the grid: reinforce the area first (Grid tool)"
+        : `Accepted — build it by ${monthYear(c.buildByMs ?? now)}, or the contract lapses`,
+    );
+  });
+  const installing = stats.built.length - stats.inService.length;
+
   const overview = (
     <>
-      <h4 className="dh-subtitle">Contracts</h4>
-      <div className="info-row">
-        <span>Offers awaiting an answer</span>
-        <span className="info-value">{stats.pending}</span>
-      </div>
-      <div className="info-row">
-        <span>The utility's arrays</span>
-        <span className="info-value">
-          {stats.built.length} · {Math.round(kwp(stats.built))} kWp
-        </span>
-      </div>
-      {stats.built.length > stats.inService.length && <p className="dh-note">{stats.built.length - stats.inService.length} still being installed.</p>}
-      <div className="info-row">
-        <span>Rent and upkeep</span>
-        <span className="info-value">{formatCHF(stats.yearlyCostRp)} a year</span>
-      </div>
-      <div className="info-row">
-        <span>Owners who built their own</span>
-        <span className="info-value">{stats.ownSolar}</span>
-      </div>
-      <div className="info-row">
-        <span>Offers declined</span>
-        <span className="info-value">{stats.declined}</span>
+      {stats.built.length === 0 && stats.pending.length === 0 && stats.accepted.length === 0 && (
+        <p className="dh-note">
+          Rent large roofs and put the utility&apos;s own solar on them: it pays the build and keeps what the array makes, against the rent and its upkeep. Set the rent
+          and offer contracts under Build.
+        </p>
+      )}
+      <div className="tool-tiles">
+        <ToolTile
+          label="The utility's arrays"
+          value={`${Math.round(kwp(stats.built))} kWp`}
+          sub={`on ${stats.built.length} roof${stats.built.length === 1 ? "" : "s"}${installing > 0 ? ` · ${installing} being installed` : ""}`}
+          title="The utility's own solar on rented roofs: it keeps what they make"
+        />
+        <ToolTile
+          label="Rent and upkeep"
+          value={stats.yearlyCostRp > 0 ? formatCHF(stats.yearlyCostRp) : "none"}
+          sub={stats.yearlyCostRp > 0 ? "a year" : "no arrays yet"}
+          title="What the utility pays a year for its arrays: the owners' rent and the upkeep"
+        />
+        <ToolTile
+          label="Offers out"
+          value={String(stats.pending.length)}
+          sub={`${stats.declined} declined · ${stats.ownSolar} built their own`}
+          title="Offers the owners are still thinking over. Some decline (for now); some are prompted to build solar of their own instead."
+        />
+        <ToolTile
+          label="Roofs left"
+          value={String(stats.eligible.length)}
+          sub={`about ${share} in 10 would accept`}
+          title="Large roofs without solar, whose owners could be offered a contract — and how many of them would accept at the rent you offer now (Build)"
+        />
       </div>
 
-      {stats.built.length > 0 && (
-        <>
-          <h4 className="dh-subtitle">The utility's arrays</h4>
-          {[...stats.built]
-            .sort((a, b) => (b.capacityKw ?? 0) - (a.capacityKw ?? 0))
-            .slice(0, 12)
-            .map((c) => (
-              <div className="info-row" key={c.id}>
-                <button className="dh-link" onClick={() => select(c.egid)}>
-                  {nameOf(lookup.get(c.egid), c.egid)}
-                </button>
-                <span className="info-value">{(c.capacityKw ?? 0).toFixed(0)} kWp</span>
-              </div>
-            ))}
-          {stats.built.length > 12 && <p className="dh-note">and {stats.built.length - 12} more.</p>}
-        </>
-      )}
+      <ToolListGroup title="Needs you" limit={5}>
+        {acceptedRows}
+      </ToolListGroup>
+      <ToolListGroup title="Offers awaiting an answer" limit={4}>
+        {stats.pending.map((c) => contractRow(c, ROOF_COLOR.offered, `CHF ${c.rentChfPerM2.toFixed(2)}/m²`, `Offered ${monthYear(c.offeredAtMs)} · answer by ${monthYear(c.answerAtMs)}`))}
+      </ToolListGroup>
+      <ToolListGroup title="The utility's arrays" limit={5}>
+        {[...stats.built]
+          .sort((a, b) => (b.capacityKw ?? 0) - (a.capacityKw ?? 0))
+          .map((c) =>
+            contractRow(
+              c,
+              ROOF_COLOR.utility,
+              `${(c.capacityKw ?? 0).toFixed(0)} kWp`,
+              (c.installedAtMs ?? Infinity) <= now ? `Generating since ${monthYear(c.installedAtMs ?? now)}` : `Being installed · ready ${monthYear(c.installedAtMs ?? now)}`,
+            ),
+          )}
+      </ToolListGroup>
       <p className="dh-note tool-list-hint">Click a roof here or on the map: its card shows its contract, or what an array there would mean.</p>
     </>
   );
 
   const build = (
     <>
-      <p className="dh-note">
-        Rent large roofs and put the utility's own solar on them. An owner can accept, decline, or be prompted to build their own. The utility pays the build cost — the
-        owner's price, less the federal payment — and keeps what the array makes, against the rent and its upkeep.
-      </p>
-
+      <h4 className="tool-list-heading">The offer</h4>
       <RentSlider />
-      <p className="dh-note">Owners want different rents — most somewhere around CHF 1–4 per m². Offer more and more say yes, but each array earns less.</p>
-      <label className="dh-check">
+      <Facts
+        facts={[
+          {
+            label: "At this rent",
+            value: `about ${share} owners in 10 would accept`,
+            title: "Owners want different rents — most somewhere around CHF 1–4 per m². Offer more and more say yes, but each array earns less.",
+          },
+          { label: "Large roofs without solar", value: String(stats.eligible.length) },
+        ]}
+      />
+      <label className="dh-check" title="The utility pays the build cost — the owner's price, less the federal payment — and keeps what the array makes, against the rent and its upkeep">
         <input type="checkbox" checked={roofContracts.getAutoBuild()} onChange={(e) => roofContracts.setAutoBuild(e.target.checked)} />
         Build as soon as an owner accepts
       </label>
-
-      <div className="info-row">
-        <span>Large roofs without solar</span>
-        <span className="info-value">{stats.eligible.length}</span>
-      </div>
-      {stats.eligible.length > 0 && (
-        <p className="dh-note">
-          At this rent, about {estimate.roofs > 0 ? Math.round((estimate.accepting / estimate.roofs) * 10) : 0} owners in 10 would accept an offer.
-        </p>
-      )}
-      <p className="dh-note">
-        Click a roof on the map to see what an array there would mean, and offer its owner the contract. The roof solar advisor (Town hall → Advisors) ranks the roofs
-        that would return the most.
+      <p className="dh-note tool-list-hint">
+        Click a roof on the map to see what an array there would mean, and offer its owner the contract. The roof solar advisor (Town hall → Advisors) ranks the roofs that
+        would return the most.
       </p>
 
       {stats.accepted.length > 0 && (
         <>
-          <h4 className="dh-subtitle">Accepted — to build within {ROOF_BUILD_WITHIN_MONTHS} months</h4>
+          <h4 className="tool-list-heading">Accepted — to build within {ROOF_BUILD_WITHIN_MONTHS} months</h4>
           {stats.accepted.map((c) => {
             const b = lookup.get(c.egid);
             const q = b ? roofContracts.quote(b, now, c.rentChfPerM2) : null;
@@ -276,7 +303,6 @@ export function RoofSolarPanel({ buildings, onSelectBuilding }: { buildings: Bui
           })}
         </>
       )}
-
     </>
   );
 

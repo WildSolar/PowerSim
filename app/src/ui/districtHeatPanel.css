@@ -61,29 +61,7 @@
   color: var(--ink-3);
 }
 
-.dh-coverage {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  column-gap: 12px;
-  row-gap: 3px;
-  margin: 8px 0 4px;
-  padding: 6px 0;
-  border-top: 1px solid var(--line);
-  color: var(--ink-2);
-}
 
-.dh-coverage-head {
-  font-size: 11px;
-  color: var(--ink-3);
-  text-align: right;
-}
-
-.dh-coverage-value {
-  text-align: right;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-}
 
 .dh-capacity {
   margin-top: 6px;

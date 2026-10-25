@@ -1,5 +1,5 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { ToolListGroup, ToolListRow } from "./ToolList";
+import { ToolListGroup, ToolListRow, ToolTile } from "./ToolList";
 import { FARM_PLOT_COLORS } from "../map/colorModes";
 import { AGRI_PV_BUILD_MONTHS, AGRI_PV_LEAD_MONTHS, AGRI_PV_PERMIT_MONTHS, AGRI_PV_SYSTEMS, type AgriPvSystem } from "../config/agriPv";
 import { agriPvKindYear } from "../sim/agriPvProfile";
@@ -302,17 +302,6 @@ function pollRange(polls: number[]): string {
   return votePct(lo) === votePct(hi) ? `${votePct(lo)}%` : `${votePct(lo)}–${votePct(hi)}%`;
 }
 
-/** A summary figure at the top of the drawer. */
-function Tile({ label, value, sub, title }: { label: string; value: string; sub?: string; title: string }) {
-  return (
-    <div className="tool-tile" title={title}>
-      <span className="tool-tile-label">{label}</span>
-      <span className="tool-tile-value">{value}</span>
-      {sub && <span className="tool-tile-sub">{sub}</span>}
-    </div>
-  );
-}
-
 /** The Agri-PV layer's panel: where the town stands at a glance, what needs the player, the zones and
  * the fields (the Overview), or zoning the picked fields and the free zoned fields to take up (Build). */
 export function AgriPvPanel() {
@@ -426,20 +415,20 @@ export function AgriPvPanel() {
         </p>
       )}
       <div className="tool-tiles">
-        <Tile label="In service" value={mw(summary.inServiceKw)} sub={`${summary.inService} field${summary.inService === 1 ? "" : "s"}`} title="The Agri-PV fields making power, whoever built them" />
-        <Tile
+        <ToolTile label="In service" value={mw(summary.inServiceKw)} sub={`${summary.inService} field${summary.inService === 1 ? "" : "s"}`} title="The Agri-PV fields making power, whoever built them" />
+        <ToolTile
           label="Under way"
           value={String(summary.underWay)}
           sub={summary.building > 0 ? `${summary.building} being built` : "in permits or the courts"}
           title="Fields taken up and not yet in service: in the permit procedure, in the courts, permitted, or being built"
         />
-        <Tile
+        <ToolTile
           label="Zoned, free"
           value={hectares(summary.freeM2)}
           sub={`${summary.free.length} field${summary.free.length === 1 ? "" : "s"} · ${summary.agreed} farmer${summary.agreed === 1 ? "" : "s"} agreed`}
           title={`Zoned fields no one has taken up yet, of ${plots.length} fields of farmland (${hectares(plots.reduce((s, p) => s + p.areaM2, 0))}). Whoever farms a field has the last word; a no stands for a few years${summary.refused > 0 ? ` — ${summary.refused} said no, for now` : ""}.`}
         />
-        <Tile
+        <ToolTile
           label="Acceptance"
           value={`${Math.round(agriPv.getAcceptance() * 100)}%`}
           sub={dialogue ? "dialogue running" : "grows with each field"}

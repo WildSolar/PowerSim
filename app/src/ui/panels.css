@@ -241,7 +241,7 @@
   font-size: 12px;
 }
 
-.panel dl.bp-facts {
+dl.bp-facts {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   column-gap: 12px;
@@ -250,13 +250,13 @@
   font-size: 12.5px;
 }
 
-.panel dl.bp-facts dt {
+dl.bp-facts dt {
   margin: 0;
   font-size: 11.5px;
   color: var(--ink-3);
 }
 
-.panel dl.bp-facts dd {
+dl.bp-facts dd {
   margin: 0;
 }
 

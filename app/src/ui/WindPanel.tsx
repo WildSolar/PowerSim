@@ -7,7 +7,7 @@ import { simClock } from "../sim/engine";
 import { useSimDay } from "../sim/store";
 import { wind, WIND_PHASE_LABEL, type WindPhase, type WindSite } from "../sim/wind";
 import { WIND_SITE_COLORS } from "../map/colorModes";
-import { ToolListGroup, ToolListRow } from "./ToolList";
+import { ToolListGroup, ToolListRow, ToolTile } from "./ToolList";
 import { formatCHF } from "./format";
 import "./districtHeatPanel.css";
 import "./zoningPanel.css";
@@ -161,7 +161,7 @@ export function WindPanel() {
     wind.select(site.id);
     mapFocus.request({ lon: site.lon, lat: site.lat, minZoom: 14.5 });
   };
-  const siteRow = (site: WindSite) => {
+  const siteRow = (site: WindSite, detailOverride?: string) => {
     const p = wind.project(site.id);
     const phase = wind.phaseOf(site.id);
     const n = p?.turbines ?? site.turbines.length;
@@ -172,32 +172,99 @@ export function WindPanel() {
         color={WIND_SITE_COLORS[phaseBucket(phase)]}
         title={site.name ?? site.id}
         figure={`${n} turbine${n === 1 ? "" : "s"} · ${(wind.yearlyKWh(site, n) / 1e6).toFixed(0)} GWh a year`}
-        detail={`${WIND_PHASE_LABEL[phase]}${until}`}
+        detail={detailOverride ?? `${WIND_PHASE_LABEL[phase]}${until}`}
         selected={site.id === selectedId}
         onClick={() => pick(site)}
       />
     );
   };
 
+  const byBucket = (bucket: ReturnType<typeof phaseBucket>) => sites.filter((s) => phaseBucket(wind.phaseOf(s.id)) === bucket);
+  const turbinesTurning = byBucket("turning").reduce((sum, s) => sum + (wind.project(s.id)?.turbines ?? 0), 0);
+  const potentialGWh = sites.reduce((sum, s) => sum + wind.yearlyKWh(s, s.turbines.length), 0) / 1e6;
+  const underWay = byBucket("underWay").length + byBucket("ready").filter((s) => wind.phaseOf(s.id) === "building").length;
+  const vote = (site: WindSite) => {
+    const key = wind.project(site.id)?.voteKey;
+    return wind.phaseOf(site.id) === "zoning" && key ? approval.getVoteInfo(key, null, now) : null;
+  };
+  // What waits on the player: a permit to apply for, a permitted site to build, a stopped one free to
+  // try again — and a vote coming up.
+  const needsYou = sites
+    .map((site) => {
+      const phase = wind.phaseOf(site.id);
+      const v = vote(site);
+      const detail =
+        phase === "zoned"
+          ? "Zoned — apply for the permit on its card"
+          : phase === "permitted"
+            ? "Permitted — order the build on its card"
+            : (phase === "rejected" || phase === "struckDown") && wind.canStartZoning(site.id, now)
+              ? `${WIND_PHASE_LABEL[phase]} — may be put forward again`
+              : v
+                ? `To the vote ${monthYear(v.atMs)} · ${votePct(v.pollYes)}% yes in the polls`
+                : null;
+      return detail ? siteRow(site, detail) : null;
+    })
+    .filter((r) => r !== null);
+
   const overview = (
     <>
-      <p className="dh-note">
-        Wind turbines make most of their power in winter, when solar makes least. But in Switzerland the road to one is long: a study, a zoning plan the voters decide
-        on, a permit that is almost always appealed, and only then the build. Each step can fail, or take years longer than planned.
-      </p>
-      {turning > 0 && (
-        <div className="info-row">
-          <span>Turning</span>
-          <span className="info-value">{(turning / 1000).toFixed(1)} MW</span>
-        </div>
+      {(study !== "done" || sites.every((s) => wind.phaseOf(s.id) === "found")) && (
+        <p className="dh-note">
+          Wind turbines make most of their power in winter, when solar makes least. But in Switzerland the road to one is long: a study, a zoning plan the voters decide
+          on, a permit that is almost always appealed, and only then the build. Each step can fail, or take years longer than planned.
+        </p>
       )}
-
       {study === "none" && <p className="dh-note">Nothing is known yet about where turbines could stand: commission a study (Build).</p>}
       {study === "running" && <p className="dh-note">The wind study is under way; results in {monthYear(wind.studyDoneAtMs() ?? now)}.</p>}
       {study === "done" && sites.length === 0 && <p className="dh-note">The study found nowhere a turbine could stand: too close to homes everywhere, or too little wind.</p>}
       {study === "done" && sites.length > 0 && (
         <>
-          <ToolListGroup title="Sites the study found">{sites.map(siteRow)}</ToolListGroup>
+          <div className="tool-tiles">
+            <ToolTile
+              label="Turning"
+              value={`${(turning / 1000).toFixed(1)} MW`}
+              sub={`${turbinesTurning} turbine${turbinesTurning === 1 ? "" : "s"}`}
+              title={`Wind turbines in service, ${TURBINE_KW / 1000} MW each`}
+            />
+            <ToolTile
+              label="Under way"
+              value={String(underWay)}
+              sub={`${byBucket("ready").length} permitted or being built`}
+              title="Sites on their way: the zoning plan and its vote, the permit and the courts, the build"
+            />
+            <ToolTile
+              label="Sites found"
+              value={String(sites.length)}
+              sub={`up to ${potentialGWh.toFixed(0)} GWh a year`}
+              title="Where the wind study found turbines could stand, and what they'd make a year with every turbine the site could take"
+            />
+            <ToolTile
+              label="Stopped"
+              value={String(byBucket("stopped").length)}
+              sub="voted down or struck down"
+              title="Sites voted down or struck down in court. After a few years at rest, a site may be put forward again."
+            />
+          </div>
+
+          <ToolListGroup title="Needs you" limit={4}>
+            {needsYou}
+          </ToolListGroup>
+          <ToolListGroup title="Turning" limit={3}>
+            {byBucket("turning").map((s) => siteRow(s))}
+          </ToolListGroup>
+          <ToolListGroup title="Permitted or being built" limit={3}>
+            {byBucket("ready").map((s) => siteRow(s))}
+          </ToolListGroup>
+          <ToolListGroup title="Zoning or permit under way" limit={3}>
+            {byBucket("underWay").map((s) => siteRow(s))}
+          </ToolListGroup>
+          <ToolListGroup title="Found, nothing done yet" limit={4}>
+            {byBucket("planned").map((s) => siteRow(s))}
+          </ToolListGroup>
+          <ToolListGroup title="Voted down or struck down" limit={0}>
+            {byBucket("stopped").map((s) => siteRow(s))}
+          </ToolListGroup>
           <p className="dh-note tool-list-hint">Click a site here or a turbine on the map: its card shows the next step.</p>
         </>
       )}
@@ -208,6 +275,7 @@ export function WindPanel() {
     <>
       {study === "none" && (
         <>
+          <h4 className="tool-list-heading">Find the sites</h4>
           <p className="dh-note">Nothing is known yet about where turbines could stand. A study takes {WIND_STUDY_MONTHS} months: wind measurements and a site assessment.</p>
           <div className="dh-actions">
             <button className="dh-order" onClick={() => wind.orderStudy(simClock.getSimTimeMs())}>
@@ -220,8 +288,16 @@ export function WindPanel() {
       {study === "done" && sites.length === 0 && <p className="dh-note">The study found nowhere a turbine could stand.</p>}
       {study === "done" && sites.length > 0 && (
         <>
-          <p className="dh-note">Each site goes its own way — a zoning plan the voters decide on, a permit, the build. Pick a site to take its next step:</p>
-          <ToolListGroup title="Sites">{sites.map(siteRow)}</ToolListGroup>
+          <ToolListGroup title="Next steps" limit={6}>
+            {needsYou}
+          </ToolListGroup>
+          <ToolListGroup title="Found — put a zoning plan forward" limit={6}>
+            {byBucket("planned").map((s) => siteRow(s, `${s.turbines.length} turbine${s.turbines.length === 1 ? "" : "s"} at most · the plan goes to the vote`))}
+          </ToolListGroup>
+          <p className="dh-note tool-list-hint">
+            Each site goes its own way — a zoning plan the voters decide on ({WIND_ZONING_MONTHS} months), a permit ({WIND_PERMIT_MONTHS} months, often appealed), the build.
+            Pick a site: its card takes the next step.
+          </p>
         </>
       )}
     </>

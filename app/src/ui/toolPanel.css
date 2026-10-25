@@ -214,3 +214,53 @@
 .tool-list-summary {
   margin: 0 0 4px;
 }
+
+/* How a whole splits up (ToolList.tsx ShareBar): one bar, its parts named under it. */
+.tool-share {
+  margin: 2px 0 8px;
+}
+
+.tool-share-bar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  margin-bottom: 4px;
+}
+
+.tool-share-bar > span {
+  flex-basis: 0;
+  min-width: 3px;
+  border-radius: 2px;
+}
+
+.tool-share-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.tool-share-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tool-share-item b {
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.tool-share-item .tool-list-dot {
+  margin: 0;
+}
+
+/* A drawer's map overlays and filters on one line: two groups of chips. */
+.tool-filter-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 0 3px;
+  background: var(--line-strong);
+}

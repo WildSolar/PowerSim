@@ -277,10 +277,3 @@
   font-weight: 600;
 }
 
-/* Grid panel: work on the way in an area (a bigger station, a battery). */
-.grid-wip {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  color: var(--warn);
-}

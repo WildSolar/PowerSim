@@ -1,4 +1,3 @@
-import { BatteryCharging, Wrench } from "lucide-react";
 import { useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { CardKind, CardSection, Facts } from "./CardParts";
 import { BATTERY_MONTHS, GRID_BATTERY_SIZES, REINFORCE_MONTHS } from "../config/grid";
@@ -13,6 +12,7 @@ import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
 import { InspectCard } from "./InspectCard";
 import { ToolPanel } from "./ToolPanel";
+import { ToolListGroup, ToolListRow, ToolTile } from "./ToolList";
 import { PlotLink } from "./PlotLink";
 
 const BUCKET_COLOR = Object.fromEntries(GRID_LEGEND.map((l) => [l.bucket, l.color]));
@@ -180,23 +180,6 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
   );
 }
 
-/** A small mark for an area with work on the way: a bigger station being built, a battery being installed. */
-function WorkInProgress({ area, now }: { area: GridArea; now: number }) {
-  const upgrade = area.upgrades.filter((u) => u.atMs > now).sort((x, y) => x.atMs - y.atMs)[0];
-  const battery = area.batteries.filter((b) => b.atMs > now).sort((x, y) => x.atMs - y.atMs)[0];
-  if (!upgrade && !battery) return null;
-  const parts = [
-    upgrade && `Reinforcing the station (${upgrade.capacityKw} kVA, ${monthYear(upgrade.atMs)})`,
-    battery && `A ${batterySize(battery)} battery is being installed (${monthYear(battery.atMs)})`,
-  ].filter(Boolean);
-  return (
-    <span className="grid-wip" title={parts.join("\n")} aria-label={parts.join(". ")}>
-      {upgrade && <Wrench size={12} strokeWidth={2} aria-hidden />}
-      {battery && <BatteryCharging size={12} strokeWidth={2} aria-hidden />}
-    </span>
-  );
-}
-
 /** The grid layer's panel: the transformer areas by how loaded their stations were at the last
  * readings, the selected area's peaks, and reinforcing it or adding a battery. */
 export function GridPanel() {
@@ -219,69 +202,101 @@ export function GridPanel() {
   const lastSummer = areas[0]?.summer?.year;
 
   const working = areas.filter((a) => grid.pendingUpgrade(a, now) || a.batteries.some((b) => b.atMs > now));
+  const auto = grid.getAutoReinforce();
+  const blocked = counts.over > 0 ? grid.blockedShare(now) : 0;
+
+  /** What a station's area is doing: which peak loads it most, its size, and work on the way. */
+  const areaDetail = (a: GridArea): string => {
+    const { drawKw, feedInKw } = grid.effectivePeaks(a, now);
+    const up = grid.pendingUpgrade(a, now);
+    const battery = a.batteries.filter((b) => b.atMs > now).sort((x, y) => x.atMs - y.atMs)[0];
+    return [
+      `${grid.capacityAt(a, now)} kVA`,
+      drawKw >= feedInKw ? "busiest on winter evenings" : "busiest at sunny middays",
+      up && `reinforcing to ${up.capacityKw} kVA, ${monthYear(up.atMs)}`,
+      battery && `battery ${monthYear(battery.atMs)}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  };
+  const areaRow = (a: GridArea, detail = areaDetail(a)) => (
+    <ToolListRow
+      key={a.id}
+      color={BUCKET_COLOR[grid.bucket(a, now)]}
+      title={a.name}
+      figure={`${Math.round(grid.loadShare(a, now) * 100)}%`}
+      detail={detail}
+      selected={a.id === selectedId}
+      onClick={() => pickArea(a)}
+    />
+  );
+  const needsYou = ranked
+    .filter((a) => grid.bucket(a, now) === "over" && !grid.pendingUpgrade(a, now))
+    .map((a) => areaRow(a, auto ? "Overloaded — reinforced automatically once the treasury has the money" : "Overloaded — new connections wait; reinforce it on its card"));
+  const inBucket = (bucket: string) => ranked.filter((a) => grid.bucket(a, now) === bucket).map((a) => areaRow(a));
 
   const overview = (
     <>
-      <div className="info-row">
-        <span>Transformer areas</span>
-        <span className="info-value">{areas.length}</span>
+      <div className="tool-tiles">
+        <ToolTile
+          label="Stations"
+          value={String(areas.length)}
+          sub={`${counts.ok} with room to spare`}
+          title={`The transformer stations that feed the town's streets, each with its area. Their load is read twice a year: winter ${lastWinter} (the coldest January/February evenings) and summer ${lastSummer} (the sunniest middays); the next readings come after each season.`}
+        />
+        <ToolTile
+          label="Overloaded"
+          value={String(counts.over)}
+          sub={counts.over > 0 ? `${Math.round(blocked * 100)}% of buildings wait` : "none — all connect"}
+          title="Stations whose last peak was more than they can carry. In their area, new heat pumps, wallboxes and large solar arrays wait for a bigger station or a battery."
+        />
+        <ToolTile
+          label="Getting tight"
+          value={String(counts.tight + counts.full)}
+          sub={`${counts.full} nearly full (90%+)`}
+          title="Stations whose last peak took 75% or more of what they can carry: the next heat pumps or solar roofs in their area may tip them over"
+        />
+        <ToolTile
+          label="Work under way"
+          value={String(working.length)}
+          sub={auto ? "reinforcing automatically" : "bigger stations, batteries"}
+          title="Stations being reinforced, or getting a neighbourhood battery"
+        />
       </div>
-      {GRID_LEGEND.map((l) => (
-        <div className="info-row" key={l.bucket}>
-          <span>
-            <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, background: l.color, marginRight: 5 }} />
-            {l.label}
-          </span>
-          <span className="info-value">{counts[l.bucket]}</span>
-        </div>
-      ))}
-      <p className="dh-note">
-        Readings: winter {lastWinter} (coldest January/February evenings), summer {lastSummer} (sunniest middays). The next ones come after each season.
-      </p>
-      <h4 className="dh-subtitle">Most loaded areas</h4>
-      {ranked.slice(0, 8).map((a) => (
-        <button
-          key={a.id}
-          className={`ev-list-row${a.id === selectedId ? " selected" : ""}`}
-          onClick={() => pickArea(a)}
-        >
-          <span className="ev-list-name">{a.name}</span>
-          <WorkInProgress area={a} now={now} />
-          <span className="info-value">{Math.round(grid.loadShare(a, now) * 100)}%</span>
-        </button>
-      ))}
-      <p className="dh-note tool-list-hint">Click a station or a building on the map to see its area.</p>
+
+      <ToolListGroup title="Needs you" limit={4}>
+        {needsYou}
+      </ToolListGroup>
+
+      <ToolListGroup title="Nearly full (90%+)" limit={4}>
+        {inBucket("full")}
+      </ToolListGroup>
+      <ToolListGroup title="Getting tight (75%+)" limit={4}>
+        {inBucket("tight")}
+      </ToolListGroup>
+      <ToolListGroup title="Room to spare" limit={counts.over + counts.full + counts.tight > 0 ? 3 : 6}>
+        {inBucket("ok")}
+      </ToolListGroup>
+      <p className="dh-note tool-list-hint">Most loaded first, at the last readings. Click a station here, or a station or building on the map, to see its area.</p>
     </>
   );
 
   const build = (
     <>
+      <h4 className="tool-list-heading">Reinforce the grid</h4>
       <p className="dh-note">
-        Pick a station on the map (or in the Overview&apos;s list) to reinforce it — a bigger transformer, the size of your choice — or to add a neighbourhood battery.
+        Pick a station on the map or in the Overview to reinforce it — a bigger transformer, the size of your choice — or to add a neighbourhood battery.
       </p>
       <label className="dh-check" title="After each reading, every overloaded station with nothing on order gets the size its peak needs, worst first, paid from the treasury. A station the treasury can't pay for waits for the next reading.">
-        <input type="checkbox" checked={grid.getAutoReinforce()} onChange={(e) => grid.setAutoReinforce(e.target.checked)} />
+        <input type="checkbox" checked={auto} onChange={(e) => grid.setAutoReinforce(e.target.checked)} />
         Reinforce overloaded stations automatically, if the treasury has the money
       </label>
-      {working.length > 0 && (
-        <>
-          <h4 className="dh-subtitle">Work under way</h4>
-          {working.map((a) => {
-            const up = grid.pendingUpgrade(a, now);
-            const batteries = a.batteries.filter((b) => b.atMs > now);
-            return (
-              <button key={a.id} className={`ev-list-row${a.id === selectedId ? " selected" : ""}`} onClick={() => pickArea(a)}>
-                <span className="ev-list-name">{a.name}</span>
-                <span className="info-value">
-                  {up ? `${up.capacityKw} kVA, ${monthYear(up.atMs)}` : ""}
-                  {up && batteries.length > 0 ? " · " : ""}
-                  {batteries.length > 0 ? `${batteries.map(batterySize).join(", ")}, ${monthYear(batteries[batteries.length - 1].atMs)}` : ""}
-                </span>
-              </button>
-            );
-          })}
-        </>
-      )}
+      <ToolListGroup title="Overloaded, nothing ordered" limit={6}>
+        {ranked.filter((a) => grid.bucket(a, now) === "over" && !grid.pendingUpgrade(a, now)).map((a) => areaRow(a))}
+      </ToolListGroup>
+      <ToolListGroup title="Work under way" limit={6}>
+        {working.map((a) => areaRow(a))}
+      </ToolListGroup>
     </>
   );
 

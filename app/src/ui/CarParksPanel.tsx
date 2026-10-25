@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { GRID_FULL_FOR_SOLAR } from "../sim/gridLimits";
-import { ToolListGroup, ToolListRow } from "./ToolList";
+import { ToolListGroup, ToolListRow, ToolTile } from "./ToolList";
 import { CAR_PARK_LEGEND } from "../map/colorModes";
 import { CAR_PARK_BUILD_MONTHS } from "../config/carParks";
 import { mapFocus } from "../map/mapFocus";
@@ -161,47 +161,111 @@ export function CarParksPanel() {
     );
   };
 
+  const building = covered.filter((l) => (carParks.canopyOn(l.id)?.installedAtMs ?? 0) > now);
+  const policy = policyStore.get();
+  const kwp = (kw: number) => (kw >= 1000 ? `${(kw / 1000).toFixed(1)} MWp` : `${Math.round(kw)} kWp`);
+  const buildRow = (lot: CarPark) => {
+    const full = carParks.gridFull(lot, now);
+    return (
+      <ToolListRow
+        key={lot.id}
+        color={legendColor("municipal")}
+        title={lotTitle(lot)}
+        figure={full ? "grid full" : formatCHF(carParks.quote(lot, now).netRp)}
+        detail={`${lot.spaces} spaces · about ${Math.round(lot.canopyKw)} kWp${full ? " · the grid here can't take it yet" : ""}`}
+        selected={lot.id === selectedId}
+        onClick={() => pick(lot)}
+      />
+    );
+  };
+
   const overview = (
     <>
-      <p className="dh-note">
-        A solar canopy over a car park makes power where it is used, shades the cars, and takes no land that isn't paved already. These are the town's open-air car parks
-        of about 20 spaces and up.
-      </p>
-      <div className="info-row">
-        <span>Car parks · spaces</span>
-        <span className="info-value">
-          {lots.length} · {lots.reduce((s, l) => s + l.spaces, 0).toLocaleString("de-CH")}
-        </span>
-      </div>
-      <div className="info-row" title="Canopies generating, against what every car park could carry">
-        <span>Canopies</span>
-        <span className="info-value">
-          {(built / 1000).toFixed(1)} of {(potential / 1000).toFixed(1)} MWp
-        </span>
-      </div>
       {lots.length === 0 ? (
         <p className="dh-note">No open-air car park here is big enough for a canopy.</p>
       ) : (
-        <p className="dh-note tool-list-hint">Click a car park here or on the map: its card shows what a canopy would make and cost.</p>
+        covered.length === 0 && (
+          <p className="dh-note">
+            A solar canopy over a car park makes power where it is used, shades the cars, and takes no land that isn&apos;t paved already. These are the town&apos;s
+            open-air car parks of about 20 spaces and up.
+          </p>
+        )
       )}
-      <ToolListGroup title="With a canopy">{covered.map(row)}</ToolListGroup>
-      <ToolListGroup title="The town's, no canopy yet">{mine.map(row)}</ToolListGroup>
-      <ToolListGroup title="Private, no canopy">{theirs.map(row)}</ToolListGroup>
+      {lots.length > 0 && (
+        <div className="tool-tiles">
+          <ToolTile
+            label="Car parks"
+            value={String(lots.length)}
+            sub={`${lots.reduce((s, l) => s + l.spaces, 0).toLocaleString("de-CH")} spaces`}
+            title="The town's open-air car parks of about 20 spaces and up, the town's own and private ones"
+          />
+          <ToolTile
+            label="Canopies"
+            value={kwp(built)}
+            sub={`of ${kwp(potential)} possible`}
+            title="Solar canopies generating, against what every car park could carry"
+          />
+          <ToolTile
+            label="The town's"
+            value={String(mine.length)}
+            sub={`without a canopy · ${kwp(mine.reduce((s, l) => s + l.canopyKw, 0))}`}
+            title="The town's own car parks — by its schools, halls and sports grounds, and the public ones — still without a canopy. You can cover them directly (Build), or a few a year with the measure ‘Solar over the town's car parks’."
+          />
+          <ToolTile
+            label="Private"
+            value={String(theirs.length)}
+            sub={`without a canopy · ${kwp(theirs.reduce((s, l) => s + l.canopyKw, 0))}`}
+            title="Private car parks still without a canopy: their owners decide. The car park solar subsidy and the solar duty for large car parks (Town hall → Measures) move them."
+          />
+        </div>
+      )}
+      <ToolListGroup title="Being built" limit={3}>
+        {building.map(row)}
+      </ToolListGroup>
+      <ToolListGroup title="With a canopy" limit={4}>
+        {covered.filter((l) => !building.includes(l)).map(row)}
+      </ToolListGroup>
+      <ToolListGroup title="The town's, no canopy yet" limit={4}>
+        {mine.map(row)}
+      </ToolListGroup>
+      <ToolListGroup title="Private, no canopy" limit={3}>
+        {theirs.map(row)}
+      </ToolListGroup>
+      {lots.length > 0 && <p className="dh-note tool-list-hint">Biggest first. Click a car park here or on the map: its card shows what a canopy would make and cost.</p>}
     </>
   );
 
   const build = (
     <>
-      <p className="dh-note">
-        The town's own car parks — by its schools, halls and sports grounds, and the public ones — you can cover directly, or a few a year with the measure ‘Solar over the
-        town's car parks’. Private ones are their owners' to decide; the car park solar subsidy and the solar duty for large car parks (Town hall → Measures) move them.
-      </p>
+      <h4 className="tool-list-heading">Set in Town hall → Measures</h4>
+      <Facts
+        facts={[
+          {
+            label: "The town's own",
+            value: policy.carParkSolarMunicipalPerYear > 0 ? `${policy.carParkSolarMunicipalPerYear} a year, biggest first` : "one at a time, below",
+            title: "The measure ‘Solar over the town's car parks’ covers a few of them a year, paid by the treasury",
+          },
+          {
+            label: "Subsidy",
+            value: policy.carParkSolarSubsidyRpPerKwp > 0 ? `${formatCHF(policy.carParkSolarSubsidyRpPerKwp)} per kWp` : "none",
+            title: "The car park solar subsidy: what you pay private owners towards a canopy",
+          },
+          {
+            label: "Solar duty",
+            value: policy.carParkSolarDutyMinSpaces > 0 ? `from ${policy.carParkSolarDutyMinSpaces} spaces, within ${policy.carParkSolarDutyYears} years` : "none",
+            title: "The solar duty for large car parks: owners must cover them by a deadline",
+          },
+        ]}
+      />
       {mine.length === 0 ? (
         <p className="dh-note">The town has no car park of its own left without a canopy.</p>
       ) : (
-        <ToolListGroup title="The town's, no canopy yet" limit={12}>
-          {mine.map(row)}
-        </ToolListGroup>
+        <>
+          <ToolListGroup title="The town's, no canopy yet" limit={8}>
+            {mine.map(buildRow)}
+          </ToolListGroup>
+          <p className="dh-note tool-list-hint">Biggest first, with the cost after the federal payment. Pick one: its card has the order.</p>
+        </>
       )}
     </>
   );

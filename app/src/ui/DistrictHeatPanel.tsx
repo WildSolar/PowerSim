@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { DH_BOILER_EFFICIENCY, DH_LINE_COST_FACTOR, DH_SOURCE_SPECS, DH_WOOD_NUISANCE_RADIUS_M, type DhLineTerrain } from "../config/districtHeat";
 import type { DhCandidateData } from "../data/types";
 import { BASELINE_YEAR, formatDate, toDateMs } from "../sim/calendar";
@@ -22,6 +22,7 @@ import { InspectCard } from "./InspectCard";
 import { ToolPanel } from "./ToolPanel";
 import { PlotLink } from "./PlotLink";
 import { CardKind, Facts } from "./CardParts";
+import { ToolListGroup, ToolListRow, ToolTile } from "./ToolList";
 
 function percent(part: number, share: CoverageShare): string {
   return share.total > 0 ? `${Math.round((part / share.total) * 100)}%` : "–";
@@ -35,6 +36,10 @@ function formatMW(w: number): string {
 function monthYear(ms: number): string {
   return formatDate(ms).replace(/^\d+ /, "");
 }
+
+// A network's dot in a list: how much of its winter peak clean sources carry.
+const CLEAN_COLOR = { all: "#1baf7a", most: "#f2b01e", little: "#d0342c", none: "#b6b4ac" };
+const DH_BUILDING_COLOR = "#b6b4ac";
 
 const PLACED: { kind: PlacedKind; note: string }[] = [
   { kind: "groundwater", note: "over a usable aquifer" },
@@ -382,7 +387,6 @@ export function DistrictHeatPanel() {
   const boilersOnly = (n: DhNetworkInfo) => n.sources.every((s) => s.existing && (!s.kind || !(s.cleanW > 0)));
   const networks = allNetworks.filter((n) => !boilersOnly(n));
   const fossilNetworks = allNetworks.filter(boilersOnly);
-  const fossilBuildings = fossilNetworks.reduce((sum, n) => sum + (stats.byNetwork.get(n.id) ?? 0), 0);
   const candidates = useMemo(() => districtHeatSources.availableCandidates(simDay), [simDay, version, draftVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const draft = districtHeatSources.getDraft();
   const woodLeft = districtHeatSources.woodRemainingMw();
@@ -403,113 +407,96 @@ export function DistrictHeatPanel() {
     mapFocus.request({ lon: source.lon, lat: source.lat, minZoom: 14.5 });
   };
 
+  const networkRow = (n: DhNetworkInfo, detail?: string) => {
+    const connected = stats.byNetwork.get(n.id) ?? 0;
+    const clean = n.id < 0 ? null : cleanCover(n, stats.peaks.get(n.id) ?? 0);
+    return (
+      <ToolListRow
+        key={n.id}
+        color={clean === null ? CLEAN_COLOR.none : clean >= 0.995 ? CLEAN_COLOR.all : clean >= 0.5 ? CLEAN_COLOR.most : CLEAN_COLOR.little}
+        title={n.name}
+        figure={clean === null ? undefined : `${Math.round(clean * 100)}% clean`}
+        detail={detail ?? (n.id < 0 ? "no pipes yet" : `${connected} connected · winter peak ${formatMW(stats.peaks.get(n.id) ?? 0)}`)}
+        selected={picked?.id === n.id}
+        onClick={() => pickNetwork(n)}
+      />
+    );
+  };
+  const mostlyBoilers = networks.filter((n) => n.id >= 0 && cleanCover(n, stats.peaks.get(n.id) ?? 0) < 0.5);
+  const needsYou = [
+    ...fossilNetworks.map((n) => {
+      const connected = stats.byNetwork.get(n.id) ?? 0;
+      return networkRow(n, `${connected} building${connected === 1 ? "" : "s"}, all on oil or gas boilers — give it a clean source, or pipe it to one`);
+    }),
+    ...mostlyBoilers.map((n) => networkRow(n, "Boilers carry most of its winter peak — add a clean source to it")),
+  ];
+  const share = (s: CoverageShare) => `${percent(s.connected, s)} connected · ${percent(s.withinReach, s)} within reach`;
+
   const overview = (
     <>
-      {fossilNetworks.length > 0 && (
-        <div className="dh-network">
-          <div className="dh-network-name">
-            {fossilNetworks.length === 1 ? fossilNetworks[0].name : `${fossilNetworks.length} small networks on boilers alone`}
-          </div>
-          <div className="dh-note">
-            {fossilBuildings} building{fossilBuildings === 1 ? "" : "s"} connected. All of their heat comes from oil or gas boilers: give them a clean source, or pipe them to a
-            network that has one.
-          </div>
-        </div>
-      )}
-      {allNetworks.length === 0 ? (
+      {!hasPipes && (
         <p className="dh-note">
           {districtHeat.getSources().length === 0
-            ? "This municipality has no district heating yet. Build a heat source below, then pipe the streets from it."
+            ? "This municipality has no district heating yet. Build a heat source (Build), then pipe the streets from it: owners connect when their heating is next replaced, if district heat is the better deal."
             : "No network is in service yet."}
         </p>
-      ) : (
-        <>
-          <h4 className="dh-subtitle">Networks</h4>
-          {networks.map((n) => {
-            const connected = stats.byNetwork.get(n.id) ?? 0;
-            return (
-              <button key={n.id} className={`ev-list-row${picked?.id === n.id ? " selected" : ""}`} onClick={() => pickNetwork(n)}>
-                <span className="ev-list-name">
-                  {n.name}
-                  <span className="dh-dim">
-                    {" "}
-                    · {n.id < 0 ? "no pipes yet" : `${connected} connected`}
-                  </span>
-                </span>
-                <span className="info-value" title="How much of the winter peak its clean sources carry">
-                  {n.id < 0 ? "–" : `${Math.round(cleanCover(n, stats.peaks.get(n.id) ?? 0) * 100)}% clean`}
-                </span>
-              </button>
-            );
-          })}
-          <p className="dh-note tool-list-hint">Click a network here, or a plant or piped street on the map, to see what feeds it.</p>
-        </>
       )}
-      {lastYearClean !== null && (
-        <p className="dh-note">
-          {lastYearClean >= 0.995
-            ? "Last year all of the district heat came from clean sources."
-            : `Last year ${Math.round(lastYearClean * 100)}% of the district heat came from clean sources, the rest from the boilers.`}
-        </p>
+      {hasPipes && (
+        <div className="tool-tiles">
+          <ToolTile
+            label="Networks"
+            value={String(allNetworks.length)}
+            sub={`${stats.lengthKm.toFixed(1)} km of piped street${lineLengthM > 0 ? ` · ${(lineLengthM / 1000).toFixed(1)} km of lines` : ""}`}
+            title="The district heating networks in service, each with what feeds it. Direct lines carry heat across country; nobody connects along them."
+          />
+          <ToolTile
+            label="Connected"
+            value={`${stats.connected}`}
+            sub={`buildings · ${percent(coverage.heatDemandKWh.connected, coverage.heatDemandKWh)} of the heat used`}
+            title="Buildings heated by district heat, and their share of the heat the town's buildings use"
+          />
+          <ToolTile
+            label="Could connect"
+            value={String(stats.connectable)}
+            sub={stats.awaiting > 0 ? `${stats.awaiting} more once the pipes are in` : "on a piped street"}
+            title="Buildings on a piped street that aren't connected yet. Each owner decides when their heating is next replaced, if district heat is the better deal — district heat's price (Town hall → Prices) and the heating measures move them."
+          />
+          <ToolTile
+            label="Clean heat"
+            value={lastYearClean === null ? "–" : `${Math.round(lastYearClean * 100)}%`}
+            sub={lastYearClean === null ? "counted after the first year" : "of last year's district heat"}
+            title="The share of last year's district heat that came from clean sources — waste heat, heat pumps, wood — rather than the oil and gas boilers that stand by for the coldest days and for networks without enough clean heat"
+          />
+        </div>
       )}
+
+      <ToolListGroup title="Needs you" limit={4}>
+        {needsYou}
+      </ToolListGroup>
+
+      <ToolListGroup title="Networks" limit={5}>
+        {networks.filter((n) => !mostlyBoilers.includes(n)).map((n) => networkRow(n))}
+      </ToolListGroup>
+      {allNetworks.length > 0 && <p className="dh-note tool-list-hint">Biggest first. Click a network here, or a plant or piped street on the map, to see what feeds it.</p>}
 
       {hasPipes && (
         <>
-          <div className="info-row">
-            <span>Piped streets</span>
-            <span className="info-value">{stats.lengthKm.toFixed(1)} km</span>
-          </div>
-          {lineLengthM > 0 && (
-            <div className="info-row">
-              <span>Direct lines</span>
-              <span className="info-value">{(lineLengthM / 1000).toFixed(1)} km</span>
-            </div>
-          )}
-          <div className="info-row">
-            <span>Connected buildings</span>
-            <span className="info-value">{stats.connected}</span>
-          </div>
-          <div className="info-row">
-            <span>On a piped street, not connected</span>
-            <span className="info-value">{stats.connectable}</span>
-          </div>
-          {stats.awaiting > 0 && (
-            <div className="info-row">
-              <span>Can connect once the pipes are in</span>
-              <span className="info-value">{stats.awaiting}</span>
-            </div>
-          )}
-
-          <div
-            className="dh-coverage"
-            title="Of the heated buildings (garages, sheds and wood-heated buildings aren't counted). Within reach: connected, or on a piped street and free to connect."
-          >
-            <span />
-            <span className="dh-coverage-head">Connected</span>
-            <span className="dh-coverage-head">Within reach</span>
-            {(
-              [
-                ["Buildings", coverage.buildings],
-                ["Floor area", coverage.floorAreaM2],
-                ["Heat demand", coverage.heatDemandKWh],
-              ] as [string, CoverageShare][]
-            ).map(([label, share]) => (
-              <Fragment key={label}>
-                <span>{label}</span>
-                <span className="dh-coverage-value">{percent(share.connected, share)}</span>
-                <span className="dh-coverage-value">{percent(share.withinReach, share)}</span>
-              </Fragment>
-            ))}
-          </div>
+          <h4 className="tool-list-heading">How much of the town it reaches</h4>
+          <Facts
+            facts={[
+              { label: "Buildings", value: share(coverage.buildings), title: "Of the heated buildings (garages, sheds and wood-heated buildings aren't counted). Within reach: connected, or on a piped street and free to connect." },
+              { label: "Floor area", value: share(coverage.floorAreaM2) },
+              { label: "Heat used", value: share(coverage.heatDemandKWh), title: "Of the heat the town's buildings use: the big users count for more" },
+            ]}
+          />
         </>
       )}
-
     </>
   );
 
   const build = (
     <>
-      <h4 className="dh-subtitle">New heat</h4>
+      <h4 className="tool-list-heading">New heat</h4>
       {draft ? (
         <DraftCard simDay={simDay} />
       ) : (
@@ -541,23 +528,23 @@ export function DistrictHeatPanel() {
         </>
       )}
 
-      {plantsUnderConstruction.length > 0 && (
-        <>
-          <h4 className="dh-subtitle">Plants being built</h4>
-          {plantsUnderConstruction.map((s) => (
-            <div className="info-row" key={s.id}>
-              <span>
-                {s.name} · {formatMW(s.cleanW)}
-              </span>
-              <span className="info-value">ready {monthYear(s.fromMs)}</span>
-            </div>
-          ))}
-        </>
-      )}
+      <ToolListGroup title="Plants being built" limit={4}>
+        {plantsUnderConstruction.map((s) => (
+          <ToolListRow
+            key={s.id}
+            color={DH_BUILDING_COLOR}
+            title={s.name}
+            figure={`ready ${monthYear(s.fromMs)}`}
+            detail={formatMW(s.cleanW)}
+            selected={false}
+            onClick={() => mapFocus.request({ lon: s.lon, lat: s.lat, minZoom: 14.5 })}
+          />
+        ))}
+      </ToolListGroup>
 
       {districtHeat.getSources().length > 0 && (
         <>
-          <h4 className="dh-subtitle">Extend the network</h4>
+          <h4 className="tool-list-heading">Extend the network</h4>
           {districtHeatLines.getDraft() ? (
             <LineDraftCard />
           ) : quote.segments.length === 0 ? (
@@ -608,19 +595,16 @@ export function DistrictHeatPanel() {
         </>
       )}
 
-      {pipesUnderConstruction.length > 0 && (
-        <>
-          <h4 className="dh-subtitle">Pipes being laid</h4>
-          {pipesUnderConstruction.map((o) => (
-            <div className="info-row" key={o.id}>
-              <span>
-                {Math.round(o.lengthM)} m{"line" in o ? " (direct line)" : ""}
-              </span>
-              <span className="info-value">ready {monthYear(o.completesAtMs)}</span>
-            </div>
-          ))}
-        </>
-      )}
+      <ToolListGroup title="Pipes being laid" limit={4}>
+        {pipesUnderConstruction.map((o) => (
+          <div className="info-row" key={o.id}>
+            <span>
+              {Math.round(o.lengthM)} m{"line" in o ? " (direct line)" : ""}
+            </span>
+            <span className="info-value">ready {monthYear(o.completesAtMs)}</span>
+          </div>
+        ))}
+      </ToolListGroup>
     </>
   );
 

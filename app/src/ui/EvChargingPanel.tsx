@@ -1,7 +1,7 @@
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { CardKind, CardSection, Facts, NowLine } from "./CardParts";
 import { BUILD_SPEC, MAX_FILL, QOS_CURVE, QOS_FLOOR, type ChargingKind, type QosKind } from "../config/charging";
-import { COVERAGE_COLOR } from "../map/colorModes";
+import { CHARGER_BUILDING_COLOR, CHARGER_USE_RAMP, COVERAGE_COLOR, EV_CHARGING_LEGEND } from "../map/colorModes";
 import { formatDate, toDateMs, toSimTimeMs } from "../sim/calendar";
 import { simClock } from "../sim/engine";
 import { existsAt } from "../sim/lifetime";
@@ -9,6 +9,7 @@ import {
   buildCostRp,
   buildMonthsFor,
   qosKindOf,
+  pointsAt,
   qosReachM,
   sizesFor,
   upgradeCostRp,
@@ -31,6 +32,7 @@ import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
 import { InspectCard } from "./InspectCard";
 import { ToolPanel } from "./ToolPanel";
+import { ShareBar, ToolListGroup, ToolListRow, ToolTile } from "./ToolList";
 
 const YEAR_MS = 365.25 * 24 * 60 * 60_000;
 const QUARTER_HOUR_MS = 15 * 60_000;
@@ -81,12 +83,7 @@ function focusSite(site: ChargingSite): void {
   mapFocus.request({ lon: site.lon, lat: site.lat });
 }
 
-/** A price rounded to the franc thousand, for build buttons. */
-function priceTag(rp: number): string {
-  return formatCHF(Math.round(rp / 100_000) * 100_000);
-}
-
-/** The same, compact ("CHF 60k", "CHF 1.05M"), for the narrow size buttons. */
+/** A price, compact ("CHF 60k", "CHF 1.05M"), for the narrow size buttons. */
 function shortPriceTag(rp: number): string {
   const chf = rp / 100;
   return chf >= 1_000_000 ? `CHF ${Number((chf / 1_000_000).toFixed(2))}M` : `CHF ${Math.round(chf / 1000)}k`;
@@ -105,7 +102,17 @@ const KIND_FILTERS: { id: KindFilter; label: string }[] = [
   { id: "dc", label: "Fast" },
   { id: "fleet", label: "Lorry" },
 ];
-const BUSIEST_COUNT = 6;
+interface RankedSite {
+  site: ChargingSite;
+  users: number;
+  capacity: number;
+}
+
+/** A charger's dot in a list, in its colour on the map: room to spare, filling up, full. */
+function fillColor(fill: number): string {
+  return fill >= 1 ? CHARGER_USE_RAMP[2] : fill >= 0.7 ? CHARGER_USE_RAMP[1] : CHARGER_USE_RAMP[0];
+}
+const EV_ACCESS_COLOR = Object.fromEntries(EV_CHARGING_LEGEND.map((e) => [e.bucket, e.color]));
 
 const COVERAGE_KINDS: QosKind[] = ["ac", "shop", "dc", "fleet"];
 const COVERAGE_LABEL: Record<QosKind, string> = { ac: "On-street", shop: "Shops", dc: "Fast charging", fleet: "Lorry parks" };
@@ -365,31 +372,115 @@ export function EvChargingPanel() {
 
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>("all");
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
-  const busiest = useMemo(
+  // Every open charger, fullest first; the filters pick from these.
+  const ranked: RankedSite[] = useMemo(
     () =>
       publicCharging
         .getSites()
         .filter((s) => siteCapacityAt(s, simDay) > 0)
-        .filter((s) => ownerFilter === "all" || s.owner === ownerFilter)
-        .filter((s) => kindFilter === "all" || s.kind === kindFilter)
         .map((s) => ({ site: s, users: publicCharging.usersAt(s.id, simDay), capacity: siteCapacityAt(s, simDay) }))
-        .sort((a, b) => b.users / b.capacity - a.users / a.capacity || b.users - a.users)
-        .slice(0, BUSIEST_COUNT),
+        .sort((a, b) => b.users / b.capacity - a.users / a.capacity || b.users - a.users),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [simDay, version, ownerFilter, kindFilter],
+    [simDay, version],
   );
-  const underConstruction = publicCharging.getSites().filter((s) => s.openedAtMs > simDay);
+  const sites = publicCharging.getSites();
+  const underConstruction = sites.filter((s) => s.openedAtMs > simDay);
+  const municipalFull = ranked.filter(({ site, users, capacity }) => site.owner === "municipal" && users >= capacity && publicCharging.plannedPoints(site) === pointsAt(site, simDay));
+  const shown = ranked.filter(({ site }) => (ownerFilter === "all" || site.owner === ownerFilter) && (kindFilter === "all" || site.kind === kindFilter));
+  const siteRow = ({ site, users, capacity }: RankedSite, detail?: string) => (
+    <ToolListRow
+      key={site.id}
+      color={fillColor(users / capacity)}
+      title={`${KIND_ICON[site.kind]}${site.name}`}
+      figure={percent(users, capacity)}
+      detail={detail ?? `${SITE_KIND_NAME[site.kind]} · ${pointsAt(site, simDay)} points · ${site.owner === "municipal" ? "the town's" : "private"}`}
+      selected={site.id === selectedId}
+      onClick={() => focusSite(site)}
+    />
+  );
+  const access = town.byAccess;
 
   const overview = (
     <>
+      {sites.length === 0 && (
+        <p className="dh-note">
+          Households without a parking space of their own can only go electric if there&apos;s a public charger near enough. Build some, and set what they charge under
+          Prices.
+        </p>
+      )}
+      <div className="tool-tiles">
+        <ToolTile
+          label="Public chargers"
+          value={`${town.usage.points} points`}
+          sub={`at ${town.usage.sites} site${town.usage.sites === 1 ? "" : "s"}${underConstruction.length > 0 ? ` · ${underConstruction.length} being built` : ""}`}
+          title="The charge points open to the public, the town's own and private operators' together"
+        />
+        <ToolTile
+          label="How full"
+          value={percent(town.usage.users, town.usage.capacity)}
+          sub="all of them together"
+          title={`How much of the public chargers' room is taken, all of them together: a van needs about twice a car's, a lorry many times. A charger past full takes nobody new — at ${Math.round(MAX_FILL * 100)}% it's closed to newcomers.`}
+        />
+        <ToolTile
+          label="Charging publicly"
+          value={`${town.usage.vehicles.car} car${town.usage.vehicles.car === 1 ? "" : "s"}`}
+          sub={town.usage.vehicles.van + town.usage.vehicles.truck > 0 ? vehicleList({ car: 0, van: town.usage.vehicles.van, truck: town.usage.vehicles.truck }) : "no vans or lorries"}
+          title="Electric cars of households without home charging, and businesses' vans and lorries without a yard to charge in, that rely on public chargers"
+        />
+        <ToolTile
+          label="Lacked charging"
+          value={String(town.unmet)}
+          sub="bought petrol or diesel instead, 12 mo."
+          title="Households and businesses that bought a petrol or diesel vehicle in the last 12 months but would have gone electric with an empty public charger next door. They show on the map. Private operators build on-street chargers where this gathers; lorries need a fast-charging hub, which they leave to the municipality."
+        />
+      </div>
+
+      <ToolListGroup title="Needs you" limit={4}>
+        {municipalFull.map((r) => siteRow(r, r.users >= r.capacity * MAX_FILL ? "Full — takes nobody new; enlarge it on its card" : "Full — enlarge it on its card"))}
+      </ToolListGroup>
+
+      <h4 className="tool-list-heading">How households could charge</h4>
+      <ShareBar
+        label="Households by how they could charge"
+        shares={[
+          { label: "Wallbox", value: access.home, color: EV_ACCESS_COLOR.home, title: "Households with a wallbox at home" },
+          { label: "Very good", value: access.q4, color: EV_ACCESS_COLOR.q4, title: "No wallbox; the public chargers around could do 75% or more of their charging" },
+          { label: "Good", value: access.q3, color: EV_ACCESS_COLOR.q3, title: "No wallbox; public chargers could do 50–75% of their charging" },
+          { label: "Fair", value: access.q2, color: EV_ACCESS_COLOR.q2, title: "No wallbox; public chargers could do 25–50% of their charging" },
+          { label: "Poor", value: access.q1, color: EV_ACCESS_COLOR.q1, title: "No wallbox; public chargers could do 10–25% of their charging" },
+          { label: "Too little", value: access.none, color: EV_ACCESS_COLOR.none, title: "No wallbox, and too little public charging around to rely on" },
+        ]}
+      />
+      <Facts
+        facts={[
+          {
+            label: "Could put in a wallbox",
+            value: percent(access.mayInstall, town.households),
+            title: "Households without a wallbox that have their own parking space and may put one in — or may by the right to charge. They weigh its cost against public charging when they buy an electric car.",
+          },
+          {
+            label: "Can charge at work",
+            value: `${percent(workChargingShareAt(simDay), 1)} of drivers`,
+            title: "Drivers whose employer has chargers in its car park — more each year, and more with a workplace charging programme. It adds to whatever public charging they have near home.",
+          },
+          meters.offered && {
+            label: "On the charging tariff",
+            value: `${meters.on.toLocaleString("en-GB")} of ${meters.eligible.toLocaleString("en-GB")}`,
+            title: "Households with a wallbox and an electric car who put their wallbox on the charging tariff's own meter this year (Town hall → Prices).",
+          },
+          { label: "Business vans", value: `${town.fleet.vans} · ${percent(town.fleet.vansElectric, town.fleet.vans)} electric`, title: "Businesses' vans — the town's total is from the federal vehicle register" },
+          { label: "Lorries", value: `${town.fleet.trucks} · ${percent(town.fleet.trucksElectric, town.fleet.trucks)} electric`, title: "Businesses' lorries — the town's total is from the federal vehicle register" },
+        ]}
+      />
+
       <div className="ev-coverage" title="Show how far each kind of charger reaches along the streets — the stronger the colour, the better the charging there (chargers being built included)">
-        <span className="ev-coverage-label">Coverage</span>
+        <span className="ev-coverage-label">Reach on the map</span>
         {COVERAGE_KINDS.map((kind) => (
           <button
             key={kind}
             className={`ev-coverage-toggle${coverage.has(kind) ? " on" : ""}`}
-            disabled={!publicCharging.getSites().some((s) => qosKindOf(s) === kind)}
-            title={publicCharging.getSites().some((s) => qosKindOf(s) === kind) ? reachLabel(kind) : NONE_YET[kind]}
+            disabled={!sites.some((s) => qosKindOf(s) === kind)}
+            title={sites.some((s) => qosKindOf(s) === kind) ? reachLabel(kind) : NONE_YET[kind]}
             onClick={() => publicCharging.toggleCoverage(kind)}
           >
             <span className="ev-coverage-swatch" style={{ background: COVERAGE_COLOR[kind] }} />
@@ -398,118 +489,48 @@ export function EvChargingPanel() {
         ))}
       </div>
 
-      <div className="info-row">
-        <span>Public charging sites</span>
-        <span className="info-value">
-          {town.usage.sites} · {town.usage.points} points
-        </span>
-      </div>
-      <div className="info-row" title="Electric cars of households without home charging, and businesses' vans and lorries without a yard to charge in, that rely on public chargers">
-        <span>Charging publicly</span>
-        <span className="info-value">{vehicleList(town.usage.vehicles)}</span>
-      </div>
-      <div className="info-row" title="How much of the public chargers' room is taken, all of them together: a van needs about twice a car's, a lorry many times">
-        <span>How full</span>
-        <span className="info-value">{percent(town.usage.users, town.usage.capacity)}</span>
-      </div>
-      <UsageBar used={town.usage.users} capacity={town.usage.capacity} />
-
-      <div
-        className="ev-access"
-        title="Of every household in the municipality, whether or not it has an electric car yet. For those without a wallbox: how much of their charging the public chargers around could do — how close they are along the streets, and how busy. Charging at work comes on top, for those who can. A household that may put in a wallbox weighs its cost against relying on public chargers when it buys an electric car."
-      >
-        <div className="info-row">
-          <span>Households with a wallbox</span>
-          <span className="info-value">{percent(town.byAccess.home, town.households)}</span>
-        </div>
-        <div className="info-row">
-          <span>Without a wallbox: public charging very good (75%+)</span>
-          <span className="info-value">{percent(town.byAccess.q4, town.households)}</span>
-        </div>
-        <div className="info-row">
-          <span>…good (50–75%)</span>
-          <span className="info-value">{percent(town.byAccess.q3, town.households)}</span>
-        </div>
-        <div className="info-row">
-          <span>…fair (25–50%)</span>
-          <span className="info-value">{percent(town.byAccess.q2, town.households)}</span>
-        </div>
-        <div className="info-row">
-          <span>…poor (10–25%)</span>
-          <span className="info-value">{percent(town.byAccess.q1, town.households)}</span>
-        </div>
-        <div className="info-row">
-          <span>…too little to rely on</span>
-          <span className="info-value">{percent(town.byAccess.none, town.households)}</span>
-        </div>
-        <div className="info-row" title="Households without a wallbox that have their own parking space and may put one in — or may by the right to charge. They weigh its cost against public charging when they buy an electric car.">
-          <span>Without a wallbox, but may put one in</span>
-          <span className="info-value">{percent(town.byAccess.mayInstall, town.households)}</span>
-        </div>
-      </div>
-      <div className="info-row" title="Drivers whose employer has chargers in its car park — more each year, and more with a workplace charging programme. It adds to whatever public charging they have near home.">
-        <span>Drivers who can charge at work</span>
-        <span className="info-value">{percent(workChargingShareAt(simDay), 1)}</span>
-      </div>
-      {meters.offered && (
-        <div className="info-row" title="Households with a wallbox and an electric car who put their wallbox on the charging tariff's own meter this year (Town hall → Prices).">
-          <span>On the charging tariff</span>
-          <span className="info-value">
-            {meters.on.toLocaleString("en-GB")} of {meters.eligible.toLocaleString("en-GB")}
-          </span>
-        </div>
-      )}
-      <div className="info-row" title="Households and businesses that bought a petrol or diesel vehicle in the last 12 months but would have gone electric with an empty public charger next door. Private operators build on-street chargers where this gathers; lorries need a fast-charging hub, which they leave to the municipality.">
-        <span>Wanted an EV, lacked charging (12 mo.)</span>
-        <span className="info-value">{town.unmet}</span>
-      </div>
-      <div className="ev-access" title="Businesses' goods vehicles — the town's total is from the federal vehicle register">
-        <div className="info-row">
-          <span>🚐 Business vans</span>
-          <span className="info-value">
-            {town.fleet.vans} · {percent(town.fleet.vansElectric, town.fleet.vans)} electric
-          </span>
-        </div>
-        <div className="info-row">
-          <span>🚚 Lorries</span>
-          <span className="info-value">
-            {town.fleet.trucks} · {percent(town.fleet.trucksElectric, town.fleet.trucks)} electric
-          </span>
-        </div>
-      </div>
-
-      {publicCharging.getSites().length > 0 && (
+      {sites.length > 0 && (
         <>
-          <h4 className="dh-subtitle">Busiest chargers</h4>
-          <div className="ev-filters">
+          <h4 className="tool-list-heading">Chargers</h4>
+          <div className="ev-filters" role="group" aria-label="Which chargers">
             {OWNER_FILTERS.map((f) => (
-              <button key={f.id} className={`ev-filter${ownerFilter === f.id ? " on" : ""}`} onClick={() => setOwnerFilter(f.id)}>
+              <button key={f.id} className={`ev-filter${ownerFilter === f.id ? " on" : ""}`} aria-pressed={ownerFilter === f.id} onClick={() => setOwnerFilter(f.id)}>
                 {f.label}
               </button>
             ))}
-          </div>
-          <div className="ev-filters">
+            <span className="tool-filter-sep" aria-hidden />
             {KIND_FILTERS.map((f) => (
-              <button key={f.id} className={`ev-filter${kindFilter === f.id ? " on" : ""}`} onClick={() => setKindFilter(f.id)}>
+              <button key={f.id} className={`ev-filter${kindFilter === f.id ? " on" : ""}`} aria-pressed={kindFilter === f.id} onClick={() => setKindFilter(f.id)}>
                 {f.label}
               </button>
             ))}
           </div>
-          {busiest.length === 0 && <p className="dh-note">No open chargers match these filters yet.</p>}
-          {busiest.map(({ site, users, capacity }) => (
-            <button
-              key={site.id}
-              className={`ev-list-row${site.id === selectedId ? " selected" : ""}`}
-              onClick={() => focusSite(site)}
-            >
-              <span className="ev-list-name">
-                {KIND_ICON[site.kind]}
-                {site.name}
-              </span>
-              <span className="info-value">{percent(users, capacity)}</span>
-            </button>
-          ))}
-          <p className="dh-note tool-list-hint">Click a charger here or on the map to see how it&apos;s used.</p>
+          {shown.length === 0 && underConstruction.length === 0 && <p className="dh-note">None of these yet.</p>}
+          <ToolListGroup title="Full" limit={4}>
+            {shown.filter((r) => r.users >= r.capacity).map((r) => siteRow(r))}
+          </ToolListGroup>
+          <ToolListGroup title="Filling up (70%+)" limit={4}>
+            {shown.filter((r) => r.users < r.capacity && r.users >= r.capacity * 0.7).map((r) => siteRow(r))}
+          </ToolListGroup>
+          <ToolListGroup title="Room to spare" limit={3}>
+            {shown.filter((r) => r.users < r.capacity * 0.7).map((r) => siteRow(r))}
+          </ToolListGroup>
+          <ToolListGroup title="Being built" limit={3}>
+            {underConstruction
+              .filter((s) => (ownerFilter === "all" || s.owner === ownerFilter) && (kindFilter === "all" || s.kind === kindFilter))
+              .map((s) => (
+                <ToolListRow
+                  key={s.id}
+                  color={CHARGER_BUILDING_COLOR}
+                  title={`${KIND_ICON[s.kind]}${s.name}`}
+                  figure={`ready ${monthYear(s.openedAtMs)}`}
+                  detail={`${SITE_KIND_NAME[s.kind]} · ${s.points} points`}
+                  selected={s.id === selectedId}
+                  onClick={() => focusSite(s)}
+                />
+              ))}
+          </ToolListGroup>
+          <p className="dh-note tool-list-hint">Fullest first. Click a charger here or on the map: its card shows who relies on it, and when.</p>
         </>
       )}
     </>
@@ -517,7 +538,7 @@ export function EvChargingPanel() {
 
   const build = (
     <>
-      <h4 className="dh-subtitle">Build public chargers</h4>
+      <h4 className="tool-list-heading">Build public chargers</h4>
       {placing ? (
         <>
           <p className="dh-note">
@@ -534,53 +555,43 @@ export function EvChargingPanel() {
         <div className="ev-build">
           {(["ac", "dc", "fleet"] as ChargingKind[]).map((kind) => {
             const spec = BUILD_SPEC[kind];
-            const sizes = sizesFor(kind);
-            if (sizes.length > 1)
-              return (
-                <div className="ev-build-card" key={kind}>
-                  <span className="ev-build-name">{spec.label}</span>
-                  <span className="ev-build-detail">
-                    {spec.powerKw} kW each · {BUILD_HINT[kind]}
-                  </span>
-                  <div className="ev-sizes">
-                    {sizes.map(({ points }) => (
-                      <button key={points} onClick={() => publicCharging.startPlacing(kind, points)}>
-                        <span className="ev-build-name">{points} points</span>
-                        <span className="ev-build-detail">{shortPriceTag(buildCostRp(kind, simDay, points))}</span>
-                        <span className="ev-build-detail">{buildMonthsFor(kind, points)} months</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
             return (
-              <button key={kind} onClick={() => publicCharging.startPlacing(kind)}>
+              <div className="ev-build-card" key={kind}>
                 <span className="ev-build-name">{spec.label}</span>
                 <span className="ev-build-detail">
-                  {spec.points} × {spec.powerKw} kW · {priceTag(buildCostRp(kind, simDay))} · {spec.buildMonths} months
+                  {spec.powerKw} kW each · {BUILD_HINT[kind]}
                 </span>
-                <span className="ev-build-detail">{BUILD_HINT[kind]}</span>
-              </button>
+                <div className="ev-sizes">
+                  {sizesFor(kind).map(({ points }) => (
+                    <button key={points} onClick={() => publicCharging.startPlacing(kind, points)}>
+                      <span className="ev-build-name">{points} points</span>
+                      <span className="ev-build-detail">{shortPriceTag(buildCostRp(kind, simDay, points))}</span>
+                      <span className="ev-build-detail">{buildMonthsFor(kind, points)} months</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             );
           })}
-          <p className="dh-note">
-            The municipality's chargers sell at the prices set in the tariff, and their upkeep is paid from the treasury. To enlarge one of them, click it on the
-            map.
+          <p className="dh-note tool-list-hint">
+            The town&apos;s chargers sell at the prices set under Prices; their upkeep is paid from the treasury. To enlarge one, click it on the map.
           </p>
         </div>
       )}
 
-      {underConstruction.length > 0 && (
-        <>
-          <h4 className="dh-subtitle">Being built</h4>
-          {underConstruction.map((s) => (
-            <button key={s.id} className={`ev-list-row${s.id === selectedId ? " selected" : ""}`} onClick={() => focusSite(s)}>
-              <span className="ev-list-name">{s.name}</span>
-              <span className="info-value">ready {monthYear(s.openedAtMs)}</span>
-            </button>
-          ))}
-        </>
-      )}
+      <ToolListGroup title="Being built" limit={4}>
+        {underConstruction.map((s) => (
+          <ToolListRow
+            key={s.id}
+            color={CHARGER_BUILDING_COLOR}
+            title={`${KIND_ICON[s.kind]}${s.name}`}
+            figure={`ready ${monthYear(s.openedAtMs)}`}
+            detail={`${SITE_KIND_NAME[s.kind]} · ${s.points} points`}
+            selected={s.id === selectedId}
+            onClick={() => focusSite(s)}
+          />
+        ))}
+      </ToolListGroup>
     </>
   );
 
