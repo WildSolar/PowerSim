@@ -16,6 +16,7 @@ import { approval } from "../sim/approval";
 import { BASELINE_YEAR, MONTH_NAMES, toDateMs, toSimTimeMs } from "../sim/calendar";
 import { cachedEmissionsForYear, EMISSION_SOURCES, EMISSIONS_SOURCE_COLOR } from "../sim/emissions";
 import { bookedFinances, townTakeRp, utilityProfitRp, type UtilityMonth } from "../sim/finances";
+import { GRID_BATTERY_ROUND_TRIP } from "../config/spotMarket";
 import { grid } from "../sim/grid";
 import { market } from "../sim/market";
 import { spotPriceRpKWh } from "../sim/spotMarket";
@@ -131,6 +132,14 @@ export const ELECTRICITY_GROUPS: { key: string; label: string; color: string; of
   { key: "ev", label: "Electric cars", color: color("ev"), of: ["ev"] },
 ];
 
+// The other side of a balance of power (this chart and At a glance's day): where it came from beyond
+// the uses, and where it went.
+export const BALANCE_COLORS = { wind: "#2a78d6", battery: "#eb6834", bought: "#6f6d66", sentOut: "#b4b2a9" };
+
+/** The town's electricity month by month, as a balance: above the line what it went to — each use,
+ * the neighbourhood batteries charging, the surplus sold out of town — and below it where it came
+ * from — the town's own solar and wind, the batteries, and power bought over the contracts. Months
+ * counted before the trade was recorded show the town's own use against its own generation. */
 function electricityChart(nowMs: number): ChartData {
   const { records, ...m } = monthly(nowMs, (r) => !!r.electricityKWh);
   const stacks = ELECTRICITY_GROUPS.map((g) => ({ ...g, values: records.map((r) => g.of.reduce((s, k) => s + r.electricityKWh![k], 0)) }));
@@ -143,18 +152,33 @@ function electricityChart(nowMs: number): ChartData {
       of: [],
       values: records.map((r) => r.dhHeatPumpKWh ?? 0),
     });
+  const used = records.map((_, i) => stacks.reduce((s, g) => s + g.values[i], 0));
   const solar = records.map((r) => r.electricityKWh!.solar);
   const wind = records.map((r) => r.windKWh ?? 0);
-  const { unit, scale } = energyUnit(Math.max(stackMax(stacks, records.length), ...solar, ...wind));
+  const into = records.map((r) => r.storedKWh ?? 0);
+  const outOf = into.map((kWh) => kWh * GRID_BATTERY_ROUND_TRIP);
+  // What was sold, and bought: as the utility traded it, or the difference where that wasn't kept.
+  const sent = records.map((r, i) => r.soldKWh ?? Math.max(0, solar[i] + wind[i] - used[i]));
+  const bought = records.map((r, i) => r.boughtKWh ?? Math.max(0, used[i] - solar[i] - wind[i]));
+  const above = used.map((u, i) => u + into[i] + sent[i]);
+  const below = solar.map((s, i) => s + wind[i] + outOf[i] + bought[i]);
+  const { unit, scale } = energyUnit(Math.max(0, ...above, ...below));
   const sc = (v: number[]) => v.map((x) => x * scale);
+  const any = (v: number[]) => v.some((x) => x > 0);
   return {
     ...m,
     unit,
-    total: "Used",
+    total: "Went to",
+    totalBelow: "Came from",
+    height: 400,
     series: [
       ...stacks.map((g) => ({ key: g.key, label: g.label, color: g.color, kind: "stack" as const, values: sc(g.values) })),
-      { key: "solar", label: "Made by solar", color: color("solar"), kind: "line", values: sc(solar) },
-      ...(wind.some((w) => w > 0) ? [{ key: "wind", label: "Made by wind", color: "#5b6b7a", kind: "line" as const, dashed: true, values: sc(wind) }] : []),
+      ...(any(into) ? [{ key: "into", label: "Into batteries", legend: "Neighbourhood batteries: in (above), out (below)", color: BALANCE_COLORS.battery, kind: "stack" as const, values: sc(into) }] : []),
+      ...(any(sent) ? [{ key: "sent", label: "Sent out of town", color: BALANCE_COLORS.sentOut, kind: "stack" as const, values: sc(sent) }] : []),
+      { key: "solar", label: "Own solar", color: color("solar"), kind: "stack" as const, below: true, values: sc(solar) },
+      ...(any(wind) ? [{ key: "wind", label: "Own wind", color: BALANCE_COLORS.wind, kind: "stack" as const, below: true, values: sc(wind) }] : []),
+      ...(any(into) ? [{ key: "outOf", label: "Out of batteries", legend: false as const, color: BALANCE_COLORS.battery, kind: "stack" as const, below: true, values: sc(outOf) }] : []),
+      { key: "bought", label: "Bought from the grid", color: BALANCE_COLORS.bought, kind: "stack" as const, below: true, values: sc(bought) },
     ],
   };
 }
@@ -802,7 +826,8 @@ export const CHARTS: ChartDef[] = [
     id: "electricity",
     group: "Energy",
     title: "Electricity",
-    description: "What the town used each month, by what used it — the district heating networks' heat pumps included — and what its solar panels and wind turbines made.",
+    description:
+      "The town's electricity each month, as a balance. Above the line, what it went to: each use — the district heating networks' heat pumps included — the neighbourhood batteries charging, and the surplus sold out of town. Below it, where it came from: the town's own solar and wind, the batteries, and power bought from the wider grid.",
     data: (_, now) => electricityChart(now),
   },
   {

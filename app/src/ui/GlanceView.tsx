@@ -19,7 +19,7 @@ import { effectivePowerPlantsAt } from "../sim/solarAdoption";
 import { useSimDay, useTariff } from "../sim/store";
 import { tariffKey } from "../sim/tariff";
 import { windPowerW } from "../sim/windPower";
-import { ELECTRICITY_GROUPS, energyUnit, HEAT_KEYS, type ChartData } from "./charts";
+import { BALANCE_COLORS, ELECTRICITY_GROUPS, energyUnit, HEAT_KEYS, type ChartData } from "./charts";
 import { DEVICE_CATEGORIES } from "./deviceCategories";
 import { PlotLink } from "./PlotLink";
 import { formatValue, TimeChart } from "./TimeChart";
@@ -335,10 +335,7 @@ function Energy() {
 
 const DAY_HOURS = 24;
 // The other side of the balance: where the town's power came from, and what it did beyond its use.
-const WIND_COLOR = "#2a78d6";
-const BATTERY_COLOR = "#eb6834";
-const BOUGHT_COLOR = "#6f6d66";
-const SENT_OUT_COLOR = "#b4b2a9";
+const { wind: WIND_COLOR, battery: BATTERY_COLOR, bought: BOUGHT_COLOR, sentOut: SENT_OUT_COLOR } = BALANCE_COLORS;
 
 /** The day's power as a balance: above the line where it went — each use, the batteries charging,
  * what was sent out of town — and below it where it came from — the town's own solar and wind, the

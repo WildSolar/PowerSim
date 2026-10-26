@@ -1165,7 +1165,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "The charts in Town hall → Statistics show how the town has changed since you took office. Pick a chart on the left; hover over it to read the numbers for a month or a year. A small grey chart icon next to a panel's title — the grid, a transformer, district heating, roof solar, wind, the modal split, the accounts, approval — opens the matching chart directly.",
       ),
       list([
-        "Electricity — what the town used each month, by what used it (homes, businesses, heat pumps, hot water, cooling, electric cars), and what its solar panels and wind turbines made.",
+        "Electricity — the town's electricity each month as a balance, like At a glance's day: above the line what it went to (homes, businesses, heat pumps, hot water, cooling, electric cars, the neighbourhood batteries charging, the surplus sold out of town), below it where it came from (its own solar and wind, the batteries, power bought from the wider grid).",
         "Spot market price — what power fetches on the spot market, where the town's surplus is sold, against the contract price the utility pays: month by month (the average hour and the cheapest) or yesterday, hour by hour.",
         "Heat by heating system — the heat buildings got each month, by what heated them.",
         "District heat by source — what the networks' plants made each month, and how much the backup boilers burned.",
