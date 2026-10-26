@@ -183,20 +183,30 @@ function electricityChart(nowMs: number): ChartData {
   };
 }
 
+/** The utility's trade month by month, as a balance in the colours of the Electricity chart: above
+ * the line the town's surplus — what it made beyond its own use, in the hours it did — sold on the
+ * spot market or taken in by the neighbourhood batteries; below it the town's shortfall, bought over
+ * the contracts or given back by the batteries. */
 function tradeChart(nowMs: number): ChartData {
   const { records, ...m } = monthly(nowMs, (r) => r.boughtKWh !== undefined);
   const bought = records.map((r) => r.boughtKWh!);
   const sold = records.map((r) => r.soldKWh!);
-  const stored = records.map((r) => r.storedKWh!);
-  const { unit, scale } = energyUnit(Math.max(0, ...bought, ...sold));
+  const into = records.map((r) => r.storedKWh ?? 0);
+  const outOf = into.map((kWh) => kWh * GRID_BATTERY_ROUND_TRIP);
+  const { unit, scale } = energyUnit(Math.max(0, ...sold.map((s, i) => s + into[i]), ...bought.map((b, i) => b + outOf[i])));
   const sc = (v: number[]) => v.map((x) => x * scale);
+  const batteries = into.some((v) => v > 0);
   return {
     ...m,
     unit,
+    total: "The town's surplus",
+    totalBelow: "Its shortfall",
+    height: 400,
     series: [
-      { key: "bought", label: "Bought over contracts", color: "#2a78d6", kind: "line", values: sc(bought) },
-      { key: "sold", label: "Surplus sold on the spot market", color: color("solar"), kind: "line", values: sc(sold) },
-      ...(stored.some((v) => v > 0) ? [{ key: "stored", label: "Shifted by neighbourhood batteries", color: "#4a3aa7", kind: "line" as const, dashed: true, values: sc(stored) }] : []),
+      { key: "sold", label: "Sold on the spot market", color: BALANCE_COLORS.sentOut, kind: "stack", values: sc(sold) },
+      ...(batteries ? [{ key: "into", label: "Into the batteries", legend: "Neighbourhood batteries: in (above), out (below)", color: BALANCE_COLORS.battery, kind: "stack" as const, values: sc(into) }] : []),
+      { key: "bought", label: "Bought over the contracts", color: BALANCE_COLORS.bought, kind: "stack", below: true, values: sc(bought) },
+      ...(batteries ? [{ key: "outOf", label: "Out of the batteries", legend: false as const, color: BALANCE_COLORS.battery, kind: "stack" as const, below: true, values: sc(outOf) }] : []),
     ],
   };
 }
@@ -834,7 +844,8 @@ export const CHARTS: ChartDef[] = [
     id: "trade",
     group: "Energy",
     title: "Power bought and sold",
-    description: "What the utility bought each month over its contracts, the surplus it sold when the town made more than it used, and what the neighbourhood batteries shifted from one to the other.",
+    description:
+      "The utility's trade with the wider grid each month, as a balance. Above the line, the town's surplus — what it made beyond its own use, in the hours it did — sold on the spot market or taken in by the neighbourhood batteries. Below it, the town's shortfall — bought over the contracts, or given back by the batteries.",
     data: (_, now) => tradeChart(now),
   },
   {

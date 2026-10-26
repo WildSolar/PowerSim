@@ -1166,6 +1166,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
       ),
       list([
         "Electricity — the town's electricity each month as a balance, like At a glance's day: above the line what it went to (homes, businesses, heat pumps, hot water, cooling, electric cars, the neighbourhood batteries charging, the surplus sold out of town), below it where it came from (its own solar and wind, the batteries, power bought from the wider grid).",
+        "Power bought and sold — the utility's trade with the wider grid each month, as a balance: above the line the town's surplus, sold on the spot market or taken in by the neighbourhood batteries; below it the town's shortfall, bought over the contracts or given back by the batteries.",
         "Spot market price — what power fetches on the spot market, where the town's surplus is sold, against the contract price the utility pays: month by month (the average hour and the cheapest) or yesterday, hour by hour.",
         "Heat by heating system — the heat buildings got each month, by what heated them.",
         "District heat by source — what the networks' plants made each month, and how much the backup boilers burned.",

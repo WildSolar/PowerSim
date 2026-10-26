@@ -29,6 +29,7 @@ export const CHANGELOG: Release[] = [
     ],
     changed: [
       "Statistics → Electricity is a balance now, like At a glance's day but month by month: above the line what the town's power went to — each use, the neighbourhood batteries charging, the surplus sold out of town — and below it where it came from — its own solar and wind, the batteries, and power bought from the wider grid.",
+      "Statistics → Power bought and sold is a balance too: above the line the town's surplus each month, sold on the spot market or taken in by the neighbourhood batteries; below it the town's shortfall, bought over the contracts or given back by the batteries.",
     ],
     fixed: [
       "Grid-friendly home batteries charge as forecast-based systems do: from the top of their building's midday surplus, just enough to be full by the end of the sunny hours, instead of holding back until two in the afternoon and then all filling at once. They now take the midday peak off the transformer stations.",
