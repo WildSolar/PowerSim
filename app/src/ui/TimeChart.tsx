@@ -145,6 +145,14 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
                 return bottom - top > 0.5 ? <rect key={`${s.key}-${i}`} className="bar" x={x(xv) - barWidth / 2} width={barWidth} y={top} height={bottom - top} style={{ fill: s.color }} /> : null;
               }),
             )}
+          {data.bars &&
+            data.xs.map((xv, i) =>
+              belowStacks.map((s, j) => {
+                const top = y(j > 0 ? depths[j - 1][i] : 0);
+                const bottom = y(depths[j][i]);
+                return bottom - top > 0.5 ? <rect key={`${s.key}-${i}`} className="bar" x={x(xv) - barWidth / 2} width={barWidth} y={top} height={bottom - top} style={{ fill: s.color }} /> : null;
+              }),
+            )}
           {(data.events ?? [])
             .filter((e) => e.x >= data.from && e.x <= data.to)
             .map((e, i) => (
@@ -194,7 +202,7 @@ export function TimeChart({ data, emptyText }: { data: ChartData; emptyText: str
               ))}
             {data.totalBelow && belowStacks.length > 1 && (
               <span className="total">
-                {data.totalBelow}: {formatValue(-depths[depths.length - 1][hovered])} {data.unit}
+                {data.totalBelow}: {formatValue(0 - depths[depths.length - 1][hovered])} {data.unit}
               </span>
             )}
             {hoveredEvents.map((e, i) => (

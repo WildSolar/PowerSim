@@ -29,6 +29,7 @@ export const CHANGELOG: Release[] = [
     ],
     changed: [
       "Statistics → Electricity is a balance now, like At a glance's day but month by month: above the line what the town's power went to — each use, the neighbourhood batteries charging, the surplus sold out of town — and below it where it came from — its own solar and wind, the batteries, and power bought from the wider grid.",
+      "More of the charts in Statistics are balances, in the same style: Heat by heating system (the heat buildings got and what the boilers lost, against the oil, gas and wood burned, district heat, the heat pumps' electricity and the heat they drew from the air and the ground), District heat by source (the networks it went to, against what made it), Emissions (what carbon removal contracts took back, below the line) and the utility's accounts (where the money went, against where it came from).",
       "Statistics → Power bought and sold is a balance too: above the line the town's surplus each month, sold on the spot market or taken in by the neighbourhood batteries; below it the town's shortfall, bought over the contracts or given back by the batteries.",
     ],
     fixed: [

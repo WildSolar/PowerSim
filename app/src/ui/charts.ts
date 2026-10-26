@@ -10,6 +10,7 @@
 
 import { DH_SOURCE_SPECS } from "../config/districtHeat";
 import { HEATING_SYSTEM_CATALOG, type HeatingSystemId } from "../config/heating";
+import { fuelEfficiency } from "../sim/heatingSystems";
 import { ENERGY_CLASS_CATALOG, ENERGY_CLASS_ORDER } from "../config/retrofit";
 import { MOBILITY_MODE_CATALOG } from "../config/mobility";
 import { approval } from "../sim/approval";
@@ -111,12 +112,6 @@ export function energyUnit(maxKWh: number): { unit: string; scale: number } {
   if (maxKWh >= 2_000_000) return { unit: "GWh", scale: 1e-6 };
   if (maxKWh >= 2_000) return { unit: "MWh", scale: 1e-3 };
   return { unit: "kWh", scale: 1 };
-}
-
-function stackMax(series: { values: (number | null)[] }[], n: number): number {
-  let max = 0;
-  for (let i = 0; i < n; i++) max = Math.max(max, series.reduce((s, x) => s + (x.values[i] ?? 0), 0));
-  return max;
 }
 
 const color = (key: string) => DEVICE_CATEGORIES.find((c) => c.key === key)?.color ?? "#888";
@@ -310,18 +305,47 @@ export const HEAT_KEYS = [
   ["oil", "oilBoiler"],
 ] as const;
 
+/** The heat buildings got each month, as a balance: above the line the heat, by what heated them,
+ * and what the boilers lost; below it what it took — the oil, gas and wood burned, district heat, the
+ * heat pumps' electricity, and the heat they drew from the air and the ground. */
 function heatChart(nowMs: number): ChartData {
   const { records, ...m } = monthly(nowMs, (r) => !!r.heatingKWh);
-  const keys = HEAT_KEYS;
-  const raw = keys.map(([k]) => records.map((r) => r.heatingKWh![k] ?? 0));
-  const { unit, scale } = energyUnit(stackMax(raw.map((values) => ({ values })), records.length));
+  const heat = (k: (typeof HEAT_KEYS)[number][0]) => records.map((r) => r.heatingKWh![k] ?? 0);
+  const burned = (k: "oil" | "gas" | "wood", fuel: "oilBoiler" | "gasBoiler" | "woodPellet") => heat(k).map((v) => v / fuelEfficiency(fuel));
+  const oil = burned("oil", "oilBoiler");
+  const gas = burned("gas", "gasBoiler");
+  const wood = burned("wood", "woodPellet");
+  const lost = records.map((_, i) => oil[i] + gas[i] + wood[i] - heat("oil")[i] - heat("gas")[i] - heat("wood")[i]);
+  const pumped = records.map((_, i) => heat("airHeatPump")[i] + heat("groundHeatPump")[i]);
+  // The heat pumps' electricity, no more than the heat they gave; the rest came from the air and the ground.
+  const electricity = records.map((r, i) => Math.min(pumped[i], r.electricityKWh?.heatPump ?? 0));
+  const ambient = pumped.map((p, i) => p - electricity[i]);
+  const districtHeat = heat("districtHeating");
+  const above = records.map((_, i) => HEAT_KEYS.reduce((s, [k]) => s + heat(k)[i], 0) + lost[i]);
+  const { unit, scale } = energyUnit(Math.max(0, ...above));
+  const sc = (v: number[]) => v.map((x) => x * scale);
+  const any = (v: number[]) => v.some((x) => x > 0);
+  const system = (id: HeatingSystemId) => HEATING_SYSTEM_CATALOG[id];
   return {
     ...m,
     unit,
-    total: "All heat",
-    series: keys.map(([k, id], i) => ({ key: k, label: HEATING_SYSTEM_CATALOG[id].label, color: HEATING_SYSTEM_CATALOG[id].color, kind: "stack" as const, values: raw[i].map((v) => v * scale) })),
+    total: "Heat, and lost",
+    totalBelow: "What it took",
+    height: 400,
+    series: [
+      ...HEAT_KEYS.map(([k, id]) => ({ key: k, label: system(id).label, color: system(id).color, kind: "stack" as const, values: sc(heat(k)) })),
+      ...(any(lost) ? [{ key: "lost", label: "Lost in the boilers", color: BALANCE_COLORS.sentOut, kind: "stack" as const, values: sc(lost) }] : []),
+      ...(any(ambient) ? [{ key: "ambient", label: "Heat from the air and the ground", color: AMBIENT_HEAT_COLOR, kind: "stack" as const, below: true, values: sc(ambient) }] : []),
+      ...(any(electricity) ? [{ key: "electricity", label: "Heat pumps' electricity", color: color("heatPump"), kind: "stack" as const, below: true, values: sc(electricity) }] : []),
+      ...(any(districtHeat) ? [{ key: "dhIn", label: "District heat", legend: false as const, color: system("districtHeating").color, kind: "stack" as const, below: true, values: sc(districtHeat) }] : []),
+      ...(any(wood) ? [{ key: "woodIn", label: "Wood burned", legend: false as const, color: system("woodPellet").color, kind: "stack" as const, below: true, values: sc(wood) }] : []),
+      ...(any(gas) ? [{ key: "gasIn", label: "Gas burned", legend: false as const, color: system("gasBoiler").color, kind: "stack" as const, below: true, values: sc(gas) }] : []),
+      ...(any(oil) ? [{ key: "oilIn", label: "Oil burned", legend: false as const, color: system("oilBoiler").color, kind: "stack" as const, below: true, values: sc(oil) }] : []),
+    ],
   };
 }
+
+const AMBIENT_HEAT_COLOR = "#9fd8c0";
 
 const DH_COLORS: Record<string, string> = {
   incinerator: "#4a3aa7",
@@ -333,6 +357,13 @@ const DH_COLORS: Record<string, string> = {
   other: "#e87ba4",
 };
 
+// The networks' colours in the district heat balance, biggest first (the rest together in the last) —
+// none of them a source's colour, which sit below the line.
+const DH_NETWORK_COLORS = ["#5b6b7a", "#eda100", "#a8a060", "#b0716a", "#6f9fa8", "#c9c6bd"];
+const DH_NETWORKS_SHOWN = 5;
+
+/** District heat each month, as a balance: above the line the networks it went to (the biggest on
+ * their own), below it what made it — each kind of source, and the backup boilers. */
 function districtHeatChart(nowMs: number): ChartData {
   const { records, ...m } = monthly(nowMs, (r) => !!r.districtHeatKWh);
   const order = [
@@ -343,12 +374,30 @@ function districtHeatChart(nowMs: number): ChartData {
     { label: "Oil boilers", color: "#b23a2e" },
   ].filter((s) => records.some((r) => (r.districtHeatKWh![s.label] ?? 0) > 0));
   const raw = order.map((s) => records.map((r) => r.districtHeatKWh![s.label] ?? 0));
-  const { unit, scale } = energyUnit(stackMax(raw.map((values) => ({ values })), records.length));
+  const made = records.map((_, i) => raw.reduce((s, v) => s + v[i], 0));
+  // The networks, biggest over the years first; months counted before networks were kept show all
+  // the heat as one.
+  const totals = new Map<string, number>();
+  for (const r of records) for (const [name, n] of Object.entries(r.dhNetworkKWh ?? {})) totals.set(name, (totals.get(name) ?? 0) + n.clean + n.boiler);
+  const names = [...totals.keys()].sort((a, b) => (totals.get(b) ?? 0) - (totals.get(a) ?? 0));
+  const shown = names.length > DH_NETWORKS_SHOWN + 1 ? names.slice(0, DH_NETWORKS_SHOWN) : names;
+  const ofNetwork = (r: MonthRecord, name: string) => (r.dhNetworkKWh?.[name] ? r.dhNetworkKWh[name].clean + r.dhNetworkKWh[name].boiler : 0);
+  const networks = shown.map((name, i) => ({ key: `net-${name}`, label: name, color: DH_NETWORK_COLORS[i], values: records.map((r) => ofNetwork(r, name)) }));
+  const rest = records.map((_, i) => made[i] - networks.reduce((s, n) => s + n.values[i], 0));
+  if (rest.some((v) => v > 1))
+    networks.push({ key: "net-rest", label: "Other networks", color: DH_NETWORK_COLORS[DH_NETWORK_COLORS.length - 1], values: rest.map((v) => Math.max(0, v)) });
+  const { unit, scale } = energyUnit(Math.max(0, ...made));
+  const sc = (v: number[]) => v.map((x) => x * scale);
   return {
     ...m,
     unit,
-    total: "All district heat",
-    series: order.map((s, i) => ({ key: s.label, label: s.label, color: s.color, kind: "stack" as const, values: raw[i].map((v) => v * scale) })),
+    total: "Went to",
+    totalBelow: "Came from",
+    height: 400,
+    series: [
+      ...networks.map((n) => ({ key: n.key, label: n.label, color: n.color, kind: "stack" as const, values: sc(n.values) })),
+      ...order.map((s, i) => ({ key: s.label, label: s.label, color: s.color, kind: "stack" as const, below: true, values: sc(raw[i]) })),
+    ],
   };
 }
 
@@ -681,9 +730,12 @@ function emissionsChart(nowMs: number): ChartData {
     unit: "t CO₂",
     bars: true,
     total: "Emitted",
+    totalBelow: "Removed",
     series: [
       ...EMISSION_SOURCES.map((s) => ({ key: s.key, label: s.label, color: EMISSIONS_SOURCE_COLOR[s.key], kind: "stack" as const, values: list.map((e) => t(s.kgCO2(e))) })),
-      { key: "removals", label: "Removed (contracts)", color: "#888", kind: "hidden", values: list.map((e) => t(e.removalsKgCO2)) },
+      ...(list.some((e) => e.removalsKgCO2 > 0)
+        ? [{ key: "removals", label: "Removed under contract", color: "#8fa3b8", kind: "stack" as const, below: true, values: list.map((e) => t(e.removalsKgCO2)) }]
+        : []),
       { key: "net", label: "Net, after removals", color: "var(--ink)", kind: "line", values: list.map((e) => t(e.netKgCO2)) },
     ],
   };
@@ -760,7 +812,7 @@ const UTILITY_LINES: { key: keyof UtilityMonth | "concessionFee"; label: string;
 ];
 
 function utilityOptions(): { value: string; label: string }[] {
-  return [{ value: "overview", label: "Sales, costs and result (yearly)" }, ...UTILITY_LINES.map((l) => ({ value: l.key, label: `${l.label} (monthly)` }))];
+  return [{ value: "overview", label: "Where the money went and came from (yearly)" }, ...UTILITY_LINES.map((l) => ({ value: l.key, label: `${l.label} (monthly)` }))];
 }
 
 function utilityChart(param: string | null, nowMs: number): ChartData {
@@ -779,30 +831,42 @@ function utilityChart(param: string | null, nowMs: number): ChartData {
       series: [{ key: line.key, label: line.label, color: line.cost ? "#eb6834" : "#2a78d6", kind: "line", values: records.map((r) => value(r) / 100 / 1000) }],
     };
   }
+  // The booked years, as a balance: above the line where the money went — each kind of cost, and
+  // the result, the department's — below it where it came from: each kind of sale (and a loss, the
+  // department's to bear). Surplus sold at below-zero prices is a cost.
   const list = bookedFinances();
   const k = (rp: number) => rp / 100 / 1000;
-  const sales = list.map((f) => f.energyRevenueRp + f.networkRevenueRp + f.districtHeatRevenueRp + f.publicChargingRevenueRp + f.surplusSoldRp);
-  const costs = list.map(
-    (f) =>
-      f.feedInPaidRp +
-      f.wholesaleCostRp +
-      f.gridMaintenanceCostRp +
-      f.districtHeatPurchaseRp +
-      f.districtHeatUpkeepRp +
-      f.publicChargingUpkeepRp +
-      f.roofContractCostRp +
-      f.windUpkeepRp +
-      f.agriPvUpkeepRp,
-  );
+  const of = (pick: (f: (typeof list)[number]) => number) => list.map((f) => k(pick(f)));
+  const sales = [
+    { key: "energy", label: "Electricity sold", color: "#2a78d6", values: of((f) => f.energyRevenueRp) },
+    { key: "network", label: "Network and base fees", color: "#7fb0e8", values: of((f) => f.networkRevenueRp) },
+    { key: "surplus", label: "Surplus sold on the spot market", color: color("solar"), values: of((f) => Math.max(0, f.surplusSoldRp)) },
+    { key: "heat", label: "District heat sold", color: "#e8a87c", values: of((f) => f.districtHeatRevenueRp) },
+    { key: "charging", label: "Public charging sold", color: color("ev"), values: of((f) => f.publicChargingRevenueRp) },
+  ];
+  const costs = [
+    { key: "bought", label: "Power bought over contracts", color: BALANCE_COLORS.bought, values: of((f) => f.wholesaleCostRp + Math.max(0, -f.surplusSoldRp)) },
+    { key: "feedIn", label: "Solar feed-in paid to owners", color: "#c2410c", values: of((f) => f.feedInPaidRp) },
+    { key: "grid", label: "Grid upkeep", color: "#4a3aa7", values: of((f) => f.gridMaintenanceCostRp) },
+    { key: "dh", label: "District heat: making it, and upkeep", color: "#a56b2c", values: of((f) => f.districtHeatPurchaseRp + f.districtHeatUpkeepRp) },
+    { key: "upkeep", label: "Upkeep and rent: chargers, roofs, wind, Agri-PV", color: "#b4b2a9", values: of((f) => f.publicChargingUpkeepRp + f.roofContractCostRp + f.windUpkeepRp + f.agriPvUpkeepRp) },
+  ];
+  const result = list.map((_, i) => sales.reduce((s, x) => s + x.values[i], 0) - costs.reduce((s, x) => s + x.values[i], 0));
+  const any = (v: number[]) => v.some((x) => x > 0);
   return {
     xs: list.map((f) => f.year + 0.5),
     xLabels: list.map((f) => String(f.year)),
     ...axis(nowMs),
     unit: "kCHF",
+    bars: true,
+    total: "Went to",
+    totalBelow: "Came from",
+    height: 400,
     series: [
-      { key: "sales", label: "Sales: power, surplus, district heat, charging", color: "#2a78d6", kind: "line", values: sales.map(k) },
-      { key: "costs", label: "Costs: power bought, feed-in, the grid, heat, upkeep", color: "#eb6834", kind: "line", values: costs.map(k) },
-      { key: "result", label: "Result", color: "#1baf7a", kind: "line", dashed: true, values: sales.map((s, i) => k(s - costs[i])) },
+      ...costs.filter((x) => any(x.values)).map((x) => ({ ...x, kind: "stack" as const })),
+      ...(any(result) ? [{ key: "result", label: "Result: the department's (the concession fee and the rest)", color: "#1baf7a", kind: "stack" as const, values: result.map((v) => Math.max(0, v)) }] : []),
+      ...sales.filter((x) => any(x.values)).map((x) => ({ ...x, kind: "stack" as const, below: true })),
+      ...(result.some((v) => v < 0) ? [{ key: "loss", label: "Loss: borne by the department", color: "#b23a2e", kind: "stack" as const, below: true, values: result.map((v) => Math.max(0, -v)) }] : []),
     ],
   };
 }
@@ -861,14 +925,15 @@ export const CHARTS: ChartDef[] = [
     id: "heat",
     group: "Energy",
     title: "Heat by heating system",
-    description: "The heat delivered to buildings each month, by what heated them.",
+    description:
+      "The heat buildings got each month, as a balance. Above the line, the heat, by what heated them, and what the boilers lost on the way. Below it, what it took: the oil, gas and wood burned, district heat, the heat pumps' electricity — and the heat they drew from the air and the ground, often two or three times as much.",
     data: (_, now) => heatChart(now),
   },
   {
     id: "district-heat",
     group: "Energy",
     title: "District heat by source",
-    description: "What the district heating networks' plants made each month — and how much the backup boilers had to burn.",
+    description: "District heat each month, as a balance. Above the line, the networks it went to, the biggest on their own. Below it, what made it: each kind of source, and the oil and gas boilers that stand by for the coldest days.",
     data: (_, now) => districtHeatChart(now),
   },
   {
@@ -999,7 +1064,7 @@ export const CHARTS: ChartDef[] = [
     id: "emissions",
     group: "Books",
     title: "Emissions",
-    description: "Each counted year's emissions by source, and what is left after carbon removals.",
+    description: "Each counted year's emissions, as a balance: above the line what was emitted, by source; below it what carbon removal contracts took back; the line is what is left.",
     data: (_, now) => emissionsChart(now),
   },
   {
@@ -1021,7 +1086,8 @@ export const CHARTS: ChartDef[] = [
     id: "utility",
     group: "Books",
     title: "The utility's accounts",
-    description: "What the municipal utility sold and what it cost each booked year, and the result — or any line of its accounts, month by month.",
+    description:
+      "The municipal utility's booked years, as a balance. Above the line, where the money went: each kind of cost, and the result, which is the department's. Below it, where it came from: each kind of sale. Or any line of its accounts, month by month.",
     param: { label: "Show", options: utilityOptions },
     data: utilityChart,
   },
