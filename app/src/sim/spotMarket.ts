@@ -17,12 +17,18 @@ import { GRID_BATTERY_ROUND_TRIP, SPOT_BASE_SHARE, SPOT_SOLAR_DIP_SHARE } from "
 import { interpolateCurve } from "../config/curve";
 import { toDateMs } from "./calendar";
 import { topSliceLevel } from "./peakShave";
+import { market } from "./market";
 import { ghiWm2 } from "./pv";
 
 /** The spot price at `atMs` as a share of the month's wholesale price. */
 export function spotShare(atMs: number): number {
   const year = new Date(toDateMs(atMs)).getUTCFullYear();
   return SPOT_BASE_SHARE - interpolateCurve(SPOT_SOLAR_DIP_SHARE, year) * (ghiWm2(atMs) / 1000);
+}
+
+/** The spot price at `atMs` (Rp/kWh): the month's wholesale price times spotShare. */
+export function spotPriceRpKWh(atMs: number): number {
+  return market.price("wholesale", atMs) * spotShare(atMs);
 }
 
 export interface PowerFlows {

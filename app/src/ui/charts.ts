@@ -17,6 +17,8 @@ import { BASELINE_YEAR, MONTH_NAMES, toDateMs, toSimTimeMs } from "../sim/calend
 import { cachedEmissionsForYear, EMISSION_SOURCES, EMISSIONS_SOURCE_COLOR } from "../sim/emissions";
 import { bookedFinances, townTakeRp, utilityProfitRp, type UtilityMonth } from "../sim/finances";
 import { grid } from "../sim/grid";
+import { market } from "../sim/market";
+import { spotPriceRpKWh } from "../sim/spotMarket";
 import { measures } from "../sim/measures";
 import { monthRecords, type MonthRecord } from "../sim/monthRecords";
 import { PAYOUT_CATEGORIES, PAYOUT_LABEL, treasury, type PayoutCategory } from "../sim/treasury";
@@ -174,6 +176,93 @@ function tradeChart(nowMs: number): ChartData {
     ],
   };
 }
+
+// --- the spot market ---
+
+const SPOT_VIEWS = [
+  { value: "months", label: "Month by month" },
+  { value: "yesterday", label: "Yesterday, hour by hour" },
+];
+
+/** The contract price and the spot price over a month, Rp/kWh: the spot price's average hour and its
+ * cheapest. Hour by hour, from the market and the sun alone — kept for the months that are over. */
+const spotMonths = new Map<number, { contract: number; average: number; lowest: number }>();
+
+function spotMonth(month: number, untilMs: number): { contract: number; average: number; lowest: number } | null {
+  const known = spotMonths.get(month);
+  if (known) return known;
+  const year = Math.floor(month / 12);
+  const m = month % 12;
+  const start = toSimTimeMs(Date.UTC(year, m, 1));
+  const end = Math.min(untilMs, toSimTimeMs(Date.UTC(year, m + 1, 1)));
+  let sum = 0;
+  let n = 0;
+  let lowest = Infinity;
+  for (let t = Math.max(0, start) + 1_800_000; t < end; t += 3_600_000) {
+    const price = spotPriceRpKWh(t);
+    sum += price;
+    n++;
+    lowest = Math.min(lowest, price);
+  }
+  if (n === 0) return null;
+  const result = { contract: market.price("wholesale", Math.max(0, start)), average: sum / n, lowest };
+  if (end < untilMs) spotMonths.set(month, result);
+  return result;
+}
+
+function spotChart(param: string | null, nowMs: number): ChartData {
+  if (param === "yesterday") {
+    const DAY_MS = 86_400_000;
+    const today = Math.floor(toDateMs(nowMs) / DAY_MS) * DAY_MS;
+    const start = toSimTimeMs(today - DAY_MS);
+    const times = Array.from({ length: 49 }, (_, i) => start + i * 1_800_000);
+    const clock = (t: number) => new Date(toDateMs(t)).toISOString().slice(11, 16);
+    return {
+      xs: times.map((t) => (t - start) / 3_600_000),
+      xLabels: times.map(clock),
+      xTicks: [0, 6, 12, 18, 24].map((h) => ({ x: h, label: `${String(h).padStart(2, "0")}:00` })),
+      from: 0,
+      to: 24,
+      unit: "Rp/kWh",
+      reference: { value: 0, label: "Below zero: the seller pays to be rid of it" },
+      series: [
+        { key: "spot", label: "Spot price", color: SPOT_COLOR, kind: "line", values: times.map(spotPriceRpKWh) },
+        { key: "contract", label: "Contract price", color: CONTRACT_COLOR, kind: "line", dashed: true, values: times.map((t) => market.price("wholesale", t)) },
+      ],
+    };
+  }
+  const first = (() => {
+    const d = new Date(toDateMs(0));
+    return d.getUTCFullYear() * 12 + d.getUTCMonth();
+  })();
+  const last = (() => {
+    const d = new Date(toDateMs(nowMs));
+    return d.getUTCFullYear() * 12 + d.getUTCMonth();
+  })();
+  const months: number[] = [];
+  const values: { contract: number; average: number; lowest: number }[] = [];
+  for (let month = first; month <= last; month++) {
+    const v = spotMonth(month, nowMs);
+    if (!v) continue;
+    months.push(month);
+    values.push(v);
+  }
+  return {
+    xs: months.map((mo) => Math.floor(mo / 12) + ((mo % 12) + 0.5) / 12),
+    xLabels: months.map((mo) => `${MONTH_NAMES[mo % 12]} ${Math.floor(mo / 12)}`),
+    ...axis(nowMs),
+    unit: "Rp/kWh",
+    reference: { value: 0, label: "Below zero: the seller pays to be rid of it" },
+    series: [
+      { key: "contract", label: "Contract price", color: CONTRACT_COLOR, kind: "line", values: values.map((v) => v.contract) },
+      { key: "average", label: "Spot price, the average hour", color: SPOT_COLOR, kind: "line", values: values.map((v) => v.average) },
+      { key: "lowest", label: "Spot price, the cheapest hour", color: SPOT_COLOR, kind: "line", dashed: true, values: values.map((v) => v.lowest) },
+    ],
+  };
+}
+
+const SPOT_COLOR = "#eb6834";
+const CONTRACT_COLOR = "#2a78d6";
 
 // --- heat ---
 
@@ -722,6 +811,15 @@ export const CHARTS: ChartDef[] = [
     title: "Power bought and sold",
     description: "What the utility bought each month over its contracts, the surplus it sold when the town made more than it used, and what the neighbourhood batteries shifted from one to the other.",
     data: (_, now) => tradeChart(now),
+  },
+  {
+    id: "spot-price",
+    group: "Energy",
+    title: "Spot market price",
+    description:
+      "What power fetches on the spot market, where the utility sells the town's surplus, against the contract price it pays for what it buys. The spot price sinks as the sun rises over the whole region's panels — on the sunniest middays below zero, in later years.",
+    param: { label: "Show", options: () => SPOT_VIEWS },
+    data: spotChart,
   },
   {
     id: "heat",

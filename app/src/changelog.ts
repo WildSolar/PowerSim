@@ -24,6 +24,9 @@ export const CHANGELOG: Release[] = [
   {
     version: "0.10.1",
     date: null,
+    added: [
+      "A chart of the spot market price (Town hall → Statistics → Spot market price), where the utility sells the town's surplus: month by month — its average hour and its cheapest — or yesterday hour by hour, each against the contract price the utility pays for the power it buys.",
+    ],
     fixed: [
       "Grid-friendly home batteries charge as forecast-based systems do: from the top of their building's midday surplus, just enough to be full by the end of the sunny hours, instead of holding back until two in the afternoon and then all filling at once. They now take the midday peak off the transformer stations.",
       "Neighbourhood batteries are run for the grid in the utility's accounts and in Statistics → At a glance, as the transformer card already counted them: they store from the top of the town's surplus, the sunniest and cheapest hours, and give it back into the top of the evening draw, instead of filling as soon as the town makes more than it uses. Less is sold at the lowest prices.",
