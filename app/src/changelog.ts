@@ -22,6 +22,15 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.10.1",
+    date: null,
+    fixed: [
+      "Grid-friendly home batteries charge as forecast-based systems do: from the top of their building's midday surplus, just enough to be full by the end of the sunny hours, instead of holding back until two in the afternoon and then all filling at once. They now take the midday peak off the transformer stations.",
+      "Neighbourhood batteries are run for the grid in the utility's accounts and in Statistics → At a glance, as the transformer card already counted them: they store from the top of the town's surplus, the sunniest and cheapest hours, and give it back into the top of the evening draw, instead of filling as soon as the town makes more than it uses. Less is sold at the lowest prices.",
+      "Home batteries give back what they took in: they never charge past full, give back about nine tenths of it, and carry what is left at night into the next morning. They used to take in more than they could hold in buildings that use little by day, give back only a fraction of it from buildings that use little in the evening, and give back power they never stored in busy ones.",
+    ],
+  },
+  {
     version: "0.10.0",
     date: "2026-10-25",
     added: [

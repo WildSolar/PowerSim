@@ -8,6 +8,7 @@ import { cachedEmissionsForYear } from "../sim/emissions";
 import { fleets } from "../sim/fleet";
 import { GRID_BATTERY_ROUND_TRIP } from "../config/spotMarket";
 import { grid } from "../sim/grid";
+import { batteriesThroughTheDay } from "../sim/peakShave";
 import { currentHeatingSystemId } from "../sim/heatingRenewal";
 import type { CategorySeries } from "../sim/history";
 import { existsAt } from "../sim/lifetime";
@@ -341,9 +342,9 @@ const SENT_OUT_COLOR = "#b4b2a9";
 
 /** The day's power as a balance: above the line where it went — each use, the batteries charging,
  * what was sent out of town — and below it where it came from — the town's own solar and wind, the
- * batteries, and the wider grid. The neighbourhood batteries are run through the day as the
- * utility's accounts run them (spotMarket.ts): filling from the town's surplus, giving it back
- * when the town draws more than it makes, empty at midnight. */
+ * batteries, and the wider grid. The neighbourhood batteries are run through the day as the utility
+ * runs them (spotMarket.ts, peakShave.ts): empty at midnight, they store from the top of the town's
+ * surplus — the sunniest hours — and give it back into the top of its draw once they have it. */
 function dayChart(
   times: number[],
   series: CategorySeries,
@@ -365,34 +366,15 @@ function dayChart(
   // The series' generation is everything the plants made, wind turbines included; less what the
   // home batteries' feed-in caps held back.
   const solarW = times.map((_, i) => Math.max(0, series.solarW[i] - windW[i] - curtailedW[i]));
-  const intoW: number[] = [];
-  const outOfW: number[] = [];
-  const boughtW: number[] = [];
-  const sentW: number[] = [];
-  let storedKWh = 0;
-  for (let i = 0; i < times.length; i++) {
-    const dtHours = i > 0 ? (times[i] - times[i - 1]) / HOUR_MS : 0;
-    const home = homeBatteryW[i];
-    // What the town still needs after its own plants and its home batteries (negative: a surplus).
-    const residualW = usedW[i] + home - solarW[i] - windW[i];
-    let chargeW = 0;
-    let dischargeW = 0;
-    if (gridBattery.kw > 0 && dtHours > 0) {
-      if (residualW < 0) {
-        const roomKWh = Math.max(0, gridBattery.kwh - storedKWh);
-        chargeW = Math.min(gridBattery.kw * 1000, -residualW, (roomKWh / dtHours) * 1000);
-        storedKWh += (chargeW / 1000) * dtHours;
-      } else {
-        dischargeW = Math.min(gridBattery.kw * 1000, residualW, ((storedKWh * GRID_BATTERY_ROUND_TRIP) / dtHours) * 1000);
-        storedKWh -= (dischargeW / 1000 / GRID_BATTERY_ROUND_TRIP) * dtHours;
-      }
-    }
-    intoW.push(Math.max(0, home) + chargeW);
-    outOfW.push(Math.max(0, -home) + dischargeW);
-    const net = residualW + chargeW - dischargeW;
-    boughtW.push(Math.max(0, net));
-    sentW.push(Math.max(0, -net));
-  }
+  const hoursOf = times.map((t, i) => (i > 0 ? (t - times[i - 1]) / HOUR_MS : 0));
+  // What the town still needs after its own plants and its home batteries (negative: a surplus).
+  const residualW = times.map((_, i) => usedW[i] + homeBatteryW[i] - solarW[i] - windW[i]);
+  const { chargeW, dischargeW } = batteriesThroughTheDay(residualW, hoursOf, gridBattery, GRID_BATTERY_ROUND_TRIP);
+  const intoW = times.map((_, i) => Math.max(0, homeBatteryW[i]) + chargeW[i]);
+  const outOfW = times.map((_, i) => Math.max(0, -homeBatteryW[i]) + dischargeW[i]);
+  const netW = residualW.map((w, i) => w + chargeW[i] - dischargeW[i]);
+  const boughtW = netW.map((w) => Math.max(0, w));
+  const sentW = netW.map((w) => Math.max(0, -w));
   const clock = (t: number) => {
     const d = new Date(toDateMs(t));
     return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;

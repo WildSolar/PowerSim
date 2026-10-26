@@ -4,36 +4,40 @@
  * added later, seeded for registered systems); it hands the battery over on the building's PV plant
  * (PowerPlant.battery).
  *
- * A battery's state of charge depends on the whole day so far, but everything here is a pure
- * function of the moment, like the rest of the power model. So the day is worked out once per kWp,
- * shared by every battery in town (the same sun on every roof): how full a typical battery is at
- * each quarter hour, from the sunlight since sunrise less what the building uses meanwhile, and
- * when its evening discharge starts and how long it lasts. A battery at a given moment then:
- *  - charges from the building's surplus (up to its power) until the day's curve says it's full;
- *  - discharges into the building's own use from the late afternoon, for as long as the day's
- *    charge lasts (into the night);
- *  - in grid-friendly operation, charges only from the part of the surplus above its feed-in cap
- *    until the early afternoon, and the system never feeds in more than the cap — what's left once
- *    the battery is full is curtailed. A solar feed-in limit (the law) caps feed-in the same way.
+ * A battery's charge depends on the whole day so far, while everything else in the power model is a
+ * pure function of the moment. So each battery's day is worked out once, at half hours, and kept: the
+ * sun on its building's panels, the building's own use (sampled every four hours and drawn between),
+ * and from those what the battery takes in and gives back at each half hour — never more than it
+ * has room for, and HOME_BATTERY_ROUND_TRIP of what it took in. It starts the day with what was left
+ * of the night before. A battery at a given moment then does what its day says for that half hour,
+ * as far as the building's actual use allows: it charges no more than the building has to spare,
+ * and gives no more than the building draws.
+ *
+ * In plain self-consumption it charges from any surplus, so on a sunny day it is full by mid-morning.
+ * In grid-friendly operation it charges as a forecast-based system does: only from the part of the
+ * building's surplus above the level that just fills it over the day — the top of the midday peak —
+ * and the system never feeds in more than its cap (the rest, once the battery is full, is curtailed).
+ * A solar feed-in limit (the law) caps feed-in the same way.
  */
 
-import {
-  DAYTIME_OWN_USE_KW_PER_KWP,
-  GRID_FRIENDLY_PEAK_UNTIL_HOUR,
-  HOME_BATTERY_KW_PER_KWH,
-  HOME_BATTERY_KWH_PER_KWP,
-  HOURS_A_FULL_BATTERY_LASTS,
-} from "../config/homeBattery";
-import type { PowerPlant } from "../data/types";
+import { HOME_BATTERY_ROUND_TRIP } from "../config/homeBattery";
+import type { Building, PowerPlant } from "../data/types";
+import { buildingLoadW } from "./buildingPower";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { policyStore } from "./policy";
-import { irradianceWm2, profileShareAt, pvPowerWAt, roofProfileIndex } from "./pv";
+import { irradianceWm2, pvPowerWAt } from "./pv";
+import { topSliceLevel } from "./peakShave";
 import { snowDepthCm } from "./snow";
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
-const STEPS_PER_DAY = 96; // quarter hours
+const STEPS_PER_DAY = 48; // half hours
 const STEP_HOURS = 24 / STEPS_PER_DAY;
+const STEP_HOURS_EACH = new Float32Array(STEPS_PER_DAY).fill(STEP_HOURS);
+// When a building's own use is sampled for its battery's day (hours); drawn between them, round the clock.
+const LOAD_SAMPLE_HOURS = [2, 6, 10, 14, 18, 22];
+// Days of batteries kept (the map's day, the statistics' yesterday, the grid's readings).
+const DAYS_KEPT = 12;
 
 export interface HomeBattery {
   kwh: number;
@@ -43,44 +47,117 @@ export interface HomeBattery {
   feedInCap: number | null;
 }
 
-interface DayCurve {
-  /** How full a typical battery is at the start of each quarter hour (0–1). */
-  fill: Float32Array;
-  /** Hour of day the evening discharge starts, and ends (past 24: into the next morning). */
-  dischargeFromHour: number;
-  dischargeToHour: number;
+/** One battery's day. */
+interface BatteryDay {
+  /** What it does in each half hour (W): positive charging, negative discharging. */
+  flowW: Float32Array;
+  /** How much it holds at the day's end (kWh): the next day starts with it. */
+  endKWh: number;
+  /** The battery it was worked out for (a new or larger one starts afresh). */
+  kwh: number;
 }
 
-const curves = new Map<string, DayCurve>();
+// Kept by day (by date), then building. `firstGuesses` holds the days worked out only to give the
+// next day its start (from an empty battery), so a day never reaches back further than one day.
+const days = new Map<number, Map<string, BatteryDay>>();
+const firstGuesses = new Map<number, Map<string, BatteryDay>>();
+const loadSamples = new Map<number, Map<string, Float32Array>>();
+const sunByDay = new Map<number, Float32Array>();
 
-/** The day `dayIndex` (days since the epoch) for a battery with the given feed-in cap (0: none),
- * with panels facing the sun as `profile` (pv.ts) — a roof facing east fills its battery earlier,
- * one facing west later. */
-function dayCurve(dayIndex: number, cap: number, snowCm: number, profile: number): DayCurve {
-  const key = `${dayIndex}:${cap}:${profile}`;
-  let curve = curves.get(key);
-  if (curve) return curve;
-  if (curves.size > 1024) curves.clear();
-  const capacity = HOME_BATTERY_KWH_PER_KWP; // per kWp
-  const power = capacity * HOME_BATTERY_KW_PER_KWH;
-  const fill = new Float32Array(STEPS_PER_DAY + 1);
-  let stored = 0;
-  let lastSunStep = -1; // the last quarter hour with a surplus to speak of
+function dayMap<T>(byDay: Map<number, Map<string, T>>, day: number): Map<string, T> {
+  let m = byDay.get(day);
+  if (!m) {
+    if (byDay.size >= DAYS_KEPT) byDay.delete(byDay.keys().next().value as number);
+    m = new Map();
+    byDay.set(day, m);
+  }
+  return m;
+}
+
+/** The light on the panels at each half hour of `day` (days since 1970, by date). */
+function sunOf(day: number): Float32Array {
+  let sun = sunByDay.get(day);
+  if (!sun) {
+    if (sunByDay.size >= DAYS_KEPT) sunByDay.delete(sunByDay.keys().next().value as number);
+    const snow = snowDepthCm(toSimTimeMs(day * DAY_MS + 12 * HOUR_MS));
+    sun = Float32Array.from({ length: STEPS_PER_DAY }, (_, i) => irradianceWm2(toSimTimeMs(day * DAY_MS + (i + 0.5) * STEP_HOURS * HOUR_MS), snow));
+    sunByDay.set(day, sun);
+  }
+  return sun;
+}
+
+/** The building's own use (W) at each of LOAD_SAMPLE_HOURS of `day`. */
+function loadsOf(building: Building, day: number): Float32Array {
+  const m = dayMap(loadSamples, day);
+  let loads = m.get(building.egid);
+  if (!loads) {
+    loads = Float32Array.from(LOAD_SAMPLE_HOURS, (h) => buildingLoadW(building, toSimTimeMs(day * DAY_MS + h * HOUR_MS)));
+    m.set(building.egid, loads);
+  }
+  return loads;
+}
+
+/** The building's own use at `hour` of the day, drawn between the samples (round midnight too). */
+function loadAtHour(loads: Float32Array, hour: number): number {
+  const n = LOAD_SAMPLE_HOURS.length;
+  let j = LOAD_SAMPLE_HOURS.findIndex((h) => h > hour);
+  if (j === -1) j = n; // past the last sample: towards the first one, tomorrow
+  const i = j - 1;
+  const h0 = i < 0 ? LOAD_SAMPLE_HOURS[n - 1] - 24 : LOAD_SAMPLE_HOURS[i];
+  const h1 = j >= n ? LOAD_SAMPLE_HOURS[0] + 24 : LOAD_SAMPLE_HOURS[j];
+  const l0 = loads[(i + n) % n];
+  const l1 = loads[j % n];
+  return l0 + ((l1 - l0) * (hour - h0)) / (h1 - h0);
+}
+
+/** What a battery gives the building in half an hour (W): its power, the building's draw, what it holds. */
+function dischargeW(maxW: number, drawW: number, storedKWh: number): number {
+  return Math.min(maxW, drawW, (storedKWh * HOME_BATTERY_ROUND_TRIP * 1000) / STEP_HOURS);
+}
+
+/** The battery's day: from the sun on the building's arrays and its sampled use, what it takes in
+ * and gives back at each half hour. Starts with what was left of the day before (worked out from an empty battery) —
+ * or, for a first guess, empty. */
+function batteryDay(building: Building, arrays: PowerPlant[], battery: HomeBattery, ratedW: number, day: number, firstGuess: boolean): BatteryDay {
+  const byEgid = dayMap(firstGuess ? firstGuesses : days, day);
+  const known = byEgid.get(building.egid);
+  if (known && known.kwh === battery.kwh) return known;
+
+  const start = firstGuess ? 0 : batteryDay(building, arrays, battery, ratedW, day - 1, true).endKWh;
+  const sun = sunOf(day);
+  const loads = loadsOf(building, day);
+  const surplusW = new Float32Array(STEPS_PER_DAY);
   for (let i = 0; i < STEPS_PER_DAY; i++) {
     const hour = (i + 0.5) * STEP_HOURS;
-    const t = toSimTimeMs(dayIndex * DAY_MS + hour * HOUR_MS);
-    const sun = profileShareAt(profile, t, irradianceWm2(t, snowCm));
-    const threshold = cap > 0 && hour < GRID_FRIENDLY_PEAK_UNTIL_HOUR ? cap : 0;
-    stored = Math.min(capacity, stored + Math.min(power, Math.max(0, sun - DAYTIME_OWN_USE_KW_PER_KWP - threshold)) * STEP_HOURS);
-    fill[i + 1] = stored / capacity;
-    if (sun >= DAYTIME_OWN_USE_KW_PER_KWP) lastSunStep = i;
+    const t = toSimTimeMs(day * DAY_MS + hour * HOUR_MS);
+    let gen = 0;
+    for (const plant of arrays) gen -= pvPowerWAt(plant, t, sun[i]);
+    surplusW[i] = gen - loadAtHour(loads, hour);
   }
-  // The evening discharge starts once the sun has gone for the day (not at the first cloud).
-  const dischargeFromHour = Math.max(12, (lastSunStep + 1) * STEP_HOURS);
-  const full = stored / capacity;
-  curve = { fill, dischargeFromHour, dischargeToHour: dischargeFromHour + full * HOURS_A_FULL_BATTERY_LASTS };
-  curves.set(key, curve);
-  return curve;
+  const maxW = battery.kw * 1000;
+
+  // Grid-friendly: the level of the day's surplus above which what's left just fills the battery —
+  // the room it has once the night's discharge is over — and never above the feed-in cap.
+  let thresholdW = 0;
+  if (battery.feedInCap !== null) {
+    let morning = start;
+    for (let i = 0; i < STEPS_PER_DAY && surplusW[i] <= 0; i++) morning -= (dischargeW(maxW, -surplusW[i], morning) / 1000 / HOME_BATTERY_ROUND_TRIP) * STEP_HOURS;
+    thresholdW = topSliceLevel(surplusW, STEP_HOURS_EACH, maxW, (battery.kwh - morning) * 1000);
+    const law = policyStore.get().feedInLimitPct / 100;
+    thresholdW = Math.min(thresholdW, Math.min(law, battery.feedInCap) * ratedW);
+  }
+
+  const flowW = new Float32Array(STEPS_PER_DAY);
+  let stored = start;
+  for (let i = 0; i < STEPS_PER_DAY; i++) {
+    const s = surplusW[i];
+    if (s > thresholdW) flowW[i] = Math.min(maxW, s - thresholdW, ((battery.kwh - stored) * 1000) / STEP_HOURS);
+    else if (s < 0) flowW[i] = -dischargeW(maxW, -s, stored);
+    stored += flowW[i] > 0 ? (flowW[i] / 1000) * STEP_HOURS : (flowW[i] / 1000 / HOME_BATTERY_ROUND_TRIP) * STEP_HOURS;
+  }
+  const result: BatteryDay = { flowW, endKWh: stored, kwh: battery.kwh };
+  byEgid.set(building.egid, result);
+  return result;
 }
 
 // Each plant list's solar arrays by building, made the first time a building is looked up in it:
@@ -118,9 +195,10 @@ export interface SolarAndBattery {
 }
 
 /** A building's solar and battery together at `simTimeMs`, against the rest of its use (`load`: in W,
- * or a function that works it out — called only when the answer depends on it: not at night outside
- * the battery's evening discharge, the building's use being all from the grid then either way). */
-export function solarAndBatteryAt(egid: string, plants: PowerPlant[], simTimeMs: number, load: number | (() => number), snowCoverCm?: number): SolarAndBattery {
+ * or a function that works it out — called only when the answer depends on it: not while the panels
+ * make nothing and the battery is empty, the building's use being all from the grid then either way). */
+export function solarAndBatteryAt(building: Building, plants: PowerPlant[], simTimeMs: number, load: number | (() => number), snowCoverCm?: number): SolarAndBattery {
+  const arrays = arraysOf(plants, building.egid);
   let generationW = 0;
   let batteryGenW = 0;
   let ratedW = 0;
@@ -129,7 +207,7 @@ export function solarAndBatteryAt(egid: string, plants: PowerPlant[], simTimeMs:
   let cap: number | null = null;
   let irradiance: number | null = null;
   let snow = snowCoverCm;
-  for (const plant of arraysOf(plants, egid)) {
+  for (const plant of arrays) {
     snow ??= snowDepthCm(simTimeMs);
     irradiance ??= irradianceWm2(simTimeMs, snow);
     const w = -pvPowerWAt(plant, simTimeMs, irradiance);
@@ -146,30 +224,16 @@ export function solarAndBatteryAt(egid: string, plants: PowerPlant[], simTimeMs:
 
   const battery: HomeBattery = { kwh, kw, feedInCap: cap };
   const dateMs = toDateMs(simTimeMs);
-  const dayIndex = Math.floor(dateMs / DAY_MS);
-  const hour = (dateMs - dayIndex * DAY_MS) / HOUR_MS;
-  const profile = roofProfileIndex(egid);
-  const today = dayCurve(dayIndex, cap ?? 0, snow ?? 0, profile);
-  const maxW = kw * 1000;
-  if (generationW <= 0 && typeof load === "function") {
-    // Nothing to charge from; without a discharge going on, the battery and the cap do nothing.
-    const yesterday = hour < 12 ? dayCurve(dayIndex - 1, cap ?? 0, snow ?? 0, profile) : null;
-    const discharging = (hour >= today.dischargeFromHour && hour < today.dischargeToHour) || (yesterday !== null && hour < yesterday.dischargeToHour - 24);
-    if (!discharging) return { generationW, batteryW: 0, curtailedW: 0, netW: -generationW, battery };
-  }
+  const day = Math.floor(dateMs / DAY_MS);
+  const step = Math.min(STEPS_PER_DAY - 1, Math.floor((dateMs - day * DAY_MS) / HOUR_MS / STEP_HOURS));
+  const plannedW = batteryDay(building, arrays, battery, ratedW, day, false).flowW[step];
+  // Nothing to charge from, and nothing to give: the building's use doesn't matter.
+  if (generationW <= 0 && plannedW >= 0 && typeof load === "function") return { generationW, batteryW: 0, curtailedW: 0, netW: -generationW, battery };
   const loadW = typeof load === "function" ? load() : load;
   const surplusW = generationW - loadW;
 
-  let batteryW = 0;
-  if (surplusW > 0) {
-    const full = today.fill[Math.min(STEPS_PER_DAY, Math.floor(hour / STEP_HOURS))] >= 0.999;
-    const threshold = cap !== null && hour < GRID_FRIENDLY_PEAK_UNTIL_HOUR ? cap * ratedW : 0;
-    if (!full) batteryW = Math.min(maxW, Math.max(0, surplusW - threshold));
-  } else {
-    const yesterday = hour < 12 ? dayCurve(dayIndex - 1, cap ?? 0, snow ?? 0, profile) : null;
-    const discharging = (hour >= today.dischargeFromHour && hour < today.dischargeToHour) || (yesterday !== null && hour < yesterday.dischargeToHour - 24);
-    if (discharging) batteryW = -Math.min(maxW, -surplusW);
-  }
+  // What its day says, as far as the building allows: no charging from the grid, no feeding in from the battery.
+  const batteryW = plannedW > 0 ? Math.min(plannedW, Math.max(0, surplusW)) : plannedW < 0 ? -Math.min(-plannedW, Math.max(0, -surplusW)) : 0;
 
   // Feed-in over the cap (grid-friendly operation, or the law's feed-in limit) is curtailed. The
   // arrays without a battery are already held to the law by pv.ts.

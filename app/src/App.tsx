@@ -109,7 +109,7 @@ function returnToMenu() {
 
 // Dev-only handle for inspecting the simulation from the browser console.
 if (import.meta.env.DEV) import("./dev/scenario").then((m) => Object.assign(window, { __scenario: m.runScenario }));
-if (import.meta.env.DEV) import("./dev/perf").then((m) => Object.assign(window, { __perf: m.runPerf, __perfYearEnd: m.timeYearEndReport, __perfNewYear: m.timeNewYearPieces, __perfMapTick: m.timeMapPowerTick, __perfRolling: m.timeRollingChart, __perfLastDay: m.timeLastDay, __perfMonth: m.timeMonthTurn, __perfPlay: m.timeLivePlay }));
+if (import.meta.env.DEV) import("./dev/perf").then((m) => Object.assign(window, { __perf: m.runPerf, __perfYearEnd: m.timeYearEndReport, __perfNewYear: m.timeNewYearPieces, __perfMapTick: m.timeMapPowerTick, __perfRolling: m.timeRollingChart, __perfLastDay: m.timeLastDay, __batteryDay: m.batteryDay, __jumpTo: m.jumpTo, __perfMonth: m.timeMonthTurn, __perfPlay: m.timeLivePlay }));
 if (import.meta.env.DEV) Object.assign(window, { __debug: { stock, simClock, policyStore, treasury, measures, approval, reportCardStore, tariffStore, market, inbox, dynamicTariff, grid, districtHeat, districtHeatSources, districtHeatLines, roofContracts, agriPv, carParks, datacenter, advisors, networkTariff, marketAccess, wind, publicCharging, fleets, letters, debt, studies, finances: financesModule } });
 if (import.meta.env.DEV) import("./sim/saveGame").then((m) => Object.assign(window, { __save: m }));
 if (import.meta.env.DEV) import("./sim/history").then((m) => Object.assign(window, { __history: m }));

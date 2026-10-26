@@ -6,7 +6,8 @@
  *
  * The neighbourhood batteries (grid.ts) take what they can of the surplus and give it back when the
  * town draws again, so less is sold cheap and less is bought: at most their power at any moment, and
- * one full cycle a day.
+ * one full cycle a day. They store from the top of the surplus — the sunniest hours, when it sells
+ * cheapest — and give back into the top of the draw (peakShave.ts).
  *
  * Read off the month's samples (yearReport.ts): each sample stands for its share of the month, so
  * the month's hours are represented, not each hour of it.
@@ -15,6 +16,7 @@
 import { GRID_BATTERY_ROUND_TRIP, SPOT_BASE_SHARE, SPOT_SOLAR_DIP_SHARE } from "../config/spotMarket";
 import { interpolateCurve } from "../config/curve";
 import { toDateMs } from "./calendar";
+import { topSliceLevel } from "./peakShave";
 import { ghiWm2 } from "./pv";
 
 /** The spot price at `atMs` as a share of the month's wholesale price. */
@@ -59,7 +61,8 @@ export function powerFlows(times: number[], drawW: number[], generationW: number
   });
   const stored = Math.min(canStore, battery.kwh * days, canReturn / GRID_BATTERY_ROUND_TRIP);
   const returned = stored * GRID_BATTERY_ROUND_TRIP;
-  const storeShare = canStore > 0 ? stored / canStore : 0;
+  // Taken from the top of the surplus: above this level (kW), up to the batteries' power.
+  const level = topSliceLevel(netKw.map((kw) => -kw), hours, battery.kw, stored);
 
   let drawn = 0;
   let soldKWh = 0;
@@ -69,7 +72,7 @@ export function powerFlows(times: number[], drawW: number[], generationW: number
       drawn += kw * hours[i];
       return;
     }
-    const kWh = (-kw - Math.min(battery.kw, -kw) * storeShare) * hours[i];
+    const kWh = (-kw - (stored > 0 ? Math.min(battery.kw, Math.max(0, -kw - level)) : 0)) * hours[i];
     soldKWh += kWh;
     soldRp += kWh * wholesaleRpKWh * spotShare(times[i]);
   });

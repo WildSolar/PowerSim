@@ -24,12 +24,12 @@ export const HOME_BATTERY_CYCLES_PER_YEAR = 220;
 export const HOME_BATTERY_PREFERENCE_CHF_PER_YEAR = 250;
 export const HOME_BATTERY_PREFERENCE_SPREAD_CHF_PER_YEAR = 500;
 
-// Grid-friendly operation: the battery charges from the top of the midday peak, so the system never
-// feeds in more than this share of its rating (the rest is stored or, once full, curtailed) — the
-// condition the grid operator sets for a large array in a full area, and the one a battery subsidy
-// may set. After this hour it tops up from any surplus, for the evening.
+// Grid-friendly operation: the battery charges from the top of the midday peak (forecast-based, as
+// such systems do: only from the part of the surplus above the level that just fills it over the day),
+// so the system never feeds in more than this share of its rating — the rest, once full, is
+// curtailed. The condition the grid operator sets for a large array in a full area, and the one a
+// battery subsidy may set.
 export const GRID_FRIENDLY_FEED_IN_CAP = 0.5;
-export const GRID_FRIENDLY_PEAK_UNTIL_HOUR = 14;
 
 // Owners of an existing system without a battery who look into adding one each year.
 export const BATTERY_RETROFIT_ANNUAL_HAZARD = 0.03;
@@ -44,9 +44,3 @@ export const REGISTERED_SYSTEM_BATTERY_SHARE: CurvePoint[] = [
 ];
 // New buildings: the share whose (voluntary) array comes with a battery.
 export const NEW_BUILD_BATTERY_SHARE = 0.5;
-
-// How the day plays out, per kWp, for the stateless model in sim/homeBattery.ts: the building's own
-// use while the sun is up (what isn't surplus), and how long a full battery lasts from the
-// afternoon on.
-export const DAYTIME_OWN_USE_KW_PER_KWP = 0.1;
-export const HOURS_A_FULL_BATTERY_LASTS = 6;

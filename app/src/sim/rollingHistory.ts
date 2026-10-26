@@ -77,7 +77,7 @@ function sampleAt(buildings: Building[], realPlants: PowerPlant[], t: number, ta
     for (const egid of withBattery) {
       const b = byEgid.get(egid);
       if (!b || !existsAt(b, t)) continue;
-      const r = solarAndBatteryAt(egid, plants, t, () => buildingLoadW(b, t), snow);
+      const r = solarAndBatteryAt(b, plants, t, () => buildingLoadW(b, t), snow);
       batteryW += r.batteryW;
       curtailedW += r.curtailedW;
     }

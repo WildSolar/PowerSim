@@ -116,7 +116,7 @@ export function BuildingPanel({ building, allBuildings, realPlants, onSelectDwel
   const hasSolar = buildingPlants.length > 0;
   const snowCoverCm = snowDepthCm(simTimeMs);
   const loadW = buildingLoadW(building, simTimeMs);
-  const solarState = solarAndBatteryAt(building.egid, plants, simTimeMs, loadW, snowCoverCm);
+  const solarState = solarAndBatteryAt(building, plants, simTimeMs, loadW, snowCoverCm);
   const battery = solarState.battery;
   const netW = loadW + solarState.netW;
   const solarCapacityKw = buildingPlants.reduce((sum, p) => sum + (p.capacityKw ?? 0), 0);

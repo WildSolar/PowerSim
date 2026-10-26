@@ -22,6 +22,8 @@ import { waterHeatingPowerW } from "../sim/waterHeating";
 import { workChargingPowerW } from "../sim/workCharging";
 import { snowDepthCm } from "../sim/snow";
 import { clearLast24h, sampleMunicipalityLast24h } from "../sim/rollingHistory";
+import { solarAndBatteryAt } from "../sim/homeBattery";
+import { batteriesThroughTheDay } from "../sim/peakShave";
 import { simClock } from "../sim/engine";
 import { tariffDeadline } from "../sim/tariffDeadline";
 import { startDevTiming, stopDevTiming } from "../sim/devTiming";
@@ -71,7 +73,7 @@ function unthrottledYield(): Promise<void> {
 
 /** Moves the clock to `atMs`, getting past the tariff deadline's hold on the way (this year's prices
  * kept, as autoplay.ts does). */
-async function jumpTo(atMs: number): Promise<void> {
+export async function jumpTo(atMs: number): Promise<void> {
   for (let i = 0; i < 5; i++) {
     simClock.pauseAt(atMs);
     await sleep(50);
@@ -310,6 +312,100 @@ export async function timeLastDay(atMs?: number): Promise<Record<string, unknown
   }
   pieces.batteryPlants = plantsAt[plantsAt.length - 1].filter((p) => p.battery).length;
   return { now, ms, points: r.times.length, perSampleMs: Math.round(ms / r.times.length), checksum: Math.round(sum), pieces, profile };
+}
+
+/** Dev: the sunniest of the last `lookbackDays` days before the clock, as a day start (sim ms). */
+export function sunniestRecentDay(lookbackDays = 30): number {
+  const today = Math.floor(simClock.getSimTimeMs() / 86_400_000) * 86_400_000;
+  let best = today - 86_400_000;
+  let bestCloud = Infinity;
+  for (let d = 1; d <= lookbackDays; d++) {
+    const day = today - d * 86_400_000;
+    let cloud = 0;
+    for (let h = 9; h <= 16; h++) cloud += weatherAt(day + h * 3_600_000).cloudiness;
+    if (cloud < bestCloud) {
+      bestCloud = cloud;
+      best = day;
+    }
+  }
+  return best;
+}
+
+/** Dev: one day's batteries, as the At a glance chart shows them — the home batteries (charging and
+ * discharging, kWh, and when), a few of them building by building at quarter hours, and the
+ * neighbourhood batteries as the chart runs them (or `gridBattery` as if built) — to check that what
+ * goes in comes back out, and when. */
+export async function batteryDay(dayStartMs = sunniestRecentDay(), gridBattery?: { kw: number; kwh: number }): Promise<Record<string, unknown>> {
+  const buildings = stock.getAll();
+  const plants = (await (await fetch(dataUrl("schlieren.json"))).json()).powerPlants;
+  const tariff = tariffStore.get();
+  const DAY = 86_400_000;
+  const r = sampleMunicipalityLast24h(buildings, plants, dayStartMs + DAY, tariff);
+  const hours = r.times.map((t, i) => (i === 0 ? 0 : (t - r.times[i - 1]) / 3_600_000));
+  const kWh = (w: number[], sign: 1 | -1) => w.reduce((s, x, i) => s + Math.max(0, sign * x) * hours[i], 0) / 1000;
+  const clock = (t: number) => new Date(toDateMs(t)).toISOString().slice(11, 16);
+  const livePlants = effectivePowerPlantsAt(buildings, plants, dayStartMs + DAY / 2);
+  const withBattery = livePlants.filter((p) => p.battery);
+  const out: Record<string, unknown> = {
+    day: new Date(toDateMs(dayStartMs)).toISOString().slice(0, 10),
+    homeBatteries: withBattery.length,
+    homeCapacityKWh: Math.round(withBattery.reduce((s, p) => s + (p.battery?.kwh ?? 0), 0)),
+    homeChargedKWh: Math.round(kWh(r.homeBatteryW, 1)),
+    homeDischargedKWh: Math.round(kWh(r.homeBatteryW, -1)),
+    homeCurtailedKWh: Math.round(kWh(r.curtailedW, 1)),
+    homeByHalfHour: r.times.map((t, i) => `${clock(t)} ${Math.round(r.homeBatteryW[i] / 1000)}`).join(" | "),
+  };
+  // A few home batteries on their own, at quarter hours.
+  const byEgid = new Map(buildings.map((b) => [b.egid, b]));
+  const sample = withBattery.filter((_, i) => i % Math.max(1, Math.floor(withBattery.length / 6)) === 0).slice(0, 6);
+  out.buildings = sample.map((p) => {
+    const b = byEgid.get(p.egid ?? "");
+    if (!b) return null;
+    let charged = 0;
+    let discharged = 0;
+    let eveningLoad = 0;
+    let eveningN = 0;
+    let firstFull: string | null = null;
+    let stored = 0;
+    const snow = snowDepthCm(dayStartMs + DAY / 2);
+    for (let q = 0; q < 96; q++) {
+      const t = dayStartMs + q * 900_000;
+      const load = buildingLoadW(b, t);
+      const s = solarAndBatteryAt(b, livePlants, t, load, snow);
+      const e = (s.batteryW / 1000) * 0.25;
+      if (e > 0) charged += e;
+      else discharged -= e;
+      stored += e;
+      if (firstFull === null && stored >= (s.battery?.kwh ?? Infinity) * 0.999) firstFull = clock(t);
+      if (q >= 72) {
+        eveningLoad += load;
+        eveningN++;
+      }
+    }
+    return {
+      kWp: Math.round(p.capacityKw ?? 0),
+      kWh: p.battery?.kwh,
+      feedInCap: p.battery?.feedInCap,
+      homes: b.dwellings.length,
+      charged: Math.round(charged * 10) / 10,
+      discharged: Math.round(discharged * 10) / 10,
+      eveningLoadKw: Math.round(eveningLoad / Math.max(1, eveningN) / 100) / 10,
+      fullAt: firstFull,
+    };
+  });
+  // The neighbourhood batteries, as the chart runs them.
+  const gb = gridBattery ?? grid.batteriesInService(dayStartMs);
+  out.gridBatteries = gb;
+  if (gb.kw > 0) {
+    const used = r.times.map((_, i) => (["fridgeW", "lightingW", "cookingW", "laundryW", "plugLoadW", "evW", "heatPumpW", "acW", "waterHeatingW", "commercialW"] as const).reduce((s, k) => s + r.series[k][i], 0));
+    const residual = r.times.map((_, i) => used[i] + r.homeBatteryW[i] - Math.max(0, r.series.solarW[i] - r.curtailedW[i]));
+    const { chargeW, dischargeW } = batteriesThroughTheDay(residual, hours, gb, 0.9);
+    out.gridIn = Math.round(kWh(chargeW, 1));
+    out.gridOut = Math.round(kWh(dischargeW, 1));
+    out.gridByHalfHour = r.times.map((t, i) => `${clock(t)} ${Math.round((chargeW[i] - dischargeW[i]) / 1000)}`).join(" | ");
+    out.townByHalfHour = r.times.map((t, i) => `${clock(t)} ${Math.round(-residual[i] / 1000)}`).join(" | ");
+  }
+  return out;
 }
 
 export async function runPerf(year?: number): Promise<Record<string, number>> {

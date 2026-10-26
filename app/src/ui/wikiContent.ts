@@ -821,7 +821,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Tick ‘Reinforce overloaded stations automatically’ in the Grid tool and it is done for you: after each reading, every overloaded station with nothing on order gets the size its peak needs with a quarter to spare, worst first, as long as the treasury has the money. One it can't pay for waits for the next reading.",
       ),
       p(
-        "Neighbourhood batteries also earn their keep: when the town makes more power than it uses — sunny middays, once there is a lot of solar — they take in what they can of the surplus, which would otherwise sell cheap, and give it back in the evening, when the utility would have to buy it (see \"Tariffs & energy prices\"). Each takes in at most its power at any moment, and fills once a day.",
+        "Neighbourhood batteries also earn their keep: when the town makes more power than it uses — sunny middays, once there is a lot of solar — they take in what they can of the surplus, which would otherwise sell cheap, and give it back in the evening, when the utility would have to buy it (see \"Tariffs & energy prices\"). The utility runs them for the grid: they fill from the top of the surplus — the sunniest hours, when it sells cheapest and the lines are busiest — rather than as soon as there is any, and give back into the top of the evening draw. Each takes in at most its power at any moment, fills once a day, and gives back about nine tenths of what it took in.",
       ),
       p(
         "Reinforcing everywhere is expensive, so three measures buy time by shaving the peaks: heat pump load control lets the utility switch enrolled heat pumps off in turns at peak times (half of them off at any one moment, briefly, hardly noticed); a smart charging programme has electric cars charge at night rather than as soon as they are plugged in; and a solar feed-in limit caps what panels deliver at 70% (or less) of their rating, which costs little energy but shaves the sunny-midday peak. A battery subsidy tied to grid-friendly operation does the same for the systems it pays for. They slow overloading down; in the long run, reinforcement is the answer.",
@@ -967,16 +967,16 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Home batteries",
     blocks: [
       p(
-        "Many new solar systems come with a battery, about 1 kWh per kWp of panels. It charges from the building's surplus in the day and covers its own use into the evening and night, as long as the charge lasts — so less goes up the line at midday and less is drawn at the evening peak, most of all in summer.",
+        "Many new solar systems come with a battery, about 1 kWh per kWp of panels. It charges from the building's surplus in the day, until it is full, and covers the building's own use into the evening and night until it is empty — giving back about nine tenths of what it took in. What is left at night carries into the next morning. So less goes up the line at midday and less is drawn at the evening peak, most of all in summer.",
       ),
       list([
         "Who has one: some existing systems, likelier the more recent they are. An owner installing solar weighs panels alone against panels with a battery: the battery earns the full electricity price on what it shifts into the evening rather than the lower feed-in price, but costs about CHF 9,000 for 10 kWh today (getting cheaper), and owners also value being less dependent on the grid. About half of new home systems come with one, and owners of systems without one now and then add one.",
-        "Grid-friendly operation: the battery charges from the top of the midday peak, then tops up for the evening, and the system never feeds in more than half its rating — anything beyond that once the battery is full is lost. It is the condition for connecting an array over 30 kWp where the summer feed-in is over capacity (see \"The electricity grid\"), public buildings included, and it can be the condition of the municipality's battery subsidy.",
+        "Grid-friendly operation: the battery doesn't fill as soon as the sun is up, as a battery left to itself does (one is often full by mid-morning). It charges as forecast-based systems do, from the top of its building's midday surplus — just enough of it to be full by the end of the sunny hours — and the system never feeds in more than half its rating; anything beyond that once the battery is full is lost. It is the condition for connecting an array over 30 kWp where the summer feed-in is over capacity (see \"The electricity grid\"), public buildings included, and it can be the condition of the municipality's battery subsidy.",
         "The home battery subsidy pays per kWh, for batteries bought with new panels or added to existing ones — tied to grid-friendly operation or not.",
         "With a solar feed-in limit in force, a battery saves some of what the limit would otherwise cut off.",
       ]),
       p("A building's panel shows its battery's size, whether it runs grid-friendly, and what it is doing right now; Town hall → Statistics counts them."),
-      note("Bills don't count the energy a battery shifts; its value shows in the owner's decision to buy one, and its effect on the grid in the readings."),
+      note("Bills don't count the energy a battery shifts; its value shows in the owner's decision to buy one, and its effect on the grid in the readings. A battery's day is planned from the sun on its panels and its building's use at a few moments of the day, so at any one moment it may charge or give a little less than the building would allow."),
     ],
   },
 

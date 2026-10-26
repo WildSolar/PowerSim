@@ -24,7 +24,7 @@ export function buildingPowerW(building: Building, simTimeMs: number, plants: Po
   const snow = snowCoverCm ?? snowDepthCm(simTimeMs);
   const loadW = buildingLoadW(building, simTimeMs);
   // Solar, and a home battery shifting some of it into the evening (homeBattery.ts).
-  return loadW + solarAndBatteryAt(building.egid, plants, simTimeMs, loadW, snow).netW;
+  return loadW + solarAndBatteryAt(building, plants, simTimeMs, loadW, snow).netW;
 }
 
 /** Everything the building uses, before its own solar and battery (W). */
