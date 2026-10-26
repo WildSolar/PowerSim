@@ -277,3 +277,32 @@
   font-weight: 600;
 }
 
+
+/* Choosing how many charge points (PortsPicker.tsx). */
+.ports-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.ports-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ports-picker-count {
+  min-width: 64px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ports-picker-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.ports-picker .dh-actions {
+  margin-top: 2px;
+}

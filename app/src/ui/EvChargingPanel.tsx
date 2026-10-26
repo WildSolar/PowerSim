@@ -1,6 +1,6 @@
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { CardKind, CardSection, Facts, NowLine } from "./CardParts";
-import { BUILD_SPEC, MAX_FILL, QOS_CURVE, QOS_FLOOR, type ChargingKind, type QosKind } from "../config/charging";
+import { BUILD_SPEC, MAX_FILL, MAX_SITE_POINTS, UPGRADE_MONTHS, QOS_CURVE, QOS_FLOOR, type ChargingKind, type QosKind } from "../config/charging";
 import { CHARGER_BUILDING_COLOR, CHARGER_USE_RAMP, COVERAGE_COLOR, EV_CHARGING_LEGEND } from "../map/colorModes";
 import { formatDate, toDateMs, toSimTimeMs } from "../sim/calendar";
 import { simClock } from "../sim/engine";
@@ -11,7 +11,6 @@ import {
   qosKindOf,
   pointsAt,
   qosReachM,
-  sizesFor,
   upgradeCostRp,
   publicCharging,
   siteCapacityAt,
@@ -32,6 +31,7 @@ import "./districtHeatPanel.css";
 import "./evChargingPanel.css";
 import { InspectCard } from "./InspectCard";
 import { ToolPanel } from "./ToolPanel";
+import { PortsPicker } from "./PortsPicker";
 import { ShareBar, ToolListGroup, ToolListRow, ToolTile } from "./ToolList";
 
 const YEAR_MS = 365.25 * 24 * 60 * 60_000;
@@ -83,10 +83,9 @@ function focusSite(site: ChargingSite): void {
   mapFocus.request({ lon: site.lon, lat: site.lat });
 }
 
-/** A price, compact ("CHF 60k", "CHF 1.05M"), for the narrow size buttons. */
-function shortPriceTag(rp: number): string {
-  const chf = rp / 100;
-  return chf >= 1_000_000 ? `CHF ${Number((chf / 1_000_000).toFixed(2))}M` : `CHF ${Math.round(chf / 1000)}k`;
+/** "1 point", "4 points". */
+function pointsLabel(n: number): string {
+  return `${n} point${n === 1 ? "" : "s"}`;
 }
 
 type OwnerFilter = "all" | "municipal" | "private";
@@ -192,7 +191,7 @@ export function ChargerCard() {
   if (!site) return null;
   return (
     <InspectCard kicker={site.shop ? "Charger in a shop's car park" : SITE_KIND_NAME[site.kind]} title={site.name} onClose={() => publicCharging.select(null)}>
-      <SiteDetails site={site} now={now} />
+      <SiteDetails key={site.id} site={site} now={now} />
     </InspectCard>
   );
 }
@@ -247,12 +246,14 @@ function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
   const planned = publicCharging.plannedPoints(site);
   const owner = site.owner === "municipal" ? "run by the municipality" : site.id.startsWith("real-") ? "run privately" : "run by a private operator";
   const inUse = building ? { pluggedIn: 0, charging: 0 } : publicCharging.pointsInUseAt(site, now);
-  const sizes = site.owner === "municipal" ? sizesFor(site.kind).filter((s) => s.points > planned) : [];
+  const canEnlarge = site.owner === "municipal" && planned < MAX_SITE_POINTS;
+  const [enlargeTo, setEnlargeTo] = useState(Math.min(MAX_SITE_POINTS, planned + 4));
+  const toPoints = Math.max(planned + 1, Math.min(MAX_SITE_POINTS, enlargeTo));
 
   return (
     <>
       <CardKind>
-        {building ? site.points : stats.points} points × {site.powerKw} kW · {owner}
+        {pointsLabel(building ? site.points : stats.points)} × {site.powerKw} kW · {owner}
         {building ? ` · opens ${formatDate(site.openedAtMs)}` : ""}
       </CardKind>
       <Facts
@@ -297,7 +298,7 @@ function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
       />
       {!building && (
         <NowLine title="Vehicles at a charge point right now. Those relying on a charger don't charge there every day: on the street a car plugs in in the evening and stays until morning, at a hub it stops for about half an hour. So even a charger with no room left stands empty much of the day.">
-          {inUse.pluggedIn} of {stats.points} points in use{inUse.pluggedIn > 0 ? ` · ${inUse.charging} charging` : ""}
+          {inUse.pluggedIn} of {pointsLabel(stats.points)} in use{inUse.pluggedIn > 0 ? ` · ${inUse.charging} charging` : ""}
         </NowLine>
       )}
 
@@ -307,24 +308,27 @@ function SiteDetails({ site, now }: { site: ChargingSite; now: number }) {
         </CardSection>
       )}
 
-      {(pending.length > 0 || sizes.length > 0) && (
+      {(pending.length > 0 || canEnlarge) && (
         <CardSection title="What could change here">
           {pending.map((e) => (
             <p className="dh-note" key={e.atMs}>
-              {site.owner === "municipal" ? "Adding" : "The operator is adding"} {e.points} points — ready {monthYear(e.atMs)}.
+              {site.owner === "municipal" ? "Adding" : "The operator is adding"} {pointsLabel(e.points)} — ready {monthYear(e.atMs)}.
             </p>
           ))}
-          {sizes.length > 0 && (
+          {canEnlarge && (
             <>
-              <p className="dh-note">Enlarge it — ready in some months:</p>
-              <div className="ev-sizes">
-                {sizes.map(({ points }) => (
-                  <button key={points} onClick={() => publicCharging.upgrade(site.id, points, simClock.getSimTimeMs())}>
-                    <span className="ev-build-name">To {points} points</span>
-                    <span className="ev-build-detail">{shortPriceTag(upgradeCostRp(site.kind, planned, points, now))}</span>
-                  </button>
-                ))}
-              </div>
+              <p className="dh-note">Enlarge it, to at most {MAX_SITE_POINTS} points — the more at once, the less each costs:</p>
+              <PortsPicker
+                value={toPoints}
+                min={planned + 1}
+                max={MAX_SITE_POINTS}
+                buying={toPoints - planned}
+                costRp={upgradeCostRp(site.kind, planned, toPoints, now)}
+                months={UPGRADE_MONTHS[site.kind]}
+                onChange={setEnlargeTo}
+                onOrder={() => publicCharging.upgrade(site.id, toPoints, simClock.getSimTimeMs())}
+                orderLabel={`Enlarge to ${toPoints} points`}
+              />
             </>
           )}
         </CardSection>
@@ -371,6 +375,7 @@ export function EvChargingPanel() {
   }, [buildings, simDay, version]);
 
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>("all");
+  const [buildPoints, setBuildPoints] = useState<Record<ChargingKind, number>>({ ac: BUILD_SPEC.ac.points, dc: BUILD_SPEC.dc.points, fleet: BUILD_SPEC.fleet.points });
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   // Every open charger, fullest first; the filters pick from these.
   const ranked: RankedSite[] = useMemo(
@@ -393,7 +398,7 @@ export function EvChargingPanel() {
       color={fillColor(users / capacity)}
       title={`${KIND_ICON[site.kind]}${site.name}`}
       figure={percent(users, capacity)}
-      detail={detail ?? `${SITE_KIND_NAME[site.kind]} · ${pointsAt(site, simDay)} points · ${site.owner === "municipal" ? "the town's" : "private"}`}
+      detail={detail ?? `${SITE_KIND_NAME[site.kind]} · ${pointsLabel(pointsAt(site, simDay))} · ${site.owner === "municipal" ? "the town's" : "private"}`}
       selected={site.id === selectedId}
       onClick={() => focusSite(site)}
     />
@@ -524,7 +529,7 @@ export function EvChargingPanel() {
                   color={CHARGER_BUILDING_COLOR}
                   title={`${KIND_ICON[s.kind]}${s.name}`}
                   figure={`ready ${monthYear(s.openedAtMs)}`}
-                  detail={`${SITE_KIND_NAME[s.kind]} · ${s.points} points`}
+                  detail={`${SITE_KIND_NAME[s.kind]} · ${pointsLabel(s.points)}`}
                   selected={s.id === selectedId}
                   onClick={() => focusSite(s)}
                 />
@@ -543,7 +548,7 @@ export function EvChargingPanel() {
         <>
           <p className="dh-note">
             Click on the map where the{" "}
-            {placing.kind === "ac" ? `${placing.points} on-street chargers` : `${BUILD_SPEC[placing.kind].label.toLowerCase()} (${placing.points} points)`} should
+            {placing.kind === "ac" ? `${placing.points === 1 ? "on-street charger" : `${placing.points} on-street chargers`}` : `${BUILD_SPEC[placing.kind].label.toLowerCase()} (${pointsLabel(placing.points)})`} should
             go — placed at the nearest street. The blue lines show how far along the streets {placing.kind === "ac" ? "they'd" : "it'd"} reach: the stronger, the
             better the charging there ({reachLabel(placing.kind)}).
           </p>
@@ -561,20 +566,23 @@ export function EvChargingPanel() {
                 <span className="ev-build-detail">
                   {spec.powerKw} kW each · {BUILD_HINT[kind]}
                 </span>
-                <div className="ev-sizes">
-                  {sizesFor(kind).map(({ points }) => (
-                    <button key={points} onClick={() => publicCharging.startPlacing(kind, points)}>
-                      <span className="ev-build-name">{points} points</span>
-                      <span className="ev-build-detail">{shortPriceTag(buildCostRp(kind, simDay, points))}</span>
-                      <span className="ev-build-detail">{buildMonthsFor(kind, points)} months</span>
-                    </button>
-                  ))}
-                </div>
+                <PortsPicker
+                  value={buildPoints[kind]}
+                  min={1}
+                  max={MAX_SITE_POINTS}
+                  buying={buildPoints[kind]}
+                  costRp={buildCostRp(kind, simDay, buildPoints[kind])}
+                  months={buildMonthsFor(kind, buildPoints[kind])}
+                  onChange={(n) => setBuildPoints((p) => ({ ...p, [kind]: n }))}
+                  onOrder={() => publicCharging.startPlacing(kind, buildPoints[kind])}
+                  orderLabel="Place it on the map"
+                />
               </div>
             );
           })}
           <p className="dh-note tool-list-hint">
-            The town&apos;s chargers sell at the prices set under Prices; their upkeep is paid from the treasury. To enlarge one, click it on the map.
+            A bigger site costs less a point, and has room for more; several smaller ones reach more of the town. The town&apos;s chargers sell at the prices set
+            under Prices; their upkeep is paid from the treasury. To enlarge one, up to {MAX_SITE_POINTS} points, click it on the map.
           </p>
         </div>
       )}
@@ -586,7 +594,7 @@ export function EvChargingPanel() {
             color={CHARGER_BUILDING_COLOR}
             title={`${KIND_ICON[s.kind]}${s.name}`}
             figure={`ready ${monthYear(s.openedAtMs)}`}
-            detail={`${SITE_KIND_NAME[s.kind]} · ${s.points} points`}
+            detail={`${SITE_KIND_NAME[s.kind]} · ${pointsLabel(s.points)}`}
             selected={s.id === selectedId}
             onClick={() => focusSite(s)}
           />

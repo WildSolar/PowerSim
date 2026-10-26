@@ -9,7 +9,8 @@ import { couldNotPay } from "../sim/fiscalRules";
 import type { LetterPick } from "../sim/inbox";
 import { measures } from "../sim/measures";
 import { debt } from "../sim/debt";
-import { buildCostRp, publicCharging, sizesFor } from "../sim/publicCharging";
+import { buildCostRp, publicCharging } from "../sim/publicCharging";
+import { MAX_SITE_POINTS } from "../config/charging";
 import { roofContracts } from "../sim/roofContracts";
 import { stock } from "../sim/stock";
 import { useSimDay } from "../sim/store";
@@ -150,8 +151,7 @@ function RoofOffers({ picks, now }: { picks: LetterPick[]; now: number }) {
  * ordering them. */
 function ChargerAction({ pick, report, now }: { pick: LetterPick; report: AdvisorReport; now: number }) {
   const hub = pick.charger === "hub";
-  const sizes = sizesFor("ac");
-  const [points, setPoints] = useState(sizes.find((s) => s.points === 8)?.points ?? sizes[0].points);
+  const [points, setPoints] = useState(8);
   const near = publicCharging
     .getSites()
     .find((s) => s.openedAtMs > report.atMs && (hub ? s.kind !== "ac" : s.kind === "ac") && distanceM(s.lon, s.lat, pick.lon, pick.lat) <= (hub ? 800 : 200));
@@ -170,15 +170,18 @@ function ChargerAction({ pick, report, now }: { pick: LetterPick; report: Adviso
     );
   return (
     <>
-      <select className="advisor-size" value={points} onChange={(e) => setPoints(Number(e.target.value))} aria-label="Charge points">
-        {sizes.map((s) => (
-          <option key={s.points} value={s.points}>
-            {s.points} points
-          </option>
-        ))}
-      </select>
+      <input
+        className="advisor-size"
+        type="range"
+        min={1}
+        max={MAX_SITE_POINTS}
+        value={points}
+        onChange={(e) => setPoints(Number(e.target.value))}
+        aria-label="Charge points"
+        title={`${points} charge points`}
+      />
       <ActionButton costRp={buildCostRp("ac", now, points)} now={now} onClick={() => build("ac", points)}>
-        Build on-street chargers — {formatCHF(buildCostRp("ac", now, points))}
+        Build {points} on-street charge point{points === 1 ? "" : "s"} — {formatCHF(buildCostRp("ac", now, points))}
       </ActionButton>
     </>
   );

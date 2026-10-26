@@ -153,7 +153,14 @@ export const WORK_WEEKEND_FACTOR = { saturday: 0.2, sunday: 0.05 };
 // room by the energy it needs a day, in cars' worth (a van about two cars, a truck about twenty).
 // A full fast-charging point delivers about 300 kWh a day, busy about a fifth of the day — like a
 // busy real station (Danish DC points average 13.6% of the time, the busiest about 26%: Virta).
+// These are for a point of POINT_REFERENCE_KW; a point's room follows what a vehicle actually draws
+// there (sim/publicCharging.ts pointRoomFactor).
 export const CARS_PER_POINT: Record<ChargingKind, number> = { ac: 3, dc: 50, fleet: 100 }; // a lorry-park bay: about four lorries
+export const POINT_REFERENCE_KW: Record<ChargingKind, number> = { ac: 11, dc: 150, fleet: 350 };
+// What a vehicle draws on average at a fast point or a lorry-park bay, as a share of its rating — if
+// the vehicle can take that much (SESSION_POWER_KW is what it takes at most). On the street a car is
+// parked for hours: the point's power only matters below the 11 kW a car's charger takes.
+export const FAST_DRAW_SHARE = 0.8;
 
 // What private operators charge (the municipality's own prices are in the tariff), Rp/kWh.
 export const PRIVATE_PRICE_RP_PER_KWH: Record<ChargingKind, number> = { ac: 45, dc: 55, fleet: 45 }; // fleet: only what a lorry would expect to pay (no private lorry parks)
@@ -165,9 +172,10 @@ export const SESSION_DAY_SHARE: Record<ChargingVehicle, Record<ChargingKind, num
   van: { ac: 0.6, dc: 0.4, fleet: 0.4 },
   truck: { ac: 0.9, dc: 0.9, fleet: 0.9 },
 };
-// What a vehicle actually draws while charging, on average, kW: a fast charger's rated power is
-// rarely reached, and a car slows down as its battery fills (about 60 kW over a session; a van,
-// with a smaller battery and usually slower charging, about 50).
+// What a vehicle actually draws while charging, on average, kW, at a point that can give it: a fast
+// charger's rated power is rarely reached, and a car slows down as its battery fills (about 60 kW
+// over a session; a van, with a smaller battery and usually slower charging, about 50). A weaker
+// point gives less (FAST_DRAW_SHARE of its rating; on the street its rating).
 export const SESSION_POWER_KW: Record<ChargingVehicle, Record<ChargingKind, number>> = {
   car: { ac: 11, dc: 60, fleet: 100 },
   van: { ac: 11, dc: 50, fleet: 50 },
@@ -208,32 +216,23 @@ export const BUILD_SPEC: Record<ChargingKind, SiteSpec> = {
   fleet: { label: "Lorry charging park", points: 4, powerKw: 350, costChf: 1_200_000, upkeepChfPerPointYear: 12_000, buildMonths: 12 },
 };
 
-// Every kind of municipal site comes in several sizes; a bigger one shares the grid connection
-// (for a hub or a lorry park, the transformer) and the civil works, so each point costs less. A
-// running municipal site can be enlarged later: the difference in price, plus opening the site up
-// again, and some months' work.
-export interface SiteSize {
-  points: number;
-  costChf: number;
-  buildMonths: number;
-}
-export const SITE_SIZES: Partial<Record<ChargingKind, SiteSize[]>> = {
-  ac: [
-    { points: 4, costChf: 60_000, buildMonths: 4 },
-    { points: 8, costChf: 100_000, buildMonths: 5 },
-    { points: 12, costChf: 135_000, buildMonths: 6 },
-  ],
-  dc: [
-    { points: 4, costChf: 600_000, buildMonths: 12 },
-    { points: 8, costChf: 1_050_000, buildMonths: 14 },
-  ],
-  fleet: [
-    { points: 4, costChf: 1_200_000, buildMonths: 12 },
-    { points: 8, costChf: 2_100_000, buildMonths: 15 },
-  ],
+// A municipal site has 1 to MAX_SITE_POINTS charge points. A bigger one shares the grid connection
+// (for a hub or a lorry park, the transformer) and the civil works, so each point costs less: a site
+// of n points costs fixedChf + perPointChf × n^POINT_COST_EXPONENT (fitted to 4 and 8 points at
+// CHF 60k / 100k on the street, 600k / 1.05M for a hub, 1.2M / 2.1M for a lorry park). Building takes
+// from `monthsOne` (1 point) to `monthsMax` (MAX_SITE_POINTS), in between by the number of points.
+// A running site can be enlarged up to MAX_SITE_POINTS, priced as a purchase of its own: opening the
+// site up again (UPGRADE_EXTRA_CHF) and the new points on the same curve — so buying all at once
+// costs less than buying in steps.
+export const MAX_SITE_POINTS = 16;
+export const POINT_COST_EXPONENT = 0.834;
+export const SITE_COST: Record<ChargingKind, { fixedChf: number; perPointChf: number; monthsOne: number; monthsMax: number }> = {
+  ac: { fixedChf: 10_000, perPointChf: 15_700, monthsOne: 3, monthsMax: 7 },
+  dc: { fixedChf: 25_000, perPointChf: 181_000, monthsOne: 11, monthsMax: 17 },
+  fleet: { fixedChf: 46_000, perPointChf: 363_000, monthsOne: 10, monthsMax: 20 },
 };
-export const UPGRADE_EXTRA_CHF: Partial<Record<ChargingKind, number>> = { ac: 15_000, dc: 80_000, fleet: 150_000 };
-export const UPGRADE_MONTHS: Partial<Record<ChargingKind, number>> = { ac: 3, dc: 6, fleet: 6 };
+export const UPGRADE_EXTRA_CHF: Record<ChargingKind, number> = { ac: 15_000, dc: 80_000, fleet: 150_000 };
+export const UPGRADE_MONTHS: Record<ChargingKind, number> = { ac: 3, dc: 6, fleet: 6 };
 
 // --- Private operators ---
 
@@ -245,7 +244,7 @@ export const OPERATOR_NEW_SITE_MIN_DEMAND = 3;
 export const OPERATOR_MAX_NEW_SITES_PER_YEAR = 5;
 export const OPERATOR_NEW_SITE_POINTS = 4;
 export const OPERATOR_EXPAND_POINTS = 4;
-export const OPERATOR_MAX_POINTS = 12;
+export const OPERATOR_MAX_POINTS = 16;
 export const OPERATOR_EXPAND_AT_USE = 0.7;
 export const OPERATOR_BUILD_MONTHS = 4;
 // The demand left over may also bring chargers to a shop's car park: a large shop (a retail

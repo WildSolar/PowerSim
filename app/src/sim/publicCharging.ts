@@ -37,10 +37,13 @@
 import { timed } from "./devTiming";
 import {
   BUILD_SPEC,
-  SITE_SIZES,
+  SITE_COST,
+  MAX_SITE_POINTS,
+  POINT_COST_EXPONENT,
+  POINT_REFERENCE_KW,
+  FAST_DRAW_SHARE,
   UPGRADE_EXTRA_CHF,
   UPGRADE_MONTHS,
-  type SiteSize,
   BUSY_QOS,
   CARS_PER_POINT,
   DEMAND_RADIUS_M,
@@ -214,31 +217,49 @@ function roundToThousandChfRp(chf: number): number {
 }
 
 /** The sizes a municipal site of this kind can be built in (one, for a kind without a choice). */
-export function sizesFor(kind: ChargingKind): SiteSize[] {
-  const spec = BUILD_SPEC[kind];
-  return SITE_SIZES[kind] ?? [{ points: spec.points, costChf: spec.costChf, buildMonths: spec.buildMonths }];
+/** A number of charge points a municipal site can have: 1 to MAX_SITE_POINTS. */
+export function sitePoints(points: number): number {
+  return Math.max(1, Math.min(MAX_SITE_POINTS, Math.round(points)));
 }
 
-function sizeOf(kind: ChargingKind, points: number): SiteSize {
-  const sizes = sizesFor(kind);
-  return sizes.find((s) => s.points === points) ?? sizes[0];
+/** The charge points' part of a site's price (CHF): each one more costs a little less (SITE_COST). */
+function pointsChf(kind: ChargingKind, points: number): number {
+  return points > 0 ? SITE_COST[kind].perPointChf * Math.pow(points, POINT_COST_EXPONENT) : 0;
 }
 
-/** What building a municipal site of this kind and size costs at `atMs` (Rp) — chargers get cheaper
- * over time. */
+/** What building a municipal site of this kind with `points` charge points costs at `atMs` (Rp) —
+ * chargers get cheaper over time. */
 export function buildCostRp(kind: ChargingKind, atMs: number, points = BUILD_SPEC[kind].points): number {
-  return roundToThousandChfRp(sizeOf(kind, points).costChf * priceFactor(BUILD_COST_TREND[kind], atMs));
+  return roundToThousandChfRp((SITE_COST[kind].fixedChf + pointsChf(kind, sitePoints(points))) * priceFactor(BUILD_COST_TREND[kind], atMs));
 }
 
-/** Enlarging a municipal site of this kind from `fromPoints` to `toPoints` at `atMs` (Rp). */
+/** Enlarging a municipal site of this kind from `fromPoints` to `toPoints` at `atMs` (Rp): opening it
+ * up again, and the new points priced as a purchase of their own. */
 export function upgradeCostRp(kind: ChargingKind, fromPoints: number, toPoints: number, atMs: number): number {
-  const chf = sizeOf(kind, toPoints).costChf - sizeOf(kind, fromPoints).costChf + (UPGRADE_EXTRA_CHF[kind] ?? 0);
-  return roundToThousandChfRp(chf * priceFactor(BUILD_COST_TREND[kind], atMs));
+  const added = Math.max(0, Math.min(MAX_SITE_POINTS, toPoints) - fromPoints);
+  return roundToThousandChfRp((UPGRADE_EXTRA_CHF[kind] + pointsChf(kind, added)) * priceFactor(BUILD_COST_TREND[kind], atMs));
 }
 
-/** How long building a municipal site of this kind and size takes (months). */
+/** How long building a municipal site of this kind with `points` charge points takes (months). */
 export function buildMonthsFor(kind: ChargingKind, points = BUILD_SPEC[kind].points): number {
-  return sizeOf(kind, points).buildMonths;
+  const { monthsOne, monthsMax } = SITE_COST[kind];
+  return Math.round(monthsOne + ((monthsMax - monthsOne) * (sitePoints(points) - 1)) / (MAX_SITE_POINTS - 1));
+}
+
+/** What a vehicle draws at a site while charging (kW): what it takes at most of that kind of point,
+ * if the point gives that much — on the street its rating, at a fast point FAST_DRAW_SHARE of it. */
+export function sessionPowerKw(vehicle: ChargingVehicle, site: { kind: ChargingKind; powerKw: number }): number {
+  const most = SESSION_POWER_KW[vehicle][site.kind];
+  return Math.min(most, site.kind === "ac" ? site.powerKw : FAST_DRAW_SHARE * site.powerKw);
+}
+
+/** How much room one of a site's points has against a point of POINT_REFERENCE_KW (CARS_PER_POINT
+ * are for those): by what a vehicle draws there. A 50 kW fast point serves about two thirds of a
+ * 150 kW one's cars; on the street a 22 kW point no more than an 11 kW one (the car is parked for
+ * hours either way), a 3.7 kW one a third. */
+export function pointRoomFactor(site: { kind: ChargingKind; powerKw: number }): number {
+  const vehicle: ChargingVehicle = site.kind === "fleet" ? "truck" : "car";
+  return sessionPowerKw(vehicle, site) / sessionPowerKw(vehicle, { kind: site.kind, powerKw: POINT_REFERENCE_KW[site.kind] });
 }
 
 /** What the player is placing: a kind of site and, on-street, its size. */
@@ -357,7 +378,7 @@ export function pointsAt(site: ChargingSite, atMs: number): number {
 export function siteCapacityAt(site: ChargingSite, atMs: number): number {
   const points = pointsAt(site, atMs);
   if (points === 0) return 0;
-  const room = points * CARS_PER_POINT[site.kind];
+  const room = points * CARS_PER_POINT[site.kind] * pointRoomFactor(site);
   if (site.owner !== "municipal") return room;
   const year = yearOf(atMs);
   return room * roomFactor(site, tariffStore.sheetFor(year), year);
@@ -778,7 +799,7 @@ class PublicCharging {
     // On-street: overnight from the evening; a hub or a shop's car park: during the day.
     const overnight = kind === "ac" && !site.shop;
     const startHour = overnight ? 17.5 + firstRandom(seed ^ 0x5bd1e995) * 3 : 9 + firstRandom(seed ^ 0x5bd1e995) * 10;
-    const powerKw = SESSION_POWER_KW[a.vehicle][kind];
+    const powerKw = sessionPowerKw(a.vehicle, site);
     const energyKWh = a.kWhPerDay / dayShare;
     const durationMs = (energyKWh / powerKw) * 3_600_000;
     const plugInMs = day * DAY_MS + startHour * 3_600_000;
@@ -1098,13 +1119,13 @@ class PublicCharging {
     for (let n = 2; ; n++) if (!taken.has(`${base} ${main} ${n}`)) return `${base} ${main} ${n}`;
   }
 
-  /** Orders a municipal site at the street nearest to (lon, lat) — on-street with `points` charge
-   * points (4, 8 or 12): paid now, open once built. */
+  /** Orders a municipal site at the street nearest to (lon, lat) with `points` charge points (1 to
+   * MAX_SITE_POINTS): paid now, open once built. */
   build(kind: ChargingKind, lon: number, lat: number, atMs: number, points = BUILD_SPEC[kind].points): ChargingSite | null {
-    if (cannotPay(buildCostRp(kind, atMs, sizeOf(kind, points).points), atMs)) return null;
+    points = sitePoints(points);
+    if (cannotPay(buildCostRp(kind, atMs, points), atMs)) return null;
     const snapped = streets.snapToStreet(lon, lat) ?? { lon, lat, distanceM: 0, street: null };
     const spec = BUILD_SPEC[kind];
-    points = sizeOf(kind, points).points; // only the sizes on offer
     const [x, y] = this.projection.toXY(snapped.lon, snapped.lat);
     const site = this.addSite({
       id: `municipal-${this.nextId++}`,
@@ -1125,16 +1146,15 @@ class PublicCharging {
     return site;
   }
 
-  /** Enlarges a municipal site to a bigger size on offer for its kind (on-street 8 or 12 points, a
-   * hub 8): paid now, the new points ready some months on (or once the site itself opens, if it's
-   * still being built). */
+  /** Enlarges a municipal site to `toPoints` charge points (at most MAX_SITE_POINTS): paid now, the
+   * new points ready some months on (or once the site itself opens, if it's still being built). */
   upgrade(siteId: string, toPoints: number, atMs: number): boolean {
     const site = this.byId.get(siteId);
     if (!site || site.owner !== "municipal" || spendingFrozen(atMs)) return false;
     const planned = this.plannedPoints(site);
-    if (toPoints <= planned || !sizesFor(site.kind).some((s) => s.points === toPoints)) return false;
+    if (toPoints <= planned || toPoints > MAX_SITE_POINTS) return false;
     if (cannotPay(upgradeCostRp(site.kind, planned, toPoints, atMs), atMs)) return false;
-    const readyAtMs = Math.max(atMs + (UPGRADE_MONTHS[site.kind] ?? 0) * MONTH_MS, site.openedAtMs);
+    const readyAtMs = Math.max(atMs + UPGRADE_MONTHS[site.kind] * MONTH_MS, site.openedAtMs);
     site.expansions.push({ atMs: readyAtMs, points: toPoints - planned });
     treasury.recordPayout("charging", atMs, upgradeCostRp(site.kind, planned, toPoints, atMs), site.id);
     this.notify();
@@ -1184,7 +1204,7 @@ class PublicCharging {
   buildAtBuilding(building: Building, points: number, atMs: number, { select = true } = {}): ChargingSite | null {
     // A direct order waits out a spending freeze; the programme already in force carries on.
     if (select && spendingFrozen(atMs)) return null;
-    points = sizeOf("ac", points).points;
+    points = sitePoints(points);
     const street = streets.snapToStreet(building.lon, building.lat)?.street ?? "";
     const site = this.addSite({
       id: `municipal-${this.nextId++}`,

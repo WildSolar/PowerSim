@@ -7,7 +7,9 @@ import { simClock } from "../sim/engine";
 import { existsAt } from "../sim/lifetime";
 import { measures } from "../sim/measures";
 import { isPublicBuilding, publicBuildingKind, publicBuildingStatus } from "../sim/publicBuildings";
-import { buildCostRp, buildMonthsFor, pointsAt, publicCharging, sizesFor } from "../sim/publicCharging";
+import { buildCostRp, buildMonthsFor, pointsAt, publicCharging } from "../sim/publicCharging";
+import { BUILD_SPEC, MAX_SITE_POINTS } from "../config/charging";
+import { PortsPicker } from "./PortsPicker";
 import { installMunicipalSolarNow, municipalSolarQuote } from "../sim/solarAdoption";
 import { useSimDay } from "../sim/store";
 import { formatCHF } from "./format";
@@ -21,11 +23,6 @@ import { treasury } from "../sim/treasury";
 
 function monthYear(simTimeMs: number): string {
   return formatDate(simTimeMs).replace(/^\d+ /, "");
-}
-
-function shortPriceTag(rp: number): string {
-  const chf = rp / 100;
-  return chf >= 1_000_000 ? `CHF ${Number((chf / 1_000_000).toFixed(2))}M` : `CHF ${Math.round(chf / 1000)}k`;
 }
 
 const LEGEND_COLOR = Object.fromEntries(PUBLIC_BUILDINGS_LEGEND.map((l) => [l.bucket, l.color]));
@@ -51,6 +48,7 @@ export function PublicBuildingOrders({
   withName?: boolean;
 }) {
   const { solar, chargers } = publicBuildingStatus(building, realPlants);
+  const [points, setPoints] = useState(BUILD_SPEC.ac.points);
   const solarQuote = solar ? null : municipalSolarQuote(building, realPlants, now);
   return (
     <div className="ev-site">
@@ -101,21 +99,20 @@ export function PublicBuildingOrders({
         </span>
       </div>
       {chargers.length === 0 ? (
-        <div className="ev-sizes">
-          {sizesFor("ac").map(({ points }) => (
-            <button
-              key={points}
-              onClick={() => {
-                publicCharging.buildAtBuilding(building, points, simClock.getSimTimeMs());
-                onOrdered();
-              }}
-            >
-              <span className="ev-build-name">{points} points</span>
-              <span className="ev-build-detail">{shortPriceTag(buildCostRp("ac", now, points))}</span>
-              <span className="ev-build-detail">{buildMonthsFor("ac", points)} months</span>
-            </button>
-          ))}
-        </div>
+        <PortsPicker
+          value={points}
+          min={1}
+          max={MAX_SITE_POINTS}
+          buying={points}
+          costRp={buildCostRp("ac", now, points)}
+          months={buildMonthsFor("ac", points)}
+          onChange={setPoints}
+          onOrder={() => {
+            publicCharging.buildAtBuilding(building, points, simClock.getSimTimeMs());
+            onOrdered();
+          }}
+          orderLabel={`Order ${points} charge point${points === 1 ? "" : "s"}`}
+        />
       ) : (
         <p className="dh-note">Enlarge or check how they're used in the EV charging layer.</p>
       )}
