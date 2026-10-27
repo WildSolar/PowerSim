@@ -7,6 +7,9 @@
  * The script counts the visit itself. On top, events: a game started (which town, which
  * difficulty) or loaded, the tutorial started, each chapter reached, finished or left (and where),
  * each Year in Review reached (by how many years in), how a run ended, a crash, the feedback form.
+ *
+ * A player can turn the counting off (Imprint & privacy): kept in this browser, nothing is loaded or
+ * sent from then on.
  */
 
 const CODE = ((import.meta.env.VITE_GOATCOUNTER_CODE as string | undefined) ?? "").trim();
@@ -24,6 +27,32 @@ declare global {
 
 // Events before the script has loaded wait here.
 const queue: { path: string; title: string }[] = [];
+let loaded = false;
+
+const OFF_KEY = "commune-zero:no-counting";
+
+/** Whether the player turned the counting off, in this browser. */
+export function countingOff(): boolean {
+  try {
+    return localStorage.getItem(OFF_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Turns the counting off (or on again) in this browser. */
+export function setCountingOff(off: boolean): void {
+  try {
+    if (off) localStorage.setItem(OFF_KEY, "1");
+    else localStorage.removeItem(OFF_KEY);
+  } catch {
+    // Without storage it can't be remembered; it still holds for this visit.
+  }
+  offThisVisit = off;
+  if (off) queue.length = 0;
+  else initAnalytics();
+}
+let offThisVisit = false;
 
 function flush(): void {
   const count = window.goatcounter?.count;
@@ -39,7 +68,8 @@ function flush(): void {
 
 /** Loads GoatCounter's script (which counts the visit), if analytics are on. Once, at start. */
 export function initAnalytics(): void {
-  if (!ANALYTICS_ENABLED) return;
+  if (!ANALYTICS_ENABLED || loaded || offThisVisit || countingOff()) return;
+  loaded = true;
   const script = document.createElement("script");
   script.async = true;
   script.src = "https://gc.zgo.at/count.js";
@@ -50,7 +80,7 @@ export function initAnalytics(): void {
 
 /** Counts an event: a short path like "start/schlieren/normal", shown as is on the dashboard. */
 export function track(path: string, title?: string): void {
-  if (!ANALYTICS_ENABLED) return;
+  if (!ANALYTICS_ENABLED || offThisVisit || countingOff()) return;
   queue.push({ path, title: title ?? path });
   flush();
 }

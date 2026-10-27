@@ -192,3 +192,17 @@
   font-size: 13.5px;
   color: var(--ink-2);
 }
+
+/* Imprint & privacy: the switch for the visit count (PrivacyPanel.tsx). */
+.privacy-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cl-page h1.privacy-next {
+  margin-top: 36px;
+}

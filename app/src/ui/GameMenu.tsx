@@ -3,6 +3,7 @@ import { SharePreview } from "./ShareButtons";
 import { inviteText } from "./share";
 import { sound, type SoundSettings } from "../audio/sound";
 import { AboutPanel } from "./AboutPanel";
+import { PrivacyPanel } from "./PrivacyPanel";
 import { guide } from "./Onboarding";
 import { Check, Copy, Download, Save, X } from "lucide-react";
 import { simClock } from "../sim/engine";
@@ -27,6 +28,7 @@ export function GameMenu({ run, onClose, onMainMenu, onFeedback }: { run: RunInf
   const [copied, setCopied] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   const refresh = () =>
     listSaves()
@@ -197,6 +199,10 @@ export function GameMenu({ run, onClose, onMainMenu, onFeedback }: { run: RunInf
             ·{" "}
             <button className="gm-link" onClick={() => setShowAbout(true)}>
               About & credits
+            </button>{" "}
+            ·{" "}
+            <button className="gm-link" onClick={() => setShowPrivacy(true)}>
+              Imprint & privacy
             </button>
           </span>
           <button
@@ -211,6 +217,7 @@ export function GameMenu({ run, onClose, onMainMenu, onFeedback }: { run: RunInf
       </div>
       {showChangelog && <ChangelogPanel onClose={() => setShowChangelog(false)} />}
       {showAbout && <AboutPanel onClose={() => setShowAbout(false)} />}
+      {showPrivacy && <PrivacyPanel onClose={() => setShowPrivacy(false)} />}
     </div>
   );
 }

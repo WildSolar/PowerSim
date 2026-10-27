@@ -1,9 +1,7 @@
 import { useEffect } from "react";
-import { LEADERBOARD_ENABLED } from "../leaderboard/client";
 import { X } from "lucide-react";
 import { VERSION_LABEL } from "../changelog";
 import { GAME_VERSION } from "../sim/saveGame";
-import { ANALYTICS_ENABLED } from "../analytics";
 import "./changelog.css";
 
 const DATA: { what: string; source: string }[] = [
@@ -92,19 +90,8 @@ export function AboutPanel({ onClose }: { onClose: () => void }) {
           <section className="cl-group">
             <h3>Privacy</h3>
             <p className="cl-summary">
-              The game runs entirely in your browser; your runs and saves stay there. The published game counts visits and a few milestones — a game started,
-              a year reached, the tutorial finished — anonymously, with GoatCounter: no cookies, nothing about you, nothing about your game beyond that.
-              {ANALYTICS_ENABLED ? "" : " (Not in this copy.)"}
-            </p>
-            <p className="cl-summary">
-              Only if you put a finished run on the leaderboard does anything about it leave your browser: the name you choose, the town, the difficulty and
-              version, and the run's emissions year by year — kept on Cloudflare, shown to everyone who opens the leaderboard. Your address is used only to
-              limit how often one connection can submit, as a one-way hash kept for a day.
-              {LEADERBOARD_ENABLED ? "" : " (There is no leaderboard in this copy.)"}
-            </p>
-            <p className="cl-summary">
-              Feedback you send goes to the game's server on Cloudflare and is read only by whoever runs the game: your words, where you were in the game,
-              your browser and screen size, and — if you tick it — your game as a save. It isn't published.
+              The game runs in your browser, without cookies or tracking. Who runs it, and what it does with your data — the visit count, the leaderboard,
+              feedback — is under Imprint & privacy, on the start screen and in the game menu.
             </p>
           </section>
 

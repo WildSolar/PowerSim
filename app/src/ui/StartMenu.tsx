@@ -12,6 +12,7 @@ import { IS_BETA, VERSION_LABEL } from "../changelog";
 import { isCompatible, openSave, type SaveFile } from "../sim/saveGame";
 import { listSaves, readSave, type StoredSave } from "../sim/saveStore";
 import { AboutPanel } from "./AboutPanel";
+import { PrivacyPanel } from "./PrivacyPanel";
 import { savedAtLabel } from "./saveFiles";
 import "./StartMenu.css";
 
@@ -42,6 +43,7 @@ export function StartMenu({ onStart, onTutorial }: Props) {
   const [showChangelog, setShowChangelog] = useState(false);
   const [unseen, setUnseen] = useState(hasUnseenRelease);
   const [showAbout, setShowAbout] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -96,6 +98,10 @@ export function StartMenu({ onStart, onTutorial }: Props) {
           Zéro
         </h1>
         <p>A Swiss municipality, its buildings, its grid — and the road to net zero.</p>
+        <p className="start-menu-privacy">
+          No cookies, no tracking: your games stay in your browser, and visits are counted anonymously.{" "}
+          <button onClick={() => setShowPrivacy(true)}>Imprint & privacy</button>
+        </p>
         <div className="start-menu-version">
           <span>Version {VERSION_LABEL}</span>
           <button
@@ -107,6 +113,7 @@ export function StartMenu({ onStart, onTutorial }: Props) {
             What's new{unseen && <span className="start-menu-new">New</span>}
           </button>
           <button onClick={() => setShowAbout(true)}>About & credits</button>
+          <button onClick={() => setShowPrivacy(true)}>Imprint & privacy</button>
           {LEADERBOARD_ENABLED && <button onClick={() => setShowLeaderboard(true)}>Leaderboard</button>}
           <button onClick={() => setShowShare(true)}>Tell a friend</button>
         </div>
@@ -216,6 +223,7 @@ export function StartMenu({ onStart, onTutorial }: Props) {
       </div>
       {showChangelog && <ChangelogPanel onClose={() => setShowChangelog(false)} />}
       {showAbout && <AboutPanel onClose={() => setShowAbout(false)} />}
+      {showPrivacy && <PrivacyPanel onClose={() => setShowPrivacy(false)} />}
       {showLeaderboard && <LeaderboardPanel initial={null} onClose={() => setShowLeaderboard(false)} />}
       {showFeedback && <FeedbackDialog pause={false} withGame={false} onClose={() => setShowFeedback(false)} />}
       {showShare && <ShareDialog text={inviteText(null)} onClose={() => setShowShare(false)} />}

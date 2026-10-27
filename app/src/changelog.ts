@@ -22,6 +22,14 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.10.2",
+    date: null,
+    added: [
+      "Imprint & privacy, on the start screen and in the game menu: who makes the game, and what happens to your data — what stays in your browser, the anonymous visit count, the leaderboard, feedback, and the services the game relies on.",
+      "You can turn the anonymous visit count off, under Imprint & privacy. The game then sends nothing about your visit or your games.",
+    ],
+  },
+  {
     version: "0.10.1",
     date: "2026-10-26",
     added: [

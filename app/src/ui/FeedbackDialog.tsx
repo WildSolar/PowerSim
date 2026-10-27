@@ -103,7 +103,7 @@ export function FeedbackDialog({
           <>
             <p className="fb-note">
               Thanks for playing. Anything helps: what broke, what was unclear, what felt too easy or too hard. Your game version, the in-game date and your
-              browser go along automatically.
+              browser go along automatically. It is sent to the game's developer, by e-mail, and never published.
             </p>
             <label className="fb-label" htmlFor="fb-kind">
               What is it about?

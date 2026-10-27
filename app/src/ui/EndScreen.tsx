@@ -186,7 +186,7 @@ function SubmitRun({
           <>
             <p className="lb-submit-note">
               Put this run on the {municipality} board ({difficulty}, from {board.startYear}, version {board.version}) under a name of your choice. What's sent is
-              the name and the run's emissions, year by year — nothing else.
+              the name and the run's emissions, year by year — nothing else. The name is shown to everyone who opens the leaderboard.
             </p>
             <div className="lb-submit-row">
               <input type="text" value={name} maxLength={NAME_MAX + 8} placeholder="Your name" aria-label="Your name" onChange={(e) => setName(e.target.value)} />

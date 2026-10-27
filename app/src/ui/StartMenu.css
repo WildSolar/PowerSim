@@ -543,3 +543,19 @@
 .start-menu-version > * {
   white-space: nowrap;
 }
+
+/* The first word on privacy, under the tagline (the full page is PrivacyPanel.tsx). */
+.start-menu-privacy {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.start-menu-privacy button {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--ink-2);
+  text-decoration: underline;
+  cursor: pointer;
+}
