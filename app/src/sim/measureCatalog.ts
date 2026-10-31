@@ -554,7 +554,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
         ],
         default: "wear",
       },
-      { kind: "slider", key: "deadline", label: "Deadline, where chosen", min: 2028, max: 2050, step: 1, unit: "", default: 2035 },
+      { kind: "slider", key: "deadline", label: "Deadline, where chosen", min: 2028, max: 2050, step: 1, unit: "", default: 2035, isYear: true },
     ],
     leadTimeMonths: 6,
     effects: (p) => ({

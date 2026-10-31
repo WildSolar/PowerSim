@@ -191,7 +191,7 @@ function MeasureDetail({ def, nowMs, onClose }: { def: MeasureDef; nowMs: number
                 onChange={(e) => setDraft({ ...draft, [spec.key]: Number(e.target.value) })}
               />
               <span className="measure-param-value">
-                {(draft[spec.key] as number).toLocaleString("de-CH")} <small>{spec.unit}</small>
+                {spec.isYear ? String(draft[spec.key]) : (draft[spec.key] as number).toLocaleString("de-CH")} <small>{spec.unit}</small>
               </span>
             </>
           )}
@@ -233,7 +233,7 @@ function MeasureDetail({ def, nowMs, onClose }: { def: MeasureDef; nowMs: number
       {def.costCategory === "removals" && <RemovalProjection sharePct={draft.share as number} nowMs={nowMs} />}
       {vote && (
         <div className="measure-vote">
-          Public vote in {formatDate(vote.atMs).replace(/^\d+ /, "")} — latest poll: {votePct(vote.pollYes)}% in favour
+          Public vote{state?.beforeChange ? " on the change" : ""} in {formatDate(vote.atMs).replace(/^\d+ /, "")} — latest poll: {votePct(vote.pollYes)}% in favour
         </div>
       )}
       {!vote && lastVote && (

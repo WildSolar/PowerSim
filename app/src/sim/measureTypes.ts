@@ -47,7 +47,7 @@ export type ParamValue = number | boolean | string;
 export type MeasureParams = Record<string, ParamValue>;
 
 export type ParamSpec =
-  | { kind: "slider"; key: string; label: string; min: number; max: number; step: number; unit: string; default: number }
+  | { kind: "slider"; key: string; label: string; min: number; max: number; step: number; unit: string; default: number; isYear?: boolean }
   | { kind: "toggle"; key: string; label: string; default: boolean }
   | { kind: "choice"; key: string; label: string; options: { value: string; label: string }[]; default: string };
 
