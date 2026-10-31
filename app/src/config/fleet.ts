@@ -41,16 +41,17 @@ export const LSVA_RP_PER_KM = 41;
 export const LSVA_EV_EXEMPT_THROUGH_YEAR = 2030;
 export const LSVA_EV_DISCOUNT_BY_YEAR: Record<number, number> = { 2031: 0.7, 2032: 0.5, 2033: 0.3, 2034: 0.2, 2035: 0.1 };
 
-// The share of lorry routes an electric lorry can take on — the day's distance and load, a model of
-// the right size on sale: local distribution first, heavier and longer work later. A lorry whose
-// route isn't among them yet stays diesel whatever the price; each lorry's route is seeded. An
-// estimate, set so that electric lorries stay a minority of new ones through the 2020s.
+// The share of lorry routes an electric lorry can take on with a charge overnight; a lorry whose route
+// isn't among them yet stays diesel whatever the price, and each lorry's route is seeded. No study gives
+// this share directly, so it is an estimate from the federal Swiss e-Cargo study (Infras, PSI et al.,
+// 2025): Swiss goods vehicles average 110 km a day, most do under 200 km, overnight charging works up
+// to about 300 km, and for the great majority range isn't what limits electrification; only a small
+// but relevant part does over 400 km a day. What holds lorries back is cost (FLEET_PAYBACK_YEARS).
 export const TRUCK_EV_ROUTE_SHARE: CurvePoint[] = [
-  { x: 2026, y: 0.15 },
-  { x: 2030, y: 0.4 },
-  { x: 2035, y: 0.75 },
-  { x: 2040, y: 0.9 },
-  { x: 2045, y: 0.95 },
+  { x: 2026, y: 0.7 },
+  { x: 2030, y: 0.85 },
+  { x: 2035, y: 0.95 },
+  { x: 2045, y: 0.98 },
 ];
 
 // The town's own vans and lorries (its works yard, its utility) and the lorries of the firms it

@@ -1104,7 +1104,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Lorries pay the heavy vehicle fee (LSVA) on diesel — about CHF 18,000 a year for a local delivery lorry. Electric lorries are exempt through 2030; from 2031 they pay it too, at a discount that shrinks each year — 70% in 2031, then 50, 30, 20 and 10% — and in full from 2036. Electric lorries keep getting cheaper meanwhile, so for a business with a depot an electric one stays the cheaper choice.",
       ),
       p(
-        "But not every lorry can go electric yet: the day's distance and load have to suit one, and a model of the right size has to be on sale. About one lorry in seven has such a route today, most by the mid-2030s, nearly all by 2045 — until then the others stay diesel, whatever it costs. A lorry without a depot needs room at a hub (where it needs as much as about twenty cars) or a lorry charging park, which only you build; a new charger at a depot needs room on the local grid (see \"The electricity grid\"). Vans without a yard rarely go electric: charging in public costs them more than the diesel they save.",
+        "Not every lorry can go electric yet, though most can: Swiss goods vehicles average about 110 km a day, well within a night's charge. The day's distance and load have to suit one. About seven lorries in ten have such a route today, and nearly all by the mid-2030s; until then the others stay diesel, whatever it costs. A lorry without a depot needs room at a hub (where it needs as much as about twenty cars) or a lorry charging park, which only you build; a new charger at a depot needs room on the local grid (see \"The electricity grid\"). Vans without a yard rarely go electric: charging in public costs them more than the diesel they save.",
       ),
       p(
         "The electric van and lorry grant (Town hall → Measures) pays a business when an electric van or lorry replaces a diesel one, set separately for vans and lorries, and separately for a diesel that still runs and one at the end of its life (see \"Switching early\"). It weighs into the same decision, so it tips businesses that were close — and, like any grant, is also paid to those who would have gone electric anyway.",
@@ -1118,7 +1118,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "A federal end to new petrol and diesel car sales covers vans, not lorries.",
       ]),
       note(
-        "How the vehicles spread over the buildings, the share with a yard, prices and mileages (a van 18,000 km a year, a lorry 45,000) are estimates. The law sets the LSVA discount for 2031; the steps after it are the ones expected until the Federal Council sets them. The share of routes an electric lorry can serve is an estimate. Company cars are counted with the households' cars.",
+        "How the vehicles spread over the buildings, the share with a yard, prices and mileages (a van 18,000 km a year, a lorry 45,000) are estimates. The law sets the LSVA discount for 2031; the steps after it are the ones expected until the Federal Council sets them. The share of routes an electric lorry can serve is an estimate from federal studies of Swiss goods traffic (Swiss e-Cargo, 2025), which give daily distances, not this share itself. Company cars are counted with the households' cars.",
       ),
     ],
   },
