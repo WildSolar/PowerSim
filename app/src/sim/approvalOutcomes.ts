@@ -51,7 +51,7 @@ function monthOf(atMs: number): number {
 }
 
 /** What the town used and made in a month (kWh), from its record. */
-function useAndMade(r: MonthRecord): { use: number; made: number } | null {
+function monthUseAndMade(r: MonthRecord): { use: number; made: number } | null {
   const e = r.electricityKWh;
   if (!e) return null;
   let use = 0;
@@ -75,7 +75,7 @@ export function outcomeChanges(atMs: number): OutcomeChanges {
   const firstByCalendarMonth = new Map<number, { use: number; made: number }>();
   const counted: { month: number; use: number; made: number }[] = [];
   for (const r of records) {
-    const m = useAndMade(r);
+    const m = monthUseAndMade(r);
     if (!m) continue;
     if (!firstByCalendarMonth.has(r.month % 12)) firstByCalendarMonth.set(r.month % 12, m);
     counted.push({ month: r.month, ...m });
