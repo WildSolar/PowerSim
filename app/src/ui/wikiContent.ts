@@ -223,6 +223,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Laws are cheap, but act only when something is replaced anyway — and they can be voted down. A strict standard can even backfire: a demanding minimum for renovations puts off owners who would have done a smaller upgrade.",
         "Information measures help people judge their options more sharply, so they act on clear savings and stop chasing marginal ones.",
         "Mobility measures act slowly: a bicycle network, better public transport or parking management shift a little of how people get around each time a household rethinks it. The car always keeps a share.",
+        "Who pays for them: a bicycle network or a bus service serves the whole town, so your energy department carries only the share that is about energy; the town's general budget, the canton and federal programmes pay the rest. A bicycle network is built up over about ten years, as an investment you may borrow for, and it works more as it grows; if you stop, what is built stays. Public transport is mostly a yearly contribution for the service: if the payments stop, the service falls back. Larger credits go to a public vote.",
         "Green power cuts the emissions of the electricity the town uses; a climate campaign nudges households and owners a little toward the greener option, by up to a few percent of what the decision costs them a year, when it's a close call. District heating is made clean by building clean heat sources, not by a measure (see \"Heat for district heating\").",
       ]),
       p(

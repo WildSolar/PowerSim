@@ -56,6 +56,27 @@ export interface MeasureCostContext {
   residents: number;
 }
 
+/** A measure that builds something over years, instead of acting at once: while it is in force the
+ * department pays its share of the credit month by month, and the effect grows with what is built.
+ * What is built stays if the measure ends. */
+export interface MeasureBuildOut {
+  /** How long building up to its target takes, whatever the target. */
+  years: number;
+  /** How much of the full build-out these settings aim for, 0-1. */
+  target(params: MeasureParams): number;
+  /** The whole credit for the full build-out, whoever pays it. */
+  fullCreditRp(ctx: MeasureCostContext): number;
+  /** The share of the credit the department carries. */
+  departmentShare: number;
+  /** The department's upkeep a year for all of it built, in proportion to what is built. */
+  upkeepRp(ctx: MeasureCostContext): number;
+  /** What this much of it built (0-1) does to the simulation, from the first stretch on. */
+  effects(built: number): Partial<Channels>;
+}
+
+/** When a measure goes to a public vote. */
+export type MeasureReferendum = "mandatory" | "optional";
+
 export interface MeasureDef {
   id: string;
   category: MeasureCategory;
@@ -86,8 +107,15 @@ export interface MeasureDef {
   /** A subsidy programme: which kind of household decision it pays for — what its uptake counts
    * and an evaluation study looks at (studies.ts). */
   subsidyCategory?: SubsidyCategory;
-  /** Whether the measure goes to a public vote: always, or only when contested. Laws only. */
-  referendum?: "mandatory" | "optional";
+  /** Built over years rather than switched on (its credit goes on the `costCategory` line). */
+  buildOut?: MeasureBuildOut;
+  /** Whether the measure goes to a public vote: always, or only when contested; a credit may depend
+   * on its size. */
+  referendum?: MeasureReferendum | ((params: MeasureParams) => MeasureReferendum | undefined);
+}
+
+export function referendumOf(def: MeasureDef, params: MeasureParams): MeasureReferendum | undefined {
+  return typeof def.referendum === "function" ? def.referendum(params) : def.referendum;
 }
 
 export function defaultParams(def: MeasureDef): MeasureParams {

@@ -14,6 +14,7 @@ import {
   type MeasureDef,
   type MeasureParams,
   type MeasureTopic,
+  referendumOf,
 } from "../sim/measureTypes";
 import { approval, reactionText, votePct } from "../sim/approval";
 import { measures } from "../sim/measures";
@@ -126,6 +127,9 @@ function MeasureDetail({ def, nowMs, onClose }: { def: MeasureDef; nowMs: number
   const [draft, setDraft] = useState<MeasureParams>(latest ?? defaultParams(def));
 
   const cost = measures.costPreview(def, draft);
+  const buildOut = measures.buildOutPreview(def, draft);
+  const built = measures.builtShare(def.id);
+  const referendum = referendumOf(def, draft);
   const reaction = approval.reaction(def, draft);
   const vote = approval.getVoteInfo(def.id, def, nowMs);
   const changed = latest === null || !sameParams(latest, draft);
@@ -200,12 +204,18 @@ function MeasureDetail({ def, nowMs, onClose }: { def: MeasureDef; nowMs: number
         </span>
         {cost.oneOffRp > 0 && <span>One-off cost {formatCHF(cost.oneOffRp)}</span>}
         {cost.annualRp > 0 && <span>Running cost {formatCHF(cost.annualRp)} / year</span>}
+        {buildOut && (
+          <span>
+            Credit {formatCHF(buildOut.creditRp)} · your department&apos;s share {formatCHF(buildOut.yearlyRp)} / year for {buildOut.years} years, then upkeep {formatCHF(buildOut.upkeepRp)} / year
+          </span>
+        )}
         <span>
           Public reaction: <ReactionBadge reaction={reaction} />
         </span>
-        {def.referendum === "mandatory" && <span>Goes to a public vote</span>}
-        {def.referendum === "optional" && <span>May go to a public vote if contested</span>}
+        {referendum === "mandatory" && <span>Goes to a public vote</span>}
+        {referendum === "optional" && <span>May go to a public vote if contested</span>}
       </div>
+      {built > 0 && <div className="measure-note">Built so far: {Math.round(built * 100)}% of the full network.{!state && " It stays, in the care of the road budget."}</div>}
       {def.subsidyCategory && <SubsidyEvidence category={def.subsidyCategory} nowMs={nowMs} />}
       {def.costCategory === "removals" && <RemovalProjection sharePct={draft.share as number} nowMs={nowMs} />}
       {vote && (
@@ -296,6 +306,11 @@ function cardFooter(def: MeasureDef, nowMs: number): { text: string; tone?: "goo
     return { text: `${taken.length} took it up in the last 12 months · ${formatCHF(taken.reduce((sum, d) => sum + d.subsidyRp, 0))}` };
   }
   const cost = measures.costPreview(def, params ?? defaultParams(def));
+  if (state?.active && def.buildOut) {
+    const preview = measures.buildOutPreview(def, state.active);
+    const building = def.buildOut.target(state.active) - measures.builtShare(def.id) > 1e-6;
+    return { text: `${Math.round(measures.builtShare(def.id) * 100)}% built · ${building ? `${formatCHF(preview?.yearlyRp ?? 0)} a year` : `upkeep ${formatCHF(preview?.upkeepRp ?? 0)} a year`}` };
+  }
   if (state?.active && cost.annualRp > 0) return { text: `Running cost ${formatCHF(cost.annualRp)} a year` };
   if (state?.active) return { text: "In force" };
   const reaction = approval.reaction(def, defaultParams(def));

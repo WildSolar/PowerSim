@@ -59,7 +59,7 @@ import {
 import { DEFAULT_DIFFICULTY, DIFFICULTY_SPECS, type Difficulty } from "../config/difficulty";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { simClock } from "./engine";
-import type { MeasureDef, MeasureParams } from "./measureTypes";
+import { referendumOf, type MeasureDef, type MeasureParams } from "./measureTypes";
 import { measures, type MeasureEvent } from "./measures";
 import { hashSeed, mulberry32 } from "./rng";
 import { getFinishedYear } from "./score";
@@ -517,7 +517,7 @@ class ApprovalEngine {
   private scheduleVoteIfNeeded(id: string, def: MeasureDef, params: MeasureParams, atMs: number): void {
     this.votes.delete(id);
     measures.setVote(id, null);
-    if (!this.wouldGoToVote(this.stancesOf(def, params), def.referendum)) return;
+    if (!this.wouldGoToVote(this.stancesOf(def, params), referendumOf(def, params))) return;
     const delayMonths = Math.max(1, Math.min(VOTE_DELAY_MONTHS, def.leadTimeMonths - 1));
     const voteAt = atMs + delayMonths * MONTH_MS;
     const before = measures.getState(id)?.beforeChange ?? null;

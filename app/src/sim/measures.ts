@@ -20,7 +20,7 @@ import { toDateMs, toSimTimeMs } from "./calendar";
 import { combineChannels, type Channels } from "./channels";
 import { simClock } from "./engine";
 import { measureUnavailableReason } from "./measureAvailability";
-import { MEASURE_BY_ID } from "./measureCatalog";
+import { MEASURE_BY_ID, MEASURE_CATALOG } from "./measureCatalog";
 import { defaultParams, sanitizeParams, type MeasureCostContext, type MeasureDef, type MeasureParams } from "./measureTypes";
 import { treasury } from "./treasury";
 import { cannotPay, spendingFrozen } from "./fiscalRules";
@@ -75,7 +75,14 @@ export interface ExternalOutlookEntry {
 
 /** Whether a measure costs money (a subsidy, a running or one-off cost) — what a spending freeze stops. */
 export function measureSpends(def: MeasureDef): boolean {
-  return !!(def.subsidyCategory || def.annualCostRp || def.oneOffCostRp || def.costCategory);
+  return !!(def.subsidyCategory || def.annualCostRp || def.oneOffCostRp || def.costCategory || def.buildOut);
+}
+
+const BUILD_OUT_MEASURES = MEASURE_CATALOG.filter((d) => d.buildOut);
+
+/** The effects of a build-out follow it in steps of 5%, not with every month's stretch. */
+function builtStep(built: number): number {
+  return Math.floor(built * 20 + 1e-9) / 20;
 }
 
 function sameParams(a: MeasureParams, b: MeasureParams): boolean {
@@ -84,6 +91,8 @@ function sameParams(a: MeasureParams, b: MeasureParams): boolean {
 
 class MeasureEngine {
   private voteResults = new Map<string, VoteResult>();
+  /** How much of each build-out (MeasureDef.buildOut) stands, 0-1: it outlasts the measure. */
+  private built = new Map<string, number>();
   private difficulty: Difficulty = DEFAULT_DIFFICULTY;
   private states = new Map<string, MeasureState>();
   private externalActive = new Set<string>();
@@ -105,6 +114,7 @@ class MeasureEngine {
     this.difficulty = difficulty;
     this.states = new Map();
     this.voteResults = new Map();
+    this.built = new Map();
     this.externalActive = new Set();
     this.externalAnnounced = new Set();
     this.history = [];
@@ -219,6 +229,22 @@ class MeasureEngine {
     return entries.sort((a, b) => a.startYear - b.startYear);
   }
 
+  /** How much of a build-out stands, 0-1. */
+  builtShare(id: string): number {
+    return this.built.get(id) ?? 0;
+  }
+
+  /** What a build-out's settings mean in money: the whole credit, the department's share of it a year
+   * while building, and its upkeep a year with that much built. */
+  buildOutPreview(def: MeasureDef, params: MeasureParams): { creditRp: number; yearlyRp: number; years: number; upkeepRp: number } | null {
+    const out = def.buildOut;
+    if (!out) return null;
+    const ctx = { residents: this.dwellingCount(simClock.getSimTimeMs()) * RESIDENTS_PER_DWELLING };
+    const target = out.target(sanitizeParams(def, params));
+    const creditRp = target * out.fullCreditRp(ctx);
+    return { creditRp, yearlyRp: (creditRp * out.departmentShare) / out.years, years: out.years, upkeepRp: Math.max(target, this.builtShare(def.id)) * out.upkeepRp(ctx) };
+  }
+
   costPreview(def: MeasureDef, params: MeasureParams): { oneOffRp: number; annualRp: number } {
     const ctx = { residents: this.dwellingCount(simClock.getSimTimeMs()) * RESIDENTS_PER_DWELLING };
     const clean = sanitizeParams(def, params);
@@ -274,7 +300,7 @@ class MeasureEngine {
     if (!def || !state || this.frozen) return false;
     this.states.delete(id);
     const now = atMsOverride ?? simClock.getSimTimeMs();
-    this.log(now, `Repealed: ${def.title}.`);
+    this.log(now, `Repealed: ${def.title}.${this.builtShare(id) > 0 ? " What has been built stays." : ""}`);
     this.emit({ kind: "repealed", id, def, params: state.pending?.params ?? (state.active as MeasureParams), atMs: now });
     this.recompute();
     return true;
@@ -347,7 +373,7 @@ class MeasureEngine {
     }
 
     if (this.retireFinished(nowMs)) changed = true;
-    this.chargeRunningCosts(nowMs);
+    if (this.chargeRunningCosts(nowMs)) changed = true;
     if (changed) this.recompute();
   }
 
@@ -373,12 +399,15 @@ class MeasureEngine {
     return any;
   }
 
-  private chargeRunningCosts(nowMs: number): void {
+  /** The month's running costs, and the build-outs' next stretch. Returns whether a build-out's effect
+   * has grown. */
+  private chargeRunningCosts(nowMs: number): boolean {
     const month = Math.floor(nowMs / MONTH_MS);
     if (this.lastChargedMonth === null) {
       this.lastChargedMonth = month;
-      return;
+      return false;
     }
+    let grown = false;
     const first = Math.max(this.lastChargedMonth + 1, month - 24); // a long jump does not charge years of history
     for (let m = first; m <= month; m++) {
       const ctx = { residents: this.dwellingCount(m * MONTH_MS) * RESIDENTS_PER_DWELLING };
@@ -387,8 +416,24 @@ class MeasureEngine {
         const annualRp = state.active && def?.annualCostRp ? def.annualCostRp(state.active, ctx) : 0;
         if (annualRp > 0) treasury.recordPayout(def?.costCategory ?? "programs", m * MONTH_MS, annualRp / 12, id);
       }
+      for (const def of BUILD_OUT_MEASURES) {
+        const out = def.buildOut;
+        const active = this.states.get(def.id)?.active;
+        if (!out || !active) continue;
+        const target = out.target(active);
+        const before = this.builtShare(def.id);
+        const stretch = Math.min(Math.max(0, target - before), target / (out.years * 12));
+        if (stretch > 0) {
+          this.built.set(def.id, before + stretch);
+          treasury.recordPayout(def.costCategory ?? "infrastructure", m * MONTH_MS, stretch * out.fullCreditRp(ctx) * out.departmentShare, def.id);
+          if (builtStep(before + stretch) !== builtStep(before)) grown = true;
+        }
+        const upkeepRp = this.builtShare(def.id) * out.upkeepRp(ctx);
+        if (upkeepRp > 0) treasury.recordPayout("programs", m * MONTH_MS, upkeepRp / 12, def.id);
+      }
     }
     this.lastChargedMonth = month;
+    return grown;
   }
 
   // --- internals ---
@@ -400,6 +445,10 @@ class MeasureEngine {
     for (const [id, state] of active) {
       const def = MEASURE_BY_ID.get(id);
       if (def) patches.push(def.effects(state.active as MeasureParams));
+    }
+    for (const def of BUILD_OUT_MEASURES) {
+      const built = builtStep(this.builtShare(def.id));
+      if (def.buildOut && built > 0) patches.push(def.buildOut.effects(built));
     }
     this.channels = combineChannels(patches);
     this.bump();
@@ -435,6 +484,7 @@ class MeasureEngine {
       lastRetireCheckDay: this.lastRetireCheckDay,
       frozen: this.frozen,
       voteResults: this.voteResults,
+      built: this.built,
     };
   }
 
@@ -447,6 +497,7 @@ class MeasureEngine {
     this.lastRetireCheckDay = s.lastRetireCheckDay;
     this.frozen = s.frozen;
     this.voteResults = s.voteResults;
+    this.built = s.built ?? new Map();
     this.recompute();
   }
 }
