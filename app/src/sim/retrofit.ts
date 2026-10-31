@@ -103,6 +103,7 @@ function candidatesAt(building: Building, atMs: number, incumbent: EnergyClassId
       annualizedCostRp: upfrontRp / spec.reconsiderMeanYears + annualHeatingCostRp(building, atMs, uValueOfClass(building, id)),
       lifetimeMeanYears: spec.reconsiderMeanYears,
       municipalSubsidyRp: municipalRp,
+      subsidyCategory: "retrofit",
       greenness: spec.greenness,
     };
   });

@@ -194,6 +194,7 @@ function candidatesAt(
     return {
       id,
       municipalSubsidyRp: municipalRp,
+      subsidyCategory: id === "districtHeating" ? "districtHeat" : "heatPump",
       // District heating needs a pipe in the street; one already connected keeps its connection. A
       // new heat pump needs room on the grid (a building replacing one keeps its connection).
       available:

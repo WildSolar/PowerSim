@@ -352,7 +352,7 @@ class CarParks {
       return chooseNext(candidates, "none", CAR_PARK_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier, policy.progressiveNudgeRp).chosen;
     };
     if (decide(subsidyRp) === "none") return null;
-    if (subsidyRp > 0) recordSubsidisedDecision({ atMs, category: "solar", subsidyRp, additional: decide(0) === "none" });
+    if (subsidyRp > 0) recordSubsidisedDecision({ atMs, category: "carParkSolar", subsidyRp, additional: decide(0) === "none" });
     const canopy = this.addCanopy(lot, atMs, { costRp: q.costRp, subsidyRp, mandated: false });
     if (subsidyRp > 0) treasury.recordPayout("solar", atMs, subsidyRp, `car-park-${lot.id}`);
     return canopy;

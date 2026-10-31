@@ -34,8 +34,12 @@ interface MeasureState {
   /** Enacted or changed, waiting out its lead time. */
   pending: { params: MeasureParams; activeFromMs: number } | null;
   enactedAtMs: number;
-  /** A public vote is scheduled on this measure (approval.ts): if it is lost, the measure is struck down. */
+  /** A public vote is scheduled on this measure (approval.ts): if it is lost, the measure is struck
+   * down, or — when it is a change to a law already in force — the change falls. */
   vote: { atMs: number } | null;
+  /** The settings in force before the change now on the way (null for a new measure): what stays if
+   * the voters reject the change. */
+  beforeChange?: MeasureParams | null;
 }
 
 export type MeasureEvent =
@@ -51,6 +55,8 @@ export interface VoteResult {
   atMs: number;
   accepted: boolean;
   yesShare: number;
+  /** It was a vote on a change to a law in force, not on the law itself. */
+  change?: boolean;
 }
 
 export interface MeasureLogEntry {
@@ -98,6 +104,7 @@ class MeasureEngine {
     this.unsubscribeClock?.();
     this.difficulty = difficulty;
     this.states = new Map();
+    this.voteResults = new Map();
     this.externalActive = new Set();
     this.externalAnnounced = new Set();
     this.history = [];
@@ -242,6 +249,8 @@ class MeasureEngine {
     if (oneOffRp > 0) treasury.recordPayout(def.costCategory ?? "programs", now, oneOffRp, id);
 
     const state: MeasureState = existing ?? { active: null, pending: null, enactedAtMs: now, vote: null };
+    // A further change while a vote is on the way still answers to the law as it stood before that.
+    if (!state.vote) state.beforeChange = state.active;
     state.pending = { params, activeFromMs: now + def.leadTimeMonths * MONTH_MS };
     this.states.set(id, state);
     this.log(now, `${existing ? "Changed" : "Enacted"}: ${def.title}. In effect from ${this.formatDate(state.pending.activeFromMs)}.`);
@@ -273,13 +282,23 @@ class MeasureEngine {
   }
 
   /** approval.ts: the vote is in. A measure the voters reject is struck down (its one-off cost stays
-   * spent) and can't be put forward again for a while. */
+   * spent) and can't be put forward again for a while. A rejected change to a law in force takes
+   * only the change away: the law carries on as it was, and can't be changed for that while. */
   resolveVote(id: string, accepted: boolean, atMs: number, yesShare: number): void {
     const state = this.states.get(id);
     const def = MEASURE_BY_ID.get(id);
     if (!state || !def) return;
     state.vote = null;
-    this.voteResults.set(id, { atMs, accepted, yesShare });
+    const before = state.beforeChange ?? null;
+    state.beforeChange = null;
+    this.voteResults.set(id, { atMs, accepted, yesShare, change: before !== null });
+    if (!accepted && before) {
+      state.active = before;
+      state.pending = null;
+      this.log(atMs, `Change rejected by the voters: ${def.title}. The law stays as it was, and can't be changed again before ${this.formatDate(atMs + VOTE_MORATORIUM_YEARS * 12 * MONTH_MS)}.`);
+      this.recompute();
+      return;
+    }
     if (!accepted) {
       this.states.delete(id);
       this.log(atMs, `Struck down by the voters: ${def.title}. It can't be put forward again before ${this.formatDate(atMs + VOTE_MORATORIUM_YEARS * 12 * MONTH_MS)}.`);

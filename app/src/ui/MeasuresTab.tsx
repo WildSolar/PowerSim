@@ -47,11 +47,6 @@ function percent(x: number): string {
   return `${Math.round(x * 100)}%`;
 }
 
-const SHARED_NOTE: Partial<Record<SubsidyCategory, string>> = {
-  vehicle: "All vehicle grants together (electric vehicle grant and scrappage bonus).",
-  heating: "All heating grants together (heat pump grant and district heating connection grant).",
-};
-
 /** What a subsidy programme is known to have done: its uptake, always (the treasury pays it, so the
  * municipality knows), and — if it paid for an evaluation — how much of that the money actually
  * changed. */
@@ -67,12 +62,11 @@ function SubsidyEvidence({ category, nowMs }: { category: SubsidyCategory; nowMs
       <div>
         Taken up by <strong>{lastYear.length}</strong> in the last 12 months ({formatCHF(lastYearRp)}) · {ever.length} since the start.
       </div>
-      {SHARED_NOTE[category] && <div className="measure-note">{SHARED_NOTE[category]}</div>}
       {study && !result && <div className="measure-note">Evaluation under way — results in {monthYear(study.readyAtMs)}.</div>}
       {result && result.paid === 0 && <div className="measure-note">The evaluation of {monthYear(study!.readyAtMs)} found no one paid in the period it looked at.</div>}
       {result && result.paid > 0 && (
         <div className="measure-evaluation">
-          <strong>Evaluation, {monthYear(study!.readyAtMs)}</strong> — of the {result.paid} households paid in the {EVALUATION_LOOKBACK_YEARS} years before, an estimated{" "}
+          <strong>Evaluation, {monthYear(study!.readyAtMs)}</strong> — of the {result.paid} paid in the {EVALUATION_LOOKBACK_YEARS} years before, an estimated{" "}
           <strong>
             {percent(result.additionalShare)} (± {percent(result.margin)})
           </strong>{" "}
@@ -221,8 +215,10 @@ function MeasureDetail({ def, nowMs, onClose }: { def: MeasureDef; nowMs: number
       )}
       {!vote && lastVote && (
         <div className={`measure-vote-result ${lastVote.accepted ? "accepted" : "rejected"}`}>
-          {lastVote.accepted ? "Accepted" : "Rejected"} by the voters in {monthYear(lastVote.atMs)}: {votePct(lastVote.yesShare)}% yes, {votePct(100 - lastVote.yesShare)}% no.
-          {moratoriumUntil !== null && ` It can't be put forward again before ${monthYear(moratoriumUntil)}.`}
+          {lastVote.change ? (lastVote.accepted ? "The change was accepted" : "The change was rejected") : lastVote.accepted ? "Accepted" : "Rejected"} by the voters in {monthYear(lastVote.atMs)}:{" "}
+          {votePct(lastVote.yesShare)}% yes, {votePct(100 - lastVote.yesShare)}% no.
+          {!lastVote.accepted && lastVote.change && " The law stays as it was."}
+          {moratoriumUntil !== null && (lastVote.change ? ` It can't be changed again before ${monthYear(moratoriumUntil)}.` : ` It can't be put forward again before ${monthYear(moratoriumUntil)}.`)}
         </div>
       )}
 
@@ -292,7 +288,7 @@ function cardFooter(def: MeasureDef, nowMs: number): { text: string; tone?: "goo
   if (vote) return { text: `Public vote ${monthYear(vote.atMs)} · poll ${votePct(vote.pollYes)}% yes`, tone: "warn" };
   const until = measures.moratoriumUntilMs(def.id, nowMs);
   const lastVote = measures.lastVote(def.id);
-  if (until !== null && lastVote) return { text: `Rejected ${monthYear(lastVote.atMs)} (${votePct(lastVote.yesShare)}% yes) · again from ${monthYear(until)}`, tone: "bad" };
+  if (until !== null && lastVote) return { text: `${lastVote.change ? "Change rejected" : "Rejected"} ${monthYear(lastVote.atMs)} (${votePct(lastVote.yesShare)}% yes) · again from ${monthYear(until)}`, tone: "bad" };
   const state = measures.getState(def.id);
   const params = state?.pending?.params ?? state?.active ?? null;
   if (state?.active && def.subsidyCategory) {

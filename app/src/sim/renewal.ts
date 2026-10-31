@@ -29,7 +29,7 @@ import { subsidyCategoryForDecision, treasury } from "./treasury";
 import { logCandidateDecision, type DecisionCandidateLog, type DecisionLogKind } from "./decisionLog";
 import { hashSeed, mulberry32 } from "./rng";
 import { weibullAgedRemainder, weibullConditionalRemainder, weibullSample } from "./weibull";
-import { recordSubsidisedDecision } from "./additionality";
+import { recordSubsidisedDecision, type SubsidyCategory } from "./additionality";
 import { decisionHorizon } from "./decisionHorizon";
 
 export interface RenewalCandidate<T extends string> {
@@ -40,6 +40,8 @@ export interface RenewalCandidate<T extends string> {
   /** The part of the up-front cost the municipality pays (already netted out of annualizedCostRp).
    * Recorded on the event when this candidate wins, so the treasury can be charged for it then. */
   municipalSubsidyRp?: number;
+  /** Which grant that money is, for its uptake and its evaluation. */
+  subsidyCategory?: SubsidyCategory;
   /** Called when this candidate wins and the decision commits (e.g. to book the car to the public
    * charger it will rely on). */
   onChosen?: (atMs: number) => void;
@@ -274,11 +276,13 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, as
     const category = subsidyCategoryForDecision(params.kind);
     if (category && winner?.municipalSubsidyRp) {
       treasury.recordPayout(category, atMs, winner.municipalSubsidyRp, params.egid);
-      // The ground truth for evaluation studies: the same decision without the municipality's money.
-      const without = candidates.map((c) => ({ ...c, annualizedCostRp: c.annualizedCostRp + (c.municipalSubsidyRp ?? 0) / c.lifetimeMeanYears }));
-      const counterfactual = chooseNext(without, incumbent, uncertaintyFraction, bias).chosen;
-      if (category === "heating" || category === "vehicle" || category === "retrofit" || category === "solar") {
-        recordSubsidisedDecision({ atMs, category, subsidyRp: winner.municipalSubsidyRp, additional: counterfactual !== chosen });
+      // The ground truth for evaluation studies: the same decision without this grant's money (another
+      // grant, say for the option next to it, stays).
+      const grant = winner.subsidyCategory;
+      if (grant) {
+        const without = candidates.map((c) => (c.subsidyCategory === grant ? { ...c, annualizedCostRp: c.annualizedCostRp + (c.municipalSubsidyRp ?? 0) / c.lifetimeMeanYears } : c));
+        const counterfactual = chooseNext(without, incumbent, uncertaintyFraction, bias).chosen;
+        recordSubsidisedDecision({ atMs, category: grant, subsidyRp: winner.municipalSubsidyRp, additional: counterfactual !== chosen });
       }
     }
     return chosen;

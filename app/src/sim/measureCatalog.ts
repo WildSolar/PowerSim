@@ -36,7 +36,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     id: "fleet-ev-grant",
     category: "subsidy",
     topic: "mobility",
-    subsidyCategory: "vehicle",
+    subsidyCategory: "electricFleet",
     title: "Electric van and lorry grant",
     summary:
       "A municipal grant for a business buying an electric van or lorry, paid when it buys one. An electric lorry still costs about twice a diesel one; a grant closes part of the gap, and the vehicle charges at the business's own yard, or at a fast-charging hub for lorries if there is one.",
@@ -79,7 +79,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     id: "car-park-solar-subsidy",
     category: "subsidy",
     topic: "buildings",
-    subsidyCategory: "solar",
+    subsidyCategory: "carParkSolar",
     title: "Car park solar subsidy",
     summary:
       "A municipal subsidy per kWp for a solar canopy over a private car park — a shop's, a company's, a housing estate's. On top of the federal one-off payment; paid when an owner builds.",
@@ -119,7 +119,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     id: "heat-pump-grant",
     category: "subsidy",
     topic: "heating",
-    subsidyCategory: "heating",
+    subsidyCategory: "heatPump",
     title: "Heat pump grant",
     summary:
       "A flat municipal grant, on top of the cantonal one, for a heat pump. Paid to everyone who installs one, most of whom would have anyway — or only to owners who replace a working oil or gas boiler early, which reaches far fewer people but changes far more of what they do.",
@@ -145,7 +145,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     id: "district-heat-connection-grant",
     category: "subsidy",
     topic: "heating",
-    subsidyCategory: "heating",
+    subsidyCategory: "districtHeat",
     title: "District heating connection grant",
     summary:
       "A flat municipal grant towards connecting a building to district heating — the pipe from the street and the substation, about CHF 22,000 for a house, more for a block of flats. Paid to every owner who connects where the pipes run, most of whom would have anyway; it tips those weighing district heat against a heat pump or a new boiler, and prompts some to give up a working boiler early. Buildings already connected don't get it again.",
@@ -159,7 +159,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     id: "ev-grant",
     category: "subsidy",
     topic: "mobility",
-    subsidyCategory: "vehicle",
+    subsidyCategory: "electricCar",
     title: "Electric car grant",
     summary:
       "A flat municipal grant for an electric car. Paid whenever a household buys one — or only when it replaces a petrol or diesel car that still runs, which reaches few households but pulls their switch forward.",
@@ -461,7 +461,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     category: "law",
     topic: "mobility",
     title: "Ban on new petrol and diesel cars",
-    summary: "Households may no longer buy a new petrol or diesel car. Existing cars stay on the road until they are replaced.",
+    summary: "Households may no longer buy a new petrol or diesel car, nor businesses a new diesel van. Lorries stay exempt. What is on the road stays there until it is replaced.",
     params: [],
     leadTimeMonths: 36,
     effects: () => ({ iceCarPurchaseBanned: true }),
@@ -474,7 +474,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     id: "ice-scrappage",
     category: "subsidy",
     topic: "mobility",
-    subsidyCategory: "vehicle",
+    subsidyCategory: "electricCar",
     title: "Scrappage bonus for petrol and diesel cars",
     summary:
       "An extra grant when a household replaces a petrol or diesel car with an electric one, on top of the electric car grant. It pays for exactly the switch that cuts emissions — and, like any grant, also for households that would have gone electric anyway.",
@@ -576,7 +576,7 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "grid",
     title: "Green electricity as the default",
     summary:
-      "The utility supplies certified renewable power by default. Emissions attributed to grid electricity fall with the share; the certificates cost the utility a premium on every kWh it buys, which comes out of its result — and so your department's share of it — unless you pass it on in your prices.",
+      "The utility supplies certified renewable power by default. Emissions attributed to grid electricity fall with the share, by nine tenths at 100%; the certificates cost the utility a premium on every kWh it buys, which comes out of its result — and so your department's share of it — unless you pass it on in your prices.",
     params: [{ kind: "slider", key: "share", label: "Share of supply", min: 0, max: 100, step: 10, unit: "%", default: 50 }],
     leadTimeMonths: 6,
     effects: (p) => ({ greenPowerShare: num(p, "share") }),

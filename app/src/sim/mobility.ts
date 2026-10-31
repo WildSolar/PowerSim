@@ -250,6 +250,7 @@ function carCandidatesAt(
       annualizedCostRp: installCostRp / spec.lifetimeMeanYears + runningCostRp,
       lifetimeMeanYears: spec.lifetimeMeanYears,
       municipalSubsidyRp: municipalRp,
+      subsidyCategory: "electricCar",
       greenness: spec.greenness,
       onChosen: id === "carEV" ? onElectricChosen : undefined,
     };

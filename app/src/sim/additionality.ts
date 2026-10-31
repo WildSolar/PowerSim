@@ -2,13 +2,15 @@
  * The ground truth behind every municipal subsidy paid: would the household (or owner) have made
  * the same choice without it? Each time a decision is taken with a municipal subsidy on the winning
  * option, the decision is re-run with that money taken away (renewal.ts, solarAdoption.ts) — same
- * household, same leaning, same prices — and this ledger records whether the subsidy changed it.
+ * household, same leaning, same prices, any other grant still there — and this ledger records whether
+ * the subsidy changed it.
  *
  * The player never reads this directly: it's what evaluation studies (studies.ts) sample, with the
  * error margin a real study would have. Transparency mode shows the decisions themselves.
  */
 
-export type SubsidyCategory = "solar" | "battery" | "heating" | "vehicle" | "retrofit";
+/** Which grant paid: one for each subsidy measure, so each shows its own uptake and evaluation. */
+export type SubsidyCategory = "solar" | "carParkSolar" | "battery" | "heatPump" | "districtHeat" | "electricCar" | "electricFleet" | "retrofit";
 
 export interface SubsidisedDecision {
   atMs: number;

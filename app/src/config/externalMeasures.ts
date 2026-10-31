@@ -36,7 +36,7 @@ export const EXTERNAL_MEASURES: ExternalMeasureDef[] = [
     id: "federal-ice-sales-ban",
     source: "federal",
     title: "Federal ban on new petrol and diesel car sales",
-    summary: "From this year, only electric (or other zero-emission) new cars may be sold in Switzerland.",
+    summary: "From this year, only electric (or other zero-emission) new cars and vans may be sold in Switzerland. Lorries are exempt.",
     startYear: { easy: 2035, normal: 2043, hard: null },
     announcedYearsBefore: 5,
     effects: { iceCarPurchaseBanned: true },

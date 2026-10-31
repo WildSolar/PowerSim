@@ -130,9 +130,17 @@ export function datacenterHeatOfferText(mw: number, yearlyRp: number, connection
   };
 }
 
-export function voteResultText(title: string, accepted: boolean, yesShare: number, againFrom: string | null): LetterText {
+export function voteResultText(title: string, accepted: boolean, yesShare: number, againFrom: string | null, change = false): LetterText {
   const yes = votePct(yesShare);
   const no = votePct(100 - yesShare);
+  if (!accepted && change)
+    return {
+      subject: `Vote result: change to ${title} rejected`,
+      paragraphs: [
+        `The voters have rejected the change to “${title}”: only ${yes}% voted in favour, ${no}% against.`,
+        `The change falls with immediate effect, and the law stays as it was before it; money already spent on the change stays spent. A defeat at the ballot box costs the council some standing.${againFrom ? ` By custom, the council will not put a change to this law to the voters again before ${againFrom}.` : ""}`,
+      ],
+    };
   return accepted
     ? {
         subject: `Vote result: ${title} accepted`,
@@ -325,12 +333,12 @@ export function welcomeText(town: string): LetterText {
 
 // --- votes, and notices from the administration ---
 
-export function voteCalledText(title: string, when: string): LetterText {
+export function voteCalledText(title: string, when: string, change = false): LetterText {
   return {
-    subject: `To the ballot: ${title}`,
+    subject: `To the ballot: ${change ? "the change to " : ""}${title}`,
     paragraphs: [
-      `Opponents of “${title}” have gathered enough signatures to force a public vote. It will be held in ${when}.`,
-      "Until then the decision stands. If the voters reject it, it is struck down at once. The polls in the Inbox (Votes) show where opinion stands; what you decide meanwhile can still sway it.",
+      `Opponents of ${change ? "the change to " : ""}“${title}” have gathered enough signatures to force a public vote. It will be held in ${when}.`,
+      `Until then the decision stands. ${change ? "If the voters reject it, the change falls at once and the law stays as it was." : "If the voters reject it, it is struck down at once."} The polls in the Inbox (Votes) show where opinion stands; what you decide meanwhile can still sway it.`,
     ],
   };
 }

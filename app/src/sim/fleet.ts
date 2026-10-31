@@ -173,7 +173,7 @@ function candidatesFor(
       id,
       available,
       annualizedCostRp: (purchaseRp - subsidyRp) / spec.lifetimeMeanYears + runningRp,
-      ...(subsidyRp > 0 ? { municipalSubsidyRp: subsidyRp } : {}),
+      ...(subsidyRp > 0 ? { municipalSubsidyRp: subsidyRp, subsidyCategory: "electricFleet" as const } : {}),
       lifetimeMeanYears: spec.lifetimeMeanYears,
       greenness: spec.greenness,
       onChosen: spec.electric ? onElectricChosen : undefined,

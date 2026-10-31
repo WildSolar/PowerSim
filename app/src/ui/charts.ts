@@ -872,7 +872,7 @@ function utilityChart(param: string | null, nowMs: number): ChartData {
 }
 
 /** The measure log's entries that were the player's decisions (or the voters' verdict on one). */
-const DECISION_PREFIXES = ["Enacted:", "Changed:", "Repealed:", "Struck down"];
+const DECISION_PREFIXES = ["Enacted:", "Changed:", "Repealed:", "Struck down", "Change rejected"];
 
 function approvalChart(nowMs: number): ChartData {
   const history = approval.getHistory();

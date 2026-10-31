@@ -22,8 +22,17 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
-    version: "0.10.2",
+    version: "0.11.0",
     date: null,
+    fixed: [
+      "A public vote you lose on a change to a law now only rejects the change: the law stays as it was before it, instead of falling altogether. It can't be changed again for two years; you can still repeal it.",
+      "A vote lost in one game no longer blocks that measure in the next game you start without reloading the page.",
+      "Once the federal ban on new petrol and diesel cars is in force, your own ban is greyed out as already covered, like the fossil heating ban under the canton's law.",
+      "The car ban's text now says what it does: it also covers diesel vans, and lorries stay exempt. Green electricity now says how far it goes: nine tenths off grid emissions at 100%.",
+    ],
+    changed: [
+      "Each grant now shows its own uptake and its own evaluation: the heat pump grant apart from the district heating grant, cars apart from vans and lorries, roofs apart from car parks. An evaluation asks what its own grant changed, with any other grant still in place.",
+    ],
     added: [
       "Imprint & privacy, on the start screen and in the game menu: who makes the game, and what happens to your data — what stays in your browser, the anonymous visit count, the leaderboard, feedback, and the services the game relies on.",
       "You can turn the anonymous visit count off, under Imprint & privacy. The game then sends nothing about your visit or your games.",

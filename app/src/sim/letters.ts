@@ -256,13 +256,13 @@ class Letters {
     }
     if (e.kind === "voteHeld") {
       const until = measures.moratoriumUntilMs(e.key, e.atMs + 1);
-      this.post({ atMs: e.atMs, kind: "voteResult", bloc: null, from: `The Town Clerk of ${this.town}`, role: "", ...voteResultText(e.title, e.accepted, e.yesShare, until !== null ? monthYearLabel(until) : null) });
+      this.post({ atMs: e.atMs, kind: "voteResult", bloc: null, from: `The Town Clerk of ${this.town}`, role: "", ...voteResultText(e.title, e.accepted, e.yesShare, until !== null ? monthYearLabel(until) : null, e.change) });
       return;
     }
     if (e.kind !== "voteScheduled") return;
     const ranked = BLOC_ORDER.map((b) => ({ b, s: e.stances[b] ?? 0 })).sort((x, y) => x.s - y.s);
     const when = monthYearLabel(e.voteAtMs);
-    this.post({ atMs: e.atMs, kind: "voteCalled", ...this.clerk(), ...voteCalledText(e.title, when) });
+    this.post({ atMs: e.atMs, kind: "voteCalled", ...this.clerk(), ...voteCalledText(e.title, when, e.change) });
     const rng = mulberry32(hashSeed(this.seed, "campaign", e.key, String(e.atMs | 0)));
     const against = ranked[0];
     const forIt = ranked[ranked.length - 1];

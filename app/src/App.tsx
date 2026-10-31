@@ -306,6 +306,9 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         setMeasureAvailability("fossil-heating-ban", (atMs) =>
           measures.externalOutlook(atMs).some((e) => e.id === "cantonal-fossil-heating-ban" && e.inEffect) ? "The canton's own ban is already in force." : null,
         );
+        setMeasureAvailability("ice-car-ban", (atMs) =>
+          measures.externalOutlook(atMs).some((e) => e.id === "federal-ice-sales-ban" && e.inEffect) ? "The federal ban is already in force." : null,
+        );
         setMeasureAvailability("public-building-chargers", (atMs) =>
           publicCharging.publicBuildingChargerCandidates(atMs).length === 0 ? "Every public building (campus) already has chargers." : null,
         );

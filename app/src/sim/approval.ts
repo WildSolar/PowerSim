@@ -99,8 +99,8 @@ export interface GameOver {
 
 /** What the public side of politics did — for the letters. */
 export type ApprovalEvent =
-  | { kind: "voteScheduled"; key: string; title: string; atMs: number; voteAtMs: number; stances: Stances }
-  | { kind: "voteHeld"; key: string; title: string; atMs: number; accepted: boolean; yesShare: number; stances: Stances }
+  | { kind: "voteScheduled"; key: string; title: string; atMs: number; voteAtMs: number; stances: Stances; change: boolean }
+  | { kind: "voteHeld"; key: string; title: string; atMs: number; accepted: boolean; yesShare: number; stances: Stances; change: boolean }
   | { kind: "voteCalledOff"; key: string; title: string; atMs: number; reason: string }
   | { kind: "election"; atMs: number; reelected: boolean; approval: number }
   | { kind: "warning"; atMs: number; approval: number };
@@ -136,6 +136,8 @@ interface Ballot {
   atMs: number;
   title: string;
   stances: Stances;
+  /** A vote on a change to a law in force: how people felt about the law as it stood. */
+  previousStances?: Stances | null;
   /** How much is at stake (0-1): what winning or losing it does to approval. */
   weight: number;
   resolve: (accepted: boolean, atMs: number, yesShare: number) => void;
@@ -363,7 +365,7 @@ class ApprovalEngine {
       });
       const when = new Date(toDateMs(voteAt)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
       this.addLog(decision.atMs, `${decision.title} goes to a public vote in ${when}.`);
-      this.emit({ kind: "voteScheduled", key: decision.key, title: decision.title, atMs: decision.atMs, voteAtMs: voteAt, stances: decision.stances });
+      this.emit({ kind: "voteScheduled", key: decision.key, title: decision.title, atMs: decision.atMs, voteAtMs: voteAt, stances: decision.stances, change: false });
     }
     this.bump();
     return voteAt;
@@ -518,11 +520,13 @@ class ApprovalEngine {
     if (!this.wouldGoToVote(this.stancesOf(def, params), def.referendum)) return;
     const delayMonths = Math.max(1, Math.min(VOTE_DELAY_MONTHS, def.leadTimeMonths - 1));
     const voteAt = atMs + delayMonths * MONTH_MS;
-    this.votes.set(id, { atMs: voteAt, title: def.title, stances: this.stancesOf(def, params), weight: 1, resolve: (accepted, when, yes) => measures.resolveVote(id, accepted, when, yes) });
+    const before = measures.getState(id)?.beforeChange ?? null;
+    const previousStances = before ? this.stancesOf(def, before) : null;
+    this.votes.set(id, { atMs: voteAt, title: def.title, stances: this.stancesOf(def, params), previousStances, weight: 1, resolve: (accepted, when, yes) => measures.resolveVote(id, accepted, when, yes) });
     measures.setVote(id, voteAt);
     const when = new Date(toDateMs(voteAt)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
     this.addLog(atMs, `${def.title} goes to a public vote in ${when}.`);
-    this.emit({ kind: "voteScheduled", key: id, title: def.title, atMs, voteAtMs: voteAt, stances: this.stancesOf(def, params) });
+    this.emit({ kind: "voteScheduled", key: id, title: def.title, atMs, voteAtMs: voteAt, stances: this.stancesOf(def, params), change: before !== null });
   }
 
   /** The share of voters in favour, in percent. */
@@ -539,12 +543,14 @@ class ApprovalEngine {
       this.shiftAll(VOTE_WON_POINTS * vote.weight * this.sensitivity);
       this.addLog(nowMs, `Voters approved ${vote.title} (${votePct(yes)}% in favour).`);
     } else {
-      for (const b of BLOC_ORDER) this.shift(b, -(vote.stances[b] ?? 0) * ENACT_SHOCK_POINTS * this.sensitivity * REPEAL_RECOVERY_FRACTION);
+      // What falls is the change, if the law stood before it: people get back only the difference.
+      const stood = vote.previousStances ?? {};
+      for (const b of BLOC_ORDER) this.shift(b, -((vote.stances[b] ?? 0) - (stood[b] ?? 0)) * ENACT_SHOCK_POINTS * this.sensitivity * REPEAL_RECOVERY_FRACTION);
       this.shiftAll(-VOTE_LOST_POINTS * vote.weight * this.sensitivity);
-      this.addLog(nowMs, `Voters rejected ${vote.title} (${votePct(yes)}% in favour). It is struck down.`);
+      this.addLog(nowMs, `Voters rejected ${vote.previousStances ? `the change to ${vote.title}` : vote.title} (${votePct(yes)}% in favour). ${vote.previousStances ? "The law stays as it was." : "It is struck down."}`);
     }
     vote.resolve(accepted, nowMs, yes);
-    this.emit({ kind: "voteHeld", key: id, title: vote.title, atMs: nowMs, accepted, yesShare: yes, stances: vote.stances });
+    this.emit({ kind: "voteHeld", key: id, title: vote.title, atMs: nowMs, accepted, yesShare: yes, stances: vote.stances, change: !!vote.previousStances });
     this.bump();
   }
 
@@ -592,7 +598,7 @@ class ApprovalEngine {
       history: this.history,
       log: this.log,
       // A ballot's verdict handler is rebuilt from its key on load.
-      votes: [...this.votes].map(([key, b]) => ({ key, atMs: b.atMs, title: b.title, stances: b.stances, weight: b.weight })),
+      votes: [...this.votes].map(([key, b]) => ({ key, atMs: b.atMs, title: b.title, stances: b.stances, previousStances: b.previousStances ?? null, weight: b.weight })),
       gameOver: this.gameOver,
       lowMonths: this.lowMonths,
       warned: this.warned,
@@ -607,7 +613,7 @@ class ApprovalEngine {
     this.history = s.history;
     this.log = s.log;
     // A save from before ballots had weights: each a law's.
-    this.votes = new Map(s.votes.map((v) => [v.key, { atMs: v.atMs, title: v.title, stances: v.stances, weight: v.weight ?? 1, resolve: resolverFor(v.key) }]));
+    this.votes = new Map(s.votes.map((v) => [v.key, { atMs: v.atMs, title: v.title, stances: v.stances, previousStances: v.previousStances ?? null, weight: v.weight ?? 1, resolve: resolverFor(v.key) }]));
     this.gameOver = s.gameOver;
     this.lowMonths = s.lowMonths;
     this.warned = s.warned;
