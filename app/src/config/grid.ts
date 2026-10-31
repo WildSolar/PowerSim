@@ -47,14 +47,13 @@ export const GRID_SOLAR_COMPENSATION_CHF_PER_KW = 59;
 export const GRID_COMPENSATION_MONTH = 2;
 
 // Neighbourhood batteries at a station: each covers its power of the area's peak, in either
-// direction, and stores two hours of it. Today's installed prices (container, inverter, connection
-// and site work — cells are well under half), with some economy of scale; they then fall along the
-// "gridBattery" price trajectory (config/costTrends.ts).
-export const GRID_BATTERY_SIZES: { kw: number; kwh: number; costChf: number }[] = [
-  { kw: 250, kwh: 500, costChf: 350_000 },
-  { kw: 500, kwh: 1000, costChf: 600_000 },
-  { kw: 1000, kwh: 2000, costChf: 1_050_000 },
-];
+// direction, and stores two hours of it, any size on the slider. Today's installed price (container,
+// inverter, connection and site work — cells are well under half), with some economy of scale:
+// fixedChf + perKwChf × kW^exponent, fitted to CHF 350k at 250 kW, 600k at 500 and 1.05M at 1000. It
+// then falls along the "gridBattery" price trajectory (config/costTrends.ts).
+export const GRID_BATTERY_KW = { min: 100, max: 2000, step: 50, default: 250 };
+export const GRID_BATTERY_HOURS = 2;
+export const GRID_BATTERY_COST = { fixedChf: 37_500, perKwChf: 2_893.37, exponent: Math.log2(1.8) };
 export const BATTERY_MONTHS = 6;
 
 // How much of a peak a neighbourhood battery can shave depends on its storage as well as its power:

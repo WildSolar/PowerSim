@@ -1,6 +1,6 @@
-import { useMemo, useSyncExternalStore, type ReactNode } from "react";
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { CardKind, CardSection, Facts } from "./CardParts";
-import { BATTERY_MONTHS, GRID_BATTERY_SIZES, REINFORCE_MONTHS } from "../config/grid";
+import { BATTERY_MONTHS, GRID_BATTERY_HOURS, GRID_BATTERY_KW, REINFORCE_MONTHS } from "../config/grid";
 import { GRID_LEGEND } from "../map/colorModes";
 import { mapFocus } from "../map/mapFocus";
 import { formatDate } from "../sim/calendar";
@@ -23,7 +23,7 @@ function pickArea(a: GridArea): void {
   mapFocus.request({ lon: a.lon, lat: a.lat, minZoom: 15.5 });
 }
 
-/** "CHF 350k", "CHF 1.05M" — for the narrow battery buttons. */
+/** "CHF 350k", "CHF 1.05M" — for the narrow size buttons. */
 function compactCHF(rp: number): string {
   const chf = rp / 100;
   return chf >= 1e6 ? `CHF ${(chf / 1e6).toFixed(2).replace(/0$/, "")}M` : `CHF ${Math.round(chf / 1000)}k`;
@@ -70,6 +70,38 @@ export function StationCard() {
     >
       <AreaDetails area={area} now={now} />
     </InspectCard>
+  );
+}
+
+/** Choosing how big a neighbourhood battery to order: a slider, with what that costs and how long it
+ * takes (as PortsPicker does for charge points). */
+function BatteryPicker({ areaId, now }: { areaId: number; now: number }) {
+  const [kw, setKw] = useState(GRID_BATTERY_KW.default);
+  const kwh = kw * GRID_BATTERY_HOURS;
+  const costRp = gridBatteryCostRp(kw, now);
+  return (
+    <div className="ports-picker">
+      <label className="ports-picker-row">
+        <span className="ports-picker-count">{batterySize({ kw, kwh })}</span>
+        <input
+          type="range"
+          min={GRID_BATTERY_KW.min}
+          max={GRID_BATTERY_KW.max}
+          step={GRID_BATTERY_KW.step}
+          value={kw}
+          onChange={(e) => setKw(Number(e.target.value))}
+          aria-label="Size of the battery"
+        />
+      </label>
+      <span className="ev-build-detail">
+        {kw >= 1000 ? `${kw / 1000} MW` : `${kw} kW`} · {formatCHF(costRp)} · {formatCHF(Math.round(costRp / kwh / 100) * 100)} a kWh · {BATTERY_MONTHS} months
+      </span>
+      <div className="dh-actions">
+        <button className="dh-order" onClick={() => grid.addBattery(areaId, simClock.getSimTimeMs(), kw)}>
+          Order for {formatCHF(costRp)}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -166,15 +198,7 @@ function AreaDetails({ area, now }: { area: GridArea; now: number }) {
         >
           Add a neighbourhood battery ({BATTERY_MONTHS} months): <PlotLink chart="trade" title="Power bought, sold and shifted by batteries" />
         </p>
-        <div className="ev-sizes">
-          {GRID_BATTERY_SIZES.map((size, i) => (
-            <button key={size.kw} title={formatCHF(gridBatteryCostRp(i, now))} onClick={() => grid.addBattery(area.id, simClock.getSimTimeMs(), i)}>
-              <span className="ev-build-name">{size.kwh >= 1000 ? `${size.kwh / 1000} MWh` : `${size.kwh} kWh`}</span>
-              <span className="ev-build-detail">{size.kw >= 1000 ? `${size.kw / 1000} MW` : `${size.kw} kW`}</span>
-              <span className="ev-build-detail">{compactCHF(gridBatteryCostRp(i, now))}</span>
-            </button>
-          ))}
-        </div>
+        <BatteryPicker areaId={area.id} now={now} />
       </CardSection>
     </>
   );

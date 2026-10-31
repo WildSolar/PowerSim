@@ -44,6 +44,7 @@ export const CHANGELOG: Release[] = [
       "Changing a measure no longer pays its one-off cost again, only what the change adds.",
       "Energy consulting's text no longer promises more solar: it acts on boilers, insulation and vehicles. For solar there is the solar check.",
       "A bicycle network is now built up over about ten years, as an investment, and works more as it grows; what is built stays if you stop. Public transport is mostly a yearly contribution, with a small one-off for stops and bus lanes. For both your department carries only its energy share, a quarter to a third, and larger credits go to a public vote.",
+      "Neighbourhood batteries come in any size: choose from 100 kW to 2 MW on a slider, instead of three fixed sizes. Bigger ones cost less per kWh.",
       "Each grant now shows its own uptake and its own evaluation: the heat pump grant apart from the district heating grant, cars apart from vans and lorries, roofs apart from car parks. An evaluation asks what its own grant changed, with any other grant still in place.",
     ],
     added: [

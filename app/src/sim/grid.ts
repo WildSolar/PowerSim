@@ -23,7 +23,9 @@ import {
   WINTER_PEAK_HUMP,
   AUTO_REINFORCE_HEADROOM,
   BATTERY_MONTHS,
-  GRID_BATTERY_SIZES,
+  GRID_BATTERY_COST,
+  GRID_BATTERY_HOURS,
+  GRID_BATTERY_KW,
   GRID_FULL_SHARE,
   LOAD_CONTROL_OFF_SHARE_AT_PEAK,
   GRID_TIGHT_SHARE,
@@ -149,9 +151,10 @@ export interface GridZone {
   edges: [number, number][][];
 }
 
-/** What a neighbourhood battery of GRID_BATTERY_SIZES[sizeIndex] costs if ordered at `atMs`. */
-export function gridBatteryCostRp(sizeIndex: number, atMs: number): number {
-  return Math.round((GRID_BATTERY_SIZES[sizeIndex].costChf * priceFactor("gridBattery", atMs)) / 1000) * 1000 * 100;
+/** What a neighbourhood battery of this power costs if ordered at `atMs`. */
+export function gridBatteryCostRp(kw: number, atMs: number): number {
+  const chf = GRID_BATTERY_COST.fixedChf + GRID_BATTERY_COST.perKwChf * Math.pow(kw, GRID_BATTERY_COST.exponent);
+  return Math.round((chf * priceFactor("gridBattery", atMs)) / 1000) * 1000 * 100;
 }
 
 class Grid {
@@ -678,13 +681,14 @@ class Grid {
     this.notify();
   }
 
-  /** Orders a neighbourhood battery for an area — one of GRID_BATTERY_SIZES. */
-  addBattery(areaId: number, atMs: number, sizeIndex = 0): void {
+  /** Orders a neighbourhood battery for an area, of this power (GRID_BATTERY_KW). */
+  addBattery(areaId: number, atMs: number, kw: number = GRID_BATTERY_KW.default): void {
     const area = this.areas[areaId];
-    const size = GRID_BATTERY_SIZES[sizeIndex];
-    if (!area || !size || cannotPay(gridBatteryCostRp(sizeIndex, atMs), atMs)) return;
-    area.batteries.push({ atMs: atMs + BATTERY_MONTHS * MONTH_MS, kw: size.kw, kwh: size.kwh });
-    treasury.recordPayout("grid", atMs, gridBatteryCostRp(sizeIndex, atMs), `grid-battery-${areaId}`);
+    const size = Math.min(GRID_BATTERY_KW.max, Math.max(GRID_BATTERY_KW.min, kw));
+    const costRp = gridBatteryCostRp(size, atMs);
+    if (!area || cannotPay(costRp, atMs)) return;
+    area.batteries.push({ atMs: atMs + BATTERY_MONTHS * MONTH_MS, kw: size, kwh: size * GRID_BATTERY_HOURS });
+    treasury.recordPayout("grid", atMs, costRp, `grid-battery-${areaId}`);
     this.notify();
   }
 
