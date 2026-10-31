@@ -30,19 +30,29 @@ export interface Channels {
   solarCoopGrantRpPerKwp: number; // ...and the municipality's grant per kWp it builds
 
   // Heating, mobility, retrofits
-  heatPumpSubsidyRp: number; // flat municipal grant per heat pump installed
-  dhConnectionSubsidyRp: number; // flat municipal grant per building newly connected to district heating
-  heatPumpGrantEarlyOnly: boolean; // ...paid only when it replaces a working oil or gas boiler early
-  evSubsidyRp: number; // flat municipal grant per electric car bought
-  evGrantEarlyOnly: boolean; // ...paid only when it replaces a working petrol or diesel car early
-  fleetEvVanSubsidyRp: number; // municipal grant per electric van a business buys
-  fleetEvTruckSubsidyRp: number; // ...per electric lorry
-  retrofitSubsidyRpPerM2: number; // municipal top-up per m2 of envelope on an upgrade
+  // Municipal grants, one amount per situation: replacing a working fossil system early, a fossil
+  // system at the end of its life, anything else.
+  heatPumpGrantEarlyRp: number;
+  heatPumpGrantFossilRp: number;
+  heatPumpGrantOtherRp: number;
+  dhGrantEarlyRp: number; // a first connection to district heating; one already connected gets nothing
+  dhGrantFossilRp: number;
+  dhGrantOtherRp: number;
+  evGrantEarlyRp: number;
+  evGrantFossilRp: number;
+  evGrantOtherRp: number;
+  fleetVanGrantEarlyRp: number; // a business's electric van replacing a working diesel one
+  fleetVanGrantEndRp: number; // ...a diesel one at the end of its life
+  fleetTruckGrantEarlyRp: number; // ...likewise for a lorry
+  fleetTruckGrantEndRp: number;
+  // Municipal top-up per m2 of envelope, by the class the renovation reaches.
+  retrofitGrantStandardRpPerM2: number;
+  retrofitGrantMinergieRpPerM2: number;
+  retrofitGrantMinergiePRpPerM2: number;
   retrofitMinClass: EnergyClassId | "none"; // an envelope renovation must reach at least this class
   fossilHeatingInstallBanned: boolean; // no new gas or oil heating when a system is replaced
   iceCarPurchaseBanned: boolean; // no new petrol or diesel cars
 
-  iceScrappageBonusRp: number; // extra municipal grant when a petrol/diesel car is replaced by an electric one
   modeShiftToBikePts: number; // percentage points of trips moved from the car to the bicycle at each household life event
   modeShiftToOtherPts: number; // ... and to public transport and other modes
 
@@ -93,18 +103,25 @@ export const CHANNEL_DEFAULTS: Channels = {
   solarCoopGrantRpPerKwp: 0,
   carParkSolarDutyMinSpaces: 0,
   carParkSolarDutyYears: 5,
-  heatPumpSubsidyRp: 0,
-  dhConnectionSubsidyRp: 0,
-  heatPumpGrantEarlyOnly: false,
-  evSubsidyRp: 0,
-  evGrantEarlyOnly: false,
-  fleetEvVanSubsidyRp: 0,
-  fleetEvTruckSubsidyRp: 0,
-  retrofitSubsidyRpPerM2: 0,
+  heatPumpGrantEarlyRp: 0,
+  heatPumpGrantFossilRp: 0,
+  heatPumpGrantOtherRp: 0,
+  dhGrantEarlyRp: 0,
+  dhGrantFossilRp: 0,
+  dhGrantOtherRp: 0,
+  evGrantEarlyRp: 0,
+  evGrantFossilRp: 0,
+  evGrantOtherRp: 0,
+  fleetVanGrantEarlyRp: 0,
+  fleetVanGrantEndRp: 0,
+  fleetTruckGrantEarlyRp: 0,
+  fleetTruckGrantEndRp: 0,
+  retrofitGrantStandardRpPerM2: 0,
+  retrofitGrantMinergieRpPerM2: 0,
+  retrofitGrantMinergiePRpPerM2: 0,
   retrofitMinClass: "none",
   fossilHeatingInstallBanned: false,
   iceCarPurchaseBanned: false,
-  iceScrappageBonusRp: 0,
   modeShiftToBikePts: 0,
   modeShiftToOtherPts: 0,
   uncertaintyMultiplier: 1,
@@ -158,18 +175,25 @@ const COMBINERS: { [K in keyof Channels]: Combiner<Channels[K]> } = {
   pvLoanMaxRp: max,
   solarCoopSupport: any,
   solarCoopGrantRpPerKwp: max,
-  heatPumpSubsidyRp: sum,
-  dhConnectionSubsidyRp: sum,
-  heatPumpGrantEarlyOnly: any,
-  evSubsidyRp: sum,
-  evGrantEarlyOnly: any,
-  fleetEvVanSubsidyRp: sum,
-  fleetEvTruckSubsidyRp: sum,
-  retrofitSubsidyRpPerM2: sum,
+  heatPumpGrantEarlyRp: sum,
+  heatPumpGrantFossilRp: sum,
+  heatPumpGrantOtherRp: sum,
+  dhGrantEarlyRp: sum,
+  dhGrantFossilRp: sum,
+  dhGrantOtherRp: sum,
+  evGrantEarlyRp: sum,
+  evGrantFossilRp: sum,
+  evGrantOtherRp: sum,
+  fleetVanGrantEarlyRp: sum,
+  fleetVanGrantEndRp: sum,
+  fleetTruckGrantEarlyRp: sum,
+  fleetTruckGrantEndRp: sum,
+  retrofitGrantStandardRpPerM2: sum,
+  retrofitGrantMinergieRpPerM2: sum,
+  retrofitGrantMinergiePRpPerM2: sum,
   retrofitMinClass: strictestClass,
   fossilHeatingInstallBanned: any,
   iceCarPurchaseBanned: any,
-  iceScrappageBonusRp: sum,
   modeShiftToBikePts: sum,
   modeShiftToOtherPts: sum,
   uncertaintyMultiplier: product,

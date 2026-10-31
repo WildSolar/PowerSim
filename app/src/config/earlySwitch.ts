@@ -1,5 +1,5 @@
-// Switching early (sim/renewal.ts): an owner with a working oil or gas boiler, or a petrol/diesel car,
-// now and then considers replacing it before it wears out — likelier the bigger the municipal grant
+// Switching early (sim/renewal.ts): an owner with a working oil or gas boiler, a petrol/diesel car, or
+// a business with a diesel van or lorry, now and then considers replacing it before it wears out — likelier the bigger the municipal grant
 // (against the price of the new one) and with energy advice in town. Whether they do is the same
 // cost comparison as at the end of a system's life, except that keeping the old one costs only its
 // running costs and growing repairs, and switching early carries a hassle premium.
@@ -18,9 +18,11 @@ export interface EarlySwitchSpec {
   hassleChfPerYear: number;
 }
 
-export const EARLY_SWITCH: Record<"heating" | "car", EarlySwitchSpec> = {
+export const EARLY_SWITCH: Record<"heating" | "car" | "van" | "truck", EarlySwitchSpec> = {
   heating: { minAgeYears: 8, baseChancePerYear: 0.025, grantBoost: 15, repairChfPerYearOfAge: 35, hassleChfPerYear: 150 },
   car: { minAgeYears: 4, baseChancePerYear: 0.03, grantBoost: 12, repairChfPerYearOfAge: 90, hassleChfPerYear: 200 },
+  van: { minAgeYears: 4, baseChancePerYear: 0.02, grantBoost: 12, repairChfPerYearOfAge: 200, hassleChfPerYear: 400 },
+  truck: { minAgeYears: 5, baseChancePerYear: 0.02, grantBoost: 12, repairChfPerYearOfAge: 900, hassleChfPerYear: 2000 },
 };
 
 // An owner who is actively looking into it is less set in their ways: the indifference band of an

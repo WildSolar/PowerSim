@@ -189,7 +189,7 @@ function candidatesAt(
       installRp += noise.extraCostRp;
     }
     const beforeMunicipalRp = Math.max(0, installRp * scale - spec.subsidyRp);
-    const municipalRp = withMunicipalSubsidy ? Math.min(municipalHeatingSubsidyRp(id, early, newBuild ? null : incumbent), beforeMunicipalRp) : 0;
+    const municipalRp = withMunicipalSubsidy ? Math.min(municipalHeatingSubsidyRp(id, incumbent, early), beforeMunicipalRp) : 0;
     const installCostRp = beforeMunicipalRp - municipalRp;
     return {
       id,
@@ -275,10 +275,10 @@ function chainFor(building: Building, simTimeMs: number): RenewalEvent<HeatingSy
         // heating connection's; the more telling of the two.
         const scale = sizeScale(building);
         const heatPumpRp = HEATING_SYSTEM_CATALOG.airHeatPump.baseInstallCostRp * priceFactor("airHeatPump", atMs) * scale;
-        const chance = earlySwitchChance(EARLY_SWITCH.heating, municipalHeatingSubsidyRp("airHeatPump", true), heatPumpRp);
+        const chance = earlySwitchChance(EARLY_SWITCH.heating, municipalHeatingSubsidyRp("airHeatPump", "gasBoiler", true), heatPumpRp);
         if (!districtHeat.servesAt(building.streetSegments, atMs)) return chance;
         const connectionRp = HEATING_SYSTEM_CATALOG.districtHeating.baseInstallCostRp * priceFactor("districtHeating", atMs) * scale;
-        return Math.max(chance, earlySwitchChance(EARLY_SWITCH.heating, municipalHeatingSubsidyRp("districtHeating", true, "gasBoiler"), connectionRp));
+        return Math.max(chance, earlySwitchChance(EARLY_SWITCH.heating, municipalHeatingSubsidyRp("districtHeating", "gasBoiler", true), connectionRp));
       },
       candidatesAt: (atMs, incumbent, ageYears) => {
         const tariff = tariffStore.at(atMs);

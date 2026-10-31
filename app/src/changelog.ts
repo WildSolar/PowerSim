@@ -31,6 +31,11 @@ export const CHANGELOG: Release[] = [
       "The car ban's text now says what it does: it also covers diesel vans, and lorries stay exempt. Green electricity now says how far it goes: nine tenths off grid emissions at 100%.",
     ],
     changed: [
+      "Targeted grants. The heat pump, district heating and electric car grants now take one amount for a working fossil system replaced early, one for a fossil system at the end of its life, and one for anything else, instead of ‘everyone’ or ‘early only’. Set them all the same and you pay everyone alike.",
+      "The scrappage bonus is now part of the electric car grant: its amounts for a petrol or diesel car replaced.",
+      "The electric van and lorry grant likewise pays by situation, for a diesel replaced early or at the end of its life. Businesses now sometimes replace a working diesel early, as owners do with boilers and cars.",
+      "The insulation top-up can pay more the better the class a renovation reaches: the current standard, Minergie or Minergie-P. Nothing below the current standard.",
+      "The minimum standard for renovations is now Minergie only: the canton brings in the current standard itself, in its own time.",
       "Each grant now shows its own uptake and its own evaluation: the heat pump grant apart from the district heating grant, cars apart from vans and lorries, roofs apart from car parks. An evaluation asks what its own grant changed, with any other grant still in place.",
     ],
     added: [

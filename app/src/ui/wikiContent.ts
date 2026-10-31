@@ -542,13 +542,13 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Switching early",
     blocks: [
       p(
-        "Most owners replace a boiler or a car only when it wears out. But now and then an owner with a working oil or gas boiler, or a petrol or diesel car, looks into switching early. They compare keeping it — its running costs, and repairs that grow as it ages — with switching now: the new one's price less grants, its running costs, and the hassle of replacing something that still works. Owners who are actively looking are more open than usual.",
+        "Most owners replace a boiler or a vehicle only when it wears out. But now and then an owner with a working oil or gas boiler, or a petrol or diesel car, or a business with a diesel van or lorry, looks into switching early. They compare keeping it — its running costs, and repairs that grow as it ages — with switching now: the new one's price less grants, its running costs, and the hassle of replacing something that still works. Owners who are actively looking are more open than usual.",
       ),
       list([
         "Grants make owners likelier to look into it at all, and likelier to go through with it: a heat pump grant brings boiler replacements forward. That is what money buys — speed.",
-        "The heat pump grant and the electric car grant can be targeted (‘Who gets it’, in the grant's details): paid to everyone, most of whom would have switched anyway, or only to owners who replace a working boiler or car early. Targeted, far fewer people get it — so it costs much less and is a little less popular — but almost every franc changes what someone does.",
+        "The heat pump, district heating, electric car, and van and lorry grants are targeted by what you set in their details: one amount for a working system replaced early, one for a fossil system at the end of its life and, except for vans and lorries, one for anything else. Money at the end of a system's life reaches many owners, most of whom would have made the same choice anyway; money for an early switch reaches few, costs far less and is a little less popular, but almost every franc changes what someone does. Set them all the same and you pay everyone alike. Wood heating counts as ‘anything else’: nobody is paid to give up a working wood boiler early.",
         "Energy advice (the information measures) also gets more owners looking.",
-        "Cars rarely switch early: a paid-off car only costs its fuel, so it takes a large scrappage bonus — and a charger within reach.",
+        "Cars rarely switch early: a paid-off car only costs its fuel, so it takes a large grant for the early switch — and a charger within reach.",
       ]),
       note("Every early switch is shown on the building's or home's panel, like any replacement. In the decision log (transparency mode), an owner who weighed it and kept their boiler or car shows as ‘Keep the current …’ — keeping what is there, not installing a new one, so a fossil heating ban doesn't rule it out."),
     ],
@@ -701,7 +701,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "How much heat a building loses depends on its envelope — walls, windows, roof. Every building has an energy class from it: Unrenovated, Partly insulated, Current standard, Minergie or Minergie-P. Existing buildings start in the class their age suggests; a new building gets the class the rules of its permit require. The Insulation view colours buildings by class.",
       ),
       p(
-        "Every few decades an owner reconsiders the envelope. Like a heating replacement, it's a cost-benefit choice: the work beyond the maintenance that is due anyway, less the federal building programme grant and any municipal top-up, against what heating would cost afterwards with the building's own heating system at today's prices. An upgrade to a better class lowers the building's heat demand for good.",
+        "Every few decades an owner reconsiders the envelope. Like a heating replacement, it's a cost-benefit choice: the work beyond the maintenance that is due anyway, less the federal building programme grant and any municipal top-up, against what heating would cost afterwards with the building's own heating system at today's prices. An upgrade to a better class lowers the building's heat demand for good. Your top-up can pay a different amount per m² for each class reached, and nothing for less than the current standard, so it can steer owners towards deeper work.",
       ),
       note(
         "Because the payoff is lower heating bills, insulating pays off on an oil- or gas-heated house and much less on one already heated by a heat pump — cheap heat makes insulation a poorer investment.",
@@ -1100,7 +1100,7 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "But not every lorry can go electric yet: the day's distance and load have to suit one, and a model of the right size has to be on sale. About one lorry in seven has such a route today, most by the mid-2030s, nearly all by 2045 — until then the others stay diesel, whatever it costs. A lorry without a depot needs room at a hub (where it needs as much as about twenty cars) or a lorry charging park, which only you build; a new charger at a depot needs room on the local grid (see \"The electricity grid\"). Vans without a yard rarely go electric: charging in public costs them more than the diesel they save.",
       ),
       p(
-        "The electric van and lorry grant (Town hall → Measures) pays a business a flat sum for each electric van or lorry it buys, set separately for each. It weighs into the same decision, so it tips businesses that were close — and, like any grant, is also paid to those who would have gone electric anyway.",
+        "The electric van and lorry grant (Town hall → Measures) pays a business when an electric van or lorry replaces a diesel one, set separately for vans and lorries, and separately for a diesel that still runs and one at the end of its life (see \"Switching early\"). It weighs into the same decision, so it tips businesses that were close — and, like any grant, is also paid to those who would have gone electric anyway.",
       ),
       list([
         "Their electricity counts as car charging — in the business's yard, or at public chargers.",

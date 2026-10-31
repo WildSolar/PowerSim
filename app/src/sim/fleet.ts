@@ -56,6 +56,8 @@ import { totalFloorAreaM2 } from "./commercial";
 import { existsAt } from "./lifetime";
 import { policyStore } from "./policy";
 import { municipalFleetSubsidyRp } from "./subsidies";
+import { EARLY_SWITCH } from "../config/earlySwitch";
+import { earlyCandidates, earlySwitchChance } from "./earlySwitch";
 import { publicCharging, usableOption, type ChargingNeed, type ChargingOption, type ChargingSite } from "./publicCharging";
 import {
   chooseNext,
@@ -146,8 +148,10 @@ function candidatesFor(
   tariff: Tariff,
   access: FleetAccess,
   atMs: number,
+  incumbent: FleetVehicleId,
   onElectricChosen: (atMs: number) => void,
   routeSuits = true,
+  early = false,
 ): RenewalCandidate<FleetVehicleId>[] {
   // Without charging good enough to rely on, or (a lorry) on a route an electric one can't do yet,
   // electric is out — its cost is still worked out as if a charger were next door, so the decision
@@ -168,7 +172,7 @@ function candidatesFor(
     const available = spec.electric ? access.kind !== "none" && routeSuits : vehicleClass === "truck" || !policyStore.get().iceCarPurchaseBanned;
     // The municipality's grant for an electric one: never more than it costs.
     const purchaseRp = spec.purchaseCostRp * priceFactor(id, atMs);
-    const subsidyRp = Math.min(purchaseRp, municipalFleetSubsidyRp(id));
+    const subsidyRp = Math.min(purchaseRp, municipalFleetSubsidyRp(id, incumbent, early));
     return {
       id,
       available,
@@ -327,13 +331,31 @@ class Fleets {
   private wouldGoElectricWithCharger(v: FleetVehicle, incumbent: FleetVehicleId, atMs: number): boolean {
     if (!this.routeSuits(v, atMs)) return false; // no charger would make an electric lorry do this route
     const kind: ChargingKind = v.vehicleClass === "van" ? "ac" : "fleet";
-    const candidates = candidatesFor(v.vehicleClass, tariffStore.at(atMs), { kind: "public", option: publicCharging.hypotheticalOption(v.vehicleClass, kind) }, atMs, () => {});
+    const candidates = candidatesFor(v.vehicleClass, tariffStore.at(atMs), { kind: "public", option: publicCharging.hypotheticalOption(v.vehicleClass, kind) }, atMs, incumbent, () => {});
     return chooseNext(candidates, incumbent, FLEET_UNCERTAINTY_FRACTION, this.biasRp(v) + policyStore.get().progressiveNudgeRp).chosen !== FLEET_CHOICES[v.vehicleClass][1];
   }
 
   private chain(v: FleetVehicle, uptoMs: number): RenewalEvent<FleetVehicleId>[] {
     const cached = peekRenewalChain<FleetVehicleId>(v.key, uptoMs);
     if (cached) return cached;
+    const candidates = (atMs: number, incumbent: FleetVehicleId, early: boolean) => {
+      const b = this.lookupBuilding(v.egid);
+      const access: FleetAccess = b ? this.accessAt(v, b, atMs, incumbent) : { kind: "depot", chargerRp: 0 };
+      return candidatesFor(
+        v.vehicleClass,
+        tariffStore.at(atMs),
+        access,
+        atMs,
+        incumbent,
+        (chosenAtMs) => {
+          if (access.kind === "public") publicCharging.assign(v.key, null, access.option, chosenAtMs, publicNeed(v.vehicleClass));
+        },
+        this.routeSuits(v, atMs),
+        early,
+      );
+    };
+    const earlySpec = EARLY_SWITCH[v.vehicleClass];
+    const electric: FleetVehicleId = v.vehicleClass === "van" ? "vanEV" : "truckEV";
     const params: RenewalParams<FleetVehicleId> = {
       entityKey: v.key,
       egid: v.egid,
@@ -345,19 +367,18 @@ class Fleets {
       uncertaintyFraction: FLEET_UNCERTAINTY_FRACTION,
       biasStrengthRp: this.biasRp(v),
       lifetimeMeanYearsFor: (id) => FLEET_CATALOG[id].lifetimeMeanYears,
-      candidatesAt: (atMs, incumbent) => {
-        const b = this.lookupBuilding(v.egid);
-        const access: FleetAccess = b ? this.accessAt(v, b, atMs, incumbent) : { kind: "depot", chargerRp: 0 };
-        return candidatesFor(
-          v.vehicleClass,
-          tariffStore.at(atMs),
-          access,
-          atMs,
-          (chosenAtMs) => {
-            if (access.kind === "public") publicCharging.assign(v.key, null, access.option, chosenAtMs, publicNeed(v.vehicleClass));
-          },
-          this.routeSuits(v, atMs),
-        );
+      candidatesAt: (atMs, incumbent) => candidates(atMs, incumbent, false),
+      early: {
+        eligible: (system) => !FLEET_CATALOG[system].electric,
+        minAgeYears: earlySpec.minAgeYears,
+        chanceAt: (atMs, incumbent) => earlySwitchChance(earlySpec, municipalFleetSubsidyRp(electric, incumbent, true), FLEET_CATALOG[electric].purchaseCostRp * priceFactor(electric, atMs)),
+        candidatesAt: (atMs, incumbent, ageYears) => {
+          const base = candidates(atMs, incumbent, true);
+          // Keeping a diesel costs what it costs to run: the renewal's figure without the price of a new one.
+          const spec = FLEET_CATALOG[incumbent];
+          const keep = (base.find((c) => c.id === incumbent)?.annualizedCostRp ?? 0) - (spec.purchaseCostRp * priceFactor(incumbent, atMs)) / spec.lifetimeMeanYears;
+          return earlyCandidates(base, incumbent, keep, ageYears, earlySpec);
+        },
       },
       onCommit: (event) => {
         publicCharging.endAssignment(v.key, event.installedAtMs);

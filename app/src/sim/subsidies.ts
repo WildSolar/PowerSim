@@ -10,29 +10,32 @@ import type { FleetVehicleId } from "../config/fleet";
 import type { VehicleTypeId } from "./mobilitySystems";
 import { policyStore } from "./policy";
 
-/** Flat municipal grant, Rp, for installing this heating system: a heat pump (a grant targeted at
- * early replacements is paid only when `early` — a working boiler replaced before its time), or a
- * first connection to district heating (`incumbent`: what it replaces; one already connected
- * only renews its substation). */
-export function municipalHeatingSubsidyRp(id: HeatingSystemId, early = false, incumbent: HeatingSystemId | null = null): number {
+/** Municipal grant, Rp, for installing this heating system, by the situation: `early`, a working oil
+ * or gas boiler replaced before its time; a boiler at the end of its life; anything else (`incumbent`:
+ * what it replaces). Only a heat pump or a first connection to district heating gets one. */
+export function municipalHeatingSubsidyRp(id: HeatingSystemId, incumbent: HeatingSystemId, early = false): number {
   const p = policyStore.get();
-  if (id === "districtHeating") return incumbent === "districtHeating" ? 0 : p.dhConnectionSubsidyRp;
+  const fossil = incumbent === "oilBoiler" || incumbent === "gasBoiler";
+  if (id === "districtHeating") {
+    if (incumbent === "districtHeating") return 0;
+    return early ? p.dhGrantEarlyRp : fossil ? p.dhGrantFossilRp : p.dhGrantOtherRp;
+  }
   if (id !== "airHeatPump" && id !== "groundHeatPump") return 0;
-  return p.heatPumpGrantEarlyOnly && !early ? 0 : p.heatPumpSubsidyRp;
+  return early ? p.heatPumpGrantEarlyRp : fossil ? p.heatPumpGrantFossilRp : p.heatPumpGrantOtherRp;
 }
 
-/** Flat municipal grant, Rp, for buying this vehicle (electric cars only for now) — likewise only
- * for an early switch when targeted. */
-export function municipalVehicleSubsidyRp(id: VehicleTypeId, early = false): number {
+/** Municipal grant, Rp, for buying this car, by the situation likewise: only an electric one. */
+export function municipalVehicleSubsidyRp(id: VehicleTypeId, incumbent: VehicleTypeId, early = false): number {
   const p = policyStore.get();
   if (id !== "carEV") return 0;
-  return p.evGrantEarlyOnly && !early ? 0 : p.evSubsidyRp;
+  return early ? p.evGrantEarlyRp : incumbent === "carICE" ? p.evGrantFossilRp : p.evGrantOtherRp;
 }
 
-/** Flat municipal grant, Rp, for a business buying this van or lorry: electric ones only. */
-export function municipalFleetSubsidyRp(id: FleetVehicleId): number {
+/** Municipal grant, Rp, for a business's electric van or lorry: when it replaces a working diesel one
+ * early, or one at the end of its life. An electric one replacing an electric one gets nothing. */
+export function municipalFleetSubsidyRp(id: FleetVehicleId, incumbent: FleetVehicleId, early = false): number {
   const p = policyStore.get();
-  if (id === "vanEV") return p.fleetEvVanSubsidyRp;
-  if (id === "truckEV") return p.fleetEvTruckSubsidyRp;
+  if (id === "vanEV" && incumbent === "vanDiesel") return early ? p.fleetVanGrantEarlyRp : p.fleetVanGrantEndRp;
+  if (id === "truckEV" && incumbent === "truckDiesel") return early ? p.fleetTruckGrantEarlyRp : p.fleetTruckGrantEndRp;
   return 0;
 }

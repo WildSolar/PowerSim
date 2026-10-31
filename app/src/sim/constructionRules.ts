@@ -33,8 +33,8 @@ export interface ConstructionRules {
 }
 
 export interface RetrofitRules {
-  /** Municipal top-up per m2 of envelope on an upgrade. */
-  municipalSubsidyRpPerM2: number;
+  /** Municipal top-up per m2 of envelope, by the class an upgrade reaches (none for a lesser one). */
+  municipalSubsidyRpPerM2: Partial<Record<EnergyClassId, number>>;
   /** The lowest class an envelope renovation may end at, or null for no minimum. */
   minClass: EnergyClassId | null;
 }
@@ -42,7 +42,7 @@ export interface RetrofitRules {
 /** The rules for retrofits of existing buildings — the same hook, read by sim/retrofit.ts. */
 export function retrofitRules(policy: Policy, _year: number): RetrofitRules {
   return {
-    municipalSubsidyRpPerM2: policy.retrofitSubsidyRpPerM2,
+    municipalSubsidyRpPerM2: { standard: policy.retrofitGrantStandardRpPerM2, minergie: policy.retrofitGrantMinergieRpPerM2, minergieP: policy.retrofitGrantMinergiePRpPerM2 },
     minClass: policy.retrofitMinClass === "none" ? null : policy.retrofitMinClass,
   };
 }

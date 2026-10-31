@@ -94,7 +94,7 @@ function candidatesAt(building: Building, atMs: number, incumbent: EnergyClassId
 
     const premiumRp = isUpgrade ? (spec.cumulativeCostRpPerM2 - incumbentSpec.cumulativeCostRpPerM2) * area * workFactor : 0;
     const programRp = isUpgrade ? Math.max(0, spec.programSubsidyRpPerM2 - incumbentSpec.programSubsidyRpPerM2) * area : 0;
-    const municipalRp = isUpgrade ? Math.min(rules.municipalSubsidyRpPerM2 * area, MAX_MUNICIPAL_SUBSIDY_SHARE * Math.max(0, premiumRp - programRp)) : 0;
+    const municipalRp = isUpgrade ? Math.min((rules.municipalSubsidyRpPerM2[id] ?? 0) * area, MAX_MUNICIPAL_SUBSIDY_SHARE * Math.max(0, premiumRp - programRp)) : 0;
     const upfrontRp = MAINTENANCE_RP_PER_M2 * area * workFactor + premiumRp - programRp - municipalRp;
 
     return {

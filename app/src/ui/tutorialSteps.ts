@@ -240,7 +240,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     task: "Enact it.",
     done: () => enacted(HEAT_PUMP_MEASURE),
     say: [
-      "A grant for every owner who installs a heat pump. You can set how much; it costs nothing until someone takes it up — but then it costs for everyone who does, including those who would have switched anyway.",
+      "A grant for owners who install a heat pump. You can set how much, for each situation: a working boiler replaced early, one at the end of its life, anything else. It costs nothing until someone takes it up — but then it costs for everyone who does, including those who would have switched anyway.",
     ],
   },
   {

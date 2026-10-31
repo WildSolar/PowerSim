@@ -13,6 +13,18 @@ function num(params: Record<string, unknown>, key: string): number {
   return params[key] as number;
 }
 
+/** A targeted grant's three amounts (early, fossil at end of life, anything else) against a reference. */
+function tiers(params: Record<string, unknown>, reference: number): [number, number, number] {
+  return [num(params, "early") / reference, num(params, "fossil") / reference, num(params, "other") / reference];
+}
+
+/** How strongly a targeted grant acts: its amounts, by how much of the uptake each usually sees. All
+ * three at the reference is 1. */
+function tiered(params: Record<string, unknown>, reference: number, early: number, fossil: number, other: number): number {
+  const [e, f, o] = tiers(params, reference);
+  return early * e + fossil * f + other * o;
+}
+
 export const MEASURE_CATALOG: MeasureDef[] = [
   // --- Subsidies --------------------------------------------------------------------------
   {
@@ -39,14 +51,22 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     subsidyCategory: "electricFleet",
     title: "Electric van and lorry grant",
     summary:
-      "A municipal grant for a business buying an electric van or lorry, paid when it buys one. An electric lorry still costs about twice a diesel one; a grant closes part of the gap, and the vehicle charges at the business's own yard, or at a fast-charging hub for lorries if there is one.",
+      "A municipal grant for a business replacing a diesel van or lorry with an electric one, paid when it buys. Set an amount for each situation: a diesel that still runs, replaced early, or one at the end of its life. An electric lorry still costs about twice a diesel one; a grant closes part of the gap, and the vehicle charges at the business's own yard, or at a fast-charging hub for lorries if there is one.",
     params: [
-      { kind: "slider", key: "van", label: "Per electric van", min: 0, max: 20000, step: 1000, unit: "CHF each", default: 6000 },
-      { kind: "slider", key: "truck", label: "Per electric lorry", min: 0, max: 150000, step: 5000, unit: "CHF each", default: 40000 },
+      { kind: "slider", key: "vanEarly", label: "Van: replacing a working diesel early", min: 0, max: 30000, step: 1000, unit: "CHF each", default: 10000 },
+      { kind: "slider", key: "vanEnd", label: "Van: diesel at the end of its life", min: 0, max: 30000, step: 1000, unit: "CHF each", default: 5000 },
+      { kind: "slider", key: "truckEarly", label: "Lorry: replacing a working diesel early", min: 0, max: 200000, step: 5000, unit: "CHF each", default: 60000 },
+      { kind: "slider", key: "truckEnd", label: "Lorry: diesel at the end of its life", min: 0, max: 200000, step: 5000, unit: "CHF each", default: 30000 },
     ],
     leadTimeMonths: 1,
-    effects: (p) => ({ fleetEvVanSubsidyRp: num(p, "van") * CHF, fleetEvTruckSubsidyRp: num(p, "truck") * CHF }),
-    strength: (p) => (num(p, "van") / 6000 + num(p, "truck") / 40000) / 2,
+    effects: (p) => ({
+      fleetVanGrantEarlyRp: num(p, "vanEarly") * CHF,
+      fleetVanGrantEndRp: num(p, "vanEnd") * CHF,
+      fleetTruckGrantEarlyRp: num(p, "truckEarly") * CHF,
+      fleetTruckGrantEndRp: num(p, "truckEnd") * CHF,
+    }),
+    // The usual purchase is the one at the end of a vehicle's life: that's what most businesses notice.
+    strength: (p) => (0.75 * (num(p, "vanEnd") / 6000 + num(p, "truckEnd") / 40000) + 0.25 * (num(p, "vanEarly") / 6000 + num(p, "truckEarly") / 40000)) / 2,
     approval: () => ({ business: 0.5, climate: 0.4, homeowners: -0.05 }),
   },
   {
@@ -122,24 +142,20 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     subsidyCategory: "heatPump",
     title: "Heat pump grant",
     summary:
-      "A flat municipal grant, on top of the cantonal one, for a heat pump. Paid to everyone who installs one, most of whom would have anyway — or only to owners who replace a working oil or gas boiler early, which reaches far fewer people but changes far more of what they do.",
+      "A municipal grant for a heat pump, on top of the cantonal one, with an amount for each situation: an owner replacing a working oil or gas boiler early, one whose boiler has reached the end of its life, and anything else, such as a heat pump renewed like for like or a wood boiler replaced. Most who are replacing a boiler anyway would have chosen a heat pump regardless; an early replacement is rarer, and far more of it is your doing. Set them all the same and you have a grant for every heat pump.",
     params: [
-      { kind: "slider", key: "amount", label: "Grant", min: 0, max: 20000, step: 500, unit: "CHF each", default: 5000 },
-      {
-        kind: "choice",
-        key: "target",
-        label: "Who gets it",
-        options: [
-          { value: "all", label: "Every heat pump" },
-          { value: "early", label: "Only early boiler replacements" },
-        ],
-        default: "all",
-      },
+      { kind: "slider", key: "early", label: "Replacing a working oil or gas boiler early", min: 0, max: 30000, step: 500, unit: "CHF each", default: 8000 },
+      { kind: "slider", key: "fossil", label: "Oil or gas boiler at the end of its life", min: 0, max: 30000, step: 500, unit: "CHF each", default: 3000 },
+      { kind: "slider", key: "other", label: "Anything else", min: 0, max: 30000, step: 500, unit: "CHF each", default: 0 },
     ],
     leadTimeMonths: 1,
-    effects: (p) => ({ heatPumpSubsidyRp: num(p, "amount") * CHF, heatPumpGrantEarlyOnly: p.target === "early" }),
-    strength: (p) => num(p, "amount") / 5000,
-    approval: (p) => (p.target === "early" ? { homeowners: 0.35, tenants: 0.05, business: 0.05, climate: 0.6 } : { homeowners: 0.6, tenants: 0.1, business: 0.1, climate: 0.6 }),
+    effects: (p) => ({ heatPumpGrantEarlyRp: num(p, "early") * CHF, heatPumpGrantFossilRp: num(p, "fossil") * CHF, heatPumpGrantOtherRp: num(p, "other") * CHF }),
+    strength: (p) => tiered(p, 5000, 0.3, 0.5, 0.2),
+    approvalFollowsSettings: true,
+    approval: (p) => {
+      const [e, f, o] = tiers(p, 5000);
+      return { homeowners: 0.35 * e + 0.15 * f + 0.1 * o, tenants: 0.05 * e + 0.03 * f + 0.02 * o, business: 0.05 * e + 0.03 * f + 0.02 * o, climate: 0.6 * Math.max(e, f, 0.5 * o) };
+    },
   },
   {
     id: "district-heat-connection-grant",
@@ -148,12 +164,20 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     subsidyCategory: "districtHeat",
     title: "District heating connection grant",
     summary:
-      "A flat municipal grant towards connecting a building to district heating — the pipe from the street and the substation, about CHF 22,000 for a house, more for a block of flats. Paid to every owner who connects where the pipes run, most of whom would have anyway; it tips those weighing district heat against a heat pump or a new boiler, and prompts some to give up a working boiler early. Buildings already connected don't get it again.",
-    params: [{ kind: "slider", key: "amount", label: "Grant", min: 0, max: 20000, step: 500, unit: "CHF each", default: 5000 }],
+      "A municipal grant towards connecting a building to district heating — the pipe from the street and the substation, about CHF 22,000 for a house, more for a block of flats — with an amount for each situation: an owner giving up a working oil or gas boiler early, one whose boiler has reached the end of its life, and anything else, such as a heat pump or wood boiler replaced. It tips those weighing district heat against the alternatives, and prompts some to give up a working boiler. Buildings already connected don't get it again.",
+    params: [
+      { kind: "slider", key: "early", label: "Replacing a working oil or gas boiler early", min: 0, max: 30000, step: 500, unit: "CHF each", default: 8000 },
+      { kind: "slider", key: "fossil", label: "Oil or gas boiler at the end of its life", min: 0, max: 30000, step: 500, unit: "CHF each", default: 3000 },
+      { kind: "slider", key: "other", label: "Anything else", min: 0, max: 30000, step: 500, unit: "CHF each", default: 0 },
+    ],
     leadTimeMonths: 1,
-    effects: (p) => ({ dhConnectionSubsidyRp: num(p, "amount") * CHF }),
-    strength: (p) => num(p, "amount") / 5000,
-    approval: () => ({ homeowners: 0.45, tenants: 0.05, business: 0.1, climate: 0.4 }),
+    effects: (p) => ({ dhGrantEarlyRp: num(p, "early") * CHF, dhGrantFossilRp: num(p, "fossil") * CHF, dhGrantOtherRp: num(p, "other") * CHF }),
+    strength: (p) => tiered(p, 5000, 0.3, 0.5, 0.2),
+    approvalFollowsSettings: true,
+    approval: (p) => {
+      const [e, f, o] = tiers(p, 5000);
+      return { homeowners: 0.2 * e + 0.15 * f + 0.1 * o, tenants: 0.02 * e + 0.02 * f + 0.01 * o, business: 0.04 * e + 0.03 * f + 0.03 * o, climate: 0.4 * Math.max(e, f, 0.5 * o) };
+    },
   },
   {
     id: "ev-grant",
@@ -162,24 +186,20 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     subsidyCategory: "electricCar",
     title: "Electric car grant",
     summary:
-      "A flat municipal grant for an electric car. Paid whenever a household buys one — or only when it replaces a petrol or diesel car that still runs, which reaches few households but pulls their switch forward.",
+      "A municipal grant for an electric car, with an amount for each situation: a household replacing a petrol or diesel car that still runs, one whose car has reached the end of its life, and anything else, such as an electric car replaced by another. An early switch is rare, and pays for exactly what cuts emissions now; a grant at the end of a car's life goes to many households, a good part of whom would have gone electric anyway. Set them all the same and you have a grant for every electric car.",
     params: [
-      { kind: "slider", key: "amount", label: "Grant", min: 0, max: 10000, step: 500, unit: "CHF each", default: 3000 },
-      {
-        kind: "choice",
-        key: "target",
-        label: "Who gets it",
-        options: [
-          { value: "all", label: "Every electric car" },
-          { value: "early", label: "Only early car replacements" },
-        ],
-        default: "all",
-      },
+      { kind: "slider", key: "early", label: "Replacing a working petrol or diesel car early", min: 0, max: 15000, step: 500, unit: "CHF each", default: 5000 },
+      { kind: "slider", key: "fossil", label: "Petrol or diesel car at the end of its life", min: 0, max: 15000, step: 500, unit: "CHF each", default: 2000 },
+      { kind: "slider", key: "other", label: "Anything else", min: 0, max: 15000, step: 500, unit: "CHF each", default: 0 },
     ],
     leadTimeMonths: 1,
-    effects: (p) => ({ evSubsidyRp: num(p, "amount") * CHF, evGrantEarlyOnly: p.target === "early" }),
-    strength: (p) => num(p, "amount") / 3000,
-    approval: (p) => (p.target === "early" ? { drivers: 0.3, homeowners: 0.1, climate: 0.5 } : { drivers: 0.5, homeowners: 0.2, climate: 0.5 }),
+    effects: (p) => ({ evGrantEarlyRp: num(p, "early") * CHF, evGrantFossilRp: num(p, "fossil") * CHF, evGrantOtherRp: num(p, "other") * CHF }),
+    strength: (p) => tiered(p, 3000, 0.2, 0.6, 0.2),
+    approvalFollowsSettings: true,
+    approval: (p) => {
+      const [e, f, o] = tiers(p, 3000);
+      return { drivers: 0.2 * e + 0.2 * f + 0.1 * o, homeowners: 0.1 * e + 0.05 * f + 0.05 * o, climate: 0.5 * Math.max(e, f, 0.5 * o) };
+    },
   },
   {
     id: "retrofit-topup",
@@ -187,11 +207,16 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     topic: "buildings",
     subsidyCategory: "retrofit",
     title: "Insulation retrofit top-up",
-    summary: "A municipal top-up, per m² of building envelope, on the federal building-program grant when an owner upgrades the insulation.",
-    params: [{ kind: "slider", key: "perM2", label: "Top-up", min: 0, max: 200, step: 5, unit: "CHF/m²", default: 40 }],
+    summary:
+      "A municipal top-up, per m² of building envelope, on the federal building-programme grant when an owner upgrades the insulation — an amount for each class the renovation reaches. Nothing for less than the current standard. The deeper the renovation, the more it costs the owner, and the more of the heat it saves.",
+    params: [
+      { kind: "slider", key: "standard", label: "Reaching the current standard", min: 0, max: 200, step: 5, unit: "CHF/m²", default: 20 },
+      { kind: "slider", key: "minergie", label: "Reaching Minergie", min: 0, max: 200, step: 5, unit: "CHF/m²", default: 40 },
+      { kind: "slider", key: "minergieP", label: "Reaching Minergie-P", min: 0, max: 200, step: 5, unit: "CHF/m²", default: 60 },
+    ],
     leadTimeMonths: 2,
-    effects: (p) => ({ retrofitSubsidyRpPerM2: num(p, "perM2") * CHF }),
-    strength: (p) => num(p, "perM2") / 40,
+    effects: (p) => ({ retrofitGrantStandardRpPerM2: num(p, "standard") * CHF, retrofitGrantMinergieRpPerM2: num(p, "minergie") * CHF, retrofitGrantMinergiePRpPerM2: num(p, "minergieP") * CHF }),
+    strength: (p) => (num(p, "standard") + num(p, "minergie") + num(p, "minergieP")) / 120,
     approval: () => ({ homeowners: 0.6, tenants: 0.2, climate: 0.5 }),
   },
 
@@ -424,24 +449,13 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     id: "retrofit-minimum",
     category: "law",
     topic: "buildings",
-    title: "Minimum standard for renovations",
+    title: "Minergie for renovations",
     summary:
-      "An owner who renovates the building envelope must bring it to at least this class — no half-measures. Owners can still leave the envelope alone, so it can slow renovation as well as deepen it.",
-    params: [
-      {
-        kind: "choice",
-        key: "minClass",
-        label: "Minimum class",
-        options: [
-          { value: "standard", label: "Current standard" },
-          { value: "minergie", label: "Minergie" },
-        ],
-        default: "standard",
-      },
-    ],
+      "An owner who renovates the building envelope must bring it to Minergie — no half-measures. Owners can still leave the envelope alone, so it can slow renovation as well as deepen it.",
+    params: [],
     leadTimeMonths: 12,
-    effects: (p) => ({ retrofitMinClass: p.minClass as "standard" | "minergie" }),
-    approval: (p) => ({ homeowners: p.minClass === "minergie" ? -0.7 : -0.5, tenants: -0.3, business: -0.1, climate: 0.4 }),
+    effects: () => ({ retrofitMinClass: "minergie" }),
+    approval: () => ({ homeowners: -0.7, tenants: -0.3, business: -0.1, climate: 0.4 }),
     referendum: "optional",
   },
   {
@@ -470,20 +484,6 @@ export const MEASURE_CATALOG: MeasureDef[] = [
   },
 
   // --- More measures ---------------------------------------------------------------------------
-  {
-    id: "ice-scrappage",
-    category: "subsidy",
-    topic: "mobility",
-    subsidyCategory: "electricCar",
-    title: "Scrappage bonus for petrol and diesel cars",
-    summary:
-      "An extra grant when a household replaces a petrol or diesel car with an electric one, on top of the electric car grant. It pays for exactly the switch that cuts emissions — and, like any grant, also for households that would have gone electric anyway.",
-    params: [{ kind: "slider", key: "amount", label: "Bonus", min: 0, max: 10000, step: 500, unit: "CHF each", default: 2000 }],
-    leadTimeMonths: 2,
-    effects: (p) => ({ iceScrappageBonusRp: num(p, "amount") * CHF }),
-    strength: (p) => num(p, "amount") / 2000,
-    approval: () => ({ drivers: 0.3, climate: 0.5, homeowners: 0.1 }),
-  },
   {
     id: "bike-infrastructure",
     category: "infrastructure",

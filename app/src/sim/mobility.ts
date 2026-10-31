@@ -238,8 +238,7 @@ function carCandidatesAt(
   return CAR_VEHICLE_ORDER.map((id) => {
     const spec = VEHICLE_TYPE_CATALOG[id];
     const beforeMunicipalRp = Math.max(0, spec.baseInstallCostRp * priceFactor(id, atMs) - spec.subsidyRp);
-    const scrappageRp = id === "carEV" && incumbent === "carICE" ? policyStore.get().iceScrappageBonusRp : 0;
-    const municipalRp = Math.min(municipalVehicleSubsidyRp(id, early) + scrappageRp, beforeMunicipalRp);
+    const municipalRp = Math.min(municipalVehicleSubsidyRp(id, incumbent, early), beforeMunicipalRp);
     const installCostRp = beforeMunicipalRp - municipalRp;
     const runningCostRp = id === "carEV" ? ev.runningRp : (ANNUAL_CAR_KM / 100) * ICE_CAR_L_PER_100KM * tariff.petrolPriceRpPerLiter;
     return {
@@ -334,7 +333,7 @@ function vehicleChainFor(egid: string, ewid: string, slotIndex: number, kind: "c
             chanceAt: (atMs) =>
               earlySwitchChance(
                 EARLY_SWITCH.car,
-                municipalVehicleSubsidyRp("carEV", true) + policyStore.get().iceScrappageBonusRp,
+                municipalVehicleSubsidyRp("carEV", "carICE", true),
                 VEHICLE_TYPE_CATALOG.carEV.baseInstallCostRp * priceFactor("carEV", atMs),
               ),
             candidatesAt: (atMs, incumbent, ageYears) => {
