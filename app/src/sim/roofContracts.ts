@@ -304,7 +304,7 @@ class RoofContracts {
 
   // --- time ---
 
-  private advance(nowMs: number): void {
+  advance(nowMs: number): void {
     const day = Math.floor(nowMs / DAY_MS);
     if (day === this.lastDay) return;
     this.lastDay = day;

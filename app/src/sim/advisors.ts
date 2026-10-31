@@ -105,7 +105,7 @@ class Advisors {
     this.unsubscribeClock = simClock.subscribe(() => this.advance(simClock.getSimTimeMs()));
   }
 
-  private advance(nowMs: number): void {
+  advance(nowMs: number): void {
     const month = monthIndex(nowMs);
     if (month <= this.lastMonth) return;
     // A long jump writes at most the latest month's reports.

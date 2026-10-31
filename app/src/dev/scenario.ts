@@ -25,6 +25,9 @@ import { streets } from "../sim/streets";
 import { districtHeat } from "../sim/districtHeat";
 import { districtHeatSources } from "../sim/districtHeatSources";
 import { carParks } from "../sim/carParks";
+import { advisors } from "../sim/advisors";
+import { agriPv } from "../sim/agriPv";
+import { roofContracts } from "../sim/roofContracts";
 import { datacenter } from "../sim/datacenter";
 import { removals } from "../sim/removals";
 import { networkTariff } from "../sim/networkTariff";
@@ -75,6 +78,10 @@ export interface ScenarioSpec {
   autoChargers?: number;
   /** Also compute the year's emissions (slow: a few seconds per year). */
   withEmissions?: boolean;
+  /** Also run what only some measures need: Agri-PV, roof contracts and the advisors. */
+  fullTown?: boolean;
+  /** Called with each report year's row, and the moment it is read at (measureAudit.ts). */
+  onReport?: (row: ScenarioRow, atMs: number) => void;
 }
 
 export interface ScenarioRow {
@@ -194,6 +201,11 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
   streets.init(dataset);
   districtHeat.init(dataset);
   districtHeatSources.init(dataset, () => stock.getAll());
+  if (spec.fullTown) {
+    roofContracts.init(dataset, () => stock.getAll(), `roofs:${dataset.bfsNumber}`);
+    agriPv.init(dataset, () => stock.getAll(), `agripv:${dataset.bfsNumber}`);
+    advisors.init(() => stock.getAll(), `advisors:${dataset.bfsNumber}`);
+  }
   zoning.init(dataset); // before the stock: new buildings ask their parcel's zone
   transit.init(dataset, (egid) => stock.lookup(egid), (b, d) => mobilitySlotCount(b.egid, d)); // before the stock: households' modes ask how well they're served
   heatPumpSiting.init(dataset, () => stock.getAll()); // before the stock: heating decisions ask it where a heat pump may go
@@ -261,6 +273,11 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
     networkTariff.advance(t);
     marketAccess.advance(t);
     grid.advance(t);
+    if (spec.fullTown) {
+      roofContracts.advance(t);
+      agriPv.advance(t);
+      advisors.advance(t);
+    }
     if (spec.reinforceGrid) {
       for (const area of grid.getAreas()) {
         const { drawKw, feedInKw } = grid.effectivePeaks(area, t);
@@ -303,6 +320,7 @@ export async function runScenario(spec: ScenarioSpec, onProgress?: (msg: string)
         };
       }
       rows.push(row);
+      spec.onReport?.(row, t);
       onProgress?.(`done ${year}`);
     }
     if (newYear && year >= lastYear) break;

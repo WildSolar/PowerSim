@@ -780,7 +780,7 @@ class AgriPv {
 
   // --- time ---
 
-  private advance(nowMs: number): void {
+  advance(nowMs: number): void {
     let changed = false;
     for (const p of this.projects) {
       while (p.phaseUntilMs !== null && p.phaseUntilMs <= nowMs) {
