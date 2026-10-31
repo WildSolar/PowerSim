@@ -62,6 +62,7 @@ export const AUDIT_TESTS: AuditTest[] = [
   test("fleet-ev-grant", { vanEarly: 6000, vanEnd: 6000, truckEarly: 40000, truckEnd: 40000 }, [["fleet.vansElectric", ">"], ["fleet.trucksElectric", ">"], ["spentChf.vehicle", ">"]]),
   test("fleet-ev-grant:early", { vanEarly: 20000, vanEnd: 0, truckEarly: 150000, truckEnd: 0 }, [["fleet.vansElectric", ">"], ["fleet.trucksElectric", ">"], ["spentChf.vehicle", ">"]]),
   test("fleet-ev-grant:end", { vanEarly: 0, vanEnd: 20000, truckEarly: 0, truckEnd: 150000 }, [["fleet.vansElectric", ">"], ["fleet.trucksElectric", ">"], ["spentChf.vehicle", ">"]]),
+  test("fleet-ev-grant:charger", { vanEarly: 0, vanEnd: 0, truckEarly: 0, truckEnd: 0, vanCharger: 3000, truckCharger: 40000 }, [["fleet.vansElectric", ">"], ["fleet.trucksElectric", ">"], ["spentChf.vehicle", ">"]]),
   test("fleet-ev-grant:max", { vanEarly: 30000, vanEnd: 30000, truckEarly: 200000, truckEnd: 200000 }, [["fleet.vansElectric", ">"], ["fleet.trucksElectric", ">"], ["spentChf.vehicle", ">"]]),
   test("pv-loans", { max: 40000 }, [["solarKwp", ">"], ["spentExGridChf", ">"]]),
   test("pv-loans:max", { max: 150000 }, [["solarKwp", ">"], ["spentExGridChf", ">"]]),

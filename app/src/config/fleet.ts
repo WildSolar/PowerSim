@@ -124,6 +124,16 @@ export const DEPOT_CHARGER_COST_RP: Record<FleetVehicleClass, number> = { van: 3
 // Charging at the depot: overnight, starting after the working day, at this power (kW).
 export const DEPOT_POWER_KW: Record<FleetVehicleClass, number> = { van: 11, truck: 44 };
 
+// A business won't put up the extra money for an electric vehicle and its charger if the savings take
+// too long to pay it back: each draws its own limit from this range of years. The long end is about
+// how long a business keeps a lorry. It stands in for what makes firms hold back even where electric
+// is cheaper over the years, which the federal Ecoplan study (CIS4BET, 2025) also has to allow for:
+// the money, the chargers still to build, changing how the work runs. Set so that a town with nothing
+// enacted roughly follows the studies' fleets (see TRUCK_EV_ROUTE_SHARE). A working diesel replaced
+// early sells for this share of a new one's price.
+export const FLEET_PAYBACK_YEARS: [number, number] = [3, 8];
+export const FLEET_EARLY_RESALE_SHARE = 0.4;
+
 // Businesses weigh the numbers more carefully than households (a narrower indifference band) and
 // lean less on sentiment (a bias as a share of the vehicle's yearly cost).
 export const FLEET_UNCERTAINTY_FRACTION = 0.1;

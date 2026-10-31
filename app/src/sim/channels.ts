@@ -50,6 +50,8 @@ export interface Channels {
   fleetVanGrantEndRp: number; // ...a diesel one at the end of its life
   fleetTruckGrantEarlyRp: number; // ...likewise for a lorry
   fleetTruckGrantEndRp: number;
+  fleetVanChargerGrantRp: number; // towards a business's first charger in its yard, for a van
+  fleetTruckChargerGrantRp: number; // ...for a lorry
   // Municipal top-up per m2 of envelope, by the class the renovation reaches.
   retrofitGrantStandardRpPerM2: number;
   retrofitGrantMinergieRpPerM2: number;
@@ -126,6 +128,8 @@ export const CHANNEL_DEFAULTS: Channels = {
   fleetVanGrantEndRp: 0,
   fleetTruckGrantEarlyRp: 0,
   fleetTruckGrantEndRp: 0,
+  fleetVanChargerGrantRp: 0,
+  fleetTruckChargerGrantRp: 0,
   retrofitGrantStandardRpPerM2: 0,
   retrofitGrantMinergieRpPerM2: 0,
   retrofitGrantMinergiePRpPerM2: 0,
@@ -203,6 +207,8 @@ const COMBINERS: { [K in keyof Channels]: Combiner<Channels[K]> } = {
   fleetVanGrantEndRp: sum,
   fleetTruckGrantEarlyRp: sum,
   fleetTruckGrantEndRp: sum,
+  fleetVanChargerGrantRp: sum,
+  fleetTruckChargerGrantRp: sum,
   retrofitGrantStandardRpPerM2: sum,
   retrofitGrantMinergieRpPerM2: sum,
   retrofitGrantMinergiePRpPerM2: sum,

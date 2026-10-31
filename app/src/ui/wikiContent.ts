@@ -1098,6 +1098,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Each vehicle lasts about ten years and is replaced by the same kind of decision as a household's car, only more businesslike. An electric van costs more to buy but far less to run, above all when it charges overnight in its own yard at the night rate — once a charger is installed: a wallbox for a van (about CHF 3,000), a high-power charger and usually a stronger connection for a lorry (about CHF 80,000). Most vehicles at industry and warehouses have a yard, fewer at shops and offices. Without one, a business relies on public chargers, the same way a household without a charger at home does (see \"Public charging\") — a van on-street, at a hub or a lorry park, a lorry only at a hub or a lorry park.",
       ),
       p(
+        "Up-front money: even where electric is cheaper over the years, a business puts up the extra for the vehicle and any charger only if the savings bring it back soon enough — within three to eight years, depending on the firm. That is why a grant can decide it: for a lorry the extra can be well over CHF 200,000, and every franc off brings it back sooner. The electric van and lorry grant can also pay towards the first charger in a yard.",
+      ),
+      p(
         "Lorries pay the heavy vehicle fee (LSVA) on diesel — about CHF 18,000 a year for a local delivery lorry. Electric lorries are exempt through 2030; from 2031 they pay it too, at a discount that shrinks each year — 70% in 2031, then 50, 30, 20 and 10% — and in full from 2036. Electric lorries keep getting cheaper meanwhile, so for a business with a depot an electric one stays the cheaper choice.",
       ),
       p(

@@ -6,7 +6,7 @@
  */
 
 import type { HeatingSystemId } from "./heatingSystems";
-import type { FleetVehicleId } from "../config/fleet";
+import type { FleetVehicleClass, FleetVehicleId } from "../config/fleet";
 import type { VehicleTypeId } from "./mobilitySystems";
 import { policyStore } from "./policy";
 
@@ -29,6 +29,12 @@ export function municipalVehicleSubsidyRp(id: VehicleTypeId, incumbent: VehicleT
   const p = policyStore.get();
   if (id !== "carEV") return 0;
   return early ? p.evGrantEarlyRp : incumbent === "carICE" ? p.evGrantFossilRp : p.evGrantOtherRp;
+}
+
+/** Municipal grant, Rp, towards the charger a business puts in its yard for a van or a lorry. */
+export function municipalYardChargerGrantRp(vehicleClass: FleetVehicleClass): number {
+  const p = policyStore.get();
+  return vehicleClass === "van" ? p.fleetVanChargerGrantRp : p.fleetTruckChargerGrantRp;
 }
 
 /** Municipal grant, Rp, for a business's electric van or lorry: when it replaces a working diesel one

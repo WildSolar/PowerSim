@@ -52,12 +52,14 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     subsidyCategory: "electricFleet",
     title: "Electric van and lorry grant",
     summary:
-      "A municipal grant for a business replacing a diesel van or lorry with an electric one, paid when it buys. Set an amount for each situation: a diesel that still runs, replaced early, or one at the end of its life. An electric lorry still costs about twice a diesel one; a grant closes part of the gap, and the vehicle charges at the business's own yard, or at a fast-charging hub for lorries if there is one.",
+      "A municipal grant for a business replacing a diesel van or lorry with an electric one, paid when it buys. Set an amount for each situation: a diesel that still runs, replaced early, or one at the end of its life. You can also pay towards the first charger in a business's yard, about CHF 3,000 for a van and CHF 80,000 for a lorry. Many firms hold back from the extra money up front even where electric is cheaper over the years, so a grant can be what decides it.",
     params: [
       { kind: "slider", key: "vanEarly", label: "Van: replacing a working diesel early", min: 0, max: 30000, step: 1000, unit: "CHF each", default: 10000 },
       { kind: "slider", key: "vanEnd", label: "Van: diesel at the end of its life", min: 0, max: 30000, step: 1000, unit: "CHF each", default: 5000 },
       { kind: "slider", key: "truckEarly", label: "Lorry: replacing a working diesel early", min: 0, max: 200000, step: 5000, unit: "CHF each", default: 60000 },
       { kind: "slider", key: "truckEnd", label: "Lorry: diesel at the end of its life", min: 0, max: 200000, step: 5000, unit: "CHF each", default: 30000 },
+      { kind: "slider", key: "vanCharger", label: "Van: charger in the yard", min: 0, max: 3000, step: 250, unit: "CHF each", default: 0 },
+      { kind: "slider", key: "truckCharger", label: "Lorry: charger in the yard", min: 0, max: 80000, step: 5000, unit: "CHF each", default: 0 },
     ],
     leadTimeMonths: 1,
     effects: (p) => ({
@@ -65,9 +67,11 @@ export const MEASURE_CATALOG: MeasureDef[] = [
       fleetVanGrantEndRp: num(p, "vanEnd") * CHF,
       fleetTruckGrantEarlyRp: num(p, "truckEarly") * CHF,
       fleetTruckGrantEndRp: num(p, "truckEnd") * CHF,
+      fleetVanChargerGrantRp: num(p, "vanCharger") * CHF,
+      fleetTruckChargerGrantRp: num(p, "truckCharger") * CHF,
     }),
     // The usual purchase is the one at the end of a vehicle's life: that's what most businesses notice.
-    strength: (p) => (0.75 * (num(p, "vanEnd") / 6000 + num(p, "truckEnd") / 40000) + 0.25 * (num(p, "vanEarly") / 6000 + num(p, "truckEarly") / 40000)) / 2,
+    strength: (p) => (0.75 * (num(p, "vanEnd") / 6000 + num(p, "truckEnd") / 40000) + 0.25 * (num(p, "vanEarly") / 6000 + num(p, "truckEarly") / 40000) + 0.25 * (num(p, "vanCharger") / 3000 + num(p, "truckCharger") / 40000)) / 2,
     approval: () => ({ business: 0.5, climate: 0.4, homeowners: -0.05 }),
   },
   {

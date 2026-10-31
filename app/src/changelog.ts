@@ -32,7 +32,8 @@ export const CHANGELOG: Release[] = [
     changed: [
       "Targeted grants. The heat pump, district heating and electric car grants now take one amount for a working fossil system replaced early, one for a fossil system at the end of its life, and one for anything else, instead of ‘everyone’ or ‘early only’. Set them all the same and you pay everyone alike.",
       "The scrappage bonus is now part of the electric car grant: its amounts for a petrol or diesel car replaced.",
-      "The electric van and lorry grant likewise pays by situation, for a diesel replaced early or at the end of its life. Businesses now sometimes replace a working diesel early, as owners do with boilers and cars.",
+      "The electric van and lorry grant likewise pays by situation, for a diesel replaced early or at the end of its life, and can pay towards the first charger in a yard. Businesses now sometimes replace a working diesel early, as owners do with boilers and cars.",
+      "Businesses now hold back from an electric van or lorry if the savings would take too long to bring back the extra money up front, so fewer go electric early on, and grants count for more.",
       "The insulation top-up can pay more the better the class a renovation reaches: the current standard, Minergie or Minergie-P. Nothing below the current standard.",
       "The minimum standard for renovations is now Minergie only: the canton brings in the current standard itself, in its own time.",
       "The climate campaign's lean now follows the size of the decision: less on a car, more on a block of flats' heating.",

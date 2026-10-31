@@ -42,6 +42,8 @@ export interface RenewalCandidate<T extends string> {
   municipalSubsidyRp?: number;
   /** Which grant that money is, for its uptake and its evaluation. */
   subsidyCategory?: SubsidyCategory;
+  /** Whether it would be on the table without that money, if that differs (a business's payback limit). */
+  availableWithoutGrant?: boolean;
   /** Called when this candidate wins and the decision commits (e.g. to book the car to the public
    * charger it will rely on). */
   onChosen?: (atMs: number) => void;
@@ -289,7 +291,7 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, as
       // grant, say for the option next to it, stays).
       const grant = winner.subsidyCategory;
       if (grant) {
-        const without = candidates.map((c) => (c.subsidyCategory === grant ? { ...c, annualizedCostRp: c.annualizedCostRp + (c.municipalSubsidyRp ?? 0) / c.lifetimeMeanYears } : c));
+        const without = candidates.map((c) => (c.subsidyCategory === grant ? { ...c, available: c.availableWithoutGrant ?? c.available, annualizedCostRp: c.annualizedCostRp + (c.municipalSubsidyRp ?? 0) / c.lifetimeMeanYears } : c));
         const counterfactual = chooseNext(without, incumbent, uncertaintyFraction, bias).chosen;
         recordSubsidisedDecision({ atMs, category: grant, subsidyRp: winner.municipalSubsidyRp, additional: counterfactual !== chosen });
       }

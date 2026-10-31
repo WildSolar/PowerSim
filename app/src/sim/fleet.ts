@@ -37,6 +37,8 @@ import {
   FLEET_DENSITY_BY_CLASS,
   FLEET_DENSITY_MIXED_USE,
   FLEET_UNCERTAINTY_FRACTION,
+  FLEET_EARLY_RESALE_SHARE,
+  FLEET_PAYBACK_YEARS,
   FLEET_WEIBULL_SHAPE,
   INITIAL_TRUCK_EV_SHARE,
   LSVA_EV_DISCOUNT_BY_YEAR,
@@ -59,7 +61,7 @@ import { totalFloorAreaM2 } from "./commercial";
 import { existsAt } from "./lifetime";
 import { policyStore } from "./policy";
 import { treasury } from "./treasury";
-import { municipalFleetSubsidyRp } from "./subsidies";
+import { municipalFleetSubsidyRp, municipalYardChargerGrantRp } from "./subsidies";
 import { EARLY_SWITCH } from "../config/earlySwitch";
 import { earlyCandidates, earlySwitchChance } from "./earlySwitch";
 import { publicCharging, usableOption, type ChargingNeed, type ChargingOption, type ChargingSite } from "./publicCharging";
@@ -153,6 +155,16 @@ function depotRunningRp(kWhPerYear: number, chargerRp: number, lifetimeYears: nu
   return kWhPerYear * tariff.offPeakPriceRpKWh + chargerRp / lifetimeYears;
 }
 
+/** What a replacement's options depend on besides prices. `paybackLimitYears`: how long the business
+ * would wait for the extra money to come back (FLEET_PAYBACK_YEARS). `mandated`: the town requires
+ * electric (the zero-emission town vehicles measure). */
+interface FleetChoice {
+  routeSuits: boolean;
+  paybackLimitYears: number;
+  early?: boolean;
+  mandated?: boolean;
+}
+
 function candidatesFor(
   vehicleClass: FleetVehicleClass,
   tariff: Tariff,
@@ -160,35 +172,47 @@ function candidatesFor(
   atMs: number,
   incumbent: FleetVehicleId,
   onElectricChosen: (atMs: number) => void,
-  routeSuits = true,
-  early = false,
-  mandated = false,
+  { routeSuits, paybackLimitYears, early = false, mandated = false }: FleetChoice,
 ): RenewalCandidate<FleetVehicleId>[] {
   // Without charging good enough to rely on, or (a lorry) on a route an electric one can't do yet,
   // electric is out — its cost is still worked out as if a charger were next door, so the decision
   // records whether it was wanted.
   const hypothetical = publicCharging.hypotheticalOption(vehicleClass, vehicleClass === "van" ? "ac" : "fleet");
   const lsvaShare = (electric: boolean) => (vehicleClass !== "truck" ? 0 : electric ? 1 - lsvaEvDiscount(yearOf(atMs)) : 1);
-  return FLEET_CHOICES[vehicleClass].map((id) => {
+  const chargerRp = access.kind === "depot" ? access.chargerRp : 0;
+  const costs = (id: FleetVehicleId) => {
     const spec = FLEET_CATALOG[id];
     const kWh = (spec.annualKm / 100) * spec.kWhPer100Km;
     let runningRp: number;
     if (!spec.electric) runningRp = (spec.annualKm / 100) * spec.litersPer100Km * tariff.petrolPriceRpPerLiter;
-    else if (access.kind === "depot") runningRp = depotRunningRp(kWh, access.chargerRp, spec.lifetimeMeanYears, tariff);
+    else if (access.kind === "depot") runningRp = depotRunningRp(kWh, 0, spec.lifetimeMeanYears, tariff);
     else {
       const option = access.kind === "public" ? access.option : hypothetical;
       runningRp = kWh * option.priceRpPerKWh + option.hassleRp;
     }
     runningRp += spec.annualKm * LSVA_RP_PER_KM * lsvaShare(spec.electric);
-    const available = mandated ? spec.electric : spec.electric ? access.kind !== "none" && routeSuits : vehicleClass === "truck" || !policyStore.get().iceCarPurchaseBanned;
-    // The municipality's grant for an electric one: never more than it costs.
-    const purchaseRp = spec.purchaseCostRp * priceFactor(id, atMs);
-    const subsidyRp = mandated ? 0 : Math.min(purchaseRp, municipalFleetSubsidyRp(id, incumbent, early));
+    return { purchaseRp: spec.purchaseCostRp * priceFactor(id, atMs), runningRp };
+  };
+  const [electricId, dieselId] = FLEET_CHOICES[vehicleClass];
+  const diesel = costs(dieselId);
+  const electric = costs(electricId);
+  // The extra money going electric takes: the new vehicle and the charger, against a new diesel — or,
+  // replacing a working one early, against what it sells for.
+  const extraRp = electric.purchaseRp + chargerRp - diesel.purchaseRp * (early ? FLEET_EARLY_RESALE_SHARE : 1);
+  const savingRp = diesel.runningRp - electric.runningRp;
+  const paysBack = (grantRp: number) => extraRp - grantRp <= 0 || (savingRp > 0 && (extraRp - grantRp) / savingRp <= paybackLimitYears);
+  return FLEET_CHOICES[vehicleClass].map((id) => {
+    const spec = FLEET_CATALOG[id];
+    const { purchaseRp, runningRp } = id === electricId ? electric : diesel;
+    // The municipality's grants for an electric one and its charger: never more than they cost.
+    const subsidyRp = mandated || !spec.electric ? 0 : Math.min(purchaseRp, municipalFleetSubsidyRp(id, incumbent, early)) + Math.min(chargerRp, municipalYardChargerGrantRp(vehicleClass));
+    const free = access.kind !== "none" && routeSuits;
+    const available = mandated ? spec.electric : spec.electric ? free && paysBack(subsidyRp) : vehicleClass === "truck" || !policyStore.get().iceCarPurchaseBanned;
     return {
       id,
       available,
-      annualizedCostRp: (purchaseRp - subsidyRp) / spec.lifetimeMeanYears + runningRp,
-      ...(subsidyRp > 0 ? { municipalSubsidyRp: subsidyRp, subsidyCategory: "electricFleet" as const } : {}),
+      annualizedCostRp: (purchaseRp + (spec.electric ? chargerRp : 0) - subsidyRp) / spec.lifetimeMeanYears + runningRp,
+      ...(subsidyRp > 0 ? { municipalSubsidyRp: subsidyRp, subsidyCategory: "electricFleet" as const, availableWithoutGrant: free && paysBack(0) } : {}),
       lifetimeMeanYears: spec.lifetimeMeanYears,
       greenness: spec.greenness,
       onChosen: spec.electric ? onElectricChosen : undefined,
@@ -308,6 +332,12 @@ class Fleets {
     return firstRandom(hashSeed(v.key, "fleet-route")) < interpolateCurve(TRUCK_EV_ROUTE_SHARE, yearOf(atMs));
   }
 
+  /** How long this vehicle's business would wait for the extra money to come back (FLEET_PAYBACK_YEARS). */
+  private paybackLimitYears(v: FleetVehicle): number {
+    const [lo, hi] = FLEET_PAYBACK_YEARS;
+    return lo + firstRandom(hashSeed(v.key, "fleet-payback")) * (hi - lo);
+  }
+
   private biasRp(v: FleetVehicle): number {
     const diesel = FLEET_CATALOG[FLEET_CHOICES[v.vehicleClass][1]];
     const yearlyRp = diesel.purchaseCostRp / diesel.lifetimeMeanYears;
@@ -337,7 +367,9 @@ class Fleets {
     const spec = FLEET_CATALOG[electricOf(v.vehicleClass)];
     const kWh = (spec.annualKm / 100) * spec.kWhPer100Km;
     const publicRp = kWh * option.priceRpPerKWh + option.hassleRp;
-    return publicRp < depotRunningRp(kWh, depot.chargerRp, spec.lifetimeMeanYears, tariffStore.at(atMs)) ? (publicAccess as FleetAccess) : depot;
+    // Weighing up at a replacement, the grant comes off; looking again later (review), no grant is paid.
+    const netChargerRp = depotCharger === undefined ? Math.max(0, depot.chargerRp - municipalYardChargerGrantRp(v.vehicleClass)) : depot.chargerRp;
+    return publicRp < depotRunningRp(kWh, netChargerRp, spec.lifetimeMeanYears, tariffStore.at(atMs)) ? (publicAccess as FleetAccess) : depot;
   }
 
   /** A vehicle relying on public charging looks at its charging again (publicCharging.addReviewer):
@@ -378,7 +410,10 @@ class Fleets {
   private wouldGoElectricWithCharger(v: FleetVehicle, incumbent: FleetVehicleId, atMs: number): boolean {
     if (!this.routeSuits(v, atMs)) return false; // no charger would make an electric lorry do this route
     const kind: ChargingKind = v.vehicleClass === "van" ? "ac" : "fleet";
-    const candidates = candidatesFor(v.vehicleClass, tariffStore.at(atMs), { kind: "public", option: publicCharging.hypotheticalOption(v.vehicleClass, kind) }, atMs, incumbent, () => {});
+    const candidates = candidatesFor(v.vehicleClass, tariffStore.at(atMs), { kind: "public", option: publicCharging.hypotheticalOption(v.vehicleClass, kind) }, atMs, incumbent, () => {}, {
+      routeSuits: true,
+      paybackLimitYears: this.paybackLimitYears(v),
+    });
     return chooseNext(candidates, incumbent, FLEET_UNCERTAINTY_FRACTION, this.biasRp(v) + campaignLeanRp(candidates)).chosen !== FLEET_CHOICES[v.vehicleClass][1];
   }
 
@@ -415,9 +450,7 @@ class Fleets {
         (chosenAtMs) => {
           if (access.kind === "public") publicCharging.assign(v.key, null, access.option, chosenAtMs, publicNeed(v.vehicleClass));
         },
-        this.routeSuits(v, atMs),
-        early,
-        mandate !== null,
+        { routeSuits: this.routeSuits(v, atMs), paybackLimitYears: this.paybackLimitYears(v), early, mandated: mandate !== null },
       );
     };
     const earlySpec = EARLY_SWITCH[v.vehicleClass];
