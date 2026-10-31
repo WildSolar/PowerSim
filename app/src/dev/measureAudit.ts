@@ -19,6 +19,7 @@ import { sampleMunicipalityCategorySeries } from "../sim/history";
 import { existsAt } from "../sim/lifetime";
 import { pointsAt, publicCharging, workChargingShareAt } from "../sim/publicCharging";
 import { effectivePowerPlantsAt } from "../sim/solarAdoption";
+import { steepArraysKwp } from "../sim/solarAdoption";
 import { stock } from "../sim/stock";
 import { tariffStore } from "../sim/tariffStore";
 import { totalWorkChargingPowerW } from "../sim/workCharging";
@@ -55,7 +56,9 @@ export const AUDIT_TESTS: AuditTest[] = [
 
   // Subsidies
   test("solar-subsidy", { perKwp: 300, fixed: 0 }, [["solarKwp", ">"], ["spentChf.solar", ">"]]),
-  test("solar-subsidy:max", { perKwp: 2000, fixed: 10000 }, [["solarKwp", ">"], ["spentChf.solar", ">"]]),
+  test("solar-subsidy:max", { perKwp: 2000, fixed: 10000, steep: 2000 }, [["solarKwp", ">"], ["spentChf.solar", ">"]]),
+  test("solar-subsidy:steep", { perKwp: 0, fixed: 0, steep: 500 }, [["audit.steepKwp", ">"], ["audit.framedKwp", ">"], ["spentChf.solar", ">"]]),
+  test("solar-subsidy:steep-max", { perKwp: 0, fixed: 0, steep: 2000 }, [["audit.steepKwp", ">"], ["audit.framedKwp", ">"], ["spentChf.solar", ">"]]),
   test("fleet-ev-grant", { vanEarly: 6000, vanEnd: 6000, truckEarly: 40000, truckEnd: 40000 }, [["fleet.vansElectric", ">"], ["fleet.trucksElectric", ">"], ["spentChf.vehicle", ">"]]),
   test("fleet-ev-grant:early", { vanEarly: 20000, vanEnd: 0, truckEarly: 150000, truckEnd: 0 }, [["fleet.vansElectric", ">"], ["fleet.trucksElectric", ">"], ["spentChf.vehicle", ">"]]),
   test("fleet-ev-grant:end", { vanEarly: 0, vanEnd: 20000, truckEarly: 0, truckEnd: 150000 }, [["fleet.vansElectric", ">"], ["fleet.trucksElectric", ">"], ["spentChf.vehicle", ">"]]),
@@ -216,6 +219,8 @@ function auditFigures(t: number, realPlants: PowerPlant[]): Record<string, numbe
     newBuildKwp: Math.round(newBuildKwp),
     newBuildUValue: newBuilds ? newUValueSum / newBuilds : 0,
     newBuildGoodShare: newBuilds ? ((newClasses.minergie ?? 0) + (newClasses.minergieP ?? 0)) / newBuilds : 0,
+    steepKwp: Math.round(steepArraysKwp(t).kwp),
+    framedKwp: Math.round(steepArraysKwp(t).framedKwp),
     goodEnvelopes: good(classes),
     badEnvelopes: standing.length - good(classes),
     minergieEnvelopes: (classes.minergie ?? 0) + (classes.minergieP ?? 0),

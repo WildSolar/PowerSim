@@ -39,7 +39,7 @@ import { snowDepthCm, snowPvBlockingFactor } from "./snow";
 import { valueNoise } from "./valueNoise";
 import { weatherAt } from "./weather";
 import { policyStore } from "./policy";
-import { PV_ALBEDO, PV_BIFACIALITY, PV_DIFFUSE_SHARE_CLEAR, PV_PROFILES, type PvMount } from "../config/pvProfiles";
+import { PV_ALBEDO, PV_BIFACIALITY, PV_DIFFUSE_SHARE_CLEAR, PV_PROFILES, STEEP_ARRAY_TILT_DEG, type PvMount } from "../config/pvProfiles";
 import { firstRandom, hashSeed } from "./rng";
 
 const HOUR_MS = 3_600_000;
@@ -249,6 +249,25 @@ export function roofProfileIndex(key: string): number {
     roofProfileByKey.set(key, i);
   }
   return i;
+}
+
+/** The profile of a flat roof's array put on steep frames. */
+export const FRAMES_PROFILE_INDEX = PROFILE_INDEX.get("s45frames") as number;
+
+/** A flat roof's owner put the array on steep frames: it follows that profile from now on. */
+export function putRoofOnFrames(egid: string): void {
+  roofProfileByKey.set(egid, FRAMES_PROFILE_INDEX);
+}
+
+/** Whether a building has a flat roof, going by how its arrays lie. */
+export function roofIsFlat(egid: string): boolean {
+  return PV_PROFILES[roofProfileIndex(egid)].flatRoof === true;
+}
+
+/** Whether a roof's arrays are steep enough for the solar subsidy's bonus. */
+export function roofIsSteep(egid: string): boolean {
+  const mount = PV_PROFILES[roofProfileIndex(egid)].mount;
+  return mount.kind === "fixed" && mount.tiltDeg >= STEEP_ARRAY_TILT_DEG;
 }
 
 /** The profile a plant follows: its own (an Agri-PV field's system), else its roof's. */

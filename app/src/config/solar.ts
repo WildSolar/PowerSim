@@ -144,3 +144,9 @@ export const SOLAR_COOP_OWNER_AGREES = 0.6;
 export const SOLAR_COOP_SALE_SHARE = 0.85;
 export const SOLAR_COOP_MIN_RETURN = 0.1;
 export const SOLAR_COOP_ROOFS_PER_YEAR = 8;
+
+// Steep frames on a flat roof, in place of its low rows: at 45° the rows have to stand well apart so
+// as not to shade each other, so the roof carries this share of the kWp, and the frames and ballast
+// add this share to the price. Less over the year, more of it in winter. Informed placeholders.
+export const STEEP_FRAMES_CAPACITY_SHARE = 0.55;
+export const STEEP_FRAMES_EXTRA_COST_SHARE = 0.1;

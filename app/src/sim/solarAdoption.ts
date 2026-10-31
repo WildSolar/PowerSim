@@ -81,6 +81,8 @@ import {
   SOLAR_COOP_OWNER_AGREES,
   SOLAR_COOP_ROOFS_PER_YEAR,
   SOLAR_COOP_SALE_SHARE,
+  STEEP_FRAMES_CAPACITY_SHARE,
+  STEEP_FRAMES_EXTRA_COST_SHARE,
   SOLAR_HOUSE_CAPITAL_MEDIAN_CHF,
   SOLAR_PRICE_HAZARD_ELASTICITY,
   MAX_ANNUAL_HAZARD,
@@ -114,7 +116,7 @@ import {
   PANEL_LIFETIME_MEAN_YEARS,
   usableRoofFractionFromDraw,
 } from "./solarSystems";
-import { irradianceWm2, PEAK_IRRADIANCE_WM2, profileShareAt, roofProfileIndex } from "./pv";
+import { FRAMES_PROFILE_INDEX, irradianceWm2, PEAK_IRRADIANCE_WM2, profileShareAt, putRoofOnFrames, roofIsFlat, roofIsSteep, roofProfileIndex } from "./pv";
 import { isOffPeakHour, type Tariff } from "./tariff";
 import { tariffStore } from "./tariffStore";
 import { feedInExpectedRpKWhFor } from "./feedIn";
@@ -160,6 +162,8 @@ export interface SolarAdoptionRecord {
   origin?: "mandate" | "voluntary" | "municipal" | "contract" | "cooperative";
   /** A PV loan the owner took for what they couldn't pay up front. */
   pvLoanRp?: number;
+  /** A flat roof's owner chose steep frames (the solar subsidy's bonus for steep arrays). */
+  onFrames?: boolean;
 }
 
 const adoptionByEgid = new Map<string, SolarAdoptionRecord>();
@@ -339,8 +343,7 @@ interface YearSunlight {
 
 /** What 1 kW of panels on `egid`'s roof makes at each of a year's sample instants, as a share of
  * its rating — by the roof's own orientation. */
-function roofShares(sunlight: YearSunlight, egid: string): Float64Array {
-  const profile = roofProfileIndex(egid);
+function roofShares(sunlight: YearSunlight, egid: string, profile = roofProfileIndex(egid)): Float64Array {
   let shares = sunlight.shares.get(profile);
   if (!shares) {
     shares = Float64Array.from(sunlight.times, (t, i) => profileShareAt(profile, t, sunlight.irradianceWm2[i]));
@@ -380,13 +383,13 @@ function dayInMonth(seed: number, monthStartMs: number): number {
  * useBillSummary.ts's own density (24/month) — coarse enough that the
  * self-consumption/export split is an approximation, not a precise
  * simulation, a known limitation worth being upfront about (see the wiki). */
-function candidateEconomics(building: Building, candidateCapacityKw: number, sunlight: YearSunlight, tariff: Tariff): SolarEconomics {
+function candidateEconomics(building: Building, candidateCapacityKw: number, sunlight: YearSunlight, tariff: Tariff, profile?: number): SolarEconomics {
   const { times } = sunlight;
   const consumptionW = consumptionSeriesW(sampleBuildingCategorySeries(building, times, tariff, []));
   // What pv.ts's pvPowerW would give for a panel of this size on this roof (facing the way it
   // does), as a positive production figure.
   const ratedW = candidateCapacityKw * 1000;
-  const shares = roofShares(sunlight, building.egid);
+  const shares = roofShares(sunlight, building.egid, profile);
   const productionW = (i: number) => ratedW * shares[i];
   const law = policyStore.get().feedInLimitPct / 100;
   const gridCap = Math.min(law, GRID_FRIENDLY_FEED_IN_CAP);
@@ -493,6 +496,19 @@ function solarHold(
   return { reason: null, loanRp: gapRp };
 }
 
+/** What owners have built that is steep enough for the bonus by `atMs`, kWp, and how much of it is on
+ * frames on a flat roof. */
+export function steepArraysKwp(atMs: number): { kwp: number; framedKwp: number } {
+  let kwp = 0;
+  let framedKwp = 0;
+  for (const [egid, r] of adoptionByEgid) {
+    if (r.installedAtMs > atMs || !roofIsSteep(egid)) continue;
+    kwp += r.capacityKw;
+    if (r.onFrames) framedKwp += r.capacityKw;
+  }
+  return { kwp, framedKwp };
+}
+
 /** An owner who wanted solar and held back within the last few years (and hasn't built since). */
 export function solarShelved(egid: string, atMs: number): SolarShelved | undefined {
   const s = shelvedByEgid.get(egid);
@@ -510,18 +526,32 @@ function evaluateAdoption(
   hazardContext: HazardContext,
 ): SolarAdoptionRecord | null {
   const usableFraction = usableRoofFraction(building);
-  const capacityKw = (building.footprintAreaM2 ?? 0) * usableFraction * kwpPerM2At(year);
-  if (capacityKw <= 0) return null;
+  const roofKw = (building.footprintAreaM2 ?? 0) * usableFraction * kwpPerM2At(year);
+  if (roofKw <= 0) return null;
+
+  const priced = (kw: number, steep: boolean, framed: boolean) => {
+    const installCostRp = kw * installCostRpPerKwp(kw, priceFactorInYear("solar", year)) * (framed ? 1 + STEEP_FRAMES_EXTRA_COST_SHARE : 1);
+    const federalRp = federalSubsidyRp(kw);
+    const municipalRp = Math.max(0, Math.min(kw * (policy.solarSubsidyRpPerKwp + (steep ? policy.solarSteepBonusRpPerKwp : 0)) + policy.solarSubsidyFixedRp, installCostRp - federalRp));
+    return { installCostRp, federalRp, municipalRp };
+  };
+  const netValueRp = (kw: number, deal: ReturnType<typeof priced>, profile?: number) =>
+    annualValueRp(candidateEconomics(building, kw, sunlight, tariff, profile), "solar", 0) - (deal.installCostRp - deal.federalRp - deal.municipalRp) / PANEL_LIFETIME_MEAN_YEARS;
+  // With a bonus for steep arrays, a flat roof's owner weighs steep frames against the usual low rows.
+  const framesKw = roofKw * STEEP_FRAMES_CAPACITY_SHARE;
+  const onFrames =
+    policy.solarSteepBonusRpPerKwp > 0 &&
+    roofIsFlat(building.egid) &&
+    netValueRp(framesKw, priced(framesKw, true, true), FRAMES_PROFILE_INDEX) > netValueRp(roofKw, priced(roofKw, false, false));
+  const capacityKw = onFrames ? framesKw : roofKw;
   // A large array can't connect plainly while its area's summer feed-in is over the grid's capacity —
   // only with a battery run grid-friendly, which keeps its feed-in to half its rating.
   const gridBlocked = capacityKw > SMALL_SOLAR_KWP && gridFeedInBlockedAt(building, yearStartMs);
 
-  const installCostRp = capacityKw * installCostRpPerKwp(capacityKw, priceFactorInYear("solar", year));
-  const federalRp = federalSubsidyRp(capacityKw);
-  const municipalRp = Math.max(0, Math.min(capacityKw * policy.solarSubsidyRpPerKwp + policy.solarSubsidyFixedRp, installCostRp - federalRp));
+  const { installCostRp, federalRp, municipalRp } = priced(capacityKw, onFrames || roofIsSteep(building.egid), onFrames);
   const subsidyRp = federalRp + municipalRp;
 
-  const economics = candidateEconomics(building, capacityKw, sunlight, tariff);
+  const economics = candidateEconomics(building, capacityKw, sunlight, tariff, onFrames ? FRAMES_PROFILE_INDEX : undefined);
   const battery = batteryFor(capacityKw, null);
   const batteryCostRp = homeBatteryCostRp(battery.kwh, toSimTimeMs(Date.UTC(year, 6, 1)));
   const batterySubsidy = { battery: batterySubsidyRp(policy, battery.kwh, batteryCostRp, false), batteryGrid: batterySubsidyRp(policy, battery.kwh, batteryCostRp, true) };
@@ -646,6 +676,7 @@ function evaluateAdoption(
     municipalSubsidyRp: municipalRp,
     annualSavingsRp: annualValueRp(economics, chosen, battery.kwh),
     ...(loanRp > 0 ? { pvLoanRp: loanRp } : {}),
+    ...(onFrames ? { onFrames } : {}),
   };
 }
 
@@ -907,6 +938,7 @@ export function considerOwnSolarNow(building: Building, realPlants: PowerPlant[]
   const battery = batteryByEgid.get(building.egid);
   if (battery && battery.installedAtMs < installedAtMs) batteryByEgid.set(building.egid, { ...battery, installedAtMs });
   adoptionByEgid.set(building.egid, { ...decision, installedAtMs });
+  if (decision.onFrames) putRoofOnFrames(building.egid);
   treasury.recordPayout("solar", installedAtMs, decision.municipalSubsidyRp, building.egid);
   return true;
 }
@@ -1034,6 +1066,7 @@ function processMonth(buildings: Building[], realPlants: PowerPlant[], year: num
     const decision = evaluateAdoption(building, year, yearStartMs, sunlight, tariff, policy, { hazard, draw, neighborAdopters, renewalBoosted });
     if (decision) {
       adoptionByEgid.set(building.egid, decision);
+      if (decision.onFrames) putRoofOnFrames(building.egid);
       treasury.recordPayout("solar", decision.installedAtMs, decision.municipalSubsidyRp, building.egid);
     }
   }
@@ -1392,7 +1425,10 @@ export function snapshotSolar(): SolarSnapshot {
 
 export function restoreSolar(saved: SolarSnapshot): void {
   adoptionByEgid.clear();
-  for (const [egid, record] of saved.adoptions) adoptionByEgid.set(egid, record);
+  for (const [egid, record] of saved.adoptions) {
+    adoptionByEgid.set(egid, record);
+    if (record.onFrames) putRoofOnFrames(egid);
+  }
   batteryByEgid.clear();
   for (const [egid, record] of saved.batteries) batteryByEgid.set(egid, record);
   shelvedByEgid.clear();

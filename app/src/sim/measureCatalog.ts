@@ -34,14 +34,15 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     subsidyCategory: "solar",
     title: "Solar subsidy",
     summary:
-      "A municipal top-up on the federal one-off payment every installation already gets: per kWp installed, plus an optional fixed bonus per installation. Paid when a building actually adopts.",
+      "A municipal top-up on the federal one-off payment every installation already gets: per kWp installed, plus an optional fixed bonus per installation, and an optional bonus per kWp for a steep array — 45° or more — which makes more of its power in winter. Few roofs are that steep; a bonus may also lead owners of flat roofs to put their panels on steep frames, with less on the roof and less over the year, but more when it's short. Paid when a building actually adopts.",
     params: [
       { kind: "slider", key: "perKwp", label: "Per kWp", min: 0, max: 2000, step: 50, unit: "CHF/kWp", default: 300 },
       { kind: "slider", key: "fixed", label: "Fixed bonus", min: 0, max: 10000, step: 250, unit: "CHF each", default: 0 },
+      { kind: "slider", key: "steep", label: "Bonus for steep arrays (45° or more)", min: 0, max: 2000, step: 50, unit: "CHF/kWp", default: 0 },
     ],
     leadTimeMonths: 1,
-    effects: (p) => ({ solarSubsidyRpPerKwp: num(p, "perKwp") * CHF, solarSubsidyFixedRp: num(p, "fixed") * CHF }),
-    strength: (p) => num(p, "perKwp") / 300 + num(p, "fixed") / 3000,
+    effects: (p) => ({ solarSubsidyRpPerKwp: num(p, "perKwp") * CHF, solarSubsidyFixedRp: num(p, "fixed") * CHF, solarSteepBonusRpPerKwp: num(p, "steep") * CHF }),
+    strength: (p) => num(p, "perKwp") / 300 + num(p, "fixed") / 3000 + num(p, "steep") / 3000,
     approval: () => ({ homeowners: 0.5, tenants: 0.1, business: 0.2, climate: 0.6 }),
   },
   {

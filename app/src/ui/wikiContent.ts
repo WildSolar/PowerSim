@@ -842,6 +842,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "Roofs face every way: south at 30° on one house, east and west at a shallow tilt on the flat roof next door, south-west on the one after. Each building's panels have their own orientation — its panel shows which — and that sets when in the day they make the most: east in the morning, west into the evening, south around noon. Over a year a south-facing roof makes a little more and an east- or west-facing one a little less — and its owner weighs panels on what their own roof would make, so south roofs go solar a little sooner — but together the town's roofs spread their output over the day, so its midday peak on the grid is lower than if every panel faced the same way.",
       ),
       p(
+        "Steep arrays: the solar subsidy can pay a bonus per kWp for arrays at 45° or more, which make more of their power in winter, when it is short. Few roofs are that steep. With a bonus on offer, the owner of a flat roof also weighs steep frames against the usual low rows: the rows have to stand apart, so the roof carries about half the kWp, at a higher price per kWp and with less power over the year, but more of it in winter.",
+      ),
+      p(
         "Every year, each building without panels has a chance that its owner seriously considers them. That chance grows for a few years after the heating is replaced (a natural moment to think about the roof), the more neighbours already have panels, with the municipality's solar campaign, and as panels get cheaper (see \"Technology prices over time\"). Buildings over 200 years old are treated as protected and don't get panels.",
       ),
       p(
