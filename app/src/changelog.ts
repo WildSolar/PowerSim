@@ -22,6 +22,14 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.11.1",
+    date: null,
+    changed: [
+      "The Measures page is sorted by what you set out to change: six goals along the top, each with its share of the town's emissions. Open one to see who decides there and when, its measures from persuading to requiring, and the map tools and prices that also move it, one click away. Insulation now sits with heating, and each card says in one line what the measure does.",
+      "‘All on one board’ on the Measures page shows every measure at once, goals down the side and kinds across.",
+    ],
+  },
+  {
     version: "0.11.0",
     date: "2026-10-31",
     title: "Measures that hit the mark",

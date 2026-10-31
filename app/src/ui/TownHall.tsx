@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import type { MunicipalityDataset } from "../data/types";
+import type { ColorMode } from "../map/colorModes";
 import { useSimSpeed } from "../sim/store";
 import { PAUSE_SPEED } from "../sim/timeControls";
 import { AdvisorsTab } from "./AdvisorsTab";
@@ -18,7 +19,7 @@ export type TownHallSection = "overview" | "measures" | "advisors" | "treasury" 
 
 const SECTIONS: { id: TownHallSection; title: string; blurb: string }[] = [
   { id: "overview", title: "Overview", blurb: "Where the town stands, what the canton and the Confederation have in store, and what was decided lately." },
-  { id: "measures", title: "Measures", blurb: "Subsidies, infrastructure, information and laws: what the municipality can enact, and what it has." },
+  { id: "measures", title: "Measures", blurb: "What the municipality can enact, by what it sets out to change: where the emissions come from, and what you can do about them." },
   { id: "advisors", title: "Advisors", blurb: "Consultants you retain for a yearly fee: each reports once a year with what to do next, and you can act on it from here." },
   { id: "treasury", title: "Treasury", blurb: "The department's accounts, year by year, and its borrowing." },
   { id: "prices", title: "Prices", blurb: "What the municipal utility charges, and where technology prices are heading." },
@@ -77,12 +78,14 @@ export interface TownHallProps {
   onSection: (section: TownHallSection) => void;
   /** Shows an advisor's pick on the map (the Town hall closes). */
   onShowPick: (pick: LetterPick) => void;
+  /** Goes to a planning tool on the map (the Town hall closes). */
+  onOpenTool: (tool: ColorMode) => void;
 }
 
 /** The town hall: everything that isn't on the map — measures, the accounts, prices and the
  * statistics — full screen below its row of pages (TownHallStrip). The simulation pauses while it's open and
  * picks up again at the same speed when it closes (unless the player changed it meanwhile). */
-export function TownHall({ dataset, transparency, section, onSection, onShowPick }: TownHallProps) {
+export function TownHall({ dataset, transparency, section, onSection, onShowPick, onOpenTool }: TownHallProps) {
   const sections = SECTIONS.filter((s) => s.id !== "log" || transparency);
   const current = sections.find((s) => s.id === section) ?? sections[0];
 
@@ -107,7 +110,7 @@ export function TownHall({ dataset, transparency, section, onSection, onShowPick
             </div>
           )}
           {current.id === "overview" && <OverviewTab dataset={dataset} onOpen={onSection} />}
-          {current.id === "measures" && <MeasuresTab />}
+          {current.id === "measures" && <MeasuresTab onOpenTool={onOpenTool} onOpenPrices={() => onSection("prices")} />}
           {current.id === "advisors" && <AdvisorsTab onShowOnMap={onShowPick} onOpenPrices={() => onSection("prices")} />}
           {current.id === "treasury" && <TreasuryTab dataset={dataset} />}
           {/* Only while Statistics is open does At a glance resolve the solar plants: effectivePowerPlantsAt

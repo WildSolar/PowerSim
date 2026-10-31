@@ -44,8 +44,9 @@ app/public/data/*
 !app/public/data/hinwil.json
 !app/public/data/wald-zh.json
 !app/public/data/stammheim.json
-# Par (sim/par.ts): computed with the game, not the pipeline — committed.
+# Par (sim/par.ts) and the starting emissions (sim/startEmissions.ts): computed with the game, not the pipeline — committed.
 !app/public/data/par/
+!app/public/data/start-emissions.json
 pipeline/.cache/
 
 # Visual Studio workspace files

@@ -36,6 +36,7 @@ import { CarParksPanel } from "./ui/CarParksPanel";
 import { ReportCardModal } from "./ui/ReportCardModal";
 import { EndScreen } from "./ui/EndScreen";
 import { loadPar } from "./sim/par";
+import { loadStartEmissions } from "./sim/startEmissions";
 import { getFinishedYear, NET_ZERO_TARGET_YEAR, startRun } from "./sim/score";
 import { StartMenu } from "./ui/StartMenu";
 import { WikiPanel } from "./ui/WikiPanel";
@@ -262,6 +263,7 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
         setLoadingNote(`Reading ${loaded.name}'s ${loaded.buildings.length.toLocaleString("de-CH")} buildings`);
         setLoadingProgress(0.15);
         loadPar(slug, difficulty); // what doing nothing scores here, if computed
+        loadStartEmissions(slug); // where the emissions come from, until the first count
         measures.init(difficulty); // before the stock: it registers the town size the measures' costs scale with
         market.init(`market:${loaded.bfsNumber}`); // before anything prices: the shocks of the whole game
         tariffStore.init();
@@ -493,6 +495,10 @@ function Game({ slug, difficulty, transparency, restore, tutorial = false }: { s
           onShowPick={(pick) => {
             setTownHall(null);
             showPickOnMap(pick, (tool) => setColorMode(tool), selectBuilding);
+          }}
+          onOpenTool={(tool) => {
+            setTownHall(null);
+            setColorMode(tool);
           }}
         />
       )}

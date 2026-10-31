@@ -433,7 +433,7 @@ export function AgriPvPanel() {
           value={`${Math.round(agriPv.getAcceptance() * 100)}%`}
           sub={dialogue ? "dialogue running" : "grows with each field"}
           title={`How far people have come round to solar over farmland: it softens the opposition to Agri-PV zones, new and in force, and brings farmers round. ${
-            dialogue ? "The Agri-PV dialogue is running: it grows year by year." : "It grows a little with every field people get to see; the Agri-PV dialogue (Town hall → Measures, Advice) builds it faster."
+            dialogue ? "The Agri-PV dialogue is running: it grows year by year." : "It grows a little with every field people get to see; the Agri-PV dialogue (Town hall → Measures, Solar and clean power) builds it faster."
           }`}
         />
       </div>

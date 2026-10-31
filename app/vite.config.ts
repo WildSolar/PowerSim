@@ -34,7 +34,7 @@ function onlyListedMunicipalities(): Plugin {
       )
       for (const file of readdirSync(dataDir)) {
         const slug = file.replace(/\.json$/, '')
-        if (file.endsWith('.json') && file !== 'index.json' && !listed.has(slug)) rmSync(join(dataDir, file))
+        if (file.endsWith('.json') && file !== 'index.json' && file !== 'start-emissions.json' && !listed.has(slug)) rmSync(join(dataDir, file))
       }
       const parDir = join(dataDir, 'par')
       if (existsSync(parDir)) {

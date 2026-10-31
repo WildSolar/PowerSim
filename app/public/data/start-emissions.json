@@ -1,0 +1,17 @@
+{
+  "bonstetten": {"heating":0.466,"cars":0.33,"fleet":0.141,"solar":0.062},
+  "bulach": {"heating":0.428,"cars":0.329,"fleet":0.156,"solar":0.087},
+  "dietikon": {"heating":0.448,"cars":0.339,"fleet":0.147,"solar":0.067},
+  "dubendorf": {"heating":0.445,"cars":0.304,"fleet":0.158,"solar":0.093},
+  "hinwil": {"heating":0.475,"cars":0.246,"fleet":0.136,"solar":0.143},
+  "kloten": {"heating":0.53,"cars":0.252,"fleet":0.132,"solar":0.086},
+  "kusnacht-zh": {"heating":0.607,"cars":0.236,"fleet":0.088,"solar":0.068},
+  "opfikon": {"heating":0.445,"cars":0.336,"fleet":0.136,"solar":0.083},
+  "regensdorf": {"heating":0.482,"cars":0.292,"fleet":0.14,"solar":0.086},
+  "schlieren": {"heating":0.455,"cars":0.304,"fleet":0.122,"solar":0.119},
+  "stammheim": {"heating":0.569,"cars":0.239,"fleet":0.133,"solar":0.059},
+  "uster": {"heating":0.501,"cars":0.293,"fleet":0.13,"solar":0.076},
+  "wadenswil": {"heating":0.512,"cars":0.284,"fleet":0.117,"solar":0.087},
+  "wald-zh": {"heating":0.558,"cars":0.242,"fleet":0.105,"solar":0.095},
+  "wetzikon-zh": {"heating":0.478,"cars":0.277,"fleet":0.137,"solar":0.108}
+}

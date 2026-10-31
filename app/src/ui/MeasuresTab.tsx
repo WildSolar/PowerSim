@@ -1,16 +1,16 @@
 import { useState, useSyncExternalStore } from "react";
 import { cachedEmissionsForYear, removalPriceChfPerT } from "../sim/emissions";
 import { REMOVAL_CAP_SHARE } from "../config/removals";
-import { X } from "lucide-react";
+import { Check, Clock, MapPin, Tag, X } from "lucide-react";
+import type { ColorMode } from "../map/colorModes";
 import { BASELINE_YEAR, formatDate, toDateMs } from "../sim/calendar";
 import { MEASURE_CATALOG as ALL_MEASURES } from "../sim/measureCatalog";
 import {
   defaultParams,
   MEASURE_CATEGORY_LABEL,
   MEASURE_CATEGORY_SINGULAR,
+  MEASURE_LADDER,
   MEASURE_TOPIC_LABEL,
-  MEASURE_TOPIC_ORDER,
-  type MeasureCategory,
   type MeasureDef,
   type MeasureParams,
   type MeasureTopic,
@@ -18,6 +18,8 @@ import {
 } from "../sim/measureTypes";
 import { approval, reactionText, votePct } from "../sim/approval";
 import { measures } from "../sim/measures";
+import type { EmissionShares } from "../sim/startEmissions";
+import { goalShares, MEASURE_GOALS, type MeasureGoal } from "./measureGoals";
 import { measureUnavailableReason } from "../sim/measureAvailability";
 import { subsidisedDecisions, type SubsidyCategory } from "../sim/additionality";
 import { fleets } from "../sim/fleet";
@@ -36,9 +38,7 @@ import { ReactionBadge } from "./ReactionBadge";
 
 // The advisors are retained and let go on their own page (Town hall → Advisors).
 const MEASURE_CATALOG = ALL_MEASURES.filter((d) => d.topic !== "advisors");
-const TOPICS = MEASURE_TOPIC_ORDER.filter((t) => t !== "advisors");
 
-const CATEGORY_ORDER: MeasureCategory[] = ["subsidy", "infrastructure", "information", "law"];
 const DAY_MS = 24 * 60 * 60_000;
 const YEAR_MS = 365.25 * DAY_MS;
 
@@ -330,27 +330,170 @@ function cardFooter(def: MeasureDef, nowMs: number): { text: string; tone?: "goo
   return { text: `Public reaction: ${reactionText(reaction)}`, tone: reaction.tone === "good" ? "good" : reaction.tone === "bad" ? "bad" : undefined };
 }
 
-function MeasureTile({ def, nowMs, selected, onSelect }: { def: MeasureDef; nowMs: number; selected: boolean; onSelect: () => void }) {
+function MeasureTile({ def, nowMs, selected, showKind, onSelect }: { def: MeasureDef; nowMs: number; selected: boolean; showKind?: boolean; onSelect: () => void }) {
   const status = measureStatus(def, nowMs);
   const footer = cardFooter(def, nowMs);
   return (
     <button className={`measure-tile ${status.tone}${selected ? " selected" : ""}`} onClick={onSelect} aria-pressed={selected} data-tour={`measure-${def.id}`}>
       <span className="measure-tile-top">
-        <span className="measure-kind">{MEASURE_CATEGORY_SINGULAR[def.category]}</span>
+        <span className="measure-tile-title">{def.title}</span>
         <span className={`measure-status ${status.tone}`}>{status.label}</span>
       </span>
-      <span className="measure-tile-title">{def.title}</span>
-      <span className="measure-tile-summary">{def.summary}</span>
+      {showKind && <span className="measure-kind">{MEASURE_CATEGORY_SINGULAR[def.category]}</span>}
+      <span className="measure-tile-summary">{def.tagline}</span>
       <span className={`measure-tile-foot${footer.tone ? ` ${footer.tone}` : ""}`}>{footer.text}</span>
     </button>
   );
 }
 
-type TopicFilter = MeasureTopic | "all" | "enacted";
+function isEnacted(def: MeasureDef): boolean {
+  const st = measures.getState(def.id);
+  return !!(st?.active || st?.pending);
+}
 
-/** The player's measures: a rail of topics (and kinds to narrow by), the measures as cards, and the
- * one picked in full beside them. */
-export function MeasuresTab() {
+const defsOf = (topic: MeasureTopic) => MEASURE_CATALOG.filter((d) => d.topic === topic);
+
+/** A goal's share of the town's emissions, as a number and a bar, or what it does instead of having one. */
+function GoalShare({ goal, share, compact }: { goal: MeasureGoal; share: number | undefined; compact?: boolean }) {
+  if (goal.noShare) return <div className={`goal-share none${compact ? " compact" : ""}`}>{goal.noShare}</div>;
+  return (
+    <div className={`goal-share${compact ? " compact" : ""}`}>
+      <span className="goal-share-value">{share === undefined ? "—" : `${Math.round(share * 100)}%`}</span>
+      <span className="goal-share-bar">
+        <span style={{ width: `${Math.round((share ?? 0) * 100)}%` }} />
+      </span>
+    </div>
+  );
+}
+
+/** One line on what the shares are: the last count, or the town as the game starts. */
+function sharesCaption(countedYear: number | null, known: boolean): string {
+  if (countedYear !== null) return `Share of the town's emissions, as counted for ${countedYear}.`;
+  if (known) return `Share of the town's emissions as you take office. The first count comes in January ${BASELINE_YEAR + 1}.`;
+  return `The town's emissions are counted at the end of each year: the first count comes in January ${BASELINE_YEAR + 1}.`;
+}
+
+function GoalLinks({ goal, onOpenTool, onOpenPrices }: { goal: MeasureGoal; onOpenTool: (tool: ColorMode) => void; onOpenPrices: () => void }) {
+  if (goal.links.length === 0) return null;
+  return (
+    <div className="goal-links">
+      <span>Also:</span>
+      {goal.links.map((link) => (
+        <button key={link.label} onClick={() => ("tool" in link ? onOpenTool(link.tool) : onOpenPrices())}>
+          {"tool" in link ? <MapPin size={12} strokeWidth={1.75} aria-hidden /> : <Tag size={12} strokeWidth={1.75} aria-hidden />}
+          {link.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** One goal: how the decisions behind it are made, and its measures from the gentlest to the strongest. */
+function GoalPanel({ goal, nowMs, selectedId, onSelect, onOpenTool, onOpenPrices }: { goal: MeasureGoal; nowMs: number; selectedId: string | null; onSelect: (id: string) => void; onOpenTool: (tool: ColorMode) => void; onOpenPrices: () => void }) {
+  const defs = defsOf(goal.topic);
+  return (
+    <section className="goal-panel">
+      <h2>{MEASURE_TOPIC_LABEL[goal.topic]}</h2>
+      <p className="goal-who">{goal.who}</p>
+      <GoalLinks goal={goal} onOpenTool={onOpenTool} onOpenPrices={onOpenPrices} />
+      {MEASURE_LADDER.map(({ category, verb, hint }) => {
+        const inKind = defs.filter((d) => d.category === category);
+        if (inKind.length === 0) return null;
+        return (
+          <section key={category} className="goal-level">
+            <h3>
+              {verb} <small>{hint}</small>
+            </h3>
+            <div className="measures-grid">
+              {inKind.map((def) => (
+                <MeasureTile key={def.id} def={def} nowMs={nowMs} selected={def.id === selectedId} onSelect={() => onSelect(def.id)} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </section>
+  );
+}
+
+const BOARD_ICON: Partial<Record<StatusTone, typeof Check>> = { active: Check, pending: Clock };
+
+/** Every measure at once: goals down the side, the four kinds across. */
+function MeasureBoard({ shares, nowMs, selectedId, onSelect, onOpenGoal, onOpenTool }: { shares: EmissionShares | null; nowMs: number; selectedId: string | null; onSelect: (id: string) => void; onOpenGoal: (topic: MeasureTopic) => void; onOpenTool: (tool: ColorMode) => void }) {
+  return (
+    <div className="measure-board" role="table" aria-label="All measures by goal and kind">
+      <div role="row" className="board-row board-head">
+        <span role="columnheader" />
+        {MEASURE_LADDER.map(({ category, verb }) => (
+          <span role="columnheader" key={category}>
+            {verb}
+            <small>{MEASURE_CATEGORY_LABEL[category]}</small>
+          </span>
+        ))}
+      </div>
+      {MEASURE_GOALS.map((goal) => (
+        <div role="row" className="board-row" key={goal.topic}>
+          <button role="rowheader" className="board-goal" onClick={() => onOpenGoal(goal.topic)} title="Open this goal">
+            <strong>{MEASURE_TOPIC_LABEL[goal.topic]}</strong>
+            <GoalShare goal={goal} share={shares?.[goal.topic]} compact />
+          </button>
+          {MEASURE_LADDER.map(({ category }) => (
+            <div role="cell" className="board-cell" key={category}>
+              {defsOf(goal.topic)
+                .filter((d) => d.category === category)
+                .map((def) => {
+                  const status = measureStatus(def, nowMs);
+                  const Icon = BOARD_ICON[status.tone];
+                  return (
+                    <button key={def.id} className={`board-chip ${status.tone}${def.id === selectedId ? " selected" : ""}`} title={`${def.tagline} ${status.label}.`} aria-pressed={def.id === selectedId} onClick={() => onSelect(def.id)}>
+                      {Icon && <Icon size={12} strokeWidth={2} aria-hidden />}
+                      {def.title}
+                    </button>
+                  );
+                })}
+              {category === "infrastructure" && goal.links.some((l) => "tool" in l) && (
+                <div className="board-tools">
+                  {goal.links.flatMap((link) =>
+                    "tool" in link
+                      ? [
+                          <button key={link.label} onClick={() => onOpenTool(link.tool)} title="Open this tool on the map">
+                            <MapPin size={11} strokeWidth={1.75} aria-hidden />
+                            {link.label}
+                          </button>,
+                        ]
+                      : [],
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+type MeasuresView = MeasureTopic | "board" | "enacted";
+
+// The view stays while the player looks at other pages, for the length of the session.
+let lastView: MeasuresView = "heating";
+let lastGoalOpen: MeasureTopic = "heating";
+
+/** The goal to go back to from the other views. */
+function lastGoal(view: MeasuresView): MeasureTopic {
+  if (view !== "board" && view !== "enacted") lastGoalOpen = view;
+  return lastGoalOpen;
+}
+
+export interface MeasuresTabProps {
+  /** Goes to a planning tool on the map (the Town hall closes). */
+  onOpenTool: (tool: ColorMode) => void;
+  onOpenPrices: () => void;
+}
+
+/** The player's measures: the goals with their share of the emissions, the measures of the goal open
+ * (or all of them on one board, or only those enacted), and the one picked in full beside them. */
+export function MeasuresTab({ onOpenTool, onOpenPrices }: MeasuresTabProps) {
   useSyncExternalStore(
     (listener) => measures.subscribe(listener),
     () => measures.getVersion(),
@@ -364,37 +507,25 @@ export function MeasuresTab() {
     () => studies.getVersion(),
   );
   const nowMs = useSimDay();
-  const [topic, setTopic] = useState<TopicFilter>("all");
-  const [kinds, setKinds] = useState<Set<MeasureCategory>>(new Set());
+  const [view, setViewState] = useState<MeasuresView>(lastView);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = MEASURE_CATALOG.find((m) => m.id === selectedId) ?? null;
   const selectedState = selected ? measures.getState(selected.id) : null;
-
-  const enacted = (def: MeasureDef) => {
-    const st = measures.getState(def.id);
-    return !!(st?.active || st?.pending);
+  const setView = (next: MeasuresView) => {
+    lastGoal(next);
+    lastView = next;
+    setViewState(next);
+    setSelectedId(null);
   };
-  const kindOk = (def: MeasureDef) => kinds.size === 0 || kinds.has(def.category);
-  const visible = MEASURE_CATALOG.filter((def) => kindOk(def) && (topic === "all" || (topic === "enacted" ? enacted(def) : def.topic === topic)));
-  const groups: { key: string; title: string | null; defs: MeasureDef[] }[] =
-    topic === "all"
-      ? TOPICS.map((t) => ({ key: t, title: MEASURE_TOPIC_LABEL[t], defs: visible.filter((d) => d.topic === t) })).filter((g) => g.defs.length > 0)
-      : [{ key: topic, title: null, defs: visible }];
+  const toggleSelected = (id: string) => setSelectedId(id === selectedId ? null : id);
+
+  const year = new Date(toDateMs(nowMs)).getUTCFullYear();
+  const { shares, countedYear } = goalShares(year);
+  const enactedDefs = MEASURE_CATALOG.filter(isEnacted);
+  const openGoal = MEASURE_GOALS.find((g) => g.topic === view) ?? null;
 
   const budgetRp = approval.spendingAllowanceRp(nowMs);
   const spentRp = treasury.operatingPaidOutTotal(nowMs - YEAR_MS, nowMs + DAY_MS); // investments may be borrowed for
-
-  const topicRow = (key: TopicFilter, label: string, defs: MeasureDef[]) => {
-    const on = defs.filter(enacted).length;
-    return (
-      <li key={key}>
-        <button className={topic === key ? "active" : ""} aria-pressed={topic === key} onClick={() => setTopic(key)}>
-          <span>{label}</span>
-          <span className="measures-count">{key === "enacted" ? defs.length : on > 0 ? `${on} / ${defs.length}` : defs.length}</span>
-        </button>
-      </li>
-    );
-  };
 
   return (
     <div className="measures-tab">
@@ -404,53 +535,60 @@ export function MeasuresTab() {
         the department takes in a year — the government's allocation and its share of the utility's profit — of {formatCHF(budgetRp)}. Spending well beyond that costs you approval with taxpayers. Money leaves the
         treasury only when something actually happens; laws and programmes take months to years to come into effect.
       </p>
-      <div className={`measures-layout${selected ? " has-detail" : ""}`}>
-        <aside className="measures-rail">
-          <h3>Topic</h3>
-          <ul>
-            {topicRow("all", "All measures", MEASURE_CATALOG)}
-            {TOPICS.map((t) =>
-              topicRow(
-                t,
-                MEASURE_TOPIC_LABEL[t],
-                MEASURE_CATALOG.filter((d) => d.topic === t),
-              ),
-            )}
-            {topicRow("enacted", "Enacted or on the way", MEASURE_CATALOG.filter(enacted))}
-          </ul>
-          <h3>Kind</h3>
-          <div className="measures-kinds">
-            {CATEGORY_ORDER.map((k) => (
-              <button
-                key={k}
-                className={kinds.has(k) ? "active" : ""}
-                aria-pressed={kinds.has(k)}
-                onClick={() =>
-                  setKinds((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(k)) next.delete(k);
-                    else next.add(k);
-                    return next;
-                  })
-                }
-              >
-                {MEASURE_CATEGORY_LABEL[k]}
+      <div className="measures-views">
+        <p className="measures-caption">{sharesCaption(countedYear, shares !== null)}</p>
+        <div className="measures-view-switch" role="group" aria-label="How to show the measures">
+          <button className={openGoal ? "active" : ""} aria-pressed={!!openGoal} onClick={() => setView(lastGoal(view))}>
+            By goal
+          </button>
+          <button className={view === "board" ? "active" : ""} aria-pressed={view === "board"} onClick={() => setView("board")}>
+            All on one board
+          </button>
+          <button className={view === "enacted" ? "active" : ""} aria-pressed={view === "enacted"} onClick={() => setView("enacted")}>
+            Enacted or on the way <span className="measures-count">{enactedDefs.length}</span>
+          </button>
+        </div>
+      </div>
+      {openGoal && (
+        <div className="goal-tiles">
+          {MEASURE_GOALS.map((goal) => {
+            const defs = defsOf(goal.topic);
+            const on = defs.filter(isEnacted).length;
+            return (
+              <button key={goal.topic} className={`goal-tile${goal.topic === view ? " active" : ""}`} aria-pressed={goal.topic === view} data-tour={`goal-${goal.topic}`} onClick={() => setView(goal.topic)}>
+                <strong>{MEASURE_TOPIC_LABEL[goal.topic]}</strong>
+                <GoalShare goal={goal} share={shares?.[goal.topic]} />
+                <span className="goal-tile-count">
+                  {defs.length} measures{on > 0 ? ` · ${on} enacted` : ""}
+                </span>
               </button>
-            ))}
-          </div>
-        </aside>
-        <div className="measures-grid-wrap">
-          {groups.length === 0 && <p className="measure-note">No measures match.</p>}
-          {groups.map((g) => (
-            <section key={g.key} className="measures-group">
-              {g.title && <h3 className="measures-group-title">{g.title}</h3>}
-              <div className="measures-grid">
-                {g.defs.map((def) => (
-                  <MeasureTile key={def.id} def={def} nowMs={nowMs} selected={def.id === selectedId} onSelect={() => setSelectedId(def.id === selectedId ? null : def.id)} />
-                ))}
-              </div>
-            </section>
-          ))}
+            );
+          })}
+        </div>
+      )}
+      <div className={`measures-layout${selected ? " has-detail" : ""}`}>
+        <div className="measures-main">
+          {openGoal && <GoalPanel goal={openGoal} nowMs={nowMs} selectedId={selectedId} onSelect={toggleSelected} onOpenTool={onOpenTool} onOpenPrices={onOpenPrices} />}
+          {view === "board" && <MeasureBoard shares={shares} nowMs={nowMs} selectedId={selectedId} onSelect={toggleSelected} onOpenGoal={setView} onOpenTool={onOpenTool} />}
+          {view === "enacted" && (
+            <>
+              {enactedDefs.length === 0 && <p className="measure-note">Nothing yet: what you enact appears here, while it is on the way and once it is in force.</p>}
+              {MEASURE_GOALS.map((goal) => {
+                const defs = enactedDefs.filter((d) => d.topic === goal.topic);
+                if (defs.length === 0) return null;
+                return (
+                  <section key={goal.topic} className="goal-level">
+                    <h3>{MEASURE_TOPIC_LABEL[goal.topic]}</h3>
+                    <div className="measures-grid">
+                      {defs.map((def) => (
+                        <MeasureTile key={def.id} def={def} nowMs={nowMs} selected={def.id === selectedId} showKind onSelect={() => toggleSelected(def.id)} />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </>
+          )}
         </div>
         <aside className="measure-detail-pane" aria-label="Measure details">
           {selected ? (

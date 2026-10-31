@@ -210,7 +210,13 @@ export const WIKI_SECTIONS: WikiSection[] = [
     title: "Measures",
     blocks: [
       p(
-        "Town hall → Measures lists everything the municipality can enact, in four kinds: subsidies (money for households and owners that act), infrastructure (things the municipality builds itself), information (campaigns and advice that help people decide), and laws (bans, mandates and standards). They are grouped by topic — heating, buildings and solar, mobility, grid and power, advice and campaigns, carbon removal — and the kinds narrow the list further; ‘Enacted or on the way’ shows only your own.",
+        "Town hall → Measures sorts everything the municipality can enact by what it sets out to change: heating and insulation, cars and getting around, vans and lorries, solar and clean power, keeping the grid up, and what reaches across the town. Each tile shows that part's share of the town's emissions: as you take office at first, then as counted for the last year. The grid has no emissions of its own, and a share says how much there is to gain, not which measures are good.",
+      ),
+      p(
+        "Open a goal and you see who decides there and when, and what else moves it: tools on the map and prices, one click away. Its measures follow in four kinds, from the gentlest to the strongest: persuade (campaigns and advice that help people decide), pay (subsidies for households and owners that act), build (what the municipality does itself), and require (bans, mandates and standards).",
+      ),
+      p(
+        "‘All on one board’ shows every measure at once, goals down the side and kinds across, so you can see where you have only offered money and never set a rule. ‘Enacted or on the way’ shows only your own.",
       ),
       p(
         "Each card says where a measure stands and how it is doing, or how people would take it. Click it for its options, its costs, what is known about its effect, and the button to enact, change or repeal it.",

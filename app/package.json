@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "par": "node scripts/par.mjs",
+    "start-emissions": "node scripts/start-emissions.mjs",
     "measure-audit": "node scripts/measure-audit.mjs"
   },
   "dependencies": {

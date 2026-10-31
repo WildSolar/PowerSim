@@ -20,20 +20,29 @@ export const MEASURE_CATEGORY_LABEL: Record<MeasureCategory, string> = {
   law: "Laws",
 };
 
-/** What a measure is about — how the town hall groups them. */
-export type MeasureTopic = "heating" | "buildings" | "mobility" | "grid" | "advice" | "advisors" | "removal";
+/** What a measure sets out to change — how the town hall groups them. */
+export type MeasureTopic = "heating" | "cars" | "fleet" | "solar" | "grid" | "town" | "advisors";
 
-export const MEASURE_TOPIC_ORDER: MeasureTopic[] = ["heating", "buildings", "mobility", "grid", "advice", "advisors", "removal"];
+export const MEASURE_TOPIC_ORDER: MeasureTopic[] = ["heating", "cars", "fleet", "solar", "grid", "town", "advisors"];
 
 export const MEASURE_TOPIC_LABEL: Record<MeasureTopic, string> = {
-  heating: "Heating",
-  buildings: "Buildings & solar",
-  mobility: "Mobility",
-  grid: "Grid & power",
-  advice: "Advice & campaigns",
+  heating: "Heating and insulation",
+  cars: "Cars and getting around",
+  fleet: "Vans and lorries",
+  solar: "Solar and clean power",
+  grid: "Keeping the grid up",
+  town: "Across the town",
   advisors: "Advisors",
-  removal: "Carbon removal",
 };
+
+/** The four kinds as what the town does, from the gentlest to the strongest: how a goal's measures
+ * are laid out. */
+export const MEASURE_LADDER: { category: MeasureCategory; verb: string; hint: string }[] = [
+  { category: "information", verb: "Persuade", hint: "Information and advice: people still decide for themselves." },
+  { category: "subsidy", verb: "Pay", hint: "Subsidies: paid when someone acts, including those who would have anyway." },
+  { category: "infrastructure", verb: "Build", hint: "What the municipality does itself." },
+  { category: "law", verb: "Require", hint: "Laws: cheap, but they can be voted down." },
+];
 
 /** A single measure's kind, for a tag on its card. */
 export const MEASURE_CATEGORY_SINGULAR: Record<MeasureCategory, string> = {
@@ -82,6 +91,8 @@ export interface MeasureDef {
   category: MeasureCategory;
   topic: MeasureTopic;
   title: string;
+  /** One line for its card: what it does. */
+  tagline: string;
   /** One or two sentences for the player: what it does and what drives it. */
   summary: string;
   params: ParamSpec[];

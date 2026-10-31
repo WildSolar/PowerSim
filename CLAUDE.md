@@ -80,3 +80,9 @@ difficulty in parallel in Node and writes `public/data/par/<slug>.json` itself
 (scripts/par.mjs; a few minutes for a small town, longer for big ones — run it
 in the background). Par also has to be recomputed when the calendar year
 changes, since a game always starts in the current year.
+
+The Measures page shows each goal's share of emissions as the game starts from
+`app/public/data/start-emissions.json`, until the first count replaces it. It's
+only a first picture, so it needn't follow every balance change: from `app/`,
+run `npm run start-emissions -- <slug> …` (or `--all`; about a minute a town)
+when a town is added or the starting picture really moves.
