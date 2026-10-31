@@ -53,6 +53,15 @@ export const TRUCK_EV_ROUTE_SHARE: CurvePoint[] = [
   { x: 2045, y: 0.95 },
 ];
 
+// The town's own vans and lorries (its works yard, its utility) and the lorries of the firms it
+// contracts for waste collection and the like. No register says how many, so this estimates them from
+// the number of residents; they are counted among the town's goods vehicles, not added to them, and
+// picked among those with a yard. A working vehicle the town replaces early costs this share of a new
+// diesel's price on top, for what it is written off at. Informed placeholders.
+export const TOWN_OWN_VEHICLES_PER_RESIDENT = 1 / 500;
+export const TOWN_CONTRACT_LORRIES_PER_RESIDENT = 1 / 2000;
+export const TOWN_EARLY_WRITE_OFF_SHARE = 0.4;
+
 // Fallbacks for a dataset without the vehicle register (BFS withdrew the per-municipality table,
 // px-x-1103020100_111, from its API in 2026): the Swiss average, about 0.05 goods vehicles per
 // resident (some 430,000 in 2024), 4% of them electric. A town with much industry has more.

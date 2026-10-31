@@ -525,6 +525,50 @@ export const MEASURE_CATALOG: MeasureDef[] = [
     referendum: (p) => (num(p, "level") > 50 ? "mandatory" : undefined),
   },
   {
+    id: "town-zero-emission-vehicles",
+    category: "infrastructure",
+    topic: "mobility",
+    title: "Zero-emission town vehicles",
+    summary:
+      "The town's own vans and lorries, and the lorries of the firms it contracts for waste collection and the like, go electric. For its own, you pay what an electric vehicle costs over a diesel one and the charger at the yard, at each replacement. For contracts, it is a condition in the tender, and you pay a premium every year. Either can go as vehicles wear out and contracts come up, or by a deadline, which means replacing working vehicles early, at a further cost. They charge overnight at their yards, which the grid has to carry.",
+    params: [
+      {
+        kind: "choice",
+        key: "own",
+        label: "The town's own vehicles",
+        options: [
+          { value: "off", label: "Not part of it" },
+          { value: "wear", label: "As they wear out" },
+          { value: "deadline", label: "By the deadline" },
+        ],
+        default: "wear",
+      },
+      {
+        kind: "choice",
+        key: "contracts",
+        label: "Contracted services",
+        options: [
+          { value: "off", label: "Not part of it" },
+          { value: "wear", label: "As contracts come up" },
+          { value: "deadline", label: "By the deadline" },
+        ],
+        default: "wear",
+      },
+      { kind: "slider", key: "deadline", label: "Deadline, where chosen", min: 2028, max: 2050, step: 1, unit: "", default: 2035 },
+    ],
+    leadTimeMonths: 6,
+    effects: (p) => ({
+      townOwnFleetElectric: p.own !== "off",
+      townOwnFleetDeadlineYear: p.own === "deadline" ? num(p, "deadline") : 0,
+      townContractFleetElectric: p.contracts !== "off",
+      townContractFleetDeadlineYear: p.contracts === "deadline" ? num(p, "deadline") : 0,
+    }),
+    annualCostRp: (p, ctx) => ctx.residents * (p.contracts === "off" ? 0 : p.contracts === "deadline" ? 7 : 5) * CHF,
+    costCategory: "programs",
+    strength: (p) => (p.own !== "off" ? 0.5 : 0) + (p.contracts !== "off" ? 0.5 : 0),
+    approval: () => ({ climate: 0.25, tenants: 0.05, homeowners: 0.02, business: -0.05 }),
+  },
+  {
     id: "parking-management",
     category: "law",
     topic: "mobility",

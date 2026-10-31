@@ -1106,6 +1106,9 @@ export const WIKI_SECTIONS: WikiSection[] = [
       p(
         "The electric van and lorry grant (Town hall → Measures) pays a business when an electric van or lorry replaces a diesel one, set separately for vans and lorries, and separately for a diesel that still runs and one at the end of its life (see \"Switching early\"). It weighs into the same decision, so it tips businesses that were close — and, like any grant, is also paid to those who would have gone electric anyway.",
       ),
+      p(
+        "Zero-emission town vehicles (Town hall → Measures): the town also runs vans and lorries of its own, and contracts firms for waste collection and the like. You can require both to go electric, each part apart: as vehicles wear out and contracts come up, or by a deadline, which replaces working vehicles early at a further cost. For its own you pay what electric costs over diesel and the charger at the yard, at each replacement; for contracts, a premium every year. The town's yard always gets its charger, even where the grid is tight, so a large fleet can show up on the area's evening load.",
+      ),
       list([
         "Their electricity counts as car charging — in the business's yard, or at public chargers.",
         "Their diesel counts toward transport emissions.",

@@ -43,6 +43,9 @@ import {
   LSVA_EV_EXEMPT_THROUGH_YEAR,
   LSVA_RP_PER_KM,
   MIXED_USE_CATEGORIES,
+  TOWN_CONTRACT_LORRIES_PER_RESIDENT,
+  TOWN_EARLY_WRITE_OFF_SHARE,
+  TOWN_OWN_VEHICLES_PER_RESIDENT,
   TRUCK_EV_ROUTE_SHARE,
   TRUCK_SHARE_BY_CLASS,
   TRUCK_SHARE_OTHER,
@@ -55,6 +58,7 @@ import { toDateMs } from "./calendar";
 import { totalFloorAreaM2 } from "./commercial";
 import { existsAt } from "./lifetime";
 import { policyStore } from "./policy";
+import { treasury } from "./treasury";
 import { municipalFleetSubsidyRp } from "./subsidies";
 import { EARLY_SWITCH } from "../config/earlySwitch";
 import { earlyCandidates, earlySwitchChance } from "./earlySwitch";
@@ -79,12 +83,17 @@ import { gridDrawBlockedAt } from "./gridLimits";
 
 const DAY_MS = 24 * 3_600_000;
 
+/** A vehicle the town answers for: its own, or a contractor's lorry on its services. */
+export type TownRole = "own" | "contract" | null;
+
 export interface FleetVehicle {
   egid: string;
   index: number;
   vehicleClass: FleetVehicleClass;
   depot: boolean;
   key: string;
+  /** Whether it is the town's own or a contractor's (null: a business's), worked out once. */
+  townRole?: TownRole;
   /** The vehicle's renewal chain, held once it exists (the hot path skips the keyed lookup). */
   entry?: RenewalChainEntry<FleetVehicleId>;
   /** Its public charger bookings (publicCharging.ts), fetched on first use. */
@@ -153,6 +162,7 @@ function candidatesFor(
   onElectricChosen: (atMs: number) => void,
   routeSuits = true,
   early = false,
+  mandated = false,
 ): RenewalCandidate<FleetVehicleId>[] {
   // Without charging good enough to rely on, or (a lorry) on a route an electric one can't do yet,
   // electric is out — its cost is still worked out as if a charger were next door, so the decision
@@ -170,10 +180,10 @@ function candidatesFor(
       runningRp = kWh * option.priceRpPerKWh + option.hassleRp;
     }
     runningRp += spec.annualKm * LSVA_RP_PER_KM * lsvaShare(spec.electric);
-    const available = spec.electric ? access.kind !== "none" && routeSuits : vehicleClass === "truck" || !policyStore.get().iceCarPurchaseBanned;
+    const available = mandated ? spec.electric : spec.electric ? access.kind !== "none" && routeSuits : vehicleClass === "truck" || !policyStore.get().iceCarPurchaseBanned;
     // The municipality's grant for an electric one: never more than it costs.
     const purchaseRp = spec.purchaseCostRp * priceFactor(id, atMs);
-    const subsidyRp = Math.min(purchaseRp, municipalFleetSubsidyRp(id, incumbent, early));
+    const subsidyRp = mandated ? 0 : Math.min(purchaseRp, municipalFleetSubsidyRp(id, incumbent, early));
     return {
       id,
       available,
@@ -189,6 +199,9 @@ function candidatesFor(
 class Fleets {
   private scale = 0; // vehicles per unit of expectedVehicles
   private initialEvShareAtDepot: Record<FleetVehicleClass, number> = { van: 0, truck: 0 };
+  // The chance that a vehicle with a yard is the town's own, or (a lorry) on one of its contracts.
+  private townOwnShare = 0;
+  private townContractShare = 0;
   private byEgid = new Map<string, FleetVehicle[]>();
   // Each vehicle's depot seed, hashed from its key once (depotSessionW).
   private readonly depotSeeds = new Map<string, number>();
@@ -217,6 +230,9 @@ class Fleets {
         if (v.depot) counts[v.vehicleClass === "van" ? "vanDepot" : "truckDepot"]++;
       }
     }
+    const withYard = counts.vanDepot + counts.truckDepot;
+    this.townOwnShare = withYard > 0 ? Math.min(0.5, (residents * TOWN_OWN_VEHICLES_PER_RESIDENT) / withYard) : 0;
+    this.townContractShare = counts.truckDepot > 0 ? Math.min(0.4, (residents * TOWN_CONTRACT_LORRIES_PER_RESIDENT) / counts.truckDepot) : 0;
     const truckElectric = counts.truck * INITIAL_TRUCK_EV_SHARE;
     const vanElectric = Math.max(0, electric - truckElectric);
     this.initialEvShareAtDepot = {
@@ -245,6 +261,36 @@ class Fleets {
     }
     this.byEgid.set(b.egid, list);
     return list;
+  }
+
+  /** Whether a vehicle is one the town answers for (TOWN_OWN_VEHICLES_PER_RESIDENT). */
+  private townRoleOf(v: FleetVehicle): TownRole {
+    if (v.townRole !== undefined) return v.townRole;
+    const u = v.depot ? firstRandom(hashSeed(v.key, "fleet-town-role")) : 1;
+    v.townRole = u < this.townOwnShare ? "own" : v.vehicleClass === "truck" && u < this.townOwnShare + this.townContractShare ? "contract" : null;
+    return v.townRole;
+  }
+
+  /** The zero-emission town vehicles measure, as it applies to this vehicle right now: null if it
+   * doesn't; else by which year it must be electric (0: when it wears out). */
+  private mandateOf(v: FleetVehicle): { deadlineYear: number } | null {
+    const role = this.townRoleOf(v);
+    if (role === null) return null;
+    const p = policyStore.get();
+    if (role === "own") return p.townOwnFleetElectric ? { deadlineYear: p.townOwnFleetDeadlineYear } : null;
+    return p.townContractFleetElectric ? { deadlineYear: p.townContractFleetDeadlineYear } : null;
+  }
+
+  /** The vehicles the town answers for at `simTimeMs`, and how many are electric. */
+  townCensus(buildings: Building[], simTimeMs: number): Record<"own" | "contract", { total: number; electric: number }> {
+    const c = { own: { total: 0, electric: 0 }, contract: { total: 0, electric: 0 } };
+    for (const { v, b } of this.flatten(buildings)) {
+      const role = this.townRoleOf(v);
+      if (role === null || !existsAt(b, simTimeMs)) continue;
+      c[role].total++;
+      if (FLEET_CATALOG[this.typeAt(v, simTimeMs)].electric) c[role].electric++;
+    }
+    return c;
   }
 
   private initialType(v: FleetVehicle): FleetVehicleId {
@@ -336,12 +382,30 @@ class Fleets {
     return chooseNext(candidates, incumbent, FLEET_UNCERTAINTY_FRACTION, this.biasRp(v) + campaignLeanRp(candidates)).chosen !== FLEET_CHOICES[v.vehicleClass][1];
   }
 
+  private yardChargerRp(v: FleetVehicle, incumbent: FleetVehicleId, atMs: number): number {
+    return FLEET_CATALOG[incumbent].electric ? 0 : DEPOT_CHARGER_COST_RP[v.vehicleClass] * priceFactor("depotCharger", atMs);
+  }
+
+  /** The town's own vehicle gone electric under the measure: the treasury pays what electric costs
+   * over diesel and the charger at the yard, and for one replaced early what it is written off at. */
+  private payForTownVehicle(v: FleetVehicle, event: RenewalEvent<FleetVehicleId>): void {
+    if (this.townRoleOf(v) !== "own" || !this.mandateOf(v) || !FLEET_CATALOG[event.system].electric || event.previousSystem === null) return;
+    const atMs = event.installedAtMs;
+    const dieselId = FLEET_CHOICES[v.vehicleClass][1];
+    const dieselRp = FLEET_CATALOG[dieselId].purchaseCostRp * priceFactor(dieselId, atMs);
+    const premiumRp = Math.max(0, FLEET_CATALOG[event.system].purchaseCostRp * priceFactor(event.system, atMs) - dieselRp);
+    const writeOffRp = event.reasonKind === "early" ? dieselRp * TOWN_EARLY_WRITE_OFF_SHARE : 0;
+    treasury.recordPayout("infrastructure", atMs, premiumRp + this.yardChargerRp(v, event.previousSystem, atMs) + writeOffRp, v.key);
+  }
+
   private chain(v: FleetVehicle, uptoMs: number): RenewalEvent<FleetVehicleId>[] {
     const cached = peekRenewalChain<FleetVehicleId>(v.key, uptoMs);
     if (cached) return cached;
     const candidates = (atMs: number, incumbent: FleetVehicleId, early: boolean) => {
       const b = this.lookupBuilding(v.egid);
-      const access: FleetAccess = b ? this.accessAt(v, b, atMs, incumbent) : { kind: "depot", chargerRp: 0 };
+      const mandate = this.mandateOf(v);
+      // The town sees to its vehicles' chargers: at their yard, whatever else there is.
+      const access: FleetAccess = mandate ? { kind: "depot", chargerRp: this.yardChargerRp(v, incumbent, atMs) } : b ? this.accessAt(v, b, atMs, incumbent) : { kind: "depot", chargerRp: 0 };
       return candidatesFor(
         v.vehicleClass,
         tariffStore.at(atMs),
@@ -353,6 +417,7 @@ class Fleets {
         },
         this.routeSuits(v, atMs),
         early,
+        mandate !== null,
       );
     };
     const earlySpec = EARLY_SWITCH[v.vehicleClass];
@@ -372,17 +437,25 @@ class Fleets {
       early: {
         eligible: (system) => !FLEET_CATALOG[system].electric,
         minAgeYears: earlySpec.minAgeYears,
-        chanceAt: (atMs, incumbent) => earlySwitchChance(earlySpec, municipalFleetSubsidyRp(electric, incumbent, true), FLEET_CATALOG[electric].purchaseCostRp * priceFactor(electric, atMs)),
+        chanceAt: (atMs, incumbent) => {
+          const deadlineYear = this.mandateOf(v)?.deadlineYear ?? 0;
+          // By a deadline: an even share of what is left each year, the rest in the last.
+          if (deadlineYear > 0) return 1 / Math.max(1, deadlineYear - yearOf(atMs) + 1);
+          return earlySwitchChance(earlySpec, municipalFleetSubsidyRp(electric, incumbent, true), FLEET_CATALOG[electric].purchaseCostRp * priceFactor(electric, atMs));
+        },
         candidatesAt: (atMs, incumbent, ageYears) => {
           const base = candidates(atMs, incumbent, true);
           // Keeping a diesel costs what it costs to run: the renewal's figure without the price of a new one.
           const spec = FLEET_CATALOG[incumbent];
           const keep = (base.find((c) => c.id === incumbent)?.annualizedCostRp ?? 0) - (spec.purchaseCostRp * priceFactor(incumbent, atMs)) / spec.lifetimeMeanYears;
-          return earlyCandidates(base, incumbent, keep, ageYears, earlySpec);
+          const options = earlyCandidates(base, incumbent, keep, ageYears, earlySpec);
+          // A deadline leaves no choice.
+          return this.mandateOf(v)?.deadlineYear ? options.map((c) => (c.id === incumbent ? { ...c, available: false } : c)) : options;
         },
       },
       onCommit: (event) => {
         publicCharging.endAssignment(v.key, event.installedAtMs);
+        this.payForTownVehicle(v, event);
         if (v.depot || FLEET_CATALOG[event.system].electric || event.previousSystem === null) return;
         if (!this.wouldGoElectricWithCharger(v, event.previousSystem, event.installedAtMs)) return;
         const b = this.lookupBuilding(v.egid);

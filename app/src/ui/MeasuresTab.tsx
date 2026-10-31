@@ -20,6 +20,8 @@ import { approval, reactionText, votePct } from "../sim/approval";
 import { measures } from "../sim/measures";
 import { measureUnavailableReason } from "../sim/measureAvailability";
 import { subsidisedDecisions, type SubsidyCategory } from "../sim/additionality";
+import { fleets } from "../sim/fleet";
+import { stock } from "../sim/stock";
 import { studies } from "../sim/studies";
 import { simClock } from "../sim/engine";
 import { BLOC_LABEL, BLOC_ORDER } from "../config/approval";
@@ -78,6 +80,16 @@ function SubsidyEvidence({ category, nowMs }: { category: SubsidyCategory; nowMs
       <button className="measure-study" disabled={!!study && !result} onClick={() => studies.commissionEvaluation(category, simClock.getSimTimeMs())}>
         Commission {result ? "a new" : "an"} evaluation — {formatCHF(EVALUATION_COST_CHF * 100)}, {EVALUATION_MONTHS} months
       </button>
+    </div>
+  );
+}
+
+/** How many vehicles the town answers for, and how far they have come. */
+function TownVehicles({ nowMs }: { nowMs: number }) {
+  const c = fleets.townCensus(stock.getAll(), nowMs);
+  return (
+    <div className="measure-note">
+      About {c.own.total} vehicles of the town&apos;s own, {c.own.electric} of them electric; about {c.contract.total} lorries on its contracts, {c.contract.electric} electric.
     </div>
   );
 }
@@ -216,6 +228,7 @@ function MeasureDetail({ def, nowMs, onClose }: { def: MeasureDef; nowMs: number
         {referendum === "optional" && <span>May go to a public vote if contested</span>}
       </div>
       {built > 0 && <div className="measure-note">Built so far: {Math.round(built * 100)}% of the full network.{!state && " It stays, in the care of the road budget."}</div>}
+      {def.id === "town-zero-emission-vehicles" && <TownVehicles nowMs={nowMs} />}
       {def.subsidyCategory && <SubsidyEvidence category={def.subsidyCategory} nowMs={nowMs} />}
       {def.costCategory === "removals" && <RemovalProjection sharePct={draft.share as number} nowMs={nowMs} />}
       {vote && (

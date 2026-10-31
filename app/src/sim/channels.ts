@@ -42,6 +42,10 @@ export interface Channels {
   evGrantEarlyRp: number;
   evGrantFossilRp: number;
   evGrantOtherRp: number;
+  townOwnFleetElectric: boolean; // the town's own vans and lorries are replaced by electric ones
+  townOwnFleetDeadlineYear: number; // ...all of them by this year (0: as they wear out)
+  townContractFleetElectric: boolean; // the lorries of the firms it contracts likewise
+  townContractFleetDeadlineYear: number;
   fleetVanGrantEarlyRp: number; // a business's electric van replacing a working diesel one
   fleetVanGrantEndRp: number; // ...a diesel one at the end of its life
   fleetTruckGrantEarlyRp: number; // ...likewise for a lorry
@@ -114,6 +118,10 @@ export const CHANNEL_DEFAULTS: Channels = {
   evGrantEarlyRp: 0,
   evGrantFossilRp: 0,
   evGrantOtherRp: 0,
+  townOwnFleetElectric: false,
+  townOwnFleetDeadlineYear: 0,
+  townContractFleetElectric: false,
+  townContractFleetDeadlineYear: 0,
   fleetVanGrantEarlyRp: 0,
   fleetVanGrantEndRp: 0,
   fleetTruckGrantEarlyRp: 0,
@@ -187,6 +195,10 @@ const COMBINERS: { [K in keyof Channels]: Combiner<Channels[K]> } = {
   evGrantEarlyRp: sum,
   evGrantFossilRp: sum,
   evGrantOtherRp: sum,
+  townOwnFleetElectric: any,
+  townOwnFleetDeadlineYear: sum,
+  townContractFleetElectric: any,
+  townContractFleetDeadlineYear: sum,
   fleetVanGrantEarlyRp: sum,
   fleetVanGrantEndRp: sum,
   fleetTruckGrantEarlyRp: sum,
