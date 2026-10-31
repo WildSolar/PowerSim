@@ -28,7 +28,7 @@ export const REACTION_DELAY_DAYS: [number, number] = [2, 9];
 // Letters about what went wrong in town: at most this many a month, and the same complaint at most
 // once in this many months — counting everyone it concerned since.
 export const REPORT_LETTERS_PER_MONTH = 1;
-export const REPORT_COOLDOWN_MONTHS = { refused: 6, exceptions: 6, noCharger: 6 } as const;
+export const REPORT_COOLDOWN_MONTHS = { refused: 6, exceptions: 6, noCharger: 6, roadworksDrivers: 12, roadworksShops: 12 } as const;
 
 // --- Requests ---
 

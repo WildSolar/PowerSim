@@ -53,6 +53,7 @@ import { dailyMeanTempC } from "./weather";
 import { priceFactor } from "./costTrends";
 import { gridDrawBlockedAt } from "./gridLimits";
 import { heatPumpSiting } from "./heatPumpSiting";
+import { DH_OPEN_ROAD_DISCOUNT } from "../config/districtHeat";
 import { EARLY_SWITCH } from "../config/earlySwitch";
 import { earlyCandidates, earlySwitchChance } from "./earlySwitch";
 
@@ -188,6 +189,8 @@ function candidatesAt(
       sited = noise.step !== "notPermitted";
       installRp += noise.extraCostRp;
     }
+    // The road is open anyway: a first connection costs less for a while after the pipes arrive.
+    if (id === "districtHeating" && !keeps && !newBuild && districtHeat.openRoadAt(building.streetSegments, atMs)) installRp *= 1 - DH_OPEN_ROAD_DISCOUNT;
     const beforeMunicipalRp = Math.max(0, installRp * scale - spec.subsidyRp);
     const municipalRp = withMunicipalSubsidy ? Math.min(municipalHeatingSubsidyRp(id, incumbent, early), beforeMunicipalRp) : 0;
     const installCostRp = beforeMunicipalRp - municipalRp;
@@ -271,6 +274,8 @@ function chainFor(building: Building, simTimeMs: number): RenewalEvent<HeatingSy
       eligible: (system) => system === "oilBoiler" || system === "gasBoiler",
       minAgeYears: EARLY_SWITCH.heating.minAgeYears,
       chanceAt: (atMs) => {
+        // Pipes just reached the street: every owner looks into it once.
+        if (districtHeat.openRoadAt(building.streetSegments, atMs) && districtHeat.servesAt(building.streetSegments, atMs)) return 1;
         // The grants that could prompt it: a heat pump's, and — on a piped street — a district
         // heating connection's; the more telling of the two.
         const scale = sizeScale(building);
@@ -283,7 +288,12 @@ function chainFor(building: Building, simTimeMs: number): RenewalEvent<HeatingSy
       candidatesAt: (atMs, incumbent, ageYears) => {
         const tariff = tariffStore.at(atMs);
         const keep = runningCostRpFor(incumbent, annualHeatingEstimate(building, atMs), tariff, (tariff.offPeakPriceRpKWh + tariff.peakPriceRpKWh) / 2);
-        return earlyCandidates(candidatesAt(building, atMs, incumbent, true, false, true), incumbent, keep, ageYears, EARLY_SWITCH.heating);
+        const options = earlyCandidates(candidatesAt(building, atMs, incumbent, true, false, true), incumbent, keep, ageYears, EARLY_SWITCH.heating);
+        // Pipes just reached the street: this look is about connecting, not about the heating in general.
+        if (districtHeat.openRoadAt(building.streetSegments, atMs) && districtHeat.servesAt(building.streetSegments, atMs)) {
+          return options.map((c) => (c.id === incumbent || c.id === "districtHeating" ? c : { ...c, available: false }));
+        }
+        return options;
       },
     },
   };
@@ -415,6 +425,9 @@ function renewalNote(event: RenewalEvent<HeatingSystemId>, building?: Building):
 
   if (event.reasonKind === "early") {
     const grant = event.municipalSubsidyRp ? ", with the municipality's grant" : "";
+    if (event.system === "districtHeating" && building && districtHeat.openRoadAt(building.streetSegments, event.installedAtMs)) {
+      return `The old ${oldLabel} still worked, but when the pipes came down the street the owner connected to district heating${grant}, at the cheaper price while the road was open.`;
+    }
     return `The old ${oldLabel} still worked, but the owner replaced it early with ${articleLabel(event.system)}${grant} — cheaper to run, and repairs on the old one were adding up.`;
   }
   if (event.exception) {

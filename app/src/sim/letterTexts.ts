@@ -343,6 +343,27 @@ export function voteCalledText(title: string, when: string, change = false): Let
   };
 }
 
+export function roadworksDriversText(street: string | null, quarters: number): LetterText {
+  const where = street ? `the streets around ${street}` : "a whole neighbourhood";
+  return {
+    subject: street ? `Everything around ${street} is dug up` : "A whole neighbourhood is dug up",
+    paragraphs: [
+      `Our members can hardly get through: the district heating works have ${where} open at once${quarters > 1 ? `, and that is only one of ${quarters} such neighbourhoods` : ""}. Nobody minds a street at a time. This is too much at once.`,
+      "Next time, please build it in stages. Until the roads are back, you will not find many friends among drivers.",
+    ],
+  };
+}
+
+export function roadworksShopsText(street: string | null): LetterText {
+  return {
+    subject: street ? `Our customers can't reach us around ${street}` : "Our customers can't reach us",
+    paragraphs: [
+      "The district heating works have gone on long enough. Deliveries come late, customers go elsewhere, and there is no end in sight for those of us in the middle of it.",
+      "We understand what the pipes are for. But the town could have dug them up a few streets at a time.",
+    ],
+  };
+}
+
 export function voteCalledOffText(title: string, reason: string): LetterText {
   return {
     subject: `Vote called off: ${title}`,

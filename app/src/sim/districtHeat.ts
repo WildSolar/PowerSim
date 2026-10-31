@@ -27,7 +27,11 @@ import {
   DH_EXISTING_CLEAN_SHARE_WITH_BOILER,
   DH_MAIN_ROAD_CLASSES,
   DH_MAIN_ROAD_COST_FACTOR,
+  DH_OPEN_ROAD_MONTHS,
   DH_PIPE_COST_CHF_PER_M,
+  DH_QUARTER_SIZE_M,
+  DH_QUARTER_TOLERATED_M,
+  DH_QUARTER_TOLERATED_SHARE,
   DH_SOURCE_SPECS,
   type DhSourceKind,
 } from "../config/districtHeat";
@@ -40,6 +44,18 @@ import { cannotPay } from "./fiscalRules";
 const MONTH_MS = (365.25 * 24 * 60 * 60_000) / 12;
 
 export type SegmentState = "piped" | "construction" | "none";
+
+/** A neighbourhood with more of its roads dug up at once than it puts up with. */
+export interface DugQuarter {
+  /** How far beyond what it tolerates, 0-1: 1 is all of its roads open. */
+  severity: number;
+  /** The street with the most open in it, for the letters. */
+  street: string | null;
+  lon: number;
+  lat: number;
+  /** Part of it is what's planned, not yet ordered. */
+  planned: boolean;
+}
 
 export interface NetworkOrder {
   id: number;
@@ -139,6 +155,11 @@ export function segmentCostRp(segmentId: number, atMs: number): number {
   return Math.round(s.lengthM * DH_PIPE_COST_CHF_PER_M * factor * priceFactor("districtHeatPipes", atMs) * 100);
 }
 
+/** A road's length for how disruptive digging it up is: a main road counts double. */
+function roadWeightM(s: { lengthM: number; highway: string }): number {
+  return DH_MAIN_ROAD_CLASSES.has(s.highway) ? s.lengthM * 2 : s.lengthM;
+}
+
 export function buildMonths(lengthM: number): number {
   return DH_BUILD_MIN_MONTHS + Math.ceil(lengthM / DH_BUILD_METRES_PER_MONTH);
 }
@@ -198,9 +219,11 @@ class DistrictHeatNetwork {
   private picked: { sourceId?: string; segmentId?: number } | null = null;
   private lastTopology: { atMs: number; version: number; topology: Topology } | null = null;
   private townName = "";
+  private quarters: { cells: Map<number, string>; totals: Map<string, number> } | null = null;
 
   init(dataset: MunicipalityDataset): void {
     this.townName = dataset.name.replace(/\s*\(.*\)$/, ""); // "Küsnacht (ZH)": Küsnacht
+    this.quarters = null;
     const dh = dataset.districtHeat ?? null;
     let networks: DhNetworkData[] = dh?.networks ?? [];
     if (!dh?.networks && dh?.source) {
@@ -330,6 +353,64 @@ class DistrictHeatNetwork {
   /** Every network with a source in service at `atMs`. */
   networksAt(atMs: number): DhNetworkInfo[] {
     return [...this.topologyAt(atMs).networks.values()];
+  }
+
+  /** Whether a building on these segments is in the months after pipes first reached it, with the road
+   * open anyway: a connection is cheaper, and owners look into it. A starting network's streets never
+   * are; a building on two streets counts from the first. */
+  openRoadAt(segmentIds: number[] | undefined, atMs: number): boolean {
+    if (!segmentIds || segmentIds.length === 0) return false;
+    let firstMs = Number.POSITIVE_INFINITY;
+    for (const id of segmentIds) firstMs = Math.min(firstMs, this.builtAtMs.get(id) ?? Number.POSITIVE_INFINITY);
+    return firstMs !== Number.NEGATIVE_INFINITY && atMs >= firstMs && atMs < firstMs + DH_OPEN_ROAD_MONTHS * MONTH_MS;
+  }
+
+  /** The quarters dug up beyond what they tolerate at `atMs`, with `planned` streets as if they were
+   * being laid too. Footpaths don't count. */
+  dugQuarters(atMs: number, planned: Iterable<number> = []): DugQuarter[] {
+    const open = new Map<string, { m: number; planned: boolean; streetM: Map<string, number>; lon: number; lat: number }>();
+    const add = (id: number, isPlanned: boolean) => {
+      const s = streets.get(id);
+      const cell = s ? this.quarterRoads().cells.get(id) : undefined;
+      if (!s || cell === undefined) return;
+      let q = open.get(cell);
+      if (!q) {
+        q = { m: 0, planned: false, streetM: new Map(), lon: s.line[0][0], lat: s.line[0][1] };
+        open.set(cell, q);
+      }
+      const m = roadWeightM(s);
+      q.m += m;
+      q.planned ||= isPlanned;
+      if (s.name) q.streetM.set(s.name, (q.streetM.get(s.name) ?? 0) + m);
+    };
+    for (const o of this.orders) if (o.orderedAtMs <= atMs && o.completesAtMs > atMs) for (const id of o.segments) add(id, false);
+    for (const id of planned) add(id, true);
+    const dug: DugQuarter[] = [];
+    for (const [cell, q] of open) {
+      const roadM = this.quarterRoads().totals.get(cell) ?? 0;
+      const tolerated = Math.max(DH_QUARTER_TOLERATED_M, roadM * DH_QUARTER_TOLERATED_SHARE);
+      if (q.m <= tolerated) continue;
+      const street = [...q.streetM.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      dug.push({ severity: Math.min(1, (q.m - tolerated) / Math.max(1, roadM - tolerated)), street, lon: q.lon, lat: q.lat, planned: q.planned });
+    }
+    return dug;
+  }
+
+  /** Which quarter each road segment is in, and each quarter's roads in all: worked out once. */
+  private quarterRoads(): { cells: Map<number, string>; totals: Map<string, number> } {
+    if (this.quarters) return this.quarters;
+    const cells = new Map<number, string>();
+    const totals = new Map<string, number>();
+    for (const s of streets.all()) {
+      if (s.highway === "path") continue;
+      const line = streets.lineXY(s.id);
+      const [x, y] = line[Math.floor(line.length / 2)];
+      const cell = `${Math.floor(x / DH_QUARTER_SIZE_M)},${Math.floor(y / DH_QUARTER_SIZE_M)}`;
+      cells.set(s.id, cell);
+      totals.set(cell, (totals.get(cell) ?? 0) + roadWeightM(s));
+    }
+    this.quarters = { cells, totals };
+    return this.quarters;
   }
 
   /** Whether any of the given segments has pipes being laid at `atMs` (ordered, not finished). */

@@ -749,6 +749,13 @@ export const WIKI_SECTIONS: WikiSection[] = [
         "To extend the pipes, open the District heating tool and click streets: each click picks one stretch between two junctions (click again to drop it; footpaths among the buildings count as streets), and the buildings it would newly reach light up in orange. An extension must connect to the network or a heat source, directly or through the other streets you picked; a picked street that doesn't shows in red until the gap is closed. Every street the network could run along is shaded grey. The drawer shows the extension's length, cost and build time, and how much heat the buildings it reaches use a year — in total and per metre of pipe, the figure planners judge an extension by. Ordering pays the whole cost at once; the pipes are laid over the following months, and buildings along them can connect as soon as they are done.",
       ),
       p(
+        "When pipes reach a street: for a year, connecting costs 30% less, the road being open anyway, and every owner with a working oil or gas boiler at least eight years old weighs it up once (see \"Switching early\"). Many still keep the boiler: it is cheaper to run a working one than to pay for a connection, unless your heat price, a grant or dearer fuel tips it. A boiler due for replacement that year gets the same price. Once the year is over, so is the offer.",
+      ),
+      p(
+        "Roadworks: a street at a time, or a long line down ordinary streets, nobody minds. Dig up a whole neighbourhood at once, more than about a quarter of its roads, and drivers and shops object, and a main road counts double, so a long stretch of one is enough: approval falls with them every month it lasts, and you will hear from them. The order card warns you beforehand. Footpaths and direct lines don't count, and building in stages avoids it.",
+      ),
+      note("A connection's price is the same for every house, whatever the street, and how long the road stays open doesn't depend on how the work is run. The neighbourhoods are simple squares on the map."),
+      p(
         "Streets aren't the only way across. ‘Lay a direct line’ in the same section runs a pipe off the streets from one street junction to another, along a course you draw: click where it starts, then along its way — every click is a bend, and the last one is where it ends. Each end joins the nearest junction, and one of them has to be on the network (a piped street, a line or a plant's junction). Going round the built-up areas through fields is longer but can come cheaper. Use it to bring a plant's heat across town the short way, or to join two networks without going round by the streets. A line carries heat across, but nobody connects along it.",
       ),
       list([

@@ -369,6 +369,7 @@ export function DistrictHeatPanel() {
 
   const coverage = useMemo(() => networkCoverage(buildings, simDay), [buildings, simDay, version]); // eslint-disable-line react-hooks/exhaustive-deps
   const quote = useMemo(() => districtHeat.quote(simDay), [version, simDay]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dugBySelection = useMemo(() => districtHeat.dugQuarters(simDay, quote.segments).find((q) => q.planned) ?? null, [version, simDay, quote]); // eslint-disable-line react-hooks/exhaustive-deps
   const demand = useMemo(() => streetDemand(buildings, quote.segments, simDay), [buildings, quote, simDay]);
   const pipesUnderConstruction = [
     ...districtHeat.getOrders().filter((o) => o.completesAtMs > simDay),
@@ -583,13 +584,19 @@ export function DistrictHeatPanel() {
               {!quote.connected && (
                 <p className="dh-warning">The streets in red don't connect to the network or a heat source — pick the streets in between too, or drop them.</p>
               )}
+              {dugBySelection && (
+                <p className="dh-warning">
+                  This would leave {dugBySelection.street ? `much of the area around ${dugBySelection.street}` : "much of a neighbourhood"} dug up at once. Drivers and shops will object, and approval will
+                  fall while it lasts. In stages, a street or two at a time, it needn&apos;t.
+                </p>
+              )}
               <div className="dh-actions">
                 <button className="dh-order" disabled={!quote.connected} onClick={() => districtHeat.order(simClock.getSimTimeMs())}>
                   Order for {formatCHF(quote.costRp)}
                 </button>
                 <button onClick={() => districtHeat.clearSelection()}>Clear</button>
               </div>
-              <p className="dh-note">Connecting is up to each owner: a building switches when its heating is next replaced, if district heat is the better deal.</p>
+              <p className="dh-note">For a year after the pipes arrive, connecting is 30% cheaper, the road being open, and every owner with a working oil or gas boiler weighs it up. Otherwise, connecting is up to each owner: a building switches when its heating is next replaced, if district heat is the better deal.</p>
             </>
           )}
         </>

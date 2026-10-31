@@ -16,6 +16,24 @@ export const DH_MAIN_ROAD_CLASSES = new Set(["main"]);
 export const DH_BUILD_MIN_MONTHS = 3;
 export const DH_BUILD_METRES_PER_MONTH = 250;
 
+// Roadworks: what the town puts up with. A neighbourhood is a square this wide. It tolerates this share
+// of its roads open at once (main roads count double), or this many metres if that is more, so a long
+// line down ordinary streets passes, and only digging up a whole quarter (or a long stretch of main
+// road) is held against the department. For each
+// such quarter, drivers lose this many approval points a month, up to the cap, and businesses this
+// share of it. Informed placeholders.
+export const DH_QUARTER_SIZE_M = 600;
+export const DH_QUARTER_TOLERATED_SHARE = 0.25;
+export const DH_QUARTER_TOLERATED_M = 800;
+export const DH_DUG_QUARTER_POINTS_PER_MONTH = 0.4;
+export const DH_DUG_QUARTER_MAX_POINTS_PER_MONTH = 1.5;
+export const DH_DUG_QUARTER_BUSINESS_SHARE = 0.5;
+
+// When pipes reach a street, its owners look into connecting: for this long a connection is this much
+// cheaper, the road being open anyway, and every owner of a working oil or gas boiler weighs it up once.
+export const DH_OPEN_ROAD_MONTHS = 12;
+export const DH_OPEN_ROAD_DISCOUNT = 0.3;
+
 // Direct lines off the streets (sim/districtHeatLines.ts): the cost of a metre against a metre under a
 // street (DH_PIPE_COST_CHF_PER_M), by what the line crosses. Open land is a trench through a field;
 // gardens, yards and car parks in the building zone need their surface restored and the owners'

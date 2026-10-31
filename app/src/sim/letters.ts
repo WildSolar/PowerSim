@@ -49,6 +49,7 @@ import {
   REQUEST_LAPSED_POINTS,
 } from "../config/letters";
 import type { Building, MunicipalityDataset, PowerPlant } from "../data/types";
+import { DH_DUG_QUARTER_BUSINESS_SHARE, DH_DUG_QUARTER_MAX_POINTS_PER_MONTH, DH_DUG_QUARTER_POINTS_PER_MONTH } from "../config/districtHeat";
 import { approval, type ApprovalEvent, type Stances } from "./approval";
 import { toDateMs, toSimTimeMs } from "./calendar";
 import { debt, type DebtEvent } from "./debt";
@@ -71,6 +72,8 @@ import {
   moodText,
   noChargerText,
   reactionText,
+  roadworksDriversText,
+  roadworksShopsText,
   refusedHeatPumpText,
   requestText,
   resolvedByOthersText,
@@ -220,6 +223,7 @@ class Letters {
   private monthly(month: number): void {
     const start = monthStartMs(month);
     const rng = mulberry32(hashSeed(this.seed, "month", String(month)));
+    this.roadworks(start);
     this.reports(month - 1, start, rng);
     this.heatOffers(month - 1);
     this.news(month - 1);
@@ -379,6 +383,29 @@ class Letters {
   }
 
   // --- reports ---
+
+  /** Quarters dug up by the district heating works cost goodwill with drivers and businesses, month by
+   * month; drivers write when it starts, shops when it drags on or spreads. */
+  private roadworks(start: number): void {
+    const dug = districtHeat.dugQuarters(start);
+    if (dug.length === 0) return;
+    const points = Math.min(DH_DUG_QUARTER_MAX_POINTS_PER_MONTH, dug.reduce((sum, q) => sum + DH_DUG_QUARTER_POINTS_PER_MONTH * (0.5 + 0.5 * q.severity), 0));
+    approval.goodwill("drivers", -points);
+    approval.goodwill("business", -points * DH_DUG_QUARTER_BUSINESS_SHARE);
+    const worst = [...dug].sort((a, b) => b.severity - a.severity)[0];
+    const month = monthIndex(start);
+    const focus = { lon: worst.lon, lat: worst.lat };
+    const due = (kind: "roadworksDrivers" | "roadworksShops") => month - (this.lastReport.get(kind) ?? -Infinity) >= REPORT_COOLDOWN_MONTHS[kind];
+    if (due("roadworksDrivers")) {
+      this.lastReport.set("roadworksDrivers", month);
+      this.post({ atMs: start, kind: "report", ...this.organisation("drivers"), focus, ...roadworksDriversText(worst.street, dug.length) });
+    }
+    const dragsOn = dug.length >= 2 || districtHeat.dugQuarters(monthStartMs(month - 6)).length > 0;
+    if (dragsOn && due("roadworksShops")) {
+      this.lastReport.set("roadworksShops", month);
+      this.post({ atMs: start + 10 * DAY_MS, kind: "report", ...this.organisation("business"), focus, ...roadworksShopsText(worst.street) });
+    }
+  }
 
   private reports(month: number, start: number, rng: () => number): void {
     const from = monthStartMs(month);
