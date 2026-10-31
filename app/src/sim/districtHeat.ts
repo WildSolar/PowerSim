@@ -121,7 +121,7 @@ export interface DhNetworkInfo {
   /** The sources in service, cheapest to run first. */
   sources: DhSource[];
   fossil: DhFuel;
-  /** For the player: its biggest source's name. */
+  /** For the player: its biggest source's name, or the town's if it is the only network. */
   name: string;
 }
 
@@ -197,8 +197,10 @@ class DistrictHeatNetwork {
    * one of its piped streets — a network's id changes as pipes join it. */
   private picked: { sourceId?: string; segmentId?: number } | null = null;
   private lastTopology: { atMs: number; version: number; topology: Topology } | null = null;
+  private townName = "";
 
   init(dataset: MunicipalityDataset): void {
+    this.townName = dataset.name.replace(/\s*\(.*\)$/, ""); // "Küsnacht (ZH)": Küsnacht
     const dh = dataset.districtHeat ?? null;
     let networks: DhNetworkData[] = dh?.networks ?? [];
     if (!dh?.networks && dh?.source) {
@@ -478,6 +480,8 @@ class DistrictHeatNetwork {
       const named = [...network.sources].filter((s) => !s.hidden).sort((a, b) => (b.cleanW || 0) - (a.cleanW || 0))[0];
       network.name = (existing ?? named ?? network.sources[0]).name;
     }
+    // The town's only network goes by the town's name.
+    if (networks.size === 1) for (const network of networks.values()) network.name = `Fernwärme ${this.townName}`;
     return { segmentNetwork, networks };
   }
 

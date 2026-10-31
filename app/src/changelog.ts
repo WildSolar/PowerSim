@@ -46,6 +46,7 @@ export const CHANGELOG: Release[] = [
       "Each grant now shows its own uptake and its own evaluation: the heat pump grant apart from the district heating grant, cars apart from vans and lorries, roofs apart from car parks. An evaluation asks what its own grant changed, with any other grant still in place.",
     ],
     added: [
+      "A town's only district heating network now goes by Fernwärme and the town's name, whether it has just the one or you have joined several into one.",
       "A new measure, zero-emission town vehicles: the town's own vans and lorries, and the lorries of the firms it contracts for waste collection and the like, go electric, as they wear out or by a deadline.",
       "The solar subsidy can pay a bonus for steep arrays, at 45° or more, which make more of their power in winter. Few roofs are that steep; a bonus also leads some owners of flat roofs to put their panels on steep frames, with less on the roof but more when power is short.",
       "Imprint & privacy, on the start screen and in the game menu: who makes the game, and what happens to your data — what stays in your browser, the anonymous visit count, the leaderboard, feedback, and the services the game relies on.",
