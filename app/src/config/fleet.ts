@@ -70,8 +70,10 @@ export const FALLBACK_GOODS_VEHICLES_PER_RESIDENT = 0.05;
 export const FALLBACK_GOODS_ELECTRIC_SHARE = 0.04;
 
 // Goods vehicles in Switzerland are about 87% vans, 13% lorries and articulated lorries (BFS vehicle
-// stock); electric lorries are still rare — most of the electric goods vehicles are vans.
-export const INITIAL_TRUCK_EV_SHARE = 0.01;
+// stock). Electric lorries at the start: about 4% of them, a rough count from registrations (561 in
+// 2024, 942 in 2025, 847 to September 2026, of some 60,000); the rest of the electric goods vehicles
+// are vans.
+export const INITIAL_TRUCK_EV_SHARE = 0.04;
 
 // Where the vehicles are: vehicles per 1,000 m² of floor area, relative, by building use — scaled so
 // the town's total matches the register. Warehouses, industry and workshops run the most; shops and
