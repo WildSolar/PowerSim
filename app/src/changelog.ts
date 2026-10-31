@@ -23,7 +23,10 @@ export interface Release {
 export const CHANGELOG: Release[] = [
   {
     version: "0.11.0",
-    date: null,
+    date: "2026-10-31",
+    title: "Measures that hit the mark",
+    summary:
+      "Grants now pay by situation, so you can put the money where it changes what people do, and each shows its own uptake and evaluation. Electric lorries follow what federal studies say about Swiss goods traffic, the bicycle network is built over years, the town's own vehicles can go electric, and pipes reaching a street open a cheaper connection. The balance has changed, so games saved in 0.10 don't load in this version.",
     fixed: [
       "The notice of a vote's or an election's result now always shows the outcome: it comes first, with the share of yes votes, and the notice wraps instead of cutting it off.",
       "A public vote you lose on a change to a law now only rejects the change: the law stays as it was before it, instead of falling altogether. It can't be changed again for two years; you can still repeal it.",
