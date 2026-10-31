@@ -348,7 +348,7 @@ export function ReportCardModal({ dataset, year, onClose }: ReportCardModalProps
                   {ballots.map((l) => (
                     <li key={l.id}>
                       <span className="yr-headline-month">{MONTH_NAMES[new Date(toDateMs(l.atMs)).getUTCMonth()]}</span>
-                      <span>{l.subject.replace(/^(Vote|Election) result: /, "")}</span>
+                      <span>{l.subject}</span>
                     </li>
                   ))}
                 </ul>

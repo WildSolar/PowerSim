@@ -576,6 +576,19 @@
   font-size: 14px;
   box-shadow: var(--shadow-2), inset 4px 0 0 var(--accent);
 }
+/* A verdict (a vote, an election) wraps rather than losing its end. */
+.inbox-toast.good .inbox-toast-text,
+.inbox-toast.bad .inbox-toast-text {
+  white-space: normal;
+}
+.inbox-toast.good {
+  width: max-content; /* placed from the middle, it would otherwise wrap at half the screen */
+  box-shadow: var(--shadow-2), inset 4px 0 0 var(--good);
+}
+.inbox-toast.bad {
+  width: max-content;
+  box-shadow: var(--shadow-2), inset 4px 0 0 var(--bad);
+}
 
 .inbox-mark-read {
   display: inline-flex;

@@ -66,6 +66,8 @@ export interface Letter {
   role: string;
   subject: string;
   paragraphs: string[];
+  /** How the news stands for the player, where it is a verdict: a vote's or the election's. */
+  tone?: "good" | "bad";
   /** A place the letter is about, to show on the map — a building, when it is about one. */
   focus?: { lon: number; lat: number; egid?: string };
   /** Places a report ranks: each opens its planning tool there. */

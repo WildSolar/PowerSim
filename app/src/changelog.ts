@@ -25,6 +25,7 @@ export const CHANGELOG: Release[] = [
     version: "0.11.0",
     date: null,
     fixed: [
+      "The notice of a vote's or an election's result now always shows the outcome: it comes first, with the share of yes votes, and the notice wraps instead of cutting it off.",
       "A public vote you lose on a change to a law now only rejects the change: the law stays as it was before it, instead of falling altogether. It can't be changed again for two years; you can still repeal it.",
       "Once the federal ban on new petrol and diesel cars is in force, your own ban is greyed out as already covered, like the fossil heating ban under the canton's law.",
       "The car ban's text now says what it does: it also covers diesel vans, and lorries stay exempt. Green electricity now says how far it goes: nine tenths off grid emissions at 100%.",

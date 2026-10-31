@@ -7,6 +7,8 @@ import { votePct } from "./approval";
 import type { Bloc } from "../config/approval";
 
 export interface LetterText {
+  /** How the news stands for the player, where it is a verdict (the inbox's notice shows it). */
+  tone?: "good" | "bad";
   subject: string;
   paragraphs: string[];
 }
@@ -135,7 +137,8 @@ export function voteResultText(title: string, accepted: boolean, yesShare: numbe
   const no = votePct(100 - yesShare);
   if (!accepted && change)
     return {
-      subject: `Vote result: change to ${title} rejected`,
+      subject: `Rejected (${yes}% yes): the change to ${title}`,
+      tone: "bad",
       paragraphs: [
         `The voters have rejected the change to “${title}”: only ${yes}% voted in favour, ${no}% against.`,
         `The change falls with immediate effect, and the law stays as it was before it; money already spent on the change stays spent. A defeat at the ballot box costs the council some standing.${againFrom ? ` By custom, the council will not put a change to this law to the voters again before ${againFrom}.` : ""}`,
@@ -143,14 +146,16 @@ export function voteResultText(title: string, accepted: boolean, yesShare: numbe
     };
   return accepted
     ? {
-        subject: `Vote result: ${title} accepted`,
+        subject: `Accepted (${yes}% yes): ${change ? "the change to " : ""}${title}`,
+        tone: "good",
         paragraphs: [
           `The voters have accepted “${title}”, with ${yes}% in favour and ${no}% against.`,
           "The decision stands, and the council may carry on as planned. A clear win at the ballot box also does the council's standing some good.",
         ],
       }
     : {
-        subject: `Vote result: ${title} rejected`,
+        subject: `Rejected (${yes}% yes): ${title}`,
+        tone: "bad",
         paragraphs: [
           `The voters have rejected “${title}”: only ${yes}% voted in favour, ${no}% against.`,
           `The decision is struck down with immediate effect; money already spent on it stays spent. A defeat at the ballot box costs the council some standing.${againFrom ? ` By custom, the council will not put the same proposal to the voters again before ${againFrom}.` : ""}`,
@@ -375,11 +380,13 @@ export function electionText(reelected: boolean, approval: number): LetterText {
   const pct = Math.round(approval);
   return reelected
     ? {
-        subject: "Election result: confirmed in office",
+        subject: `Re-elected, with approval at ${pct}%`,
+        tone: "good",
         paragraphs: [`With approval at ${pct}%, the voters have given the energy department another four years.`],
       }
     : {
-        subject: "Election result: voted out",
+        subject: `Voted out, with approval at ${pct}%`,
+        tone: "bad",
         paragraphs: [`Approval stood at just ${pct}% on election day, and the voters have chosen someone else to run the energy department.`],
       };
 }

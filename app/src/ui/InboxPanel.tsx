@@ -344,16 +344,15 @@ export function InboxToast({ onOpen }: { onOpen: (selection: InboxSelection) => 
   const important = item.kind === "voteResult" || item.kind === "election" || item.kind === "warning";
   return (
     <button
-      className={`inbox-toast${important ? " important" : ""}`}
+      className={`inbox-toast${important ? " important" : ""}${item.tone ? ` ${item.tone}` : ""}`}
       onClick={() => {
         onOpen({ tab: letterGroup(item), id: item.id });
         setItem(null);
       }}
     >
       {important ? <Vote size={15} strokeWidth={1.75} aria-hidden /> : <Mail size={15} strokeWidth={1.75} aria-hidden />}
-      <span className="inbox-toast-text">
-        <strong>{item.from}</strong> {item.subject}
-      </span>
+      {/* A verdict is the news in itself: no sender, and all of it readable. */}
+      <span className="inbox-toast-text">{item.tone ? <strong>{item.subject}</strong> : <><strong>{item.from}</strong> {item.subject}</>}</span>
     </button>
   );
 }
