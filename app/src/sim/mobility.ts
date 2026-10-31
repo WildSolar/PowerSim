@@ -60,6 +60,7 @@ import { transit } from "./transit";
 import { municipalVehicleSubsidyRp } from "./subsidies";
 import { hashSeed, mulberry32 } from "./rng";
 import {
+  campaignLeanRp,
   chooseNext,
   peekRenewalChain,
   renewalChainEntry,
@@ -370,7 +371,7 @@ function wouldGoElectricWithCharger(egid: string, ewid: string, slotIndex: numbe
   const nearby = publicCharging.hypotheticalOption("car");
   const annualKWh = (ANNUAL_CAR_KM / 100) * EV_CAR_KWH_PER_100KM;
   const candidates = carCandidatesAt(tariffStore.at(atMs), atMs, incumbent, { runningRp: annualKWh * nearby.priceRpPerKWh + nearby.hassleRp, available: true }, () => {});
-  const bias = biasStrengthRp(egid, ewid, slotIndex, "car") + policyStore.get().progressiveNudgeRp;
+  const bias = biasStrengthRp(egid, ewid, slotIndex, "car") + campaignLeanRp(candidates);
   return chooseNext(candidates, incumbent, VEHICLE_UNCERTAINTY_FRACTION, bias).chosen === "carEV";
 }
 

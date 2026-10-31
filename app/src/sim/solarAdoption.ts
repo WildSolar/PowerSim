@@ -79,7 +79,8 @@ import {
   SOLAR_COOP_LOOKS_PER_YEAR,
   SOLAR_COOP_MIN_RETURN,
   SOLAR_COOP_OWNER_AGREES,
-  SOLAR_COOP_ROOFS_PER_YEAR,
+  SOLAR_COOP_ROOFS_PER_10K_PER_100_CHF,
+  SOLAR_COOP_ROOFS_PER_10K_RESIDENTS,
   SOLAR_COOP_SALE_SHARE,
   STEEP_FRAMES_CAPACITY_SHARE,
   STEEP_FRAMES_EXTRA_COST_SHARE,
@@ -107,7 +108,8 @@ import { historyTimeSteps, sampleBuildingCategorySeries } from "./history";
 import type { Policy } from "./policy";
 import { outreachHazardMultiplier, policyStore } from "./policy";
 import { hashSeed, mulberry32 } from "./rng";
-import { candidateLogEntries, chooseNext, type RenewalCandidate } from "./renewal";
+import { RESIDENTS_PER_DWELLING } from "../config/treasury";
+import { campaignLeanRp, candidateLogEntries, chooseNext, type RenewalCandidate } from "./renewal";
 import {
   AGE_EXCLUSION_YEARS,
   federalSubsidyRp,
@@ -580,7 +582,8 @@ function evaluateAdoption(
   ];
   const biasRp = solarBiasStrengthRp(building.egid);
   const uncertainty = SOLAR_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier;
-  const choose = (cs: RenewalCandidate<Choice>[]) => chooseNext(cs, "none", uncertainty, biasRp + policy.progressiveNudgeRp).chosen;
+  const leanRp = campaignLeanRp(candidates, panelsRp);
+  const choose = (cs: RenewalCandidate<Choice>[]) => chooseNext(cs, "none", uncertainty, biasRp + leanRp).chosen;
   const chosen = choose(candidates);
   const chosenBatterySubsidyRp = chosen === "battery" || chosen === "batteryGrid" ? batterySubsidy[chosen] : 0;
   // It pays — but does the owner go ahead now, and can they pay for it up front?
@@ -711,7 +714,8 @@ function considerBatteryRetrofit(building: Building, capacityKw: number, year: n
   ];
   const biasRp = solarBiasStrengthRp(building.egid);
   const uncertainty = SOLAR_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier;
-  const choose = (cs: RenewalCandidate<Choice>[]) => chooseNext(cs, "none", uncertainty, biasRp + policy.progressiveNudgeRp).chosen;
+  const leanRp = campaignLeanRp(candidates, costRp / HOME_BATTERY_LIFETIME_YEARS);
+  const choose = (cs: RenewalCandidate<Choice>[]) => chooseNext(cs, "none", uncertainty, biasRp + leanRp).chosen;
   const chosen = choose(candidates);
   logCandidateDecision({
     atMs: yearStartMs,
@@ -994,12 +998,15 @@ export function solarStatusOf(building: Building, realPlants: PowerPlant[]): { c
 /** A solar cooperative at work (a measure): it looks into the roofs of owners who wanted solar but
  * held back, asks each owner once, and puts panels up where the power, sold to the building at a
  * discount, pays back the panels (less the federal payment and the municipality's grant) with a little
- * to spare — no more than a handful of roofs a year. */
+ * to spare — no more roofs a year than the town's size and the grant allow. */
 function cooperativeRound(buildings: Building[], realPlants: PowerPlant[], year: number, month: number, monthStartMs: number, tariff: Tariff, policy: Policy): void {
   const yearStart = toSimTimeMs(Date.UTC(year, 0, 1));
   let built = 0;
   for (const r of adoptionByEgid.values()) if (r.origin === "cooperative" && r.installedAtMs >= yearStart) built++;
-  if (built >= SOLAR_COOP_ROOFS_PER_YEAR) return;
+  const dwellings = buildings.reduce((sum, b) => sum + b.dwellings.length, 0);
+  const per10k = SOLAR_COOP_ROOFS_PER_10K_RESIDENTS + SOLAR_COOP_ROOFS_PER_10K_PER_100_CHF * (policy.solarCoopGrantRpPerKwp / 100_00);
+  const roofsPerYear = Math.max(1, Math.round(((dwellings * RESIDENTS_PER_DWELLING) / 10_000) * per10k));
+  if (built >= roofsPerYear) return;
   const lookup = buildingLookup(buildings);
   const chance = monthlyChance(SOLAR_COOP_LOOKS_PER_YEAR);
   let sunlight: YearSunlight | undefined;
@@ -1029,7 +1036,7 @@ function cooperativeRound(buildings: Building[], realPlants: PowerPlant[], year:
     });
     if (grantRp > 0) treasury.recordPayout("solar", installedAtMs, grantRp, egid);
     shelvedByEgid.delete(egid);
-    if (++built >= SOLAR_COOP_ROOFS_PER_YEAR) return;
+    if (++built >= roofsPerYear) return;
   }
 }
 

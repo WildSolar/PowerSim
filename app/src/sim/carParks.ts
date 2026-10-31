@@ -51,7 +51,7 @@ import { existsAt } from "./lifetime";
 import { LocalProjection, pointInPolygon, type XY } from "./localGeo";
 import { policyStore } from "./policy";
 import { profileYearFactor } from "./pv";
-import { chooseNext, type RenewalCandidate } from "./renewal";
+import { campaignLeanRp, chooseNext, type RenewalCandidate } from "./renewal";
 import { hashSeed, mulberry32 } from "./rng";
 import { setExtraPlants, specificYieldKWhPerKwp } from "./solarAdoption";
 import { federalSubsidyRp } from "./solarSystems";
@@ -349,7 +349,7 @@ class CarParks {
           greenness: 1,
         },
       ];
-      return chooseNext(candidates, "none", CAR_PARK_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier, policy.progressiveNudgeRp).chosen;
+      return chooseNext(candidates, "none", CAR_PARK_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier, campaignLeanRp(candidates, q.netRp / CAR_PARK_PAYBACK_YEARS)).chosen;
     };
     if (decide(subsidyRp) === "none") return null;
     if (subsidyRp > 0) recordSubsidisedDecision({ atMs, category: "carParkSolar", subsidyRp, additional: decide(0) === "none" });

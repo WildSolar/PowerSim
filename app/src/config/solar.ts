@@ -137,13 +137,16 @@ export const PV_LOAN_BUYDOWN_SHARE = 0.08;
 // owner's interest is fresh (it was within the last few years), the owner agrees this often, and it
 // sells the power to the building at a discount — this share of what the power is worth there. It
 // takes a roof on if that pays back the panels (less the federal payment and the municipal grant)
-// with a little to spare, and no more than a handful of roofs a year.
+// with a little to spare. How many roofs a year it can manage follows the town's size and the grant,
+// which draws in savings and members: so many per 10,000 residents with no grant, and this many more
+// per CHF 100/kWp of grant. Informed placeholders.
 export const SOLAR_COOP_INTEREST_YEARS = 5;
 export const SOLAR_COOP_LOOKS_PER_YEAR = 0.5;
 export const SOLAR_COOP_OWNER_AGREES = 0.6;
 export const SOLAR_COOP_SALE_SHARE = 0.85;
 export const SOLAR_COOP_MIN_RETURN = 0.1;
-export const SOLAR_COOP_ROOFS_PER_YEAR = 8;
+export const SOLAR_COOP_ROOFS_PER_10K_RESIDENTS = 1;
+export const SOLAR_COOP_ROOFS_PER_10K_PER_100_CHF = 1;
 
 // Steep frames on a flat roof, in place of its low rows: at 45° the rows have to stand well apart so
 // as not to shade each other, so the roof carries this share of the kWp, and the frames and ballast

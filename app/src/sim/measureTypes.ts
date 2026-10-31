@@ -68,7 +68,7 @@ export interface MeasureDef {
   leadTimeMonths: number;
   /** What the measure does to the simulation. */
   effects(params: MeasureParams): Partial<Channels>;
-  /** A one-off cost, paid when the measure is enacted or changed. */
+  /** A one-off cost, paid when the measure is enacted; a change pays only what it adds. */
   oneOffCostRp?(params: MeasureParams, ctx: MeasureCostContext): number;
   /** A running cost, paid monthly while the measure is in effect. */
   annualCostRp?(params: MeasureParams, ctx: MeasureCostContext): number;

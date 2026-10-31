@@ -130,6 +130,15 @@ export interface EarlySwitch<T extends string> {
 
 const YEAR_MS = 365.25 * 24 * 60 * 60_000;
 
+/** What a climate campaign adds to an owner's lean, Rp/year: a share of what the decision is about —
+ * a little on a car, more on a block of flats' heating. `sizeRp` where the options' own costs don't
+ * say (they may be net of what the option earns). */
+export function campaignLeanRp<T extends string>(candidates: RenewalCandidate<T>[], sizeRp?: number): number {
+  const share = policyStore.get().progressiveNudgeShare;
+  if (share <= 0) return 0;
+  return share * (sizeRp ?? Math.max(0, ...candidates.map((c) => Math.abs(c.annualizedCostRp))));
+}
+
 const MAX_EVENTS_PER_CALL = 1000; // defensive cap against a misconfigured/runaway chain, not a real limit
 
 /** One entity's chain, plus when its next event falls due: until then the chain is complete, so a
@@ -238,7 +247,7 @@ export function renewalEventsUpTo<T extends string>(params: RenewalParams<T>, as
   const commit = (atMs: number, incumbent: T, candidates: RenewalCandidate<T>[], early: boolean): T => {
     // Information measures narrow the band; an owner actively looking into an early switch is less set in their ways.
     const uncertaintyFraction = params.uncertaintyFraction * policyStore.get().uncertaintyMultiplier * (early ? EARLY_SWITCH_UNCERTAINTY_SHARE : 1);
-    const bias = params.biasStrengthRp + policyStore.get().progressiveNudgeRp;
+    const bias = params.biasStrengthRp + campaignLeanRp(candidates);
     const decision = chooseNext(candidates, incumbent, uncertaintyFraction, bias);
     const { chosen, bestOverallId } = decision;
     const reasonKind: RenewalReasonKind = early && chosen !== incumbent ? "early" : decision.reasonKind;

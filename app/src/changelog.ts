@@ -35,6 +35,11 @@ export const CHANGELOG: Release[] = [
       "The electric van and lorry grant likewise pays by situation, for a diesel replaced early or at the end of its life. Businesses now sometimes replace a working diesel early, as owners do with boilers and cars.",
       "The insulation top-up can pay more the better the class a renovation reaches: the current standard, Minergie or Minergie-P. Nothing below the current standard.",
       "The minimum standard for renovations is now Minergie only: the canton brings in the current standard itself, in its own time.",
+      "The climate campaign's lean now follows the size of the decision: less on a car, more on a block of flats' heating.",
+      "A solar cooperative's grant now decides how many roofs it takes on a year: a bigger grant brings more members and savings. Until now it nearly always hit the same limit.",
+      "Programmes with a fixed price now scale with the town: load control, smart charging, the advisors, the Agri-PV dialogue, the start-up costs of energy consulting and a cooperative. They cost less in a village, more in a city.",
+      "Changing a measure no longer pays its one-off cost again, only what the change adds.",
+      "Energy consulting's text no longer promises more solar: it acts on boilers, insulation and vehicles. For solar there is the solar check.",
       "Each grant now shows its own uptake and its own evaluation: the heat pump grant apart from the district heating grant, cars apart from vans and lorries, roofs apart from car parks. An evaluation asks what its own grant changed, with any other grant still in place.",
     ],
     added: [

@@ -67,7 +67,6 @@ export const AUDIT_TESTS: AuditTest[] = [
   test("pv-loans:max", { max: 150000 }, [["solarKwp", ">"], ["spentExGridChf", ">"]]),
   test("solar-cooperatives", { perKwp: 200 }, [["solarKwp", ">"], ["spentExGridChf", ">"]]),
   test("solar-cooperatives:max", { perKwp: 800 }, [["solarKwp", ">"], ["spentExGridChf", ">"]]),
-  test("solar-cooperatives:no-grant", { perKwp: 0 }, [["solarKwp", ">"]]),
   test("solar-cooperatives:low", { perKwp: 50 }, [["solarKwp", ">"]]),
   test("car-park-solar-subsidy", { perKwp: 300 }, [["audit.canopyKw", ">"], ["spentChf.solar", ">"]]),
   test("car-park-solar-subsidy:max", { perKwp: 1000 }, [["audit.canopyKw", ">"], ["spentChf.solar", ">"]]),

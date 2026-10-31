@@ -21,7 +21,7 @@ import { combineChannels, type Channels } from "./channels";
 import { simClock } from "./engine";
 import { measureUnavailableReason } from "./measureAvailability";
 import { MEASURE_BY_ID } from "./measureCatalog";
-import { defaultParams, sanitizeParams, type MeasureDef, type MeasureParams } from "./measureTypes";
+import { defaultParams, sanitizeParams, type MeasureCostContext, type MeasureDef, type MeasureParams } from "./measureTypes";
 import { treasury } from "./treasury";
 import { cannotPay, spendingFrozen } from "./fiscalRules";
 
@@ -222,7 +222,14 @@ class MeasureEngine {
   costPreview(def: MeasureDef, params: MeasureParams): { oneOffRp: number; annualRp: number } {
     const ctx = { residents: this.dwellingCount(simClock.getSimTimeMs()) * RESIDENTS_PER_DWELLING };
     const clean = sanitizeParams(def, params);
-    return { oneOffRp: def.oneOffCostRp?.(clean, ctx) ?? 0, annualRp: def.annualCostRp?.(clean, ctx) ?? 0 };
+    const state = this.states.get(def.id);
+    return { oneOffRp: this.oneOffRp(def, clean, state?.pending?.params ?? state?.active ?? null, ctx), annualRp: def.annualCostRp?.(clean, ctx) ?? 0 };
+  }
+
+  /** What enacting costs once: a change pays only what it adds. */
+  private oneOffRp(def: MeasureDef, params: MeasureParams, latest: MeasureParams | null, ctx: MeasureCostContext): number {
+    const costRp = def.oneOffCostRp?.(params, ctx) ?? 0;
+    return latest ? Math.max(0, costRp - (def.oneOffCostRp?.(latest, ctx) ?? 0)) : costRp;
   }
 
   // --- acting ---
@@ -244,7 +251,7 @@ class MeasureEngine {
     if (def.strength && def.strength(params) <= 0) return existing ? this.repeal(id, atMsOverride) : false;
 
     const ctx = { residents: this.dwellingCount(now) * RESIDENTS_PER_DWELLING };
-    const oneOffRp = def.oneOffCostRp?.(params, ctx) ?? 0;
+    const oneOffRp = this.oneOffRp(def, params, latest, ctx);
     if (oneOffRp > 0 && cannotPay(oneOffRp, now)) return false;
     if (oneOffRp > 0) treasury.recordPayout(def.costCategory ?? "programs", now, oneOffRp, id);
 

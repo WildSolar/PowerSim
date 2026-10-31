@@ -60,6 +60,7 @@ import { EARLY_SWITCH } from "../config/earlySwitch";
 import { earlyCandidates, earlySwitchChance } from "./earlySwitch";
 import { publicCharging, usableOption, type ChargingNeed, type ChargingOption, type ChargingSite } from "./publicCharging";
 import {
+  campaignLeanRp,
   chooseNext,
   peekRenewalChain,
   renewalChainEntry,
@@ -332,7 +333,7 @@ class Fleets {
     if (!this.routeSuits(v, atMs)) return false; // no charger would make an electric lorry do this route
     const kind: ChargingKind = v.vehicleClass === "van" ? "ac" : "fleet";
     const candidates = candidatesFor(v.vehicleClass, tariffStore.at(atMs), { kind: "public", option: publicCharging.hypotheticalOption(v.vehicleClass, kind) }, atMs, incumbent, () => {});
-    return chooseNext(candidates, incumbent, FLEET_UNCERTAINTY_FRACTION, this.biasRp(v) + policyStore.get().progressiveNudgeRp).chosen !== FLEET_CHOICES[v.vehicleClass][1];
+    return chooseNext(candidates, incumbent, FLEET_UNCERTAINTY_FRACTION, this.biasRp(v) + campaignLeanRp(candidates)).chosen !== FLEET_CHOICES[v.vehicleClass][1];
   }
 
   private chain(v: FleetVehicle, uptoMs: number): RenewalEvent<FleetVehicleId>[] {

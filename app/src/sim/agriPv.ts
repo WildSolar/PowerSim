@@ -97,7 +97,7 @@ import { existsAt } from "./lifetime";
 import { LocalProjection, pointInPolygon, type XY } from "./localGeo";
 import { policyStore } from "./policy";
 import { hashSeed, mulberry32 } from "./rng";
-import { chooseNext, type RenewalCandidate } from "./renewal";
+import { campaignLeanRp, chooseNext, type RenewalCandidate } from "./renewal";
 import { setExtraPlants, specificYieldKWhPerKwp } from "./solarAdoption";
 import { profileYearFactor } from "./pv";
 import { tariffStore } from "./tariffStore";
@@ -622,7 +622,7 @@ class AgriPv {
       { id: "field", available: true, annualizedCostRp: best.annualizedCostRp, lifetimeMeanYears: AGRI_PV_LIFETIME_YEARS, greenness: 1 },
     ];
     const policy = policyStore.get();
-    const { chosen } = chooseNext(candidates, "none", AGRI_PV_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier, policy.progressiveNudgeRp);
+    const { chosen } = chooseNext(candidates, "none", AGRI_PV_UNCERTAINTY_FRACTION * policy.uncertaintyMultiplier, campaignLeanRp(candidates));
     if (chosen === "none") return false;
     this.start(plot.id, "business", atMs, best.system, { partnerEgid: b.egid, ppaShare: best.ppaShare });
     return true;
